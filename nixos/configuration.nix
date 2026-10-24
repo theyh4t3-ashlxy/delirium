@@ -86,6 +86,31 @@
   # 1.6 battery telemetry: so quickshell can watch our li-ion cells degrade in real-time without tlp declaring war
   services.upower.enable = true;
 
+  # 1.7 thermal & flash longevity: protecting silicon from our questionable lifestyle choices
+  services.thermald.enable = true; # prevent 12th-gen alder lake p-cores from initiating nuclear meltdown
+  services.fstrim = {
+    enable = true; # reminding the nvme controller that dead blocks exist so write speeds don't decay into a floppy drive
+    interval = "weekly";
+  };
+  services.btrfs.autoScrub = {
+    enable = true; # periodic checksum audit so silent bitrot doesn't corrupt our unfinished side projects
+    interval = "monthly";
+    fileSystems = [ "/" ];
+  };
+
+  # zram compression: trapping memory leaks in compressed ram so swap thrashing doesn't murder nvme endurance
+  zramSwap = {
+    enable = true;
+    algorithm = "zstd";
+    memoryPercent = 50;
+    priority = 100;
+  };
+
+  # btrfs compression & atime muzzle: stopping the nix store from devouring the entire solid state drive
+  fileSystems."/".options = [ "compress=zstd" "noatime" ];
+  fileSystems."/home".options = [ "subvol=home" "compress=zstd" "noatime" ];
+  fileSystems."/nix".options = [ "subvol=nix" "compress=zstd" "noatime" ];
+
   # 2. networking: broadcasting our existential dread directly to the local subnet
   networking.hostName = "lost"; # accurate diagnostic status of the user and their root partition
   networking.networkmanager.enable = true;
