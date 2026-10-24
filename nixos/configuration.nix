@@ -1,7 +1,7 @@
 # manifesto of a recovering arch refugee whose getdents64 syscall got hooked by an orphaned pkgbuild
 # fleeing directly into functional isolation so npm install atomic-lockfile can never touch bare metal again.
 
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 {
   imports =
@@ -10,7 +10,11 @@
     ];
 
   # 1. bootloader & boot graphics: masking the sins of the kernel behind an oem logo
-  boot.loader.systemd-boot.enable = true;
+  boot.loader.systemd-boot.enable = lib.mkForce false;
+  boot.lanzaboote = {
+    enable = true;
+    pkiBundle = "/var/lib/sbctl";
+  };
   boot.loader.systemd-boot.configurationLimit = 10;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.timeout = 5; # timeout in seconds so you can choose Windows Boot Manager
@@ -184,6 +188,9 @@
 
   # 10. digital hoarder collection: terminal toys to look like a cinematic hacker while nix rebuilds world
   environment.systemPackages = with pkgs; [
+    sbctl
+    efibootmgr
+
     # wayland rice tooling
     kitty
     git
