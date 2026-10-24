@@ -87,7 +87,7 @@
   services.upower.enable = true;
 
   # 1.7 thermal & flash longevity: protecting silicon from our questionable lifestyle choices
-  services.thermald.enable = true; # prevent 12th-gen alder lake p-cores from initiating nuclear meltdown
+  # note: thinkpad_acpi dytc already governs thermals in firmware, so we let lenovo ec handle cooling
   services.fstrim = {
     enable = true; # reminding the nvme controller that dead blocks exist so write speeds don't decay into a floppy drive
     interval = "weekly";
