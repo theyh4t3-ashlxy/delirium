@@ -150,7 +150,7 @@
   };
 
   # 6. audio plumbing: pulseaudio corpse buried in an unmarked shallow grave
-  services.printing.enable = true;
+  services.printing.enable = false; # no printer has ever existed in this room and cups is evicted
   services.pulseaudio.enable = false; # salt the earth where pulseaudio once stood
   security.rtkit.enable = true;
   services.pipewire = {
@@ -185,8 +185,13 @@
   nix.gc = {
     automatic = true;
     dates = "weekly";
-    options = "--delete-older-than 14d";
+    options = "--delete-older-than 3d";
   };
+
+  # journal & documentation containment: keeping logs and static html from rotting in storage
+  services.journald.extraConfig = "SystemMaxUse=100M";
+  documentation.nixos.enable = false;
+  documentation.doc.enable = false;
 
   # 9. obs studio: virtual camera plumbing wrapped tightly so v4l2 doesn't leak into the abyss
   programs.obs-studio = {
