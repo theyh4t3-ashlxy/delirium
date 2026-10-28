@@ -1,7 +1,7 @@
 # manifesto of a recovering arch refugee whose getdents64 syscall got hooked by an orphaned pkgbuild
 # fleeing directly into functional isolation so npm install atomic-lockfile can never touch bare metal again.
 
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, inputs, ... }:
 
 {
   imports =
@@ -168,9 +168,6 @@
     description = "ashley";
     extraGroups = [ "networkmanager" "wheel" "video" "audio" ];
     shell = pkgs.zsh;
-    packages = with pkgs; [
-      kdePackages.kate
-    ];
   };
 
   # passwordless sudo so typing passwords during endless rebuilds stops draining the remaining will to live
@@ -274,11 +271,11 @@
     # i need a way on how to use the 5tb of google ai pro before next year
     rclone
 
-    # asciiiiiiiiiiiiii
-    figlet
-
     # i want btop
     btop
+
+    # antigravity cli compiled directly into system closure from flake input
+    inputs.antigravity-nix.packages.${pkgs.stdenv.hostPlatform.system}.google-antigravity-cli
   ];
 
   # 11. typography: sacrificial glyphs to keep unicode tofu rectangles from infesting waybar

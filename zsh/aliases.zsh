@@ -16,8 +16,8 @@ cleanup() {
     print -P "%F{cyan}󰄛 killing my own generations because i want my 512gb back ..%f"
     nix-collect-garbage --delete-older-than 7d
     if (( $+commands[sudo] )); then
-        print -P "%F{cyan}󰄛 purging whatever it is in there. idgaf if it dies%f"
-        sudo nix-collect-garbage -d
+        print -P "%F{cyan}󰄛 purging dead system generations older than 7d...%f"
+        sudo nix-collect-garbage --delete-older-than 7d
     fi
     print -P "%F{green}󰄲 nix store cleanup complete%f"
 }
@@ -111,15 +111,17 @@ alias -- -='cd -'
 hash -d dots="$HOME/.local/share/dotfiles"
 hash -d hypr="$HOME/.local/share/dotfiles/hypr"
 hash -d qs="$HOME/.local/share/dotfiles/quickshell"
-hash -d nix="/etc/nixos"
+hash -d nix="$HOME/.local/share/dotfiles/nixos"
 hash -d wp="$HOME/.wallpapers"
 hash -d conf="$HOME/.config"
 
 # nmtui with an actual dark aesthetic palette
 alias nmtui='NEWT_COLORS="root=black,black:border=gray,black:window=black,black:title=lightgray,black:button=black,cyan:actbutton=cyan,black:compactbutton=black,gray:checkbox=black,gray:actcheckbox=cyan,black:entry=white,black:label=gray,black:listbox=lightgray,black:actlistbox=black,cyan:textbox=lightgray,black:acttextbox=black,cyan:helpline=gray,black:roottext=gray,black" command nmtui'
 
-# fixed alias spacing and quoting for antigravity cli
-alias agy="nix run 'github:jacopone/antigravity-nix#google-antigravity-cli'"
+# antigravity cli - uses compiled system binary once rebuilt, fallback until then
+if (( ! $+commands[agy] )); then
+    alias agy="nix run 'github:jacopone/antigravity-nix#google-antigravity-cli'"
+fi
 
 # quick shell reload
 alias reload="exec zsh"

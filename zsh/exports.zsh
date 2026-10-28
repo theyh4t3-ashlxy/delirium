@@ -6,8 +6,9 @@ export LANG="en_US.UTF-8"
 export TZDIR="/etc/zoneinfo"
 export TZ="America/Chicago"
 export QT_LOGGING_RULES="quickshell.dbus.warning=false;quickshell.service.powerprofiles.warning=false"
-export QT_QPA_PLATFORMTHEME="kde"
-export QT_STYLE_OVERRIDE="Breeze"
+# qt theming: defer to portal/gtk theme instead of missing kde breeze
+# export QT_QPA_PLATFORMTHEME="kde"
+# export QT_STYLE_OVERRIDE="Breeze"
 
 # less that doesnt leave ghost text all over my screen
 export LESS="-R -F -X -i"
