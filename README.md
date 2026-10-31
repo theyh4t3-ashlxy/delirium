@@ -134,7 +134,7 @@ clone into xdg data storage (cluttering `~` is a felony):
 
 ```zsh
 mkdir -p ~/.local/share
-git clone https://github.com/theyh4t3-ashlxy/my_hyprland_dots.git ~/.local/share/dotfiles
+git clone https://github.com/theyh4t3-ashlxy/delirium.git ~/.local/share/dotfiles
 cd ~/.local/share/dotfiles
 chmod +x install.zsh
 ./install.zsh
@@ -147,7 +147,7 @@ if fzf is installed, it drops you into an interactive menu. if fzf is missing, i
 if you possess zero survival instincts and actively want to execute untrusted code off the internet:
 
 ```zsh
-curl -fsSL https://raw.githubusercontent.com/theyh4t3-ashlxy/my_hyprland_dots/main/install.zsh | zsh
+curl -fsSL https://raw.githubusercontent.com/theyh4t3-ashlxy/delirium/main/install.zsh | zsh
 ```
 
 the installer hijacks `/dev/tty` for user input, so piping curl straight to zsh will not panic on eof. you have no excuses. (as a certain charter school district motto once threatened. we do not speak its name)
