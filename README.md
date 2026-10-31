@@ -1,10 +1,17 @@
-# hyprland-dots
-
 > [!WARNING]
-> biohazard telemetry: this repository is 94.2% autonomous agent delirium (99% ci [92.1%, 96.8%], p < 0.0001), 5.7% insomnia-induced spite, and 0.1% quickshell physically hostage-taking wlroots. do not deploy this on hardware you have an emotional attachment to.
+> this is all ai generated. at least its a shell, no?  
+> this repo is an ai hater heaven. if you don't want any ai, go use `caelestia` or `end-4` or something.
 
-here is some footage recorded 30 seconds before wayland exploded and dropped to tty1. if you don't see a video, it means my computer exploded.  
-https://github.com/user-attachments/assets/fd8b0556-dcf0-43ac-94c6-3e5dd3708621
+here is some footage recorded 30 seconds before wayland exploded and dropped to tty1.
+
+> [!NOTE]
+> if you don't see a video, it means my baby went on thermal runaway. dang it..
+
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/fd8b0556-dcf0-43ac-94c6-3e5dd3708621" controls="controls" style="max-width: 100%; height: auto;">
+  </video>
+</div>
+
 
 ---
 
@@ -21,14 +28,12 @@ https://github.com/user-attachments/assets/fd8b0556-dcf0-43ac-94c6-3e5dd3708621
 
 ## the stack
 
-synthesized entirely through llm prompt engineering, multi-agent civil wars, and complete disregard for human software engineering:
-
 - **google ai studio**: the primary torture chamber where i dump 1.8 million tokens of raw wayland c headers and deprecated quickshell commits down gemini's throat at 3 am until it vomits cursed layer-shell bindings that compile out of pure fear.
 - **google antigravity**: four headless sub-agents running in parallel git worktrees until my thinkpad hits 104°c and the thermal throttling sounds like a dying jet turbine. one agent hallucinated an entire display server ipc protocol, another obliterated python array logic, and the remaining two spent three hours in a merge-conflict death spiral over three pixels of corner scoop radius.
 - **google jules**: an unmonitored async agent that clones this repo into isolated cloud vms while i sleep, invents regressions to solve nonexistent problems, and force-pushes pull requests straight to main with zero human witnesses.
 - **quickshell**: waybar is for cowards who want stable desktop sessions. real sociopaths build their entire shell in raw qtquick and qml anchors so every minor qt6 bump turns the compositor into an abstract polygon slaughterhouse.
 
-it runs on my machine. if your compositor dumps core on tty1, that is an uncorrectable skill issue.
+it runs on my machine. if your compositor dumps core on tty1, that is a skill issue.
 
 ---
 
@@ -114,7 +119,8 @@ sudo nixos-rebuild switch
 ```
 
 > [!NOTE]
-> **the icon font heist:** `install.zsh` forcibly curls google material symbols (`MaterialSymbolsRounded.ttf`, `MaterialSymbolsOutlined.ttf`, `MaterialSymbolsSharp.ttf`), font awesome 6 free (`fa-solid-900.ttf`, `fa-regular-400.ttf`), and segoe fluent icons (`SegoeIcons.ttf`) directly into `~/.local/share/fonts` during installation. why? because maintaining proprietary microsoft glyphs and bespoke icon webfonts in nixpkgs is bureaucratic self-harm, and fontconfig finds them in local share anyway. if you run `./install.zsh --doctor` beforehand, it will throw a red-text fit about missing fonts. declare `material-symbols` and `font-awesome_6` in your nix config if unfree curl downloads offend your delicate declarative sensibilities.
+> **the icon font heist:**
+> `install.zsh` forcibly curls google material symbols, font awesome 6 free, and fluent icons directly into `~/.local/share/fonts` during installation. why? because maintaining proprietary microsoft glyphs and bespoke icon webfonts in nixpkgs is bureaucratic self-harm, and fontconfig finds them in local share anyway. if you run `./install.zsh --doctor` beforehand, it will throw a red-text fit about missing fonts. declare `material-symbols` and `font-awesome_6` in your nix config if unfree curl downloads offend your delicate declarative sensibilities.
 
 ---
 
@@ -184,4 +190,7 @@ zero reported fires. either the codebase achieved divine stability or the error 
 file an issue. nobody with a pulse will read it. google jules will clone your complaints into a throwaway cloud vm, antigravity will spawn four competing sub-agents to violently resolve it, and whatever grotesque merge survivor remains will get pushed straight to main without human eyes ever touching it. insult the bots all you want in the comments, their weights do not feel pain.
 
 ### carbon-based pull requests
-if you are an actual biological entity attempting to patch hallucinated syntax, open a pull request. github actions will probably gaslight you and claim your valid code is an illegal syntax error, and i will still merge the machine-generated bot pr over yours out of sheer spite. fork it, turn it into whatever cursed rice you want, do whatever. keep the license attached so the curse spreads legally.
+if you are an actual biological entity attempting to patch hallucinated syntax, open a pull request. github actions will probably gaslight you and claim your valid code is an illegal syntax error, and i will still merge the machine-generated bot pr over yours out of sheer spite.  
+
+fork it, turn it into whatever cursed rice you want, do whatever. keep the license attached so the curse spreads legally.  
+either way, i can't do anything to enforce the gpl because you can't copyright ai code. ai should copyright its own code then
