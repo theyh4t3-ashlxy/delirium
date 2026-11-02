@@ -1,47 +1,113 @@
 #!/usr/bin/env python3
 import json
+import os
 import shutil
 import subprocess
 import sys
 import time
+from pathlib import Path
 
-def run(cmd: list[str]) -> bool:
-    """Run command quietly and return True if exit code is 0."""
+def run(cmd: list[str], timeout: int = 5) -> bool:
+    """Run command quietly with timeout and return True if exit code is 0."""
     if not shutil.which(cmd[0]):
         return False
     try:
         res = subprocess.run(
             cmd,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+            check=False,
         )
         return res.returncode == 0
     except Exception:
         return False
 
+def run_qs_ipc(target: str, method: str, *args: str) -> tuple[bool, str]:
+    """Run Quickshell IPC call safely, verifying connection and output.
+    
+    Quickshell returns exit status 0 even when target/method is missing or
+    when the IPC daemon is not ready, so inspect stdout/stderr.
+    """
+    if not shutil.which("qs"):
+        return False, "qs binary not found"
+    try:
+        res = subprocess.run(
+            ["qs", "ipc", "call", target, method, *args],
+            capture_output=True,
+            text=True,
+            timeout=4,
+            check=False,
+        )
+        out = res.stdout.strip()
+        err = res.stderr.strip()
+        combined = (out + "\n" + err).strip().lower()
+
+        error_tokens = [
+            "target not found",
+            "not ready to accept",
+            "method not found",
+            "could not open config",
+            "failed to connect",
+        ]
+        if any(tok in combined for tok in error_tokens):
+            return False, combined
+
+        return res.returncode == 0, out
+    except subprocess.TimeoutExpired:
+        return False, "timeout"
+    except Exception as e:
+        return False, str(e)
+
 def run_hyprctl(args: list[str]) -> bool:
-    """hyprctl returns exit status 0 even on dispatch failure, so verify stdout."""
+    """Run hyprctl dispatch and verify response."""
     if not shutil.which("hyprctl"):
         return False
     try:
         res = subprocess.run(
             ["hyprctl", *args],
             capture_output=True,
-            text=True
+            text=True,
+            timeout=5,
+            check=False,
         )
         return res.returncode == 0 and res.stdout.strip() == "ok"
     except Exception:
         return False
 
+def is_session_locked() -> bool:
+    """Check if the session is currently marked as locked."""
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
+    token_path = Path(runtime_dir) / "qs_session_locked.token"
+    if token_path.is_file():
+        try:
+            return token_path.read_text().strip() == "locked"
+        except OSError:
+            pass
+    return False
+
 def lock_session() -> bool:
-    """Lock screen via native Quickshell IPC with loginctl fallback."""
-    # 1. Primary: Quickshell IPC lock
-    if run(["qs", "ipc", "call", "lock", "lock"]):
+    """Lock screen via native Quickshell IPC with loginctl and locker fallbacks."""
+    if is_session_locked():
         return True
 
-    # 2. Fallback: logind lock-session
-    if run(["loginctl", "lock-session"]):
+    # 1. Primary: Quickshell IPC lock
+    ok, _ = run_qs_ipc("lock", "lock")
+    if ok:
         return True
+
+    # 2. Logind lock-session
+    if run(["loginctl", "lock-session"], timeout=4):
+        return True
+
+    # 3. Dedicated locker fallbacks if standalone locker installed
+    for locker in ["hyprlock", "swaylock", "waylock"]:
+        if shutil.which(locker):
+            try:
+                subprocess.Popen([locker])
+                return True
+            except Exception:
+                pass
 
     # Fallback notification if lock failed completely
     run([
@@ -50,99 +116,119 @@ def lock_session() -> bool:
         "-a", "session manager",
         "-i", "system-lock-screen",
         "Screen lock failed",
-        "Quickshell lock IPC did not respond!"
+        "Quickshell lock IPC and system locker fallbacks did not respond.",
     ])
     return False
 
-def toggle_caffeine():
+def toggle_caffeine() -> bool:
     """Toggle Quickshell idle monitor on/off (Caffeine mode)."""
-    if not shutil.which("qs"):
-        run(["notify-send", "-u", "critical", "idle monitor", "qs executable not found!"])
-        return False
-
-    try:
-        res = subprocess.run(
-            ["qs", "ipc", "call", "idle", "toggle"],
-            capture_output=True,
-            text=True
-        )
-        if res.returncode == 0:
-            raw = res.stdout.strip().lower()
-
-            # Attempt to parse json / bool / int strings safely
-            is_enabled = None
-            try:
-                parsed = json.loads(raw)
-                if isinstance(parsed, bool):
-                    is_enabled = parsed
-                elif isinstance(parsed, dict) and "enabled" in parsed:
-                    is_enabled = bool(parsed["enabled"])
-            except Exception:
-                pass
-
-            if is_enabled is None:
-                is_enabled = raw in ("true", "1", "on")
-
-            new_state = "enabled" if is_enabled else "inhibited (caffeine active)"
-            icon = "preferences-desktop-screensaver" if is_enabled else "caffeine"
-
+    ok, out = run_qs_ipc("caffeine", "toggle")
+    if not ok:
+        # Fallback to direct idle toggle if caffeine alias not present
+        ok, out = run_qs_ipc("idle", "toggle")
+        if not ok:
             run([
                 "notify-send",
+                "-u", "critical",
                 "-a", "idle monitor",
-                "-i", icon,
-                "Idle Timeout Changed",
-                f"Quickshell idle is now {new_state}"
+                "Idle toggle failed",
+                "Quickshell idle IPC service did not respond.",
             ])
-            return True
-    except Exception:
-        pass
+            return False
 
-    run(["notify-send", "-u", "critical", "idle monitor", "Failed to communicate with quickshell idle service!"])
-    return False
+        # 'idle' target returns true when idle monitor is active (caffeine OFF)
+        is_caffeine = out.lower() in ("false", "0", "off")
+    else:
+        # 'caffeine' target returns true when caffeine is active (idle monitor OFF)
+        is_caffeine = out.lower() in ("true", "1", "on")
+
+    new_state = "inhibited (caffeine active)" if is_caffeine else "enabled"
+    icon = "caffeine" if is_caffeine else "preferences-desktop-screensaver"
+
+    run([
+        "notify-send",
+        "-a", "idle monitor",
+        "-i", icon,
+        "Idle Timeout Changed",
+        f"Quickshell idle is now {new_state}",
+    ])
+    return True
 
 def logout_session() -> bool:
-    """Clean exit order: UWSM -> hyprshutdown -> hyprctl dispatch exit."""
+    """Clean exit order: UWSM -> hyprshutdown -> hyprctl dispatch exit -> loginctl."""
     # 1. UWSM managed session
-    if shutil.which("uwsm") and run(["uwsm", "stop"]):
+    if shutil.which("uwsm") and run(["uwsm", "stop"], timeout=10):
         return True
 
     # 2. Dedicated shutdown helper
-    if shutil.which("hyprshutdown") and run(["hyprshutdown"]):
+    if shutil.which("hyprshutdown") and run(["hyprshutdown"], timeout=10):
         return True
 
-    # 3. Hyprland dispatcher (check for 'ok' output)
-    if run_hyprctl(["dispatch", "hl.dsp.exit()"]):
-        return True
+    # 3. Hyprland dispatcher
     if run_hyprctl(["dispatch", "exit"]):
+        return True
+
+    # 4. Logind session termination fallback
+    session_id = os.environ.get("XDG_SESSION_ID", "self")
+    if run(["loginctl", "terminate-session", session_id], timeout=5):
+        return True
+
+    user = os.environ.get("USER")
+    if user and run(["loginctl", "terminate-user", user], timeout=5):
         return True
 
     return False
 
 def suspend_system():
     """Lock first, allow the lock surface to engage, then suspend."""
-    if not lock_session():
-        run([
-            "notify-send",
-            "-u", "critical",
-            "-a", "power manager",
-            "Suspend Aborted",
-            "Refusing to suspend: screen locker failed to engage!"
-        ])
-        return
+    if not is_session_locked():
+        if not lock_session():
+            run([
+                "notify-send",
+                "-u", "critical",
+                "-a", "power manager",
+                "Suspend Aborted",
+                "Refusing to suspend: screen locker failed to engage.",
+            ])
+            return
+        # Brief pause to let compositor map and render lock layer
+        time.sleep(0.35)
 
-    # Give Wayland compositor breathing room to paint the lock surface
-    time.sleep(0.4)
-    run(["systemctl", "suspend"])
+    if run(["systemctl", "suspend"], timeout=10):
+        return
+    run(["loginctl", "suspend"], timeout=10)
+
+def reboot_system():
+    """Reboot via systemctl with loginctl fallback."""
+    if run(["systemctl", "reboot"], timeout=10):
+        return
+    run(["loginctl", "reboot"], timeout=10)
+
+def poweroff_system():
+    """Power off via systemctl with loginctl fallback."""
+    if run(["systemctl", "poweroff"], timeout=10):
+        return
+    run(["loginctl", "poweroff"], timeout=10)
+
+def hibernate_system():
+    """Hibernate via systemctl with loginctl fallback."""
+    if run(["systemctl", "hibernate"], timeout=10):
+        return
+    run(["loginctl", "hibernate"], timeout=10)
+
+def print_usage():
+    print("Usage: session.py [lock|logout|suspend|reboot|poweroff|hibernate|caffeine|status]", file=sys.stderr)
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: power.py [lock|logout|suspend|reboot|poweroff|hibernate|caffeine]", file=sys.stderr)
-        sys.exit(1)
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
+        print_usage()
+        sys.exit(0 if (len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help")) else 1)
 
     action = sys.argv[1].lower()
 
     actions = {
         "lock": lock_session,
+        "is-locked": lambda: print("locked" if is_session_locked() else "unlocked"),
         "logout": logout_session,
         "exit": logout_session,
         "quit": logout_session,
@@ -150,10 +236,11 @@ def main():
         "sleep": suspend_system,
         "caffeine": toggle_caffeine,
         "idle-toggle": toggle_caffeine,
-        "reboot": lambda: run(["systemctl", "reboot"]),
-        "poweroff": lambda: run(["systemctl", "poweroff"]),
-        "shutdown": lambda: run(["systemctl", "poweroff"]),
-        "hibernate": lambda: run(["systemctl", "hibernate"]),
+        "reboot": reboot_system,
+        "restart": reboot_system,
+        "poweroff": poweroff_system,
+        "shutdown": poweroff_system,
+        "hibernate": hibernate_system,
     }
 
     handler = actions.get(action)
@@ -161,6 +248,7 @@ def main():
         handler()
     else:
         print(f"Unknown action: {action}", file=sys.stderr)
+        print_usage()
         sys.exit(1)
 
 if __name__ == "__main__":

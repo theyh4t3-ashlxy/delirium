@@ -10,3 +10,5 @@ stock qt widgets look like a corporate intranet dashboard from 2007. we wrote ou
 - `PopupPanel.qml`: lightweight floating modal card wrapper with blur effects and proper elevation shadows that don't clip your contents.
 - `FlickList.qml`: buttery kinetic scrolling list container tuned with the right friction coefficients so scrolling does not feel like pushing a brick through wet cement.
 - `BarPreview.qml`: micro interactive preview component used inside `BarStudio` to drag and drop widgets around like legos.
+- `ColorStudioModal.qml`: live screen eye-dropper color picker backed by `colorpicker.py` (slurp + grim), hex palette controls, and native `wl-copy` clipboard syncing.
+- `ScratchBlock.qml`: scratch-inspired block cards color-coded by category for preset creation and visual reordering.

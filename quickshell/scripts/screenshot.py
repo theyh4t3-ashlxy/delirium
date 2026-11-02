@@ -70,6 +70,12 @@ def handle_post_capture(action: str, file_path: str, send_notification: bool):
     if send_notification:
         notify(file_path, action)
 
+    if action == "copy":
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
+
 def trigger_native_capture(mode: str = "region"):
     # Zero grim. Pure native quickshell screencopy IPC.
     cmd = ["qs", "ipc", "call", "screenshot"]

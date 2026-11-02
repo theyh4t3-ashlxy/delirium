@@ -66,6 +66,7 @@ Rectangle {
     }
 
     readonly property color artAccent: {
+        if (Theme.isMonochrome) return Theme.primary;
         if (root.coverArtUrl !== "" && artQuantizer.colors && artQuantizer.colors.length > 0) {
             for (let i = 0; i < artQuantizer.colors.length; i++) {
                 let c = artQuantizer.colors[i];
@@ -73,7 +74,7 @@ Rectangle {
                 let mx = Math.max(c.r, c.g, c.b);
                 let mn = Math.min(c.r, c.g, c.b);
                 if (mx > 0.25 && (mx - mn) > 0.15) {
-                    return Theme.blend(c, Theme.primary, 0.35);
+                    return Theme.blend(c, Theme.primary, 0.45);
                 }
             }
         }
@@ -81,20 +82,23 @@ Rectangle {
     }
 
     readonly property bool isCollapsed: (!root.hasTrack || root.compactMode) && !npMouse.containsMouse && !popup.open
-    readonly property bool isWideIcon: Theme.iconSet === "kaomoji" || Theme.iconSet === "text"
+    readonly property int pillSize: Theme.barHeight - 8
+    readonly property int hPad: Math.round(Theme.widgetPaddingH * Theme.paddingScaleMult) + 4
 
     implicitWidth: {
-        if (Theme.isVertical) return Theme.barHeight - 8;
+        if (Theme.isVertical) return root.pillSize;
         if (root.isCollapsed) {
-            return root.isWideIcon ? Math.max(Theme.barHeight - 8, barIcon.implicitWidth + 14) : (Theme.barHeight - 8);
+            return Theme.isTextIconSet ? Math.max(root.pillSize, barIcon.implicitWidth + 14) : root.pillSize;
         }
-        return row.implicitWidth + (Theme.widgetPaddingH * 2) + 8;
+        return row.implicitWidth + (root.hPad * 2);
     }
-    implicitHeight: Theme.barHeight - 8
+    implicitHeight: root.pillSize
     radius: Theme.radiusPill
-    color: popup.open ? Theme.primary_overlay : (npMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-    border.color: popup.open ? Theme.alpha(Theme.primary, 0.5) : Theme.pillBorder
-    border.width: (popup.open || Theme.pillBorder !== "transparent") ? 1 : 0
+    color: popup.open
+        ? Theme.widgetActive
+        : (npMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+    border.color: popup.open ? Theme.alpha(root.artAccent, 0.55) : Theme.pillBorder
+    border.width: (popup.open || Theme.pillBorder.a > 0) ? 1 : 0
     clip: true
 
     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -183,10 +187,7 @@ Rectangle {
     Row {
         id: row
         spacing: Theme.widgetSpacing + 2
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.left: (!Theme.isVertical && !root.isCollapsed) ? parent.left : undefined
-        anchors.leftMargin: Theme.widgetPaddingH + 4
-        anchors.horizontalCenter: (Theme.isVertical || root.isCollapsed) ? parent.horizontalCenter : undefined
+        anchors.centerIn: parent
 
         Text {
             id: barIcon
@@ -195,9 +196,9 @@ Rectangle {
                 ? (Theme.iconSet === "kaomoji" ? Theme.kaoJam : Theme.iconMusic)
                 : (root.hasTrack ? Theme.iconPause : Theme.iconMusic)
             font.family: Theme.fontIcon
-            font.pixelSize: root.isWideIcon ? Theme.fontSizeXs : Theme.fontSizeSm
-            font.weight: root.isWideIcon ? Theme.fontWeightBold : Theme.fontWeightRegular
-            color: root.isPlaying ? Theme.primary : Theme.on_surface_variant
+            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+            font.weight: Theme.isTextIconSet ? Theme.fontWeightBold : Theme.fontWeightRegular
+            color: root.isPlaying ? root.artAccent : Theme.textSecondary
 
             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         }
@@ -217,14 +218,14 @@ Rectangle {
             }
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSizeSm
-            color: root.hasTrack ? Theme.on_surface : Theme.on_surface_variant
+            color: root.hasTrack ? Theme.textPrimary : Theme.textSecondary
             elide: Text.ElideRight
             width: Math.min(implicitWidth, root.compactMode ? 100 : 170)
         }
 
         // Bar mini equalizer
         Row {
-            visible: root.isPlaying && (Settings?.mediaWaveVisualizer ?? true) && !Theme.isVertical
+            visible: root.isPlaying && (Settings?.mediaWaveVisualizer ?? true) && !Theme.isVertical && !root.isCollapsed
             anchors.verticalCenter: parent.verticalCenter
             spacing: 2
             height: 12
@@ -235,7 +236,7 @@ Rectangle {
                     required property int index
                     width: 2
                     radius: 1
-                    color: Theme.primary
+                    color: root.artAccent
                     anchors.verticalCenter: parent.verticalCenter
 
                     height: {
@@ -250,8 +251,8 @@ Rectangle {
 
                     Behavior on height {
                         NumberAnimation {
-                            duration: 90
-                            easing.type: Easing.OutQuad
+                            duration: Theme.animFast
+                            easing.type: Theme.animColorEasing
                         }
                     }
                 }
@@ -317,7 +318,7 @@ Rectangle {
 
     PopupPanel {
         id: popup
-        cardWidth: 420
+        cardWidth: 400
         cardHeight: Math.max(Theme.popupMinHeight, Math.min(Theme.popupMaxHeight, mediaContentLayout.implicitHeight + (Theme.popupPadding * 2)))
         onOpenChanged: {
             if (!open) root.dropdownOpen = false;
@@ -326,7 +327,7 @@ Rectangle {
         content: ColumnLayout {
             id: mediaContentLayout
             anchors.fill: parent
-            spacing: 10
+            spacing: Theme.popupSpacing
 
             // Header + player switcher pill
             RowLayout {
@@ -337,26 +338,24 @@ Rectangle {
                     text: root.isPlaying && Theme.iconSet === "kaomoji"
                         ? "media playback " + Theme.kaoDJ
                         : "media playback"
-                    font.family: Theme.fontFamily
+                    font.family: Theme.fontDisplay
                     font.pixelSize: Theme.fontSizeLg
                     font.weight: Theme.fontWeightBold
-                    color: Theme.on_surface
+                    color: Theme.textPrimary
                     Layout.fillWidth: true
                 }
 
                 Rectangle {
                     visible: root.activeList.length > 0
                     radius: Theme.radiusPill
-                    color: switchHover.containsMouse
-                        ? Theme.stateHover(Theme.surface_container_highest, root.artAccent)
-                        : Theme.surface_container_highest
-                    border.color: switchHover.containsMouse ? Theme.alpha(root.artAccent, 0.5) : Theme.widgetBorder
-                    border.width: 1
-                    implicitWidth: switchRow.implicitWidth + 16
+                    color: switchHover.containsMouse ? Theme.pillHover : Theme.pillBg
+                    border.color: switchHover.containsMouse ? Theme.alpha(root.artAccent, 0.5) : Theme.pillBorder
+                    border.width: (switchHover.containsMouse || Theme.pillBorder.a > 0) ? 1 : 0
+                    implicitWidth: switchRow.implicitWidth + 18
                     implicitHeight: 26
 
-                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-                    Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
+                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+                    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                     RowLayout {
                         id: switchRow
@@ -373,10 +372,10 @@ Rectangle {
 
                         Text {
                             visible: root.activeList.length > 1
-                            text: "(" + (root.currentPlayerIdx + 1) + "/" + root.activeList.length + ")"
+                            text: (root.currentPlayerIdx + 1) + "/" + root.activeList.length
                             font.family: Theme.fontMono
                             font.pixelSize: Theme.fontSizeXs
-                            color: Theme.on_surface_variant
+                            color: Theme.textSecondary
                         }
 
                         Text {
@@ -384,7 +383,7 @@ Rectangle {
                             text: Theme.iconChevronRight
                             font.family: Theme.fontIcon
                             font.pixelSize: Theme.fontSizeXs
-                            color: Theme.on_surface_variant
+                            color: Theme.textSecondary
                         }
                     }
 
@@ -403,100 +402,154 @@ Rectangle {
 
             Rectangle {
                 Layout.fillWidth: true
-                height: 1
+                height: Theme.popupDividerHeight
                 color: Theme.widgetBorder
             }
 
-            // Active playback card
+            // Active playback section
             ColumnLayout {
                 Layout.fillWidth: true
-                spacing: 12
+                spacing: Theme.popupSpacing
                 visible: root.player !== null && root.hasTrack
 
-                // Hero track banner with tinted backdrop
-                Rectangle {
+                // Cohesive Hero Card with integrated ambient spectrum backdrop
+                ClippingRectangle {
+                    id: heroCard
                     Layout.fillWidth: true
-                    implicitHeight: heroRow.implicitHeight + 20
+                    implicitHeight: Math.max(108, heroRow.implicitHeight + 24)
                     radius: Theme.radiusLg
-                    color: Theme.blend(Theme.cardBg, root.artAccent, root.isPlaying ? 0.14 : 0.05)
-                    border.color: Theme.alpha(root.artAccent, root.isPlaying ? 0.35 : 0.15)
+                    color: Theme.blend(Theme.cardBg, root.artAccent, root.isPlaying ? 0.12 : 0.04)
+                    border.color: root.isPlaying ? Theme.alpha(root.artAccent, 0.30) : Theme.cardBorder
                     border.width: 1
 
-                    Behavior on color { ColorAnimation { duration: Theme.animSlow } }
-                    Behavior on border.color { ColorAnimation { duration: Theme.animSlow } }
+                    Behavior on color { ColorAnimation { duration: Theme.animSlow; easing.type: Theme.animColorEasing } }
+                    Behavior on border.color { ColorAnimation { duration: Theme.animSlow; easing.type: Theme.animColorEasing } }
+
+                    // Integrated 24-band ambient spectrum inside the hero card bottom
+                    RowLayout {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        height: 44
+                        spacing: 3
+                        visible: Settings?.mediaWaveVisualizer ?? true
+                        opacity: root.isPlaying ? 0.22 : 0.08
+
+                        Behavior on opacity { NumberAnimation { duration: Theme.animNormal } }
+
+                        Repeater {
+                            model: 24
+                            Rectangle {
+                                required property int index
+                                Layout.fillWidth: true
+                                Layout.alignment: Qt.AlignBottom
+                                radius: 2
+
+                                readonly property real env: {
+                                    let norm = index / 23.0;
+                                    return Math.sin(norm * Math.PI) * 0.72 + 0.28;
+                                }
+
+                                readonly property real chPeak: {
+                                    let pList = (typeof peakMonitor !== "undefined" && peakMonitor.peaks && peakMonitor.peaks.length > 0)
+                                        ? peakMonitor.peaks
+                                        : [];
+                                    if (pList.length >= 2) {
+                                        let mix = index / 23.0;
+                                        return (pList[0] * (1.0 - mix)) + (pList[1] * mix);
+                                    }
+                                    return (typeof peakMonitor !== "undefined" && peakMonitor.peak !== undefined) ? peakMonitor.peak : 0;
+                                }
+
+                                height: {
+                                    if (!root.isPlaying) return 3;
+                                    let p = chPeak;
+                                    let ripple = Math.sin((index * 0.65) + root.wavePhase) * 0.3 + Math.cos((index * 1.2) - root.wavePhase * 0.7) * 0.2;
+                                    if (p > 0.008) {
+                                        let target = (p * env * 38) + (Math.abs(ripple) * 14 * Math.min(1.0, p * 3.5));
+                                        return Math.max(3, Math.min(42, Math.round(target)));
+                                    }
+                                    return Math.max(3, Math.round(3 + Math.abs(ripple) * 5));
+                                }
+
+                                color: chPeak > 0.55 ? Theme.tertiary : root.artAccent
+
+                                Behavior on height {
+                                    NumberAnimation {
+                                        duration: 80
+                                        easing.type: Theme.animColorEasing
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     RowLayout {
                         id: heroRow
-                        anchors.fill: parent
-                        anchors.margins: 10
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.margins: 12
                         spacing: 14
 
-                        // True rounded-corner album cover via ClippingRectangle
-                        Item {
-                            Layout.preferredWidth: 88
-                            Layout.preferredHeight: 88
+                        // Rounded album art container
+                        ClippingRectangle {
+                            Layout.preferredWidth: 84
+                            Layout.preferredHeight: 84
+                            radius: Theme.radiusMd
+                            color: Theme.widgetBg
+                            border.color: Theme.isGlass ? Theme.glassHighlight : Theme.cardBorder
+                            border.width: 1
 
-                            Rectangle {
+                            Image {
                                 anchors.fill: parent
-                                anchors.margins: -3
-                                radius: Theme.radiusMd + 3
-                                color: Theme.alpha(root.artAccent, root.isPlaying ? 0.32 : 0.10)
-                                Behavior on color { ColorAnimation { duration: Theme.animNormal } }
+                                source: root.coverArtUrl
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                                visible: status === Image.Ready && source != ""
+                                scale: coverMouse.containsMouse ? 1.05 : 1.0
+                                Behavior on scale { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
                             }
 
-                            ClippingRectangle {
-                                anchors.fill: parent
-                                radius: Theme.radiusMd
-                                color: Theme.surface_container_highest
+                            Text {
+                                anchors.centerIn: parent
+                                text: Theme.iconSet === "kaomoji" ? Theme.kaoMusic : Theme.iconMusic
+                                font.family: Theme.fontIcon
+                                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
+                                color: root.artAccent
+                                visible: root.coverArtUrl === ""
+                            }
 
-                                Image {
-                                    anchors.fill: parent
-                                    source: root.coverArtUrl
-                                    fillMode: Image.PreserveAspectCrop
-                                    asynchronous: true
-                                    visible: status === Image.Ready && source != ""
-                                    scale: coverMouse.containsMouse ? 1.05 : 1.0
-                                    Behavior on scale { NumberAnimation { duration: Theme.animNormal; easing.type: Easing.OutQuad } }
-                                }
+                            // Hover play/pause scrim overlay
+                            Rectangle {
+                                anchors.fill: parent
+                                color: Theme.alpha(Theme.scrim, coverMouse.containsMouse ? 0.48 : 0.0)
+                                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: Theme.iconSet === "kaomoji" ? Theme.kaoMusic : Theme.iconMusic
+                                    opacity: coverMouse.containsMouse ? 1.0 : 0.0
+                                    scale: coverMouse.containsMouse ? 1.0 : 0.8
+                                    text: root.isPlaying ? Theme.iconPause : Theme.iconPlay
                                     font.family: Theme.fontIcon
-                                    font.pixelSize: root.isWideIcon ? Theme.fontSizeMd : 28
-                                    color: root.artAccent
-                                    visible: root.coverArtUrl === ""
+                                    font.pixelSize: Theme.fontSizeLg
+                                    color: Theme.on_surface
+                                    Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+                                    Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animExpressiveEasing } }
                                 }
+                            }
 
-                                // Hover play/pause overlay on the album art
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: Qt.rgba(0, 0, 0, coverMouse.containsMouse ? 0.38 : 0.0)
-                                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        opacity: coverMouse.containsMouse ? 1.0 : 0.0
-                                        scale: coverMouse.containsMouse ? 1.0 : 0.8
-                                        text: root.isPlaying ? Theme.iconPause : Theme.iconPlay
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeLg
-                                        color: "#ffffff"
-                                        Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
-                                        Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutBack } }
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: coverMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.togglePlayback()
-                                    onWheel: (wheel) => {
-                                        if (root.player && root.player.volume !== undefined) {
-                                            root.player.volume = Math.max(0.0, Math.min(1.0, root.player.volume + (wheel.angleDelta.y > 0 ? 0.05 : -0.05)));
-                                        }
+                            MouseArea {
+                                id: coverMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.togglePlayback()
+                                onWheel: (wheel) => {
+                                    if (root.player && root.player.volume !== undefined) {
+                                        root.player.volume = Math.max(0.0, Math.min(1.0, root.player.volume + (wheel.angleDelta.y > 0 ? 0.05 : -0.05)));
                                     }
                                 }
                             }
@@ -504,14 +557,15 @@ Rectangle {
 
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 4
+                            Layout.alignment: Qt.AlignVCenter
+                            spacing: 3
 
                             Text {
                                 text: (root.player?.trackTitle || "unknown track").toLowerCase()
-                                font.family: Theme.fontFamily
+                                font.family: Theme.fontDisplay
                                 font.pixelSize: Theme.fontSizeMd
                                 font.weight: Theme.fontWeightBold
-                                color: Theme.on_surface
+                                color: Theme.textPrimary
                                 Layout.fillWidth: true
                                 elide: Text.ElideRight
                                 maximumLineCount: 2
@@ -526,14 +580,14 @@ Rectangle {
                                 color: root.artAccent
                                 Layout.fillWidth: true
                                 elide: Text.ElideRight
-                                Behavior on color { ColorAnimation { duration: Theme.animNormal } }
+                                Behavior on color { ColorAnimation { duration: Theme.animNormal; easing.type: Theme.animColorEasing } }
                             }
 
                             Text {
                                 text: (root.player?.trackAlbum || "").toLowerCase()
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeXs
-                                color: Theme.on_surface_variant
+                                color: Theme.textSecondary
                                 Layout.fillWidth: true
                                 elide: Text.ElideRight
                                 visible: text !== ""
@@ -545,8 +599,9 @@ Rectangle {
                                 text: Theme.getFlavor("media_playing", Theme.getVibe(Theme.kaoVibe + " vibing", "", ""))
                                 font.family: Theme.fontVibe
                                 font.pixelSize: Theme.fontSizeXs
-                                color: Theme.alpha(Theme.on_surface_variant, 0.8)
+                                color: Theme.alpha(Theme.textSecondary, 0.85)
                                 Layout.fillWidth: true
+                                Layout.topMargin: 2
                                 elide: Text.ElideRight
                             }
                         }
@@ -556,12 +611,12 @@ Rectangle {
                 // Seekbar + timestamps
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: 4
+                    spacing: 2
 
                     WavyProgress {
                         id: progressTrack
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 22
+                        Layout.preferredHeight: 20
                         from: 0
                         to: (root.player && root.player.length > 0) ? root.player.length : 1
                         value: root.trackPosition
@@ -583,7 +638,7 @@ Rectangle {
                             text: root.formatTime(root.trackPosition)
                             font.family: Theme.fontMono
                             font.pixelSize: Theme.fontSizeXs
-                            color: Theme.on_surface_variant
+                            color: Theme.textSecondary
                         }
 
                         Item { Layout.fillWidth: true }
@@ -592,93 +647,40 @@ Rectangle {
                             text: root.formatTime(root.player?.length ?? 0)
                             font.family: Theme.fontMono
                             font.pixelSize: Theme.fontSizeXs
-                            color: Theme.on_surface_variant
+                            color: Theme.textSecondary
                         }
                     }
                 }
 
-                // 24-band reactive spectrum visualizer
+                // Symmetrical Transport Controls: Shuffle | Prev | Play/Pause | Next | Repeat
                 RowLayout {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 26
-                    spacing: 3
-                    visible: Settings?.mediaWaveVisualizer ?? true
+                    spacing: 10
 
-                    Repeater {
-                        model: 24
-                        Rectangle {
-                            required property int index
-                            Layout.fillWidth: true
-                            Layout.alignment: Qt.AlignBottom
-                            radius: 2
-
-                            readonly property real env: {
-                                let norm = index / 23.0;
-                                return Math.sin(norm * Math.PI) * 0.72 + 0.28;
-                            }
-
-                            readonly property real chPeak: {
-                                let pList = (typeof peakMonitor !== "undefined" && peakMonitor.peaks && peakMonitor.peaks.length > 0)
-                                    ? peakMonitor.peaks
-                                    : [];
-                                if (pList.length >= 2) {
-                                    let mix = index / 23.0;
-                                    return (pList[0] * (1.0 - mix)) + (pList[1] * mix);
-                                }
-                                return (typeof peakMonitor !== "undefined" && peakMonitor.peak !== undefined) ? peakMonitor.peak : 0;
-                            }
-
-                            height: {
-                                if (!root.isPlaying) return 3;
-                                let p = chPeak;
-                                let ripple = Math.sin((index * 0.65) + root.wavePhase) * 0.3 + Math.cos((index * 1.2) - root.wavePhase * 0.7) * 0.2;
-                                if (p > 0.008) {
-                                    let target = (p * env * 24) + (Math.abs(ripple) * 10 * Math.min(1.0, p * 3.5));
-                                    return Math.max(3, Math.min(26, Math.round(target)));
-                                }
-                                return Math.max(3, Math.round(3 + Math.abs(ripple) * 4));
-                            }
-
-                            color: {
-                                if (!root.isPlaying) return Theme.surface_container_highest;
-                                if (chPeak > 0.55) return Theme.tertiary;
-                                if (chPeak > 0.18) return root.artAccent;
-                                return Theme.alpha(root.artAccent, 0.45);
-                            }
-
-                            Behavior on height {
-                                NumberAnimation {
-                                    duration: 75
-                                    easing.type: Easing.OutQuad
-                                }
-                            }
-
-                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
-                        }
-                    }
-                }
-
-                // Transport controls: Shuffle | Prev | Play/Pause | Next | Repeat + Player Volume
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    // Shuffle button
+                    // Shuffle button (fixed width slot so center buttons never shift off-center)
                     Rectangle {
-                        visible: root.player?.shuffleSupported ?? false
-                        width: 32
-                        height: 32
-                        radius: Theme.radiusPill
-                        color: (root.player?.shuffle ?? false)
+                        readonly property bool supported: root.player?.shuffleSupported ?? false
+                        readonly property bool active: root.player?.shuffle ?? false
+                        width: Theme.popupActionHeight
+                        height: Theme.popupActionHeight
+                        radius: active ? Theme.radiusMd : Theme.radiusPill
+                        opacity: supported ? 1.0 : 0.0
+                        enabled: supported
+                        color: active
                             ? Theme.alpha(root.artAccent, 0.22)
-                            : (shufMouse.containsMouse ? Theme.surface_container_highest : "transparent")
+                            : (shufMouse.containsMouse ? Theme.widgetHover : "transparent")
+                        border.color: active ? Theme.alpha(root.artAccent, 0.4) : "transparent"
+                        border.width: active ? 1 : 0
+
+                        Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                         Text {
                             anchors.centerIn: parent
                             text: Theme.iconShuffle
                             font.family: Theme.fontIcon
                             font.pixelSize: Theme.fontSizeSm
-                            color: (root.player?.shuffle ?? false) ? root.artAccent : Theme.on_surface_variant
+                            color: parent.active ? root.artAccent : Theme.textSecondary
                         }
 
                         MouseArea {
@@ -704,8 +706,8 @@ Rectangle {
 
                     // Squishy primary Play/Pause pill
                     Rectangle {
-                        width: root.isPlaying ? 54 : 44
-                        height: 42
+                        width: root.isPlaying ? 56 : 44
+                        height: 40
                         radius: root.isPlaying ? Theme.radiusMd : Theme.radiusPill
                         color: playMouse.pressed
                             ? Theme.statePress(root.artAccent, Theme.on_primary)
@@ -715,13 +717,13 @@ Rectangle {
 
                         Behavior on width { NumberAnimation { duration: Theme.expressiveFast; easing.type: Theme.animExpressiveEasing } }
                         Behavior on radius { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
-                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                         Text {
                             anchors.centerIn: parent
                             text: root.isPlaying ? Theme.iconPause : Theme.iconPlay
                             font.family: Theme.fontIcon
-                            font.pixelSize: root.isWideIcon ? Theme.fontSizeSm : Theme.fontSizeLg
+                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                             font.weight: Theme.fontWeightBold
                             color: Theme.on_primary
                         }
@@ -745,23 +747,30 @@ Rectangle {
 
                     Item { Layout.fillWidth: true }
 
-                    // Loop / Repeat button
+                    // Loop / Repeat button (fixed width slot for symmetry)
                     Rectangle {
-                        visible: root.player?.loopSupported ?? false
-                        width: 32
-                        height: 32
-                        radius: Theme.radiusPill
-                        readonly property bool loopActive: (root.player?.loopState ?? MprisLoopState.None) !== MprisLoopState.None
-                        color: loopActive
+                        readonly property bool supported: root.player?.loopSupported ?? false
+                        readonly property bool active: (root.player?.loopState ?? MprisLoopState.None) !== MprisLoopState.None
+                        width: Theme.popupActionHeight
+                        height: Theme.popupActionHeight
+                        radius: active ? Theme.radiusMd : Theme.radiusPill
+                        opacity: supported ? 1.0 : 0.0
+                        enabled: supported
+                        color: active
                             ? Theme.alpha(root.artAccent, 0.22)
-                            : (loopMouse.containsMouse ? Theme.surface_container_highest : "transparent")
+                            : (loopMouse.containsMouse ? Theme.widgetHover : "transparent")
+                        border.color: active ? Theme.alpha(root.artAccent, 0.4) : "transparent"
+                        border.width: active ? 1 : 0
+
+                        Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                         Text {
                             anchors.centerIn: parent
                             text: (root.player?.loopState === MprisLoopState.Track) ? Theme.iconRepeatOne : Theme.iconRepeat
                             font.family: Theme.fontIcon
                             font.pixelSize: Theme.fontSizeSm
-                            color: parent.loopActive ? root.artAccent : Theme.on_surface_variant
+                            color: parent.active ? root.artAccent : Theme.textSecondary
                         }
 
                         MouseArea {
@@ -775,23 +784,29 @@ Rectangle {
                 }
             }
 
-            // Empty state with smooth dropdown drawer
-            Item {
+            // Cohesive Empty State Card
+            Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: emptyCol.implicitHeight + 16
+                implicitHeight: emptyCol.implicitHeight + 28
                 visible: root.player === null || !root.hasTrack
+                radius: Theme.radiusLg
+                color: Theme.cardBg
+                border.color: Theme.cardBorder
+                border.width: 1
 
                 ColumnLayout {
                     id: emptyCol
-                    anchors.centerIn: parent
-                    spacing: 8
-                    width: parent.width - 12
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.margins: 14
+                    spacing: 10
 
                     Text {
                         text: Theme.getVibe(Theme.kaoSilent, Theme.iconHeadphones, Theme.iconHeadphones)
                         font.family: Theme.fontIcon
-                        font.pixelSize: root.isWideIcon ? Theme.fontSizeXl : 28
-                        color: Theme.on_surface_variant
+                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXl : Theme.fontSizeTitle
+                        color: Theme.textSecondary
                         Layout.alignment: Qt.AlignHCenter
                     }
 
@@ -799,26 +814,29 @@ Rectangle {
                         text: Theme.getFlavor("media_quiet", Theme.getVibe("quiet right now", "no players active", "nothing playing"))
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSm
-                        color: Theme.on_surface_variant
+                        color: Theme.textSecondary
                         Layout.alignment: Qt.AlignHCenter
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
                     }
 
                     RowLayout {
-                        Layout.alignment: Qt.AlignHCenter
                         Layout.fillWidth: true
                         Layout.topMargin: 4
                         spacing: 8
 
+                        // App selector pill
                         Rectangle {
                             Layout.fillWidth: true
-                            height: 34
+                            height: Theme.popupActionHeight + 2
                             radius: Theme.radiusMd
-                            color: dropHover.containsMouse ? Theme.surface_container_highest : Theme.surface_container_high
-                            border.color: root.dropdownOpen ? Theme.primary : Theme.widgetBorder
+                            color: dropHover.containsMouse ? Theme.widgetHover : Theme.widgetBg
+                            border.color: root.dropdownOpen ? Theme.alpha(Theme.primary, 0.6) : Theme.widgetBorder
                             border.width: 1
 
-                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
-                            Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
+                            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+                            Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                             RowLayout {
                                 anchors.fill: parent
@@ -838,7 +856,7 @@ Rectangle {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightDemiBold
-                                    color: Theme.on_surface
+                                    color: Theme.textPrimary
                                     Layout.fillWidth: true
                                     elide: Text.ElideRight
                                 }
@@ -847,7 +865,7 @@ Rectangle {
                                     text: root.dropdownOpen ? Theme.iconChevronUp : Theme.iconChevronDown
                                     font.family: Theme.fontIcon
                                     font.pixelSize: Theme.fontSizeXs
-                                    color: Theme.on_surface_variant
+                                    color: Theme.textSecondary
                                 }
                             }
 
@@ -860,15 +878,18 @@ Rectangle {
                             }
                         }
 
+                        // Primary action launch button using Material 3 state layers
                         Rectangle {
                             Layout.preferredWidth: 88
-                            height: 34
+                            height: Theme.popupActionHeight + 2
                             radius: Theme.radiusMd
-                            color: launchHover.containsMouse ? Theme.primary : Theme.surface_container_high
-                            border.color: Theme.primary
-                            border.width: 1
+                            color: launchHover.pressed
+                                ? Theme.statePress(Theme.primary, Theme.on_primary)
+                                : (launchHover.containsMouse
+                                    ? Theme.stateHover(Theme.primary, Theme.on_primary)
+                                    : Theme.primary)
 
-                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                             RowLayout {
                                 anchors.centerIn: parent
@@ -879,14 +900,14 @@ Rectangle {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightBold
-                                    color: launchHover.containsMouse ? Theme.on_primary : Theme.on_surface
+                                    color: Theme.on_primary
                                 }
 
                                 Text {
                                     text: Theme.iconPlay
                                     font.family: Theme.fontIcon
                                     font.pixelSize: Theme.fontSizeXs
-                                    color: launchHover.containsMouse ? Theme.on_primary : Theme.primary
+                                    color: Theme.on_primary
                                 }
                             }
 
@@ -900,18 +921,18 @@ Rectangle {
                         }
                     }
 
+                    // Dropdown drawer
                     Rectangle {
-                        Layout.alignment: Qt.AlignHCenter
                         Layout.fillWidth: true
                         height: root.dropdownOpen ? Math.min(drawerCol.implicitHeight + 8, 136) : 0
                         visible: height > 0
                         clip: true
                         radius: Theme.radiusMd
-                        color: Theme.surface_container_low
+                        color: Theme.widgetBg
                         border.color: Theme.widgetBorder
                         border.width: 1
 
-                        Behavior on height { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+                        Behavior on height { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
 
                         Flickable {
                             anchors.fill: parent
@@ -930,14 +951,15 @@ Rectangle {
 
                                     Rectangle {
                                         required property var modelData
+                                        readonly property bool isSelected: root.preferredAppId === modelData.id
                                         Layout.fillWidth: true
                                         height: 28
                                         radius: Theme.radiusSm
                                         color: itemHover.containsMouse
-                                            ? Theme.primary_overlay
-                                            : (root.preferredAppId === modelData.id ? Theme.surface_container_highest : "transparent")
+                                            ? Theme.widgetHover
+                                            : (isSelected ? Theme.primary_overlay : "transparent")
 
-                                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                                         RowLayout {
                                             anchors.fill: parent
@@ -949,14 +971,15 @@ Rectangle {
                                                 text: modelData.icon
                                                 font.family: Theme.fontIcon
                                                 font.pixelSize: Theme.fontSizeXs
-                                                color: root.preferredAppId === modelData.id ? Theme.primary : Theme.on_surface_variant
+                                                color: parent.parent.isSelected ? Theme.primary : Theme.textSecondary
                                             }
 
                                             Text {
                                                 text: modelData.name.toLowerCase()
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSizeXs
-                                                color: root.preferredAppId === modelData.id ? Theme.on_surface : Theme.on_surface_variant
+                                                font.weight: parent.parent.isSelected ? Theme.fontWeightDemiBold : Theme.fontWeightRegular
+                                                color: parent.parent.isSelected ? Theme.textPrimary : Theme.textSecondary
                                                 Layout.fillWidth: true
                                                 elide: Text.ElideRight
                                             }
@@ -966,7 +989,7 @@ Rectangle {
                                                 font.family: Theme.fontIcon
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: Theme.primary
-                                                visible: root.preferredAppId === modelData.id
+                                                visible: parent.parent.isSelected
                                             }
                                         }
 

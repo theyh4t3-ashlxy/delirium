@@ -106,9 +106,11 @@ Item {
         onTriggered: root.copiedToast = false
     }
 
+    readonly property string colorPickerScript: Qt.resolvedUrl("../scripts/colorpicker.py").toString().replace(/^file:\/\//, "")
+
     Process {
         id: eyeProc
-        command: ["bash", "-c", "geom=$(slurp -p -b 00000000 -c 00000000 2>/dev/null) || exit 0; rgb=$(grim -g \"$geom\" -t ppm - 2>/dev/null | tail -c 3 | od -An -t u1) || exit 0; echo \"$rgb\" | awk '{ r=$1+0; g=$2+0; b=$3+0; printf \"#%02x%02x%02x\\n\", r, g, b }'"]
+        command: ["python3", root.colorPickerScript]
         stdout: SplitParser {
             onRead: function(line) {
                 if (!line || !line.startsWith("#")) return;
@@ -123,7 +125,7 @@ Item {
     }
 
     function copyToClipboard(str) {
-        copyProc.command = ["bash", "-c", "printf '%s' '" + str + "' | wl-copy"];
+        copyProc.command = ["wl-copy", "--", str];
         copyProc.running = true;
         copiedToast = true;
         toastTimer.restart();

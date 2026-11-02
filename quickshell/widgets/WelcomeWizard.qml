@@ -74,12 +74,13 @@ PanelWindow {
 
     readonly property string brainShellSrc: Quickshell.env("HOME") + "/.local/src/Brain_Shell"
     readonly property string brainShellConf: Quickshell.env("HOME") + "/.config/Brain_Shell"
+    readonly property string detectScript: Qt.resolvedUrl("../scripts/detect-brainshell.zsh").toString().replace(/^file:\/\//, "")
     property bool brainShellDetected: false
     property bool isInstallingBrainShell: false
 
     Process {
         id: brainDetectProc
-        command: ["sh", "-c", "test -d \"$HOME/.local/src/Brain_Shell\" || test -d \"$HOME/.config/Brain_Shell\""]
+        command: [root.detectScript, root.brainShellSrc, root.brainShellConf]
         running: false
         onExited: (code) => {
             root.brainShellDetected = (code === 0);
@@ -88,7 +89,7 @@ PanelWindow {
 
     Process {
         id: brainInstallProc
-        command: ["sh", "-c", "git clone -b dev https://github.com/Brainitech/Brain_Shell.git ~/.local/src/Brain_Shell"]
+        command: ["git", "clone", "-b", "dev", "https://github.com/Brainitech/Brain_Shell.git", root.brainShellSrc]
         running: false
         onExited: (code) => {
             root.isInstallingBrainShell = false;

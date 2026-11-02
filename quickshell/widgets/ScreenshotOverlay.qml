@@ -154,20 +154,7 @@ PanelWindow {
 
     function runPostCaptureAction(act: string, filePath: string): void {
         let notifyFlag = (Settings?.screenshotNotify ?? true) ? "1" : "0";
-        let escapedPath = "'" + filePath.replace(/'/g, "'\\''") + "'";
-        let escapedScript = "'" + overlayRoot.scriptPath.replace(/'/g, "'\\''") + "'";
-
-        // run screenshot.py if present, otherwise fall back to native wl-copy / swappy / notify-send
-        let cmd = "if [ -f " + escapedScript + " ]; then "
-            + "python3 " + escapedScript + " post " + act + " " + escapedPath + " " + notifyFlag + "; "
-            + "else "
-            + ((act === "copy" || act === "both") ? ("wl-copy --type image/png < " + escapedPath + " 2>/dev/null; ") : "")
-            + (act === "edit" ? ("(swappy -f " + escapedPath + " || satty -f " + escapedPath + ") 2>/dev/null & ") : "")
-            + (notifyFlag === "1" ? ("notify-send -a 'Screen Capture' -i " + escapedPath + " 'Screenshot Captured' " + escapedPath + " 2>/dev/null; ") : "")
-            + (act === "copy" ? ("rm -f " + escapedPath + "; ") : "")
-            + "fi";
-
-        Quickshell.execDetached(["sh", "-c", cmd]);
+        Quickshell.execDetached(["python3", overlayRoot.scriptPath, "post", act, filePath, notifyFlag]);
     }
 
     function executeNativeGrab(x: real, y: real, w: real, h: real, action: string): void {

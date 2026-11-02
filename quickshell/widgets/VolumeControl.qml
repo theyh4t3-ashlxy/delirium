@@ -24,6 +24,7 @@ Rectangle {
     property bool ready: sink?.ready ?? false
     property real vol: (ready && sink?.audio) ? sink.audio.volume : 0
     property bool muted: (ready && sink?.audio) ? sink.audio.muted : true
+    readonly property string mixerScript: Qt.resolvedUrl("../scripts/open-mixer.zsh").toString().replace(/^file:\/\//, "")
 
     Row {
         id: row
@@ -95,7 +96,7 @@ Rectangle {
                     popup.open = false;
                 }
             } else if (mouse.button === Qt.RightButton) {
-                Quickshell.execDetached(["sh", "-c", "pavucontrol || pwcc || pipewire-control-center || easyeffects || helvum"]);
+                Quickshell.execDetached([volRoot.mixerScript]);
             } else if (mouse.button === Qt.MiddleButton) {
                 if (source && source.audio) {
                     source.audio.muted = !source.audio.muted;
@@ -161,7 +162,7 @@ Rectangle {
                     icon: Theme.iconSliders
                     iconSize: Theme.fontSizeMd
                     tooltip: "open audio mixer"
-                    onClicked: Quickshell.execDetached(["sh", "-c", "pavucontrol || pwcc || pipewire-control-center || easyeffects || helvum"])
+                    onClicked: Quickshell.execDetached([volRoot.mixerScript])
                 }
             }
 

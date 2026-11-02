@@ -14,10 +14,12 @@ Scope {
     property bool _ready: false
     signal brightnessChanged(int newPercent)
 
+    readonly property string detectScript: Qt.resolvedUrl("../scripts/detect-backlight.zsh").toString().replace(/^file:\/\//, "")
+
     // detects amdgpu, intel, etc automatically
     Process {
         id: detectProc
-        command: ["sh", "-c", "ls -1 /sys/class/backlight 2>/dev/null | head -n 1"]
+        command: [root.detectScript]
         running: true
         stdout: SplitParser {
             onRead: data => {

@@ -744,6 +744,7 @@ QtObject {
     readonly property string confPath: stateDir + "/settings.conf"
     readonly property string fallbackConfPath: decodeURIComponent(Qt.resolvedUrl("../settings.conf").toString().replace(/^file:\/\//, ""))
     readonly property string welcomeCompletedMarkerPath: stateDir + "/welcome_completed"
+    readonly property string writeScript: decodeURIComponent(Qt.resolvedUrl("../scripts/write-file.zsh").toString().replace(/^file:\/\//, ""))
 
     property FileView fallbackConfFile: FileView {
         path: root.fallbackConfPath
@@ -769,7 +770,7 @@ QtObject {
         if (!root.hasCompletedWelcome) {
             root.hasCompletedWelcome = true;
         }
-        Quickshell.execDetached(["sh", "-c", "mkdir -p " + root.stateDir + " && echo 'true' > " + root.welcomeCompletedMarkerPath]);
+        Quickshell.execDetached([root.writeScript, root.welcomeCompletedMarkerPath, "true"]);
         queueSave();
     }
 
@@ -954,3 +955,4 @@ QtObject {
         }
     }
 }
+
