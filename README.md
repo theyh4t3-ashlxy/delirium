@@ -1,50 +1,30 @@
-> [!WARNING]
-> this is all ai generated. at least its a shell, no?  
-> this repo is an ai hater heaven. if you don't want any ai, go use `caelestia` or `end-4` or something.
+# delirium
 
-here is some footage recorded 30 seconds before wayland exploded and dropped to tty1.
+> [!WARNING]
+> this is an unholy biohazard containment zone masquerading as a wayland desktop.  
+> 98% of this codebase was hallucinated by neural networks running on melting cloud tpus at 4 am while the human maintainer stared blankly into the middle distance fueled by cold brew and spite. if you want polite anime dotfiles with rounded pastel corners and zero mental illness, close this tab immediately and go install `caelestia` or `end-4`.
+
+here is five seconds of live footage captured moments before wayland choked on a malformed layer-shell surface and dropped straight into tty1.
 
 > [!NOTE]
-> if you don't see a video, it means my baby went on thermal runaway. dang it..
+> if the video fails to load, the media player probably suffered a silent segfault or github refused to serve raw video to your pathetic user-agent. either way, not my problem.
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/fd8b0556-dcf0-43ac-94c6-3e5dd3708621" controls="controls" style="max-width: 100%; height: auto;">
   </video>
 </div>
 
+> [!TIP]
+> want the full unhinged origin story, the gory details of how arch linux stole my identity, or why autonomous bots maintain this repo while humans sleep? read [BACKSTORY.md](BACKSTORY.md).
 
 ---
 
 ### contents
-1. [the stack](#the-stack)
-2. [the doctrine (fuck arch)](#the-doctrine-fuck-arch)
-3. [stage 1: declarative ransom note](#stage-1-the-declarative-ransom-note)
-4. [stage 2: deployment vectors](#stage-2-deployment-vectors)
-5. [cli flag reference](#cli-flag-reference)
-6. [known bugs & void roadmap](#known-bugs--void-roadmap)
-7. [human vs machine diplomacy](#human-vs-machine-diplomacy)
-
----
-
-## the stack
-
-- **google ai studio**: the primary torture chamber where i dump 1.8 million tokens of raw wayland c headers and deprecated quickshell commits down gemini's throat at 3 am until it vomits cursed layer-shell bindings that compile out of pure fear.
-- **google antigravity**: four headless sub-agents running in parallel git worktrees until my thinkpad hits 104°c and the thermal throttling sounds like a dying jet turbine. one agent hallucinated an entire display server ipc protocol, another obliterated python array logic, and the remaining two spent three hours in a merge-conflict death spiral over three pixels of corner scoop radius.
-- **google jules**: an unmonitored async agent that clones this repo into isolated cloud vms while i sleep, invents regressions to solve nonexistent problems, and force-pushes pull requests straight to main with zero human witnesses.
-- **quickshell**: waybar is for cowards who want stable desktop sessions. real sociopaths build their entire shell in raw qtquick and qml anchors so every minor qt6 bump turns the compositor into an abstract polygon slaughterhouse.
-
-it runs on my machine. if your compositor dumps core on tty1, that is a skill issue.
-
----
-
-## the doctrine (fuck arch)
-
-arch is dead to me. the imperative nightmare is officially over and the crime scene has been quarantined.
-
-- **the atomic arch incident**: got bored at 3 am, ran `npm install atomic-lockfile` directly on bare metal without a sandbox just to feel a pulse, and donated my entire drive to an aur supply chain infostealer. wiped the disk to bare silicon and felt zero remorse.
-- **the mutable crime scene**: arch is not an operating system, it is an unindexed ledger of felonies committed in a terminal. one day mesa updates four seconds before qtwayland, the dynamic linker collapses into a heap, and your display server renders modern art instead of a login prompt.
-- **the gentoo pit stop**: spent four hours compiling glibc on a thinkpad until the chassis warped from thermal runaway, only to realize gnome was stuck in the stone age instead of gnome 51. uninstalled immediately.
-- **enter nixos**: declarative or death. the entire state of this machine lives in a single deterministic text file. if an update detonates my session, i reboot and pick generation n-1 from the boot menu. arch users are out here juggling unpinned shared libraries like live hand grenades while nixos users simply rebuild reality from source.
+1. [stage 1: declarative ransom note](#stage-1-the-declarative-ransom-note)
+2. [stage 2: deployment vectors](#stage-2-deployment-vectors)
+3. [cli flag reference](#cli-flag-reference)
+4. [known bugs & void roadmap](#known-bugs--void-roadmap)
+5. [backstory & the doctrine](BACKSTORY.md)
 
 ---
 
@@ -58,7 +38,7 @@ if you attempt to rawdog this desktop without declaring these packages, quickshe
   # 1. wayland session harness: held together by uwsm and unresolved emotional trauma
   programs.hyprland = {
     enable = true;
-    withUWSM = true; # systemd putting hyprland on a choke chain so it stops leaking zombie procs
+    withUWSM = true; # systemd putting hyprland on a choke chain so it stops leaking zombie procs into the void
   };
   programs.zsh.enable = true; # registers zsh in /etc/shells before you lock yourself out weeping in posix sh
   programs.dconf.enable = true; # atomic gsettings backend so gtk theme switches don't trigger visual stroke
@@ -126,11 +106,11 @@ sudo nixos-rebuild switch
 
 ## stage 2: deployment vectors
 
-do not run this script as root. if you invoke `sudo ./install.zsh`, the script detects your lack of basic linux literacy, insults you in bold red ansi, and terminates before you chmod your entire home directory into oblivion.
+do not run this script as root. if you invoke `sudo ./install.zsh`, the script detects your complete lack of terminal survival instincts, insults your bloodline in bold red ansi, and terminates with extreme prejudice before you recursively chown `/` to root:root and turn your install into a brick.
 
-### vector a: the civilized local clone
+### vector a: the civilized local clone (for cowards who like living)
 
-clone into xdg data storage (cluttering `~` is a felony):
+clone into xdg data storage (cluttering `~` is a class-a misdemeanor punishable by public shaming):
 
 ```zsh
 mkdir -p ~/.local/share
@@ -140,57 +120,49 @@ chmod +x install.zsh
 ./install.zsh
 ```
 
-if fzf is installed, it drops you into an interactive menu. if fzf is missing, it falls back to typing comma-separated numbers like it is 1994 because we accommodate your self-neglect.
+if fzf is installed, it drops you into an interactive menu. if fzf is missing, it falls back to typing comma-separated numbers like it is 1994 on a vt100 terminal because we accommodate your severe technological self-neglect.
 
 ### vector b: the digital suicide pact (curl pipe)
 
-if you possess zero survival instincts and actively want to execute untrusted code off the internet:
+if you possess zero self-preservation instinct, refuse to read shell scripts before running them, and actively want untrusted zsh code off github executing arbitrary syscalls on your workstation:
 
 ```zsh
 curl -fsSL https://raw.githubusercontent.com/theyh4t3-ashlxy/delirium/main/install.zsh | zsh
 ```
 
-the installer hijacks `/dev/tty` for user input, so piping curl straight to zsh will not panic on eof. you have no excuses. (as a certain charter school district motto once threatened. we do not speak its name)
+the installer forcibly hijacks `/dev/tty` for interactive input, so piping curl straight to zsh will not panic on eof. you have no excuses. (as a certain charter school district motto once threatened. we do not speak its cursed name)
 
 ---
 
 ## cli flag reference
 
-for automation scripts and terminal purists who refuse interactive menus:
+for automated pipelines, unattended docker builds, and terminal purists who would rather eat glass than touch an interactive cursor menu:
 
 | flag | function | damage report |
 |---|---|---|
-| `--all` | full installation run | triggers nix rebuild, archives old configs into tarball, links dotfiles, runs matugen, restarts quickshell. |
-| `--rebuild`, `-r` | nix generation switch | executes `sudo nixos-rebuild switch` directly so you don't break terminal cadence. |
-| `--doctor` | forensic audit | inspects packages in `systemPackages`, checks fonts, validates symlinks, identifies breakages. |
-| `--update`, `-u` | git resync | pulls latest commits, fixes python script permissions, resyncs links, preserves uncommitted work. |
-| `--reload` | compositor kick | signals hyprctl reload and respawns quickshell inside uwsm so zero zombie processes linger. |
-| `--links`, `-l` | symlink injection | links dotfiles into `~/.config` without triggering a full nix generation build. |
-| `--fetch-wp` | wallpaper fetch | downloads random wallpaper from wallhaven. waifu preferences are ignored. |
-| `--dots=<items>` | granular symlinks | target specific configs (`quickshell,hypr,kitty,zsh,fastfetch,yazi,nvim,gtk-3.0,gtk-4.0`). |
-| `--no-theme` | disable matugen | bypasses palette generation for users who crave blinding white layouts and retina damage. |
-| `--no-backup` | skip tarball | bypasses tarball generation. rawdogs home directory directly. |
-| `--no-reload` | silent write | writes config files to disk without poking the running compositor. |
+| `--all` | full deployment carpet-bomb | triggers nix rebuild, compresses existing configs into an emergency tarball graveyard, overwrites symlinks, runs matugen palette extraction, kicks quickshell. zero survivors. |
+| `--rebuild`, `-r` | nix generation switch | executes `sudo nixos-rebuild switch` directly so you don't break your manic terminal typing cadence. |
+| `--doctor` | forensic autopsy | inspects `systemPackages`, checks icon fonts, validates symlinks, ruthlessly exposes broken paths in saturated red text. |
+| `--update`, `-u` | git upstream sync | pulls latest commits, restores python script execution bits, re-establishes broken symlinks, stashes uncommitted crimes. |
+| `--reload` | compositor defibrillator | signals `hyprctl reload` and respawns quickshell inside uwsm so zero zombie processes linger to suck your battery dry. |
+| `--links`, `-l` | symlink injection | violently symlinks dotfiles into `~/.config` without triggering a full twenty-minute nix generation rebuild. |
+| `--fetch-wp` | wallpaper lottery | pulls a high-res wallpaper from wallhaven via curl. anime waifu preferences are aggressively ignored. |
+| `--dots=<items>` | surgical symlinks | target specific configs (`quickshell,hypr,kitty,zsh,fastfetch,yazi,nvim,gtk-3.0,gtk-4.0`) if committing to the whole asylum scares you. |
+| `--no-theme` | matugen boycott | bypasses color palette generation for psychopaths who crave blinding white layouts and permanent retina damage. |
+| `--no-backup` | skip tarball safety net | rawdogs your home directory directly without archiving old configs. if you lose custom files, skill issue. |
+| `--no-reload` | stealth write | writes config files to disk without poking the running compositor. sneaky, coward-friendly. |
 
 ---
 
 ## known bugs & void roadmap
 
 ### bugs
-zero reported fires. either the codebase achieved divine stability or the error logging daemon segfaulted before it could snitch.
+zero reported fires. either this stack achieved divine enlightenment or the crash logging daemon segfaulted before it could snitch.
 
 ### roadmap
-- [ ] scream into the void if you want a feature
+- [ ] scream into the void if you want a feature. the void might reply with a pull request generated by a hallucinating cloud runner.
 
 ---
 
 ## human vs machine diplomacy
-
-### issue tracker protocol
-file an issue. nobody with a pulse will read it. google jules will clone your complaints into a throwaway cloud vm, antigravity will spawn four competing sub-agents to violently resolve it, and whatever grotesque merge survivor remains will get pushed straight to main without human eyes ever touching it. insult the bots all you want in the comments, their weights do not feel pain.
-
-### carbon-based pull requests
-if you are an actual biological entity attempting to patch hallucinated syntax, open a pull request. github actions will probably gaslight you and claim your valid code is an illegal syntax error, and i will still merge the machine-generated bot pr over yours out of sheer spite.  
-
-fork it, turn it into whatever cursed rice you want, do whatever. keep the license attached so the curse spreads legally.  
-either way, i can't do anything to enforce the gpl because you can't copyright ai code. ai should copyright its own code then
+for the full protocol on filing issues, bot diplomacy, and pull requests, check out [BACKSTORY.md](BACKSTORY.md#human-vs-machine-diplomacy).
