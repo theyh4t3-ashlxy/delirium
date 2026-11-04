@@ -26,12 +26,17 @@
     theme = "bgrt";
   };
 
+  # early kms & systemd initrd: keep the oem lenovo logo alive without display pipe resets
+  boot.initrd.kernelModules = [ "i915" ];
+  boot.initrd.systemd.enable = true;
+
   # muzzle dmesg into absolute silence because ignorance is the only true form of stability
   boot.consoleLogLevel = 0;
   boot.initrd.verbose = false;
   boot.kernelParams = [
     "quiet"
     "splash"
+    "i915.fastboot=1"
     "boot.shell_on_fail"
     "loglevel=3"
     "rd.systemd.show_status=false"
