@@ -1124,6 +1124,74 @@ def reapply(args) -> bool:
     return set_color(["#787756", mode, scheme])
 
 
+SCHEMES = [
+    "scheme-tonal-spot",
+    "scheme-smart",
+    "scheme-vibrant",
+    "scheme-expressive",
+    "scheme-content",
+    "scheme-fruit-salad",
+    "scheme-rainbow",
+    "scheme-fidelity",
+    "scheme-monochrome",
+    "scheme-neutral",
+]
+
+
+def set_mode(args) -> bool:
+  cfg = load_settings()
+  cur_mode = cfg.get("matugenMode", "dark")
+  target_mode = args[0].strip().lower() if args else "toggle"
+
+  if target_mode in ("toggle", "t"):
+    target_mode = "light" if cur_mode == "dark" else "dark"
+  elif target_mode not in ("dark", "light"):
+    log_err(f"Invalid mode '{target_mode}'. Use 'dark', 'light', or 'toggle'.")
+    return False
+
+  update_settings({"matugenMode": target_mode})
+  log_info(f"Switched theme mode to: {C_CYAN}{target_mode}{C_RESET}")
+  return reapply([target_mode, cfg.get("matugenScheme", "scheme-tonal-spot")])
+
+
+def set_scheme(args) -> bool:
+  cfg = load_settings()
+  if not args:
+    if shutil.which("fzf"):
+      chosen = fzf_prompt(
+          SCHEMES,
+          [
+              "--header=[󰏘 select matugen color scheme]",
+              "--reverse",
+              "--height=40%",
+          ],
+      )
+      if not chosen:
+        return False
+      scheme = chosen
+    else:
+      log_err(
+          f"Usage: wp scheme <{' | '.join([s.replace('scheme-', '') for s in SCHEMES])}>"
+      )
+      return False
+  else:
+    raw = args[0].strip().lower()
+    if not raw.startswith("scheme-"):
+      scheme = f"scheme-{raw}"
+    else:
+      scheme = raw
+
+    if scheme not in SCHEMES:
+      log_err(
+          f"Unknown scheme '{args[0]}'. Available: {', '.join([s.replace('scheme-', '') for s in SCHEMES])}"
+      )
+      return False
+
+  update_settings({"matugenScheme": scheme})
+  log_info(f"Switched color scheme to: {C_CYAN}{scheme}{C_RESET}")
+  return reapply([cfg.get("matugenMode", "dark"), scheme])
+
+
 def download(args) -> bool:
   if not args:
     log_err("Usage: wp download <url>")
@@ -1176,11 +1244,19 @@ def interactive_picker():
     print_help()
     return
 
+  cur_cfg = load_settings()
+  cur_m = cur_cfg.get("matugenMode", "dark")
+  cur_s = cur_cfg.get("matugenScheme", "scheme-tonal-spot").replace(
+      "scheme-", ""
+  )
+
   options = [
       "󰑐 roll random local wallpaper",
       "󰖟 roll random online wallpaper (wallhaven)",
       "󰋩 select wallpaper from library",
       "󰍹 select live video / gif wallpaper",
+      f"󰔎 toggle dark / light mode (currently: {cur_m})",
+      f"󰏘 switch color scheme (currently: {cur_s})",
       "󰁕 reload current wallpaper & theme",
       "󰚰 rescan library & thumbnails",
       "󰏤 download wallpaper by url",
@@ -1191,7 +1267,7 @@ def interactive_picker():
       [
           "--header=[󰄛 wallpaper hub - what do you want to do?]",
           "--reverse",
-          "--height=40%",
+          "--height=45%",
       ],
   )
   if not choice:
@@ -1245,6 +1321,10 @@ def interactive_picker():
     )
     if res:
       set_wallpaper([res.split("\t")[0]])
+  elif "toggle dark / light mode" in choice:
+    set_mode(["toggle"])
+  elif "switch color scheme" in choice:
+    set_scheme([])
   elif "reload current" in choice:
     reapply([])
   elif "rescan library" in choice:
@@ -1264,6 +1344,9 @@ def print_help():
 
 {C_BOLD}Usage:{C_RESET}
   wp                           Open interactive fzf picker
+  wp mode [dark|light|toggle]  Switch or toggle theme mode (dark / light)
+  wp scheme [name]             Switch Matugen palette algorithm (or fzf pick)
+  wp toggle                    Quick toggle between dark and light mode
   wp random [category|online]  Roll random wallpaper (e.g. wp random anime)
   wp wh [query]                Roll random online wallpaper from Wallhaven
   wp reload                    Re-apply current wallpaper & theme
@@ -1292,6 +1375,11 @@ def main():
   dispatch = {
       "scan": lambda: (scan(), log_success("Wallpaper library rescanned."), True)[2],
       "set": lambda: set_wallpaper(args),
+      "mode": lambda: set_mode(args),
+      "scheme": lambda: set_scheme(args),
+      "toggle": lambda: set_mode(["toggle"]),
+      "dark": lambda: set_mode(["dark"]),
+      "light": lambda: set_mode(["light"]),
       "random": lambda: random_wallpaper(args),
       "roll": lambda: random_wallpaper(args),
       "wallhaven": lambda: random_wallhaven(args),
