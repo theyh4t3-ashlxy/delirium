@@ -1,11 +1,11 @@
-// ConcaveCorner.qml (Canvas version with G2 continuity, border stroking & hidpi support)
+// ConcaveCorner.qml
 import QtQuick
 import ".."
 
 Item {
     id: root
 
-    property real radius: (typeof Theme !== "undefined" ? (Theme?.scoopRadius ?? Theme?.scoopRadiusX ?? 16) : 16)
+    property real radius: (typeof Theme !== "undefined" ? (Theme?.scoopRadius ?? Theme?.scoopRadiusX ?? Settings?.scoopRadius ?? Settings?.screenCornerRadius ?? 16) : 16)
     property real radiusX: radius
     property real radiusY: radius
     property color fillColor: Theme?.cornerFill ?? Theme?.barBg ?? "#14140c"
@@ -13,9 +13,27 @@ Item {
     property bool flipY: false
     property string cornerStyle: (typeof Settings !== "undefined" ? Settings?.cornerStyle : null) ?? "cubic"
 
-    property bool showBorder: (typeof Theme !== "undefined" && Theme?.scoopBorderEnabled) ?? false
-    property real borderWidth: (typeof Theme !== "undefined" ? Theme?.scoopBorderWidth : 0) ?? 0
-    property color borderColor: (typeof Theme !== "undefined" ? Theme?.scoopBorderColor : "transparent") ?? "transparent"
+    readonly property bool hasThemeStroke: (typeof Theme !== "undefined") && (
+        (Theme?.isCyberNeon ?? false) || (Theme?.isAccentGlow ?? false) || (Theme?.isGlass ?? false) || (Theme?.isPureBlack ?? false)
+    )
+    property bool showBorder: ((typeof Theme !== "undefined" && Theme?.scoopBorderEnabled) ?? false) || hasThemeStroke
+    property real borderWidth: {
+        if (typeof Theme !== "undefined" && (Theme?.scoopBorderWidth ?? 0) > 0) return Theme.scoopBorderWidth;
+        if (typeof Theme !== "undefined" && ((Theme?.isCyberNeon ?? false) || (Theme?.isAccentGlow ?? false))) return 2;
+        if (hasThemeStroke) return 1;
+        return 0;
+    }
+    property color borderColor: {
+        if (typeof Theme !== "undefined" && Theme?.scoopBorderEnabled && Theme?.scoopBorderColor && Theme.scoopBorderColor !== "transparent") {
+            return Theme.scoopBorderColor;
+        }
+        if (typeof Theme !== "undefined") {
+            if ((Theme?.isCyberNeon ?? false) || (Theme?.isAccentGlow ?? false)) return Theme.alpha(Theme.primary, 0.85);
+            if (Theme?.isGlass ?? false) return Theme?.glassHighlight ?? Qt.rgba(1, 1, 1, 0.22);
+            if (Theme?.isPureBlack ?? false) return "#222222";
+        }
+        return "transparent";
+    }
 
     property alias color: root.fillColor
     property alias mirrored: root.flipX
@@ -39,6 +57,34 @@ Item {
     Behavior on fillColor { ColorAnimation { duration: (typeof Theme !== "undefined" ? Theme?.animFast : null) ?? 150 } }
     Behavior on borderColor { ColorAnimation { duration: (typeof Theme !== "undefined" ? Theme?.animFast : null) ?? 150 } }
 
+    // universal scoop curve from (x0, y0) to (x1, y1) bowing toward outer corner (cx, cy)
+    function traceScoopCurve(ctx, x0, y0, cx, cy, x1, y1, style, t) {
+        if (style === "chamfer") {
+            ctx.lineTo(x1, y1);
+        } else if (style === "stepped") {
+            // 3-step pixel staircase that actually uses the whole corner box instead of backtracking
+            var ux = x0 - cx, uy = y0 - cy;
+            var vx = x1 - cx, vy = y1 - cy;
+            ctx.lineTo(cx + ux + vx / 3.0, cy + uy + vy / 3.0);
+            ctx.lineTo(cx + (2.0 * ux) / 3.0 + vx / 3.0, cy + (2.0 * uy) / 3.0 + vy / 3.0);
+            ctx.lineTo(cx + (2.0 * ux) / 3.0 + (2.0 * vx) / 3.0, cy + (2.0 * uy) / 3.0 + (2.0 * vy) / 3.0);
+            ctx.lineTo(cx + ux / 3.0 + (2.0 * vx) / 3.0, cy + uy / 3.0 + (2.0 * vy) / 3.0);
+            ctx.lineTo(cx + ux / 3.0 + vx, cy + uy / 3.0 + vy);
+            ctx.lineTo(x1, y1);
+        } else if (style === "hyperbolic") {
+            // previously fx was backwards here, turning the curve into a weird S-bend
+            var hx = cx + (x0 + x1 - 2.0 * cx) * 0.2;
+            var hy = cy + (y0 + y1 - 2.0 * cy) * 0.2;
+            ctx.quadraticCurveTo(hx, hy, x1, y1);
+        } else {
+            var c1x = x0 + (cx - x0) * t;
+            var c1y = y0 + (cy - y0) * t;
+            var c2x = x1 + (cx - x1) * t;
+            var c2y = y1 + (cy - y1) * t;
+            ctx.bezierCurveTo(c1x, c1y, c2x, c2y, x1, y1);
+        }
+    }
+
     Canvas {
         id: canvas
         width: Math.round(root.width * root.dpr)
@@ -57,9 +103,6 @@ Item {
             ctx.save();
             ctx.scale(root.dpr, root.dpr);
 
-            ctx.fillStyle = root.fillColor;
-            ctx.beginPath();
-
             var fx = root.flipX;
             var fy = root.flipY;
             var w = root.w;
@@ -68,70 +111,24 @@ Item {
 
             var sx = fx ? 0 : w;
             var sy = fy ? h : 0;
-            ctx.moveTo(sx, sy);
-
             var p1x = fx ? w : 0;
             var p1y = fy ? h : 0;
-            ctx.lineTo(p1x, p1y);
-
             var p2x = fx ? w : 0;
             var p2y = fy ? 0 : h;
+
+            ctx.fillStyle = root.fillColor;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(p1x, p1y);
             ctx.lineTo(p2x, p2y);
-
-            var c1x, c1y, c2x, c2y;
-
-            if (root.cornerStyle === "chamfer") {
-                ctx.lineTo(sx, sy);
-            } else if (root.cornerStyle === "stepped") {
-                var midX = w * 0.5;
-                var midY = h * 0.5;
-                ctx.lineTo(p2x, midY);
-                ctx.lineTo(midX, midY);
-                ctx.lineTo(midX, sy);
-                ctx.lineTo(sx, sy);
-            } else if (root.cornerStyle === "hyperbolic") {
-                var hx = fx ? (w * 0.2) : (w * 0.8);
-                var hy = fy ? (h * 0.8) : (h * 0.2);
-                ctx.quadraticCurveTo(hx, hy, sx, sy);
-            } else if (root.cornerStyle === "continuous-bezier" || root.cornerStyle === "g2") {
-                c1x = fx ? w : 0;
-                c1y = fy ? (h * 0.44) : (h * 0.56);
-                c2x = fx ? (w * 0.56) : (w * 0.44);
-                c2y = fy ? h : 0;
-                ctx.bezierCurveTo(c1x, c1y, c2x, c2y, sx, sy);
-            } else {
-                c1x = fx ? w : 0;
-                c1y = fy ? (h * t) : (h * (1.0 - t));
-                c2x = fx ? (w * t) : (w * (1.0 - t));
-                c2y = fy ? h : 0;
-                ctx.bezierCurveTo(c1x, c1y, c2x, c2y, sx, sy);
-            }
-
+            root.traceScoopCurve(ctx, p2x, p2y, p1x, p1y, sx, sy, root.cornerStyle, t);
             ctx.closePath();
             ctx.fill();
 
-            // Optional high-definition continuous border stroke
             if (root.showBorder && root.borderWidth > 0 && root.borderColor !== "transparent" && root.borderColor.a > 0.01) {
                 ctx.beginPath();
                 ctx.moveTo(p2x, p2y);
-                if (root.cornerStyle === "chamfer") {
-                    ctx.lineTo(sx, sy);
-                } else if (root.cornerStyle === "stepped") {
-                    var sMidX = w * 0.5;
-                    var sMidY = h * 0.5;
-                    ctx.lineTo(p2x, sMidY);
-                    ctx.lineTo(sMidX, sMidY);
-                    ctx.lineTo(sMidX, sy);
-                    ctx.lineTo(sx, sy);
-                } else if (root.cornerStyle === "hyperbolic") {
-                    var shx = fx ? (w * 0.2) : (w * 0.8);
-                    var shy = fy ? (h * 0.8) : (h * 0.2);
-                    ctx.quadraticCurveTo(shx, shy, sx, sy);
-                } else if (root.cornerStyle === "continuous-bezier" || root.cornerStyle === "g2") {
-                    ctx.bezierCurveTo(c1x, c1y, c2x, c2y, sx, sy);
-                } else {
-                    ctx.bezierCurveTo(c1x, c1y, c2x, c2y, sx, sy);
-                }
+                root.traceScoopCurve(ctx, p2x, p2y, p1x, p1y, sx, sy, root.cornerStyle, t);
                 ctx.lineCap = "butt";
                 ctx.lineJoin = "round";
                 ctx.lineWidth = root.borderWidth;

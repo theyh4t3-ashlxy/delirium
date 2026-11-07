@@ -107,16 +107,62 @@ PanelWindow {
     readonly property int barRadius: Settings?.barRadius ?? 0
     readonly property int effectiveBarRadius: root.isFloating ? (root.barRadius > 0 ? root.barRadius : (Settings?.screenCornerRadius ?? 12)) : 0
 
-    readonly property int scoopRadius: Math.round(Settings?.scoopRadius ?? Settings?.screenCornerRadius ?? 16)
+    readonly property int scoopRadius: Math.round(Settings?.scoopRadius ?? Settings?.screenCornerRadius ?? Theme?.scoopRadius ?? 16)
     readonly property string cornerMode: Settings?.screenCornerMode ?? "all"
 
-    readonly property bool scoopAllowedLeft: cornerMode !== "none" && (cornerMode !== "monitor" || !hasAdjacentMonitorAt("left", isBottom ? "bottomLeft" : "topLeft"))
-    readonly property bool scoopAllowedRight: cornerMode !== "none" && (cornerMode !== "monitor" || !hasAdjacentMonitorAt("right", isBottom ? "bottomRight" : "topRight"))
-    readonly property bool scoopAllowedTop: cornerMode !== "none" && (cornerMode !== "monitor" || !hasAdjacentMonitorAt("top", isRight ? "topRight" : "topLeft"))
-    readonly property bool scoopAllowedBottom: cornerMode !== "none" && (cornerMode !== "monitor" || !hasAdjacentMonitorAt("bottom", isRight ? "bottomRight" : "bottomLeft"))
+    // match ScreenCorners.qml visibility rules so "opposite", "top", "bottom", etc. don't fight each other
+    readonly property bool scoopAllowedLeft: {
+        if (cornerMode === "none" || cornerMode === "opposite") return false;
+        if (cornerMode === "monitor") {
+            let c = isBottom ? "bottomLeft" : "topLeft";
+            return !hasAdjacentMonitorAt("left", c) && !hasAdjacentMonitorAt(isBottom ? "bottom" : "top", c);
+        }
+        if (cornerMode === "all" || cornerMode === "left") return true;
+        if (isTop && cornerMode === "top") return true;
+        if (isBottom && cornerMode === "bottom") return true;
+        return false;
+    }
+    readonly property bool scoopAllowedRight: {
+        if (cornerMode === "none" || cornerMode === "opposite") return false;
+        if (cornerMode === "monitor") {
+            let c = isBottom ? "bottomRight" : "topRight";
+            return !hasAdjacentMonitorAt("right", c) && !hasAdjacentMonitorAt(isBottom ? "bottom" : "top", c);
+        }
+        if (cornerMode === "all" || cornerMode === "right") return true;
+        if (isTop && cornerMode === "top") return true;
+        if (isBottom && cornerMode === "bottom") return true;
+        return false;
+    }
+    readonly property bool scoopAllowedTop: {
+        if (cornerMode === "none" || cornerMode === "opposite") return false;
+        if (cornerMode === "monitor") {
+            let c = isRight ? "topRight" : "topLeft";
+            return !hasAdjacentMonitorAt("top", c) && !hasAdjacentMonitorAt(isRight ? "right" : "left", c);
+        }
+        if (cornerMode === "all" || cornerMode === "top") return true;
+        if (isLeft && cornerMode === "left") return true;
+        if (isRight && cornerMode === "right") return true;
+        return false;
+    }
+    readonly property bool scoopAllowedBottom: {
+        if (cornerMode === "none" || cornerMode === "opposite") return false;
+        if (cornerMode === "monitor") {
+            let c = isRight ? "bottomRight" : "bottomLeft";
+            return !hasAdjacentMonitorAt("bottom", c) && !hasAdjacentMonitorAt(isRight ? "right" : "left", c);
+        }
+        if (cornerMode === "all" || cornerMode === "bottom") return true;
+        if (isLeft && cornerMode === "left") return true;
+        if (isRight && cornerMode === "right") return true;
+        return false;
+    }
+
+    readonly property bool borderLeftAllowed: cornerMode === "all" || cornerMode === "left" || (cornerMode === "monitor" && !hasAdjacentMonitor("left")) || (cornerMode === "opposite" && isRight)
+    readonly property bool borderRightAllowed: cornerMode === "all" || cornerMode === "right" || (cornerMode === "monitor" && !hasAdjacentMonitor("right")) || (cornerMode === "opposite" && isLeft)
+    readonly property bool borderTopAllowed: cornerMode === "all" || cornerMode === "top" || (cornerMode === "monitor" && !hasAdjacentMonitor("top")) || (cornerMode === "opposite" && isBottom)
+    readonly property bool borderBottomAllowed: cornerMode === "all" || cornerMode === "bottom" || (cornerMode === "monitor" && !hasAdjacentMonitor("bottom")) || (cornerMode === "opposite" && isTop)
 
     readonly property int borderWidth: Math.round((Settings?.screenFrameDocked ?? true) ? (Settings?.screenBorderWidth ?? 0) : 0)
-    readonly property bool hasBarScoops: !root.isFloating && !root.isIslandMode && (Settings?.screenFrameDocked ?? true) && (
+    readonly property bool hasBarScoops: !root.isFloating && !root.isIslandMode && (Settings?.screenFrameDocked ?? true) && root.scoopRadius > 0 && (
         root.isVertical ? (scoopAllowedTop || scoopAllowedBottom) : (scoopAllowedLeft || scoopAllowedRight)
     )
 
@@ -126,6 +172,34 @@ PanelWindow {
         if (cornerStyle === "continuous-bezier" || cornerStyle === "g2") return 0.58;
         if (cornerStyle === "flared") return 0.38;
         return Settings?.scoopTension ?? 0.55228475;
+    }
+
+    readonly property real dpr: Math.max(1.0, (Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1.0))
+
+    // same curve math as ConcaveCorner.qml so the bar and screen corners don't argue about shapes
+    function traceScoopCurve(ctx, x0, y0, cx, cy, x1, y1, style, t) {
+        if (style === "chamfer") {
+            ctx.lineTo(x1, y1);
+        } else if (style === "stepped") {
+            var ux = x0 - cx, uy = y0 - cy;
+            var vx = x1 - cx, vy = y1 - cy;
+            ctx.lineTo(cx + ux + vx / 3.0, cy + uy + vy / 3.0);
+            ctx.lineTo(cx + (2.0 * ux) / 3.0 + vx / 3.0, cy + (2.0 * uy) / 3.0 + vy / 3.0);
+            ctx.lineTo(cx + (2.0 * ux) / 3.0 + (2.0 * vx) / 3.0, cy + (2.0 * uy) / 3.0 + (2.0 * vy) / 3.0);
+            ctx.lineTo(cx + ux / 3.0 + (2.0 * vx) / 3.0, cy + uy / 3.0 + (2.0 * vy) / 3.0);
+            ctx.lineTo(cx + ux / 3.0 + vx, cy + uy / 3.0 + vy);
+            ctx.lineTo(x1, y1);
+        } else if (style === "hyperbolic") {
+            var hx = cx + (x0 + x1 - 2.0 * cx) * 0.2;
+            var hy = cy + (y0 + y1 - 2.0 * cy) * 0.2;
+            ctx.quadraticCurveTo(hx, hy, x1, y1);
+        } else {
+            var c1x = x0 + (cx - x0) * t;
+            var c1y = y0 + (cy - y0) * t;
+            var c2x = x1 + (cx - x1) * t;
+            var c2y = y1 + (cy - y1) * t;
+            ctx.bezierCurveTo(c1x, c1y, c2x, c2y, x1, y1);
+        }
     }
 
     anchors {
@@ -150,8 +224,12 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "quickshell:bar"
 
+    // let clicks pass through empty gaps between islands in island mode
     mask: Region {
-        Region { item: barBg }
+        item: root.isIslandMode ? null : barBg
+        Region { item: root.isIslandMode ? (root.isVertical ? bentoTopIslandV : bentoLeftIsland) : null }
+        Region { item: root.isIslandMode ? (root.isVertical ? bentoCenterIslandV : bentoCenterIsland) : null }
+        Region { item: root.isIslandMode ? (root.isVertical ? bentoBottomIslandV : bentoRightIsland) : null }
     }
 
     property alias launcherPopup: launcherPopup
@@ -315,14 +393,18 @@ PanelWindow {
         // Single unified shape for docked bar + concave corners
         Canvas {
             id: unifiedBarCanvas
-            anchors.fill: parent
+            width: Math.round(parent.width * root.dpr)
+            height: Math.round(parent.height * root.dpr)
+            scale: 1.0 / root.dpr
+            transformOrigin: Item.TopLeft
             visible: !root.isFloating && !root.isIslandMode
             antialiasing: true
             smooth: true
             renderTarget: Canvas.FramebufferObject
             renderStrategy: Canvas.Immediate
 
-            property color fillColor: Theme.barBg
+            property color fillColor: Theme?.cornerFill ?? Theme?.barBg ?? "#14140c"
+            Behavior on fillColor { ColorAnimation { duration: (typeof Theme !== "undefined" ? Theme?.animFast : null) ?? 150 } }
             property real glowOpacity: (Theme?.isCyberNeon ?? false) ? 1.0 : 0.85
 
             SequentialAnimation on glowOpacity {
@@ -336,6 +418,8 @@ PanelWindow {
             onGlowOpacityChanged: requestPaint()
             onWidthChanged: requestPaint()
             onHeightChanged: requestPaint()
+            onAvailableChanged: if (available) requestPaint()
+            Component.onCompleted: requestPaint()
 
             Connections {
                 target: root
@@ -346,27 +430,42 @@ PanelWindow {
                 function onScoopAllowedRightChanged() { unifiedBarCanvas.requestPaint(); }
                 function onScoopAllowedTopChanged() { unifiedBarCanvas.requestPaint(); }
                 function onScoopAllowedBottomChanged() { unifiedBarCanvas.requestPaint(); }
+                function onBorderLeftAllowedChanged() { unifiedBarCanvas.requestPaint(); }
+                function onBorderRightAllowedChanged() { unifiedBarCanvas.requestPaint(); }
+                function onBorderTopAllowedChanged() { unifiedBarCanvas.requestPaint(); }
+                function onBorderBottomAllowedChanged() { unifiedBarCanvas.requestPaint(); }
                 function onBorderWidthChanged() { unifiedBarCanvas.requestPaint(); }
                 function onCornerStyleChanged() { unifiedBarCanvas.requestPaint(); }
                 function onScoopTensionChanged() { unifiedBarCanvas.requestPaint(); }
+                function onDprChanged() { unifiedBarCanvas.requestPaint(); }
             }
 
             onPaint: {
                 var ctx = getContext("2d");
                 ctx.reset();
-                ctx.clearRect(0, 0, width, height);
+                ctx.clearRect(0, 0, unifiedBarCanvas.width, unifiedBarCanvas.height);
+                ctx.save();
+                ctx.scale(root.dpr, root.dpr);
 
-                var W = width;
-                var H = height;
+                var W = barRootItem.width;
+                var H = barRootItem.height;
                 var barH = Theme.barHeight;
                 var r = root.hasBarScoops ? root.scoopRadius : 0;
-                var bw = root.borderWidth;
+                var style = root.cornerStyle;
                 var t = root.scoopTension;
+
+                var alreadyInsetH = root.screen ? (W < root.screen.width) : false;
+                var alreadyInsetV = root.screen ? (H < root.screen.height) : false;
+
+                var bwL = (!alreadyInsetH && root.borderLeftAllowed) ? root.borderWidth : 0;
+                var bwR = (!alreadyInsetH && root.borderRightAllowed) ? root.borderWidth : 0;
+                var bwT = (!alreadyInsetV && root.borderTopAllowed) ? root.borderWidth : 0;
+                var bwB = (!alreadyInsetV && root.borderBottomAllowed) ? root.borderWidth : 0;
 
                 var sL = root.hasBarScoops && !root.isVertical && r > 0 && root.scoopAllowedLeft;
                 var sR = root.hasBarScoops && !root.isVertical && r > 0 && root.scoopAllowedRight;
                 var sT = root.hasBarScoops && root.isVertical && r > 0 && root.scoopAllowedTop;
-                var sB = root.hasBarScoops && root.isVertical && r > 0 && root.scoopAllowedBottom;
+                var sB = root.hasBarScoops && !root.isVertical ? false : (root.hasBarScoops && r > 0 && root.scoopAllowedBottom);
 
                 ctx.fillStyle = unifiedBarCanvas.fillColor;
                 ctx.beginPath();
@@ -376,15 +475,15 @@ PanelWindow {
                     ctx.lineTo(W, 0);
                     if (sR) {
                         ctx.lineTo(W, barH + r);
-                        if (bw > 0) ctx.lineTo(W - bw, barH + r);
-                        ctx.bezierCurveTo(W - bw, barH + r * (1 - t), W - bw - r * (1 - t), barH, W - bw - r, barH);
+                        if (bwR > 0) ctx.lineTo(W - bwR, barH + r);
+                        root.traceScoopCurve(ctx, W - bwR, barH + r, W - bwR, barH, W - bwR - r, barH, style, t);
                     } else {
                         ctx.lineTo(W, barH);
                     }
-                    ctx.lineTo(sL ? (bw + r) : 0, barH);
+                    ctx.lineTo(sL ? (bwL + r) : 0, barH);
                     if (sL) {
-                        ctx.bezierCurveTo(bw + r * (1 - t), barH, bw, barH + r * (1 - t), bw, barH + r);
-                        if (bw > 0) ctx.lineTo(0, barH + r);
+                        root.traceScoopCurve(ctx, bwL + r, barH, bwL, barH, bwL, barH + r, style, t);
+                        if (bwL > 0) ctx.lineTo(0, barH + r);
                     }
                     ctx.closePath();
                 } else if (root.isBottom) {
@@ -393,15 +492,15 @@ PanelWindow {
                     ctx.lineTo(W, H);
                     if (sR) {
                         ctx.lineTo(W, 0);
-                        if (bw > 0) ctx.lineTo(W - bw, 0);
-                        ctx.bezierCurveTo(W - bw, r * t, W - bw - r * (1 - t), topY, W - bw - r, topY);
+                        if (bwR > 0) ctx.lineTo(W - bwR, 0);
+                        root.traceScoopCurve(ctx, W - bwR, 0, W - bwR, topY, W - bwR - r, topY, style, t);
                     } else {
                         ctx.lineTo(W, topY);
                     }
-                    ctx.lineTo(sL ? (bw + r) : 0, topY);
+                    ctx.lineTo(sL ? (bwL + r) : 0, topY);
                     if (sL) {
-                        ctx.bezierCurveTo(bw + r * (1 - t), topY, bw, r * t, bw, 0);
-                        if (bw > 0) ctx.lineTo(0, 0);
+                        root.traceScoopCurve(ctx, bwL + r, topY, bwL, topY, bwL, 0, style, t);
+                        if (bwL > 0) ctx.lineTo(0, 0);
                     }
                     ctx.closePath();
                 } else if (root.isLeft) {
@@ -409,15 +508,15 @@ PanelWindow {
                     ctx.lineTo(0, H);
                     if (sB) {
                         ctx.lineTo(barH + r, H);
-                        if (bw > 0) ctx.lineTo(barH + r, H - bw);
-                        ctx.bezierCurveTo(barH + r * (1 - t), H - bw, barH, H - bw - r * (1 - t), barH, H - bw - r);
+                        if (bwB > 0) ctx.lineTo(barH + r, H - bwB);
+                        root.traceScoopCurve(ctx, barH + r, H - bwB, barH, H - bwB, barH, H - bwB - r, style, t);
                     } else {
                         ctx.lineTo(barH, H);
                     }
-                    ctx.lineTo(barH, sT ? (bw + r) : 0);
+                    ctx.lineTo(barH, sT ? (bwT + r) : 0);
                     if (sT) {
-                        ctx.bezierCurveTo(barH, bw + r * (1 - t), barH + r * (1 - t), bw, barH + r, bw);
-                        if (bw > 0) ctx.lineTo(barH + r, 0);
+                        root.traceScoopCurve(ctx, barH, bwT + r, barH, bwT, barH + r, bwT, style, t);
+                        if (bwT > 0) ctx.lineTo(barH + r, 0);
                     }
                     ctx.closePath();
                 } else if (root.isRight) {
@@ -426,90 +525,95 @@ PanelWindow {
                     ctx.lineTo(W, H);
                     if (sB) {
                         ctx.lineTo(0, H);
-                        if (bw > 0) ctx.lineTo(0, H - bw);
-                        ctx.bezierCurveTo(r * t, H - bw, leftX, H - bw - r * (1 - t), leftX, H - bw - r);
+                        if (bwB > 0) ctx.lineTo(0, H - bwB);
+                        root.traceScoopCurve(ctx, 0, H - bwB, leftX, H - bwB, leftX, H - bwB - r, style, t);
                     } else {
                         ctx.lineTo(leftX, H);
                     }
-                    ctx.lineTo(leftX, sT ? (bw + r) : 0);
+                    ctx.lineTo(leftX, sT ? (bwT + r) : 0);
                     if (sT) {
-                        ctx.bezierCurveTo(leftX, bw + r * (1 - t), r * t, bw, 0, bw);
-                        if (bw > 0) ctx.lineTo(0, 0);
+                        root.traceScoopCurve(ctx, leftX, bwT + r, leftX, bwT, 0, bwT, style, t);
+                        if (bwT > 0) ctx.lineTo(0, 0);
                     }
                     ctx.closePath();
                 }
 
                 ctx.fill();
 
-                // Continuous inner edge stroke so borders/glows curve smoothly into the corners
+                var hasCustomBorder = (Theme?.scoopBorderEnabled ?? false) && (Theme?.scoopBorderWidth ?? 0) > 0 && (Theme?.scoopBorderColor ?? "transparent") !== "transparent";
                 var hasNeon = (Theme?.isCyberNeon ?? false) || (Theme?.isAccentGlow ?? false);
                 var hasGlass = Theme?.isGlass ?? false;
                 var hasPureBlack = Theme?.isPureBlack ?? false;
 
-                if (hasNeon || hasGlass || hasPureBlack) {
+                if (hasCustomBorder || hasNeon || hasGlass || hasPureBlack) {
                     ctx.beginPath();
                     if (root.isTop) {
                         if (sL) {
-                            ctx.moveTo(bw, barH + r);
-                            ctx.bezierCurveTo(bw, barH + r * (1 - t), bw + r * (1 - t), barH, bw + r, barH);
+                            ctx.moveTo(bwL, barH + r);
+                            root.traceScoopCurve(ctx, bwL, barH + r, bwL, barH, bwL + r, barH, style, t);
                         } else {
                             ctx.moveTo(0, barH);
                         }
-                        ctx.lineTo(sR ? (W - bw - r) : W, barH);
+                        ctx.lineTo(sR ? (W - bwR - r) : W, barH);
                         if (sR) {
-                            ctx.bezierCurveTo(W - bw - r * (1 - t), barH, W - bw, barH + r * (1 - t), W - bw, barH + r);
+                            root.traceScoopCurve(ctx, W - bwR - r, barH, W - bwR, barH, W - bwR, barH + r, style, t);
                         }
                     } else if (root.isBottom) {
                         var bTopY = H - barH;
                         if (sL) {
-                            ctx.moveTo(bw, 0);
-                            ctx.bezierCurveTo(bw, r * t, bw + r * (1 - t), bTopY, bw + r, bTopY);
+                            ctx.moveTo(bwL, 0);
+                            root.traceScoopCurve(ctx, bwL, 0, bwL, bTopY, bwL + r, bTopY, style, t);
                         } else {
                             ctx.moveTo(0, bTopY);
                         }
-                        ctx.lineTo(sR ? (W - bw - r) : W, bTopY);
+                        ctx.lineTo(sR ? (W - bwR - r) : W, bTopY);
                         if (sR) {
-                            ctx.bezierCurveTo(W - bw - r * (1 - t), bTopY, W - bw, r * t, W - bw, 0);
+                            root.traceScoopCurve(ctx, W - bwR - r, bTopY, W - bwR, bTopY, W - bwR, 0, style, t);
                         }
                     } else if (root.isLeft) {
                         if (sT) {
-                            ctx.moveTo(barH + r, bw);
-                            ctx.bezierCurveTo(barH + r * (1 - t), bw, barH, bw + r * (1 - t), barH, bw + r);
+                            ctx.moveTo(barH + r, bwT);
+                            root.traceScoopCurve(ctx, barH + r, bwT, barH, bwT, barH, bwT + r, style, t);
                         } else {
                             ctx.moveTo(barH, 0);
                         }
-                        ctx.lineTo(barH, sB ? (H - bw - r) : H);
+                        ctx.lineTo(barH, sB ? (H - bwB - r) : H);
                         if (sB) {
-                            ctx.bezierCurveTo(barH, H - bw - r * (1 - t), barH + r * (1 - t), H - bw, barH + r, H - bw);
+                            root.traceScoopCurve(ctx, barH, H - bwB - r, barH, H - bwB, barH + r, H - bwB, style, t);
                         }
                     } else if (root.isRight) {
                         var rLeftX = W - barH;
                         if (sT) {
-                            ctx.moveTo(0, bw);
-                            ctx.bezierCurveTo(r * t, bw, rLeftX, bw + r * (1 - t), rLeftX, bw + r);
+                            ctx.moveTo(0, bwT);
+                            root.traceScoopCurve(ctx, 0, bwT, rLeftX, bwT, rLeftX, bwT + r, style, t);
                         } else {
                             ctx.moveTo(rLeftX, 0);
                         }
-                        ctx.lineTo(rLeftX, sB ? (H - bw - r) : H);
+                        ctx.lineTo(rLeftX, sB ? (H - bwB - r) : H);
                         if (sB) {
-                            ctx.bezierCurveTo(rLeftX, H - bw - r * (1 - t), r * t, H - bw, 0, H - bw);
+                            root.traceScoopCurve(ctx, rLeftX, H - bwB - r, rLeftX, H - bwB, 0, H - bwB, style, t);
                         }
                     }
 
-                    if (hasNeon) {
+                    ctx.lineCap = "butt";
+                    ctx.lineJoin = "round";
+                    if (hasCustomBorder) {
+                        ctx.lineWidth = Theme.scoopBorderWidth;
+                        ctx.strokeStyle = Theme.scoopBorderColor;
+                    } else if (hasNeon) {
                         ctx.lineWidth = 2;
                         ctx.strokeStyle = Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, unifiedBarCanvas.glowOpacity);
-                        ctx.stroke();
                     } else if (hasGlass) {
                         ctx.lineWidth = 1;
                         ctx.strokeStyle = Theme.glassHighlight ?? Qt.rgba(1, 1, 1, 0.22);
-                        ctx.stroke();
                     } else if (hasPureBlack) {
                         ctx.lineWidth = 1;
                         ctx.strokeStyle = "#222222";
-                        ctx.stroke();
                     }
+                    ctx.stroke();
                 }
+
+                ctx.restore();
             }
         }
 
@@ -800,6 +904,7 @@ PanelWindow {
 
             // Bento Floating Island: Top V
             Rectangle {
+                id: bentoTopIslandV
                 visible: root.isIslandMode && root.isVertical && leftRowV.visible && (leftRowV.implicitHeight > 0)
                 anchors.horizontalCenter: leftRowV.horizontalCenter
                 anchors.top: leftRowV.top
@@ -808,26 +913,36 @@ PanelWindow {
                 height: leftRowV.implicitHeight + 12
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
-                border.color: Theme.cardBorder
+                border.color: (Theme?.isCyberNeon ?? false) ? Theme.primary : Theme.cardBorder
                 border.width: 1
                 z: -1
+                scale: (Settings?.bentoHoverLift ?? true) && bentoTopHoverV.hovered ? 1.015 : 1.0
+                HoverHandler { id: bentoTopHoverV }
+                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
+                Behavior on height { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
             }
 
             // Bento Floating Island: Center V
             Rectangle {
+                id: bentoCenterIslandV
                 visible: root.isIslandMode && root.isVertical && centerRowV.visible && (centerRowV.implicitHeight > 0)
                 anchors.centerIn: centerRowV
                 width: Theme.barHeight - 6
                 height: centerRowV.implicitHeight + 16
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
-                border.color: Theme.cardBorder
+                border.color: (Theme?.isCyberNeon ?? false) ? Theme.primary : Theme.cardBorder
                 border.width: 1
                 z: -1
+                scale: (Settings?.bentoHoverLift ?? true) && bentoCenterHoverV.hovered ? 1.015 : 1.0
+                HoverHandler { id: bentoCenterHoverV }
+                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
+                Behavior on height { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
             }
 
             // Bento Floating Island: Bottom V
             Rectangle {
+                id: bentoBottomIslandV
                 visible: root.isIslandMode && root.isVertical && rightRowV.visible && (rightRowV.implicitHeight > 0)
                 anchors.horizontalCenter: rightRowV.horizontalCenter
                 anchors.bottom: rightRowV.bottom
@@ -836,9 +951,13 @@ PanelWindow {
                 height: rightRowV.implicitHeight + 12
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
-                border.color: Theme.cardBorder
+                border.color: (Theme?.isCyberNeon ?? false) ? Theme.primary : Theme.cardBorder
                 border.width: 1
                 z: -1
+                scale: (Settings?.bentoHoverLift ?? true) && bentoBottomHoverV.hovered ? 1.015 : 1.0
+                HoverHandler { id: bentoBottomHoverV }
+                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
+                Behavior on height { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
             }
 
             Column {

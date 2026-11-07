@@ -70,9 +70,11 @@ Scope {
     readonly property bool isIslandMode: (Theme?.isBento ?? false) || (Settings?.barStyle === "bento-floating") || (isBarFloating && (Settings?.barIslandMode ?? true))
     readonly property bool framingEnabled: Settings?.screenFrameDocked ?? true
     readonly property bool isDocked: framingEnabled && !isBarFloating
-    readonly property int cornerRadius: Settings?.screenCornerRadius ?? 16
-    readonly property int borderWidth: Settings?.screenBorderWidth ?? 0
-    readonly property color cornerColor: Theme?.cornerFill ?? Theme?.barBg ?? "#221919"
+    // synced with StatusBar & ConcaveCorner so we don't end up with two different radii
+    readonly property int cornerRadius: Math.round(Settings?.scoopRadius ?? Settings?.screenCornerRadius ?? Theme?.scoopRadius ?? 16)
+    readonly property int borderWidth: Math.round(Settings?.screenBorderWidth ?? 0)
+    property color cornerColor: Theme?.cornerFill ?? Theme?.barBg ?? "#14140c"
+    Behavior on cornerColor { ColorAnimation { duration: (typeof Theme !== "undefined" ? Theme?.animFast : null) ?? 150 } }
     readonly property string mode: Settings?.screenCornerMode ?? "all"
 
     readonly property bool isHorizontalBar: barPos === "top" || barPos === "bottom"
@@ -162,13 +164,16 @@ Scope {
 
         implicitWidth: root.modelData?.width ?? 1920
         implicitHeight: Math.max(1, root.borderWidth + (root.cornerRadius > 0 ? root.cornerRadius : 0))
-        exclusiveZone: root.borderWidth
-        exclusionMode: root.borderWidth > 0 ? ExclusionMode.Normal : ExclusionMode.Ignore
+        exclusiveZone: (root.borderWidth > 0 && (root.barPos === "top" ? root.borderBottomAllowed : root.borderTopAllowed)) ? root.borderWidth : 0
+        exclusionMode: exclusiveZone > 0 ? ExclusionMode.Normal : ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "quickshell:corners"
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
         mask: Region {}
+
+        // if leftBorder/rightBorder already shrunk our window via layer-shell exclusiveZone, don't offset twice
+        readonly property bool alreadyInsetH: root.modelData ? (width < root.modelData.width) : false
 
         Item {
             anchors.fill: parent
@@ -186,7 +191,7 @@ Scope {
             ConcaveCorner {
                 id: cornerL
                 visible: (root.barPos === "top" ? root.showBottomLeft : root.showTopLeft) && root.cornerRadius > 0
-                x: (root.borderWidth > 0 && leftBorder.visible ? root.borderWidth : 0)
+                x: (!horizontalOppositeWindow.alreadyInsetH && root.borderWidth > 0 && leftBorder.visible) ? root.borderWidth : 0
                 y: root.barPos === "top" ? 0 : (root.borderWidth > 0 && horizontalBorderRect.visible ? root.borderWidth : 0)
                 radiusX: root.cornerRadius
                 radiusY: root.cornerRadius
@@ -198,7 +203,7 @@ Scope {
             ConcaveCorner {
                 id: cornerR
                 visible: (root.barPos === "top" ? root.showBottomRight : root.showTopRight) && root.cornerRadius > 0
-                x: Math.round(parent.width - (root.borderWidth > 0 && rightBorder.visible ? root.borderWidth : 0) - width)
+                x: Math.round(parent.width - ((!horizontalOppositeWindow.alreadyInsetH && root.borderWidth > 0 && rightBorder.visible) ? root.borderWidth : 0) - width)
                 y: root.barPos === "top" ? 0 : (root.borderWidth > 0 && horizontalBorderRect.visible ? root.borderWidth : 0)
                 radiusX: root.cornerRadius
                 radiusY: root.cornerRadius
@@ -209,7 +214,7 @@ Scope {
         }
     }
 
-PanelWindow {
+    PanelWindow {
         id: horizontalBarSideWindow
         screen: root.modelData
         color: "transparent"
@@ -227,13 +232,15 @@ PanelWindow {
 
         implicitWidth: root.modelData?.width ?? 1920
         implicitHeight: Math.max(1, root.borderWidth + (root.cornerRadius > 0 ? root.cornerRadius : 0))
-        exclusiveZone: root.borderWidth
-        exclusionMode: root.borderWidth > 0 ? ExclusionMode.Normal : ExclusionMode.Ignore
+        exclusiveZone: (root.borderWidth > 0 && (root.barPos === "top" ? root.borderTopAllowed : root.borderBottomAllowed)) ? root.borderWidth : 0
+        exclusionMode: exclusiveZone > 0 ? ExclusionMode.Normal : ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "quickshell:corners"
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
         mask: Region {}
+
+        readonly property bool alreadyInsetH: root.modelData ? (width < root.modelData.width) : false
 
         Item {
             anchors.fill: parent
@@ -251,7 +258,7 @@ PanelWindow {
             ConcaveCorner {
                 id: barSideCornerL
                 visible: (root.barPos === "top" ? root.showTopLeft : root.showBottomLeft) && root.cornerRadius > 0
-                x: (root.borderWidth > 0 && leftBorder.visible ? root.borderWidth : 0)
+                x: (!horizontalBarSideWindow.alreadyInsetH && root.borderWidth > 0 && leftBorder.visible) ? root.borderWidth : 0
                 y: root.barPos === "top" ? (root.borderWidth > 0 && barSideHorizontalBorderRect.visible ? root.borderWidth : 0) : 0
                 radiusX: root.cornerRadius
                 radiusY: root.cornerRadius
@@ -263,7 +270,7 @@ PanelWindow {
             ConcaveCorner {
                 id: barSideCornerR
                 visible: (root.barPos === "top" ? root.showTopRight : root.showBottomRight) && root.cornerRadius > 0
-                x: Math.round(parent.width - (root.borderWidth > 0 && rightBorder.visible ? root.borderWidth : 0) - width)
+                x: Math.round(parent.width - ((!horizontalBarSideWindow.alreadyInsetH && root.borderWidth > 0 && rightBorder.visible) ? root.borderWidth : 0) - width)
                 y: root.barPos === "top" ? (root.borderWidth > 0 && barSideHorizontalBorderRect.visible ? root.borderWidth : 0) : 0
                 radiusX: root.cornerRadius
                 radiusY: root.cornerRadius
@@ -337,13 +344,15 @@ PanelWindow {
 
         implicitWidth: Math.max(1, root.borderWidth + (root.cornerRadius > 0 ? root.cornerRadius : 0))
         implicitHeight: root.modelData?.height ?? 1080
-        exclusiveZone: root.borderWidth
-        exclusionMode: root.borderWidth > 0 ? ExclusionMode.Normal : ExclusionMode.Ignore
+        exclusiveZone: (root.borderWidth > 0 && (root.barPos === "left" ? root.borderRightAllowed : root.borderLeftAllowed)) ? root.borderWidth : 0
+        exclusionMode: exclusiveZone > 0 ? ExclusionMode.Normal : ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "quickshell:corners-vertical"
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
         mask: Region {}
+
+        readonly property bool alreadyInsetV: root.modelData ? (height < root.modelData.height) : false
 
         Item {
             anchors.fill: parent
@@ -362,7 +371,7 @@ PanelWindow {
                 id: cornerT
                 visible: (root.barPos === "left" ? root.showTopRight : root.showTopLeft) && root.cornerRadius > 0
                 x: root.barPos === "right" ? (root.borderWidth > 0 && verticalBorderRect.visible ? root.borderWidth : 0) : 0
-                y: (root.borderWidth > 0 && topBorder.visible ? root.borderWidth : 0)
+                y: (!verticalOppositeWindow.alreadyInsetV && root.borderWidth > 0 && topBorder.visible) ? root.borderWidth : 0
                 radiusX: root.cornerRadius
                 radiusY: root.cornerRadius
                 fillColor: root.cornerColor
@@ -374,7 +383,7 @@ PanelWindow {
                 id: cornerB
                 visible: (root.barPos === "left" ? root.showBottomRight : root.showBottomLeft) && root.cornerRadius > 0
                 x: root.barPos === "right" ? (root.borderWidth > 0 && verticalBorderRect.visible ? root.borderWidth : 0) : 0
-                y: Math.round(parent.height - (root.borderWidth > 0 && bottomBorder.visible ? root.borderWidth : 0) - height)
+                y: Math.round(parent.height - ((!verticalOppositeWindow.alreadyInsetV && root.borderWidth > 0 && bottomBorder.visible) ? root.borderWidth : 0) - height)
                 radiusX: root.cornerRadius
                 radiusY: root.cornerRadius
                 fillColor: root.cornerColor
@@ -384,7 +393,7 @@ PanelWindow {
         }
     }
 
-      PanelWindow {
+    PanelWindow {
         id: verticalBarSideWindow
         screen: root.modelData
         color: "transparent"
@@ -404,13 +413,15 @@ PanelWindow {
 
         implicitWidth: Math.max(1, root.borderWidth + (root.cornerRadius > 0 ? root.cornerRadius : 0))
         implicitHeight: root.modelData?.height ?? 1080
-        exclusiveZone: root.borderWidth
-        exclusionMode: root.borderWidth > 0 ? ExclusionMode.Normal : ExclusionMode.Ignore
+        exclusiveZone: (root.borderWidth > 0 && (root.barPos === "left" ? root.borderLeftAllowed : root.borderRightAllowed)) ? root.borderWidth : 0
+        exclusionMode: exclusiveZone > 0 ? ExclusionMode.Normal : ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "quickshell:corners-vertical"
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
         mask: Region {}
+
+        readonly property bool alreadyInsetV: root.modelData ? (height < root.modelData.height) : false
 
         Item {
             anchors.fill: parent
@@ -429,7 +440,7 @@ PanelWindow {
                 id: barSideCornerT
                 visible: (root.barPos === "left" ? root.showTopLeft : root.showTopRight) && root.cornerRadius > 0
                 x: root.barPos === "left" ? (root.borderWidth > 0 && barSideVerticalBorderRect.visible ? root.borderWidth : 0) : 0
-                y: (root.borderWidth > 0 && topBorder.visible ? root.borderWidth : 0)
+                y: (!verticalBarSideWindow.alreadyInsetV && root.borderWidth > 0 && topBorder.visible) ? root.borderWidth : 0
                 radiusX: root.cornerRadius
                 radiusY: root.cornerRadius
                 fillColor: root.cornerColor
@@ -441,7 +452,7 @@ PanelWindow {
                 id: barSideCornerB
                 visible: (root.barPos === "left" ? root.showBottomLeft : root.showBottomRight) && root.cornerRadius > 0
                 x: root.barPos === "left" ? (root.borderWidth > 0 && barSideVerticalBorderRect.visible ? root.borderWidth : 0) : 0
-                y: Math.round(parent.height - (root.borderWidth > 0 && bottomBorder.visible ? root.borderWidth : 0) - height)
+                y: Math.round(parent.height - ((!verticalBarSideWindow.alreadyInsetV && root.borderWidth > 0 && bottomBorder.visible) ? root.borderWidth : 0) - height)
                 radiusX: root.cornerRadius
                 radiusY: root.cornerRadius
                 fillColor: root.cornerColor
