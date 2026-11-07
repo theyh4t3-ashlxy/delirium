@@ -18,7 +18,6 @@ output_path = "~/.config/fastfetch/config.jsonc"
 input_path = "~/.config/matugen/templates/Theme.qml"
 output_path = "~/.config/quickshell/Theme.qml"
 
-
 [templates.palette]
 input_path = "~/.config/matugen/templates/palette.css"
 output_path = "~/.config/quickshell/palette.css"
@@ -27,15 +26,15 @@ output_path = "~/.config/quickshell/palette.css"
 input_path = "~/.config/matugen/templates/zsh-colors.zsh"
 output_path = "~/.config/zsh/matugen.zsh"
 
-# dump gtk4 palette into colors.css
+# dump gtk4 palette into matugen.css (avoiding kde breeze clobbering colors.css)
 [templates.gtk4]
 input_path = "~/.config/matugen/templates/gtk4.css"
-output_path = "~/.config/gtk-4.0/colors.css"
+output_path = "~/.config/gtk-4.0/matugen.css"
 
-# dump gtk3 palette into colors.css and execute the double-tap
+# dump gtk3 palette into matugen.css and execute the double-tap
 [templates.gtk3]
 input_path = "~/.config/matugen/templates/gtk3.css"
-output_path = "~/.config/gtk-3.0/colors.css"
+output_path = "~/.config/gtk-3.0/matugen.css"
 # terrorize both gtk versions simultaneously
 post_hook = "$HOME/.config/matugen/post-hook-scripts/gtk-themes-reload.zsh 2>/dev/null || true"
 

@@ -34,13 +34,13 @@ fi
 
 # Sync theme tokens to active flatpak application config directories
 for app_gtk4 in $HOME/.var/app/*/config/gtk-4.0(N/); do
-    cp -f "$HOME/.config/gtk-4.0/colors.css" "$app_gtk4/colors.css" 2>/dev/null || true
+    cp -f "$HOME/.config/gtk-4.0/matugen.css" "$app_gtk4/matugen.css" 2>/dev/null || true
     cp -f "$HOME/.config/gtk-4.0/gtk.css" "$app_gtk4/gtk.css" 2>/dev/null || true
     cp -f "$HOME/.config/gtk-4.0/gtk-dark.css" "$app_gtk4/gtk-dark.css" 2>/dev/null || true
 done
 
 for app_gtk3 in $HOME/.var/app/*/config/gtk-3.0(N/); do
-    cp -f "$HOME/.config/gtk-3.0/colors.css" "$app_gtk3/colors.css" 2>/dev/null || true
+    cp -f "$HOME/.config/gtk-3.0/matugen.css" "$app_gtk3/matugen.css" 2>/dev/null || true
     cp -f "$HOME/.config/gtk-3.0/gtk.css" "$app_gtk3/gtk.css" 2>/dev/null || true
 done
 
