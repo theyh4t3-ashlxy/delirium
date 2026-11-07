@@ -1058,48 +1058,62 @@ PopupPanel {
         y: root.ghostY
         width: root.ghostW
         height: 44
-        radius: 7
+        radius: Theme?.radiusSm ?? 6
         readonly property var info: root.getModuleInfo(root.draggedModId)
-        readonly property color ghostColor: info?.color ?? Theme?.primary ?? "#4c97ff"
-        color: ghostColor
-        border.color: "#ffffff"
-        border.width: 2
+        readonly property color ghostColor: info?.color ?? (Theme?.primary ?? "#a8d292")
+        color: Theme?.surface_container_high ?? "#282b25"
+        border.color: Theme?.primary ?? "#a8d292"
+        border.width: 1.5
         z: 99999
         opacity: 0.95
         scale: 1.04
 
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.margins: 4
+            width: 3
+            radius: 1.5
+            color: dragGhost.ghostColor
+        }
+
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 10
+            anchors.leftMargin: 12
+            anchors.rightMargin: 8
             spacing: 8
 
             Text {
                 text: "⠿"
+                font.family: Theme?.fontFamily
                 font.pixelSize: 13
-                color: "#ffffff"
+                color: Theme?.on_surface_variant ?? "#888888"
             }
 
             Rectangle {
-                Layout.preferredWidth: 24
-                Layout.preferredHeight: 24
-                radius: 5
-                color: Qt.darker(dragGhost.ghostColor, 1.3)
+                Layout.preferredWidth: 26
+                Layout.preferredHeight: 26
+                radius: Theme?.radiusSm ?? 6
+                color: Qt.rgba(dragGhost.ghostColor.r, dragGhost.ghostColor.g, dragGhost.ghostColor.b, 0.15)
+                border.color: Qt.rgba(dragGhost.ghostColor.r, dragGhost.ghostColor.g, dragGhost.ghostColor.b, 0.35)
+                border.width: 1
 
                 Text {
                     anchors.centerIn: parent
-                    text: dragGhost.info.icon
+                    text: dragGhost.info?.icon ?? "\uE9B0"
                     font.family: Theme?.fontIcon
-                    font.pixelSize: 11
-                    color: "#ffffff"
+                    font.pixelSize: 12
+                    color: dragGhost.ghostColor
                 }
             }
 
             Text {
-                text: dragGhost.info.name
+                text: dragGhost.info?.name ?? root.draggedModId
                 font.family: Theme?.fontFamily
                 font.pixelSize: 11
-                font.weight: Font.Bold
-                color: "#ffffff"
+                font.weight: Font.DemiBold
+                color: Theme?.on_surface ?? "#ffffff"
                 Layout.fillWidth: true
                 elide: Text.ElideRight
             }

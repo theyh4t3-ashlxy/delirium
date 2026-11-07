@@ -21,19 +21,22 @@ QtObject {
     property var availablePresets: []
     property string activePresetName: "custom"
 
-    // Scratch block category colors
+    // Dynamic Theme category accent colors
     function getCategoryColor(category) {
-        switch (category) {
-            case "navigation": return "#4c97ff"; // scratch blue (motion)
-            case "status":     return "#9966ff"; // scratch purple (looks)
-            case "island":     return "#8552e6"; // violet
-            case "system":     return "#ffab19"; // scratch amber (events)
-            case "controls":   return "#00b4d8"; // cyan / control
-            case "sensors":    return "#2ec4b6"; // emerald / sensing
-            case "audio":      return "#cf63cf"; // scratch magenta (sound)
-            case "tools":      return "#ff8c1a"; // scratch orange (variables)
-            default:           return "#5cb85c"; // green
+        if (typeof Theme !== "undefined" && Theme) {
+            switch (category) {
+                case "navigation": return Theme.primary;
+                case "status":     return Theme.secondary;
+                case "island":     return Theme.tertiary;
+                case "system":     return Theme.primary;
+                case "controls":   return Theme.secondary;
+                case "sensors":    return Theme.tertiary;
+                case "audio":      return Theme.primary;
+                case "tools":      return Theme.secondary;
+                default:           return Theme.primary;
+            }
         }
+        return "#a8d292";
     }
 
     function getBlockInfo(blockId) {

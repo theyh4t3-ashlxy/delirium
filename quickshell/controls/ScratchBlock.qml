@@ -1,4 +1,4 @@
-// ScratchBlock.qml - Tactile Scratch-like interlocking widget block
+// ScratchBlock.qml - Material You studio widget card styled to match Theme.qml
 import QtQuick
 import QtQuick.Layouts
 import ".."
@@ -22,98 +22,43 @@ Item {
     signal visibilityToggled()
     signal removeRequested()
 
-    readonly property var blockInfo: PresetService.getBlockInfo(root.blockId)
-    readonly property color blockColor: root.blockInfo?.color ?? "#4c97ff"
+    readonly property var blockInfo: PresetService?.getBlockInfo(root.blockId)
+    readonly property color blockColor: root.blockInfo?.color ?? (Theme?.primary ?? "#a8d292")
     readonly property string blockName: root.blockInfo?.name ?? root.blockId
-    readonly property string blockIcon: root.blockInfo?.icon ?? "\uE9B0"
+    readonly property string blockIcon: root.blockInfo?.icon ?? (Theme?.iconGrid ?? "\uE9B0")
     readonly property string blockCategory: root.blockInfo?.category ?? "tools"
 
     implicitWidth: 320
     implicitHeight: 44
     height: 44
 
-    // Puzzle notch Canvas
-    Canvas {
-        id: bgCanvas
+    // Surface Container Card matching Theme.qml
+    Rectangle {
+        id: cardBg
         anchors.fill: parent
-        antialiasing: true
-        smooth: true
-
-        readonly property color baseColor: root.blockColor
-        readonly property bool isHovered: blockMouse.containsMouse && !root.isDragged
-        readonly property real dpr: Math.max(1.0, Screen.devicePixelRatio || 1.0)
-
-        Connections {
-            target: root
-            function onBlockColorChanged() { bgCanvas.requestPaint(); }
-            function onIsDraggedChanged() { bgCanvas.requestPaint(); }
+        radius: Theme?.radiusSm ?? 6
+        color: {
+            if (root.isDragged) return Qt.rgba(Theme?.surface_container_highest?.r ?? 0.2, Theme?.surface_container_highest?.g ?? 0.2, Theme?.surface_container_highest?.b ?? 0.2, 0.45);
+            if (blockMouse.containsMouse) return Theme?.surface_container_high ?? "#282b25";
+            return Theme?.surface_container ?? "#1d211a";
+        }
+        border.width: 1
+        border.color: {
+            if (root.isDragged) return Theme?.primary ?? "#a8d292";
+            if (blockMouse.containsMouse) return Qt.rgba(root.blockColor.r, root.blockColor.g, root.blockColor.b, 0.6);
+            return Theme?.outline_variant ?? Qt.rgba(1, 1, 1, 0.08);
         }
 
-        onPaint: {
-            let ctx = getContext("2d");
-            ctx.reset();
-            ctx.clearRect(0, 0, width, height);
-
-            let w = width;
-            let h = height;
-            let r = 7; // corner radius
-            let notchX = 20;
-            let notchW = 16;
-            let notchD = 4; // notch depth
-
-            ctx.fillStyle = root.isDragged ? Qt.rgba(baseColor.r, baseColor.g, baseColor.b, 0.45) : (isHovered ? Qt.lighter(baseColor, 1.08) : baseColor);
-
-            // Interlocking Scratch puzzle shape:
-            // Top has indent (notch going down into block)
-            // Bottom has tab (notch sticking down out of block)
-            ctx.beginPath();
-            ctx.moveTo(r, 0);
-
-            // Top edge with indent
-            ctx.lineTo(notchX, 0);
-            ctx.lineTo(notchX + 3, notchD);
-            ctx.lineTo(notchX + notchW - 3, notchD);
-            ctx.lineTo(notchX + notchW, 0);
-            ctx.lineTo(w - r, 0);
-
-            // Top right corner
-            ctx.arcTo(w, 0, w, r, r);
-
-            // Right edge
-            ctx.lineTo(w, h - r);
-            ctx.arcTo(w, h, w - r, h, r);
-
-            // Bottom edge with tab (sticking down by notchD)
-            ctx.lineTo(notchX + notchW, h);
-            ctx.lineTo(notchX + notchW - 3, h + notchD);
-            ctx.lineTo(notchX + 3, h + notchD);
-            ctx.lineTo(notchX, h);
-            ctx.lineTo(r, h);
-
-            // Bottom left corner
-            ctx.arcTo(0, h, 0, h - r, r);
-
-            // Left edge
-            ctx.lineTo(0, r);
-            ctx.arcTo(0, 0, r, 0, r);
-
-            ctx.closePath();
-            ctx.fill();
-
-            // Darker perimeter border
-            ctx.lineWidth = 1.5;
-            ctx.strokeStyle = Qt.darker(baseColor, 1.35);
-            ctx.stroke();
-
-            // Highlight bevel along top edge
-            ctx.beginPath();
-            ctx.moveTo(r, 1);
-            ctx.lineTo(notchX, 1);
-            ctx.moveTo(notchX + notchW, 1);
-            ctx.lineTo(w - r, 1);
-            ctx.lineWidth = 1.0;
-            ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.35);
-            ctx.stroke();
+        // Left accent indicator strip matching category color
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.margins: 4
+            width: 3
+            radius: 1.5
+            color: root.blockColor
+            opacity: root.isVisibleInBar ? 1.0 : 0.35
         }
     }
 
@@ -160,44 +105,47 @@ Item {
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 10
-        anchors.rightMargin: 10
+        anchors.leftMargin: 12
+        anchors.rightMargin: 8
         spacing: 8
 
-        // Drag grip
+        // Drag grip handle
         Text {
-            text: "\u283F"
+            text: "⠿"
+            font.family: Theme?.fontFamily
             font.pixelSize: 13
-            color: Qt.rgba(1, 1, 1, 0.75)
+            color: Theme?.on_surface_variant ?? "#888888"
         }
 
         // Category icon badge
         Rectangle {
-            Layout.preferredWidth: 24
-            Layout.preferredHeight: 24
-            radius: 5
-            color: Qt.darker(root.blockColor, 1.25)
+            Layout.preferredWidth: 26
+            Layout.preferredHeight: 26
+            radius: Theme?.radiusSm ?? 6
+            color: Qt.rgba(root.blockColor.r, root.blockColor.g, root.blockColor.b, 0.15)
+            border.color: Qt.rgba(root.blockColor.r, root.blockColor.g, root.blockColor.b, 0.35)
+            border.width: 1
 
             Text {
                 anchors.centerIn: parent
                 text: root.blockIcon
                 font.family: Theme?.fontIcon
-                font.pixelSize: 11
-                color: "#ffffff"
+                font.pixelSize: 12
+                color: root.blockColor
             }
         }
 
-        // Title and category badge
+        // Title and category subtitle
         ColumnLayout {
-            spacing: 0
+            spacing: 1
             Layout.fillWidth: true
 
             Text {
                 text: root.blockName
                 font.family: Theme?.fontFamily
                 font.pixelSize: 11
-                font.weight: Font.Bold
-                color: "#ffffff"
+                font.weight: Font.DemiBold
+                color: root.isVisibleInBar ? (Theme?.on_surface ?? "#ffffff") : (Theme?.on_surface_variant ?? "#888888")
                 elide: Text.ElideRight
                 Layout.fillWidth: true
             }
@@ -205,30 +153,31 @@ Item {
             Text {
                 text: root.blockCategory
                 font.family: Theme?.fontFamily
-                font.pixelSize: 8
-                font.weight: Font.DemiBold
-                color: Qt.rgba(1, 1, 1, 0.7)
+                font.pixelSize: 9
+                color: Theme?.on_surface_variant ?? "#888888"
             }
         }
 
-        // Right side action buttons
+        // Action controls
         RowLayout {
             spacing: 3
-            opacity: blockMouse.containsMouse ? 1.0 : 0.65
+            opacity: blockMouse.containsMouse ? 1.0 : 0.75
 
             // Shift Left
             Rectangle {
                 visible: root.zoneId === "center" || root.zoneId === "right"
-                Layout.preferredWidth: 20
-                Layout.preferredHeight: 20
-                radius: 4
-                color: shiftLMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(0, 0, 0, 0.2)
+                Layout.preferredWidth: 22
+                Layout.preferredHeight: 22
+                radius: Theme?.radiusSm ?? 4
+                color: shiftLMouse.containsMouse ? (Theme?.surface_container_highest ?? "#32362f") : (Theme?.surface_container_low ?? "#191d17")
+                border.width: 1
+                border.color: shiftLMouse.containsMouse ? (Theme?.outline_variant ?? "#43483e") : "transparent"
 
                 Text {
                     anchors.centerIn: parent
-                    text: "\u25C0"
+                    text: "◀"
                     font.pixelSize: 8
-                    color: "#ffffff"
+                    color: Theme?.on_surface ?? "#ffffff"
                 }
 
                 MouseArea {
@@ -243,16 +192,18 @@ Item {
             // Move Up
             Rectangle {
                 visible: root.index > 0
-                Layout.preferredWidth: 20
-                Layout.preferredHeight: 20
-                radius: 4
-                color: upMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(0, 0, 0, 0.2)
+                Layout.preferredWidth: 22
+                Layout.preferredHeight: 22
+                radius: Theme?.radiusSm ?? 4
+                color: upMouse.containsMouse ? (Theme?.surface_container_highest ?? "#32362f") : (Theme?.surface_container_low ?? "#191d17")
+                border.width: 1
+                border.color: upMouse.containsMouse ? (Theme?.outline_variant ?? "#43483e") : "transparent"
 
                 Text {
                     anchors.centerIn: parent
-                    text: "\u25B2"
+                    text: "▲"
                     font.pixelSize: 8
-                    color: "#ffffff"
+                    color: Theme?.on_surface ?? "#ffffff"
                 }
 
                 MouseArea {
@@ -266,16 +217,18 @@ Item {
 
             // Move Down
             Rectangle {
-                Layout.preferredWidth: 20
-                Layout.preferredHeight: 20
-                radius: 4
-                color: downMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(0, 0, 0, 0.2)
+                Layout.preferredWidth: 22
+                Layout.preferredHeight: 22
+                radius: Theme?.radiusSm ?? 4
+                color: downMouse.containsMouse ? (Theme?.surface_container_highest ?? "#32362f") : (Theme?.surface_container_low ?? "#191d17")
+                border.width: 1
+                border.color: downMouse.containsMouse ? (Theme?.outline_variant ?? "#43483e") : "transparent"
 
                 Text {
                     anchors.centerIn: parent
-                    text: "\u25BC"
+                    text: "▼"
                     font.pixelSize: 8
-                    color: "#ffffff"
+                    color: Theme?.on_surface ?? "#ffffff"
                 }
 
                 MouseArea {
@@ -290,16 +243,18 @@ Item {
             // Shift Right
             Rectangle {
                 visible: root.zoneId === "left" || root.zoneId === "center"
-                Layout.preferredWidth: 20
-                Layout.preferredHeight: 20
-                radius: 4
-                color: shiftRMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(0, 0, 0, 0.2)
+                Layout.preferredWidth: 22
+                Layout.preferredHeight: 22
+                radius: Theme?.radiusSm ?? 4
+                color: shiftRMouse.containsMouse ? (Theme?.surface_container_highest ?? "#32362f") : (Theme?.surface_container_low ?? "#191d17")
+                border.width: 1
+                border.color: shiftRMouse.containsMouse ? (Theme?.outline_variant ?? "#43483e") : "transparent"
 
                 Text {
                     anchors.centerIn: parent
-                    text: "\u25B6"
+                    text: "▶"
                     font.pixelSize: 8
-                    color: "#ffffff"
+                    color: Theme?.on_surface ?? "#ffffff"
                 }
 
                 MouseArea {
@@ -313,17 +268,19 @@ Item {
 
             // Eye visibility toggle
             Rectangle {
-                Layout.preferredWidth: 22
-                Layout.preferredHeight: 22
-                radius: 4
-                color: eyeMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : (root.isVisibleInBar ? Qt.rgba(0, 0, 0, 0.2) : Qt.rgba(1, 0, 0, 0.35))
+                Layout.preferredWidth: 24
+                Layout.preferredHeight: 24
+                radius: Theme?.radiusSm ?? 4
+                color: eyeMouse.containsMouse ? (Theme?.surface_container_highest ?? "#32362f") : (root.isVisibleInBar ? (Theme?.surface_container_low ?? "#191d17") : Qt.rgba(Theme?.error.r ?? 1, Theme?.error.g ?? 0, Theme?.error.b ?? 0, 0.15))
+                border.width: 1
+                border.color: root.isVisibleInBar ? (eyeMouse.containsMouse ? (Theme?.outline_variant ?? "#43483e") : "transparent") : (Theme?.error ?? "#ffb4ab")
 
                 Text {
                     anchors.centerIn: parent
                     text: root.isVisibleInBar ? (Theme?.iconEye ?? "\uE8F4") : (Theme?.iconEyeOff ?? "\uE8F5")
                     font.family: Theme?.fontIcon
-                    font.pixelSize: 11
-                    color: root.isVisibleInBar ? "#ffffff" : "#ff8888"
+                    font.pixelSize: 12
+                    color: root.isVisibleInBar ? (Theme?.on_surface ?? "#ffffff") : (Theme?.error ?? "#ffb4ab")
                 }
 
                 MouseArea {
@@ -337,16 +294,19 @@ Item {
 
             // Remove / detach
             Rectangle {
-                Layout.preferredWidth: 20
-                Layout.preferredHeight: 20
-                radius: 4
-                color: rmMouse.containsMouse ? Qt.rgba(1, 0, 0, 0.45) : Qt.rgba(0, 0, 0, 0.2)
+                Layout.preferredWidth: 22
+                Layout.preferredHeight: 22
+                radius: Theme?.radiusSm ?? 4
+                color: rmMouse.containsMouse ? (Theme?.error_container ?? "#93000a") : (Theme?.surface_container_low ?? "#191d17")
+                border.width: 1
+                border.color: rmMouse.containsMouse ? (Theme?.error ?? "#ffb4ab") : "transparent"
 
                 Text {
                     anchors.centerIn: parent
-                    text: "\u2715"
+                    text: "✕"
                     font.pixelSize: 9
-                    color: rmMouse.containsMouse ? "#ffffff" : Qt.rgba(1, 1, 1, 0.8)
+                    font.weight: Font.Bold
+                    color: rmMouse.containsMouse ? (Theme?.on_error_container ?? "#ffffff") : (Theme?.on_surface_variant ?? "#888888")
                 }
 
                 MouseArea {
