@@ -16,13 +16,37 @@ here is five seconds of live footage captured moments before wayland choked on a
 
 ---
 
+## the ecosystem comparison: why delirium is probably the worst choice for you
+
+let us be completely realistic. you have options, and almost all of them are objectively more responsible life choices than cloning this repository.
+
+here is how the popular hyprland rice landscape actually breaks down, and why `delirium` is by far the most hostile to your mental health:
+
+| rice | stack & engine | primary vibe | why people love it | why it is probably better than this | survival rate |
+|---|---|---|---|---|---|
+| **[caelestia](https://github.com/caelestia-dots/caelestia)** | quickshell (qml) + lua hyprland + aur cli | fluid, morphing, modern material | smooth card morphing, sane quickshell without writing raw qml, managed updates | an actual managed project where you don't have to debug pam auth loops | 94% |
+| **[end-4](https://github.com/end-4/dots-hyprland)** | ags (gjs/typescript) + scss + material 3 | android 14 tablet on your monitor | unbelievable unixporn screenshots, giant pill quicksettings, dynamic wallpaper swatches | polished turn-key android aesthetics if your ram can survive the gjs runtime | 78% |
+| **[HyDE](https://github.com/HyDE-Project/HyDE)** | waybar + rofi + bash script forest | classic unixporn aesthetic chameleon | 20+ community themes hot-swapped by keybinds, huge userbase, automated installer | battle-tested community presets that won't require understanding nix expressions | 85% |
+| **[ml4w](https://github.com/mylinuxforwork/dotfiles)** | waybar + wofi + python/gtk settings app | clean corporate daily driver | multi-distro installer, click-to-configure gui app, rock-solid stability for real work | built for adults who need their display server to survive zoom meetings | 99% |
+| **delirium** *(this repo)* | quickshell (qml) + lua hyprland + python cli + nixos | chaotic digital biohazard at 4 am | zero `.json` flat state, thinkpad ec fan hacking (`fanctl`), instant nix rollbacks, pure keyboard flow | it isn't. it is objectively the worst choice unless you cope with my exact neuroses | 3% |
+
+### if delirium is the worst, why does it exist?
+because the other rices are products made for an audience. `delirium` is an obsessive, bespoke containment unit hand-carved by a 15-year-old who refused to use standard tools, declared holy war on curly braces, and needed a root daemon just to keep an alder lake thinkpad from thermal death at 400mhz.
+
+if you want a painless desktop where volume sliders work and nobody yells at you in the terminal, go install **ml4w** or **caelestia**. 
+
+if you choose to cope with me anyway: steal our code, steal our continuous bezier curves, steal our native python desktop controller, and enjoy absolute, uncompromising keyboard-driven control over every single byte.
+
+---
+
 ### contents
-1. [stage 1: declarative ransom note](#stage-1-the-declarative-ransom-note)
-2. [stage 2: deployment vectors](#stage-2-deployment-vectors)
-3. [desktop cli cheat sheet](#desktop-cli-cheat-sheet)
-4. [installer flag reference](#installer-flag-reference)
-5. [known bugs & void roadmap](#known-bugs--void-roadmap)
-6. [the doctrine & lore (BACKSTORY.md)](BACKSTORY.md)
+1. [the ecosystem comparison](#the-ecosystem-comparison-why-delirium-is-probably-the-worst-choice-for-you)
+2. [stage 1: declarative ransom note](#stage-1-the-declarative-ransom-note)
+3. [stage 2: deployment vectors](#stage-2-deployment-vectors)
+4. [desktop cli cheat sheet](#desktop-cli-cheat-sheet)
+5. [installer flag reference](#installer-flag-reference)
+6. [known bugs & void roadmap](#known-bugs--void-roadmap)
+7. [the doctrine & lore (BACKSTORY.md)](BACKSTORY.md)
 
 ---
 
