@@ -87,6 +87,10 @@ PanelWindow {
     readonly property bool isRight: pos === "right"
     readonly property bool isVertical: isLeft || isRight
 
+    // actually honoring Theme.paddingScaleMult so "compact" and "comfortable" aren't placebo buttons
+    readonly property int effectivePaddingH: Math.max(4, Math.round(Theme.widgetPaddingH * Theme.paddingScaleMult))
+    readonly property int effectiveSpacing: Math.max(2, Math.round(Theme.widgetSpacing * Theme.paddingScaleMult))
+
     readonly property real maxWindowTitleWidth: {
         let halfScreen = root.width / 2;
         let centerHalf = (centerRowH.visible ? centerRowH.width : 0) / 2;
@@ -97,20 +101,19 @@ PanelWindow {
         let halfScreen = root.width / 2;
         let centerHalf = (centerRowH.visible ? centerRowH.width : 0) / 2;
         let clockRight = halfScreen - centerHalf;
-        return Math.max(380, clockRight - (Theme.widgetPaddingH * 2));
+        return Math.max(380, clockRight - (root.effectivePaddingH * 2));
     }
 
-    readonly property bool isFloating: (Settings?.barFloating ?? false) || (Theme?.isBento ?? false) || (Settings?.barStyle === "bento-floating")
-    readonly property bool isIslandMode: (Theme?.isBento ?? false) || (Settings?.barStyle === "bento-floating") || (root.isFloating && (Settings?.barIslandMode ?? true))
+    readonly property bool isFloating: (Settings?.barFloating ?? false) || Theme.isBento || (Settings?.barStyle === "bento-floating")
+    readonly property bool isIslandMode: Theme.isBento || (Settings?.barStyle === "bento-floating") || (root.isFloating && (Settings?.barIslandMode ?? true))
     readonly property int barMargin: Settings?.barMargin ?? 0
     readonly property int effectiveBarMargin: root.isFloating ? (root.barMargin > 0 ? root.barMargin : 8) : 0
     readonly property int barRadius: Settings?.barRadius ?? 0
-    readonly property int effectiveBarRadius: root.isFloating ? (root.barRadius > 0 ? root.barRadius : (Settings?.screenCornerRadius ?? 12)) : 0
+    readonly property int effectiveBarRadius: root.isFloating ? (root.barRadius > 0 ? root.barRadius : Theme.screenCornerRadius) : 0
 
-    readonly property int scoopRadius: Math.round(Settings?.scoopRadius ?? Settings?.screenCornerRadius ?? Theme?.scoopRadius ?? 16)
-    readonly property string cornerMode: Settings?.screenCornerMode ?? "all"
+    readonly property int scoopRadius: Math.round(Settings?.scoopRadius ?? Settings?.screenCornerRadius ?? Theme.scoopRadius)
+    readonly property string cornerMode: Settings?.screenCornerMode ?? Theme.screenCornerMode
 
-    // match ScreenCorners.qml visibility rules so "opposite", "top", "bottom", etc. don't fight each other
     readonly property bool scoopAllowedLeft: {
         if (cornerMode === "none" || cornerMode === "opposite") return false;
         if (cornerMode === "monitor") {
@@ -161,22 +164,32 @@ PanelWindow {
     readonly property bool borderTopAllowed: cornerMode === "all" || cornerMode === "top" || (cornerMode === "monitor" && !hasAdjacentMonitor("top")) || (cornerMode === "opposite" && isBottom)
     readonly property bool borderBottomAllowed: cornerMode === "all" || cornerMode === "bottom" || (cornerMode === "monitor" && !hasAdjacentMonitor("bottom")) || (cornerMode === "opposite" && isTop)
 
-    readonly property int borderWidth: Math.round((Settings?.screenFrameDocked ?? true) ? (Settings?.screenBorderWidth ?? 0) : 0)
-    readonly property bool hasBarScoops: !root.isFloating && !root.isIslandMode && (Settings?.screenFrameDocked ?? true) && root.scoopRadius > 0 && (
+    readonly property int borderWidth: Math.round(Theme.screenFrameDocked ? Theme.screenBorderWidth : 0)
+    readonly property bool hasBarScoops: !root.isFloating && !root.isIslandMode && Theme.screenFrameDocked && root.scoopRadius > 0 && (
         root.isVertical ? (scoopAllowedTop || scoopAllowedBottom) : (scoopAllowedLeft || scoopAllowedRight)
     )
 
-    readonly property string cornerStyle: Settings?.cornerStyle ?? "cubic"
+    readonly property string cornerStyle: Theme.scoopStyle
     readonly property real scoopTension: {
         if (cornerStyle === "squircle") return 0.72;
         if (cornerStyle === "continuous-bezier" || cornerStyle === "g2") return 0.58;
         if (cornerStyle === "flared") return 0.38;
-        return Settings?.scoopTension ?? 0.55228475;
+        return Theme.scoopTension;
     }
 
     readonly property real dpr: Math.max(1.0, (Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1.0))
 
-    // same curve math as ConcaveCorner.qml so the bar and screen corners don't argue about shapes
+    // check if ScreenCapture is already on the bar so we don't spawn two REC pills at once
+    readonly property bool hasCaptureModuleOnBar: {
+        if (!root.isModuleVisible("screenCapture")) return false;
+        let left = Settings?.barModulesLeft ?? [];
+        let center = Settings?.barModulesCenter ?? ["clock"];
+        let right = Settings?.barModulesRight ?? [];
+        return left.indexOf("screenCapture") !== -1 || left.indexOf("capture") !== -1
+            || center.indexOf("screenCapture") !== -1 || center.indexOf("capture") !== -1
+            || right.indexOf("screenCapture") !== -1 || right.indexOf("capture") !== -1;
+    }
+
     function traceScoopCurve(ctx, x0, y0, cx, cy, x1, y1, style, t) {
         if (style === "chamfer") {
             ctx.lineTo(x1, y1);
@@ -224,7 +237,6 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "quickshell:bar"
 
-    // let clicks pass through empty gaps between islands in island mode
     mask: Region {
         item: root.isIslandMode ? null : barBg
         Region { item: root.isIslandMode ? (root.isVertical ? bentoTopIslandV : bentoLeftIsland) : null }
@@ -237,6 +249,13 @@ PanelWindow {
     AppLauncher {
         id: launcherPopup
         screen: root.screen
+    }
+
+    // cooldown timer so trackpad scrolling on the bar doesn't yeet you across 12 workspaces in 50ms
+    Timer {
+        id: wsScrollCooldown
+        interval: 120
+        repeat: false
     }
 
     Connections {
@@ -269,39 +288,48 @@ PanelWindow {
         height: implicitHeight
         radius: Theme.radiusPill
         color: lMouse.pressed ? Theme.widgetActive : lMouse.containsMouse ? Theme.pillHover : (root.launcherPopup.open ? Theme.primary_overlay : Theme.pillBg)
-        border.color: Theme.pillBorder
-        border.width: Theme.pillBorder === "transparent" ? 0 : 1
-        Behavior on color { ColorAnimation { duration: Theme.animFast } }
-        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
+        border.color: root.launcherPopup.open ? Theme.primary : Theme.pillBorder
+        border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+        Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
         Text {
             id: launcherText
             anchors.centerIn: parent
             text: Theme.iconDistro ?? Theme.iconArch
             font.family: Theme.fontIcon
-            font.pixelSize: (Theme.iconSet === "kaomoji" || Theme.iconSet === "text") ? (root.isVertical ? Theme.fontSizeXs : Theme.fontSizeSm) : Theme.fontSizeLg
-            color: root.launcherPopup.open ? Theme.primary : Theme.on_surface
+            font.pixelSize: Theme.isTextIconSet ? (root.isVertical ? Theme.fontSizeXs : Theme.fontSizeSm) : Theme.fontSizeLg
+            color: root.launcherPopup.open || lMouse.containsMouse ? Theme.primary : Theme.on_surface
+            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         }
         MouseArea {
             id: lMouse
             anchors.fill: parent
             hoverEnabled: true
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
             cursorShape: Qt.PointingHandCursor
             onClicked: (mouse) => {
                 if (mouse.button === Qt.LeftButton) {
                     let pt = launcherPill.mapToItem(null, 0, 0);
                     if (pt) {
                         if (root.isVertical) {
-                            root.launcherPopup.targetRelativeY = pt.y + (launcherPill.height / 2);
+                            root.launcherPopup.targetRelativeX = 0;
+                            root.launcherPopup.targetRelativeY = pt.y + (launcherPill.implicitHeight / 2) + root.effectiveBarMargin;
                         } else {
-                            root.launcherPopup.targetRelativeX = pt.x + (launcherPill.width / 2);
+                            root.launcherPopup.targetRelativeX = pt.x + (launcherPill.implicitWidth / 2) + root.effectiveBarMargin;
+                            root.launcherPopup.targetRelativeY = 0;
                         }
                     }
                     root.launcherPopup.open = !root.launcherPopup.open;
                 } else if (mouse.button === Qt.RightButton) {
                     if (typeof Settings !== "undefined" && Settings?.requestPowerMenuToggle) {
                         Settings.requestPowerMenuToggle();
+                    }
+                } else if (mouse.button === Qt.MiddleButton) {
+                    if (typeof Settings !== "undefined" && Settings?.requestWallpaperToggle) {
+                        Settings.requestWallpaperToggle();
+                    } else if (typeof Settings !== "undefined" && Settings?.requestQuickSettingsToggle) {
+                        Settings.requestQuickSettingsToggle();
                     }
                 }
             }
@@ -380,9 +408,9 @@ PanelWindow {
         id: barRootItem
         anchors.fill: parent
 
-        // Ambient underglow for accent-glow style
+        // ambient underglow for accent-glow style (now works on vertical bars too)
         Rectangle {
-            visible: (Theme?.isAccentGlow ?? false) && !root.isVertical && !root.isIslandMode
+            visible: Theme.isAccentGlow && !root.isIslandMode
             anchors.fill: barBg
             anchors.margins: -4
             radius: root.effectiveBarRadius + 4
@@ -390,7 +418,7 @@ PanelWindow {
             z: -2
         }
 
-        // Single unified shape for docked bar + concave corners
+        // single unified shape for docked bar + concave corners
         Canvas {
             id: unifiedBarCanvas
             width: Math.round(parent.width * root.dpr)
@@ -403,13 +431,13 @@ PanelWindow {
             renderTarget: Canvas.FramebufferObject
             renderStrategy: Canvas.Immediate
 
-            property color fillColor: Theme?.cornerFill ?? Theme?.barBg ?? "#14140c"
-            Behavior on fillColor { ColorAnimation { duration: (typeof Theme !== "undefined" ? Theme?.animFast : null) ?? 150 } }
-            property real glowOpacity: (Theme?.isCyberNeon ?? false) ? 1.0 : 0.85
+            property color fillColor: Theme.cornerFill
+            Behavior on fillColor { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+            property real glowOpacity: Theme.isCyberNeon ? 1.0 : 0.85
 
             SequentialAnimation on glowOpacity {
                 loops: Animation.Infinite
-                running: (Theme?.isCyberNeon ?? false) && !root.isIslandMode && !root.isFloating
+                running: Theme.isCyberNeon && !root.isIslandMode && !root.isFloating
                 NumberAnimation { from: 0.55; to: 1.0; duration: 1200; easing.type: Easing.InOutQuad }
                 NumberAnimation { from: 1.0; to: 0.55; duration: 1200; easing.type: Easing.InOutQuad }
             }
@@ -440,6 +468,14 @@ PanelWindow {
                 function onDprChanged() { unifiedBarCanvas.requestPaint(); }
             }
 
+            Connections {
+                target: Theme
+                function onScoopBorderEnabledChanged() { unifiedBarCanvas.requestPaint(); }
+                function onScoopBorderWidthChanged() { unifiedBarCanvas.requestPaint(); }
+                function onScoopBorderColorChanged() { unifiedBarCanvas.requestPaint(); }
+                function onBarStyleChanged() { unifiedBarCanvas.requestPaint(); }
+            }
+
             onPaint: {
                 var ctx = getContext("2d");
                 ctx.reset();
@@ -465,7 +501,7 @@ PanelWindow {
                 var sL = root.hasBarScoops && !root.isVertical && r > 0 && root.scoopAllowedLeft;
                 var sR = root.hasBarScoops && !root.isVertical && r > 0 && root.scoopAllowedRight;
                 var sT = root.hasBarScoops && root.isVertical && r > 0 && root.scoopAllowedTop;
-                var sB = root.hasBarScoops && !root.isVertical ? false : (root.hasBarScoops && r > 0 && root.scoopAllowedBottom);
+                var sB = root.hasBarScoops && root.isVertical && r > 0 && root.scoopAllowedBottom;
 
                 ctx.fillStyle = unifiedBarCanvas.fillColor;
                 ctx.beginPath();
@@ -540,10 +576,10 @@ PanelWindow {
 
                 ctx.fill();
 
-                var hasCustomBorder = (Theme?.scoopBorderEnabled ?? false) && (Theme?.scoopBorderWidth ?? 0) > 0 && (Theme?.scoopBorderColor ?? "transparent") !== "transparent";
-                var hasNeon = (Theme?.isCyberNeon ?? false) || (Theme?.isAccentGlow ?? false);
-                var hasGlass = Theme?.isGlass ?? false;
-                var hasPureBlack = Theme?.isPureBlack ?? false;
+                var hasCustomBorder = Theme.scoopBorderEnabled && Theme.scoopBorderWidth > 0 && Theme.scoopBorderColor !== "transparent" && Theme.scoopBorderColor.a > 0.01;
+                var hasNeon = Theme.isCyberNeon || Theme.isAccentGlow;
+                var hasGlass = Theme.isGlass;
+                var hasPureBlack = Theme.isPureBlack;
 
                 if (hasCustomBorder || hasNeon || hasGlass || hasPureBlack) {
                     ctx.beginPath();
@@ -597,18 +633,19 @@ PanelWindow {
 
                     ctx.lineCap = "butt";
                     ctx.lineJoin = "round";
-                    if (hasCustomBorder) {
+                    // check hasNeon first when scoopBorderColor is auto so cyber-neon's pulse doesn't get eaten
+                    if (hasNeon && (Settings?.scoopBorderColor ?? "auto") === "auto") {
+                        ctx.lineWidth = Theme.scoopBorderWidth > 0 ? Theme.scoopBorderWidth : 2;
+                        ctx.strokeStyle = Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, unifiedBarCanvas.glowOpacity);
+                    } else if (hasCustomBorder) {
                         ctx.lineWidth = Theme.scoopBorderWidth;
                         ctx.strokeStyle = Theme.scoopBorderColor;
-                    } else if (hasNeon) {
-                        ctx.lineWidth = 2;
-                        ctx.strokeStyle = Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, unifiedBarCanvas.glowOpacity);
                     } else if (hasGlass) {
                         ctx.lineWidth = 1;
-                        ctx.strokeStyle = Theme.glassHighlight ?? Qt.rgba(1, 1, 1, 0.22);
+                        ctx.strokeStyle = Theme.glassHighlight;
                     } else if (hasPureBlack) {
                         ctx.lineWidth = 1;
-                        ctx.strokeStyle = "#222222";
+                        ctx.strokeStyle = "#1f1f1f";
                     }
                     ctx.stroke();
                 }
@@ -617,7 +654,7 @@ PanelWindow {
             }
         }
 
-        // Layout box and background for floating mode
+        // layout box and background for floating mode
         Rectangle {
             id: barBg
             x: root.isRight && root.hasBarScoops && root.scoopRadius > 0 ? root.scoopRadius : 0
@@ -627,15 +664,31 @@ PanelWindow {
             radius: root.effectiveBarRadius
             clip: root.isFloating && root.effectiveBarRadius > 0 && !root.isIslandMode
             color: (root.isIslandMode || !root.isFloating) ? "transparent" : Theme.barBg
-            border.color: (root.isIslandMode || !root.isFloating) ? "transparent" : ((Theme?.isPureBlack ?? false) ? "#222222" : ((Theme?.isCyberNeon ?? false) ? Theme.alpha(Theme.primary, 0.60) : Theme.barBorderColor))
-            border.width: (root.isIslandMode || !root.isFloating) ? 0 : (((Theme?.isPureBlack ?? false) || (Theme?.isCyberNeon ?? false) || Theme.barBorderColor !== "transparent") ? 1 : 0)
+            border.color: (root.isIslandMode || !root.isFloating) ? "transparent" : Theme.barBorderColor
+            border.width: (root.isIslandMode || !root.isFloating || border.color === "transparent" || border.color.a === 0) ? 0 : 1
+
+            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+            Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+            // scroll on empty bar space to cycle workspaces without kidnapping clicks from widgets
+            WheelHandler {
+                enabled: (Settings?.barScrollWorkspaces ?? true) && !root.isIslandMode
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                onWheel: (event) => {
+                    if (wsScrollCooldown.running) return;
+                    let dy = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x;
+                    if (Math.abs(dy) < 15) return;
+                    wsScrollCooldown.restart();
+                    Hyprland.dispatch("workspace " + (dy > 0 ? "e-1" : "e+1"));
+                }
+            }
         }
 
         Item {
             anchors.fill: barBg
             visible: !root.isVertical
 
-            // Bento Floating Island: Left
+            // bento floating island: left
             Rectangle {
                 id: bentoLeftIsland
                 visible: root.isIslandMode && !root.isVertical && leftRowH.visible && (leftRowH.implicitWidth > 0)
@@ -646,16 +699,17 @@ PanelWindow {
                 height: Theme.barHeight - 6
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
-                border.color: (Theme?.isCyberNeon ?? false) ? Theme.primary : Theme.cardBorder
+                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
                 border.width: 1
                 z: -1
                 scale: (Settings?.bentoHoverLift ?? true) && bentoLeftHover.hovered ? 1.015 : 1.0
                 HoverHandler { id: bentoLeftHover }
                 Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
                 Behavior on width { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                 Rectangle {
-                    visible: Theme?.isAccentGlow ?? false
+                    visible: Theme.isAccentGlow
                     anchors.fill: parent
                     anchors.margins: -4
                     radius: parent.radius + 4
@@ -663,7 +717,7 @@ PanelWindow {
                     z: -2
                 }
                 Rectangle {
-                    visible: Theme?.isGlass ?? false
+                    visible: Theme.isGlass
                     anchors.top: parent.top
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -672,7 +726,7 @@ PanelWindow {
                 }
             }
 
-            // Bento Floating Island: Center
+            // bento floating island: center
             Rectangle {
                 id: bentoCenterIsland
                 visible: root.isIslandMode && !root.isVertical && centerRowH.visible && (centerRowH.implicitWidth > 0)
@@ -681,16 +735,17 @@ PanelWindow {
                 height: Theme.barHeight - 6
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
-                border.color: (Theme?.isCyberNeon ?? false) ? Theme.primary : Theme.cardBorder
+                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
                 border.width: 1
                 z: -1
                 scale: (Settings?.bentoHoverLift ?? true) && bentoCenterHover.hovered ? 1.015 : 1.0
                 HoverHandler { id: bentoCenterHover }
                 Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
                 Behavior on width { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                 Rectangle {
-                    visible: Theme?.isAccentGlow ?? false
+                    visible: Theme.isAccentGlow
                     anchors.fill: parent
                     anchors.margins: -4
                     radius: parent.radius + 4
@@ -698,7 +753,7 @@ PanelWindow {
                     z: -2
                 }
                 Rectangle {
-                    visible: Theme?.isGlass ?? false
+                    visible: Theme.isGlass
                     anchors.top: parent.top
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -707,7 +762,7 @@ PanelWindow {
                 }
             }
 
-            // Bento Floating Island: Right
+            // bento floating island: right
             Rectangle {
                 id: bentoRightIsland
                 visible: root.isIslandMode && !root.isVertical && rightRowContainer.visible && (rightRowContainer.width > 0)
@@ -718,16 +773,17 @@ PanelWindow {
                 height: Theme.barHeight - 6
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
-                border.color: (Theme?.isCyberNeon ?? false) ? Theme.primary : Theme.cardBorder
+                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
                 border.width: 1
                 z: -1
                 scale: (Settings?.bentoHoverLift ?? true) && bentoRightHover.hovered ? 1.015 : 1.0
                 HoverHandler { id: bentoRightHover }
                 Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
                 Behavior on width { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                 Rectangle {
-                    visible: Theme?.isAccentGlow ?? false
+                    visible: Theme.isAccentGlow
                     anchors.fill: parent
                     anchors.margins: -4
                     radius: parent.radius + 4
@@ -735,7 +791,7 @@ PanelWindow {
                     z: -2
                 }
                 Rectangle {
-                    visible: Theme?.isGlass ?? false
+                    visible: Theme.isGlass
                     anchors.top: parent.top
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -747,9 +803,9 @@ PanelWindow {
             Row {
                 id: leftRowH
                 anchors.left: parent.left
-                anchors.leftMargin: Theme.widgetPaddingH
+                anchors.leftMargin: root.effectivePaddingH
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.widgetSpacing
+                spacing: root.effectiveSpacing
 
                 Repeater {
                     model: Settings.barModulesLeft ?? []
@@ -792,18 +848,20 @@ PanelWindow {
             Row {
                 id: centerRowH
                 anchors.centerIn: parent
-                spacing: Theme.widgetSpacing
+                spacing: root.effectiveSpacing
                 z: 10
 
-                // Live screen recording pill (horizontal)
+                // fallback live screen recording pill if ScreenCapture isn't already on the bar
                 Rectangle {
-                    visible: ScreenRecService.isRecording
+                    visible: (typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording) && !root.hasCaptureModuleOnBar
                     implicitHeight: Theme.barHeight - 8
                     implicitWidth: recRowH.implicitWidth + 18
                     radius: Theme.radiusPill
-                    color: Theme.alpha(Theme.error ?? "#ff5449", 0.18)
-                    border.color: Theme.error ?? "#ff5449"
+                    color: recMouseH.pressed ? Theme.error : (recMouseH.containsMouse ? Theme.alpha(Theme.error, 0.28) : Theme.error_overlay)
+                    border.color: Theme.error
                     border.width: 1
+
+                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                     RowLayout {
                         id: recRowH
@@ -814,29 +872,38 @@ PanelWindow {
                             width: 8
                             height: 8
                             radius: 4
-                            color: Theme.error ?? "#ff5449"
+                            color: recMouseH.pressed ? Theme.on_error : Theme.error
 
                             SequentialAnimation on opacity {
                                 loops: Animation.Infinite
-                                running: ScreenRecService.isRecording
+                                running: typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording
                                 NumberAnimation { from: 1.0; to: 0.20; duration: 650; easing.type: Easing.InOutQuad }
                                 NumberAnimation { from: 0.20; to: 1.0; duration: 650; easing.type: Easing.InOutQuad }
                             }
                         }
 
                         Text {
-                            text: "REC " + ScreenRecService.elapsedTimeString
+                            text: "REC " + (ScreenRecService?.elapsedTimeString ?? "00:00")
                             font.family: Theme.fontMono
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Font.Bold
-                            color: Theme.error ?? "#ff5449"
+                            color: recMouseH.pressed ? Theme.on_error : Theme.error
                         }
                     }
 
                     MouseArea {
+                        id: recMouseH
                         anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: ScreenRecService.stopRecording()
+                        onClicked: (mouse) => {
+                            if (mouse.button === Qt.RightButton) {
+                                ScreenRecService?.discardRecording();
+                            } else {
+                                ScreenRecService?.stopRecording();
+                            }
+                        }
                     }
                 }
 
@@ -857,7 +924,7 @@ PanelWindow {
             Item {
                 id: rightRowContainer
                 anchors.right: parent.right
-                anchors.rightMargin: Theme.widgetPaddingH
+                anchors.rightMargin: root.effectivePaddingH
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(rightRowH.implicitWidth, root.maxRightRowWidth)
                 height: rightRowH.implicitHeight
@@ -868,7 +935,7 @@ PanelWindow {
                     id: rightRowH
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.widgetSpacing
+                    spacing: root.effectiveSpacing
                     width: Math.min(implicitWidth, root.maxRightRowWidth)
                     clip: true
 
@@ -902,7 +969,7 @@ PanelWindow {
             anchors.fill: barBg
             visible: root.isVertical
 
-            // Bento Floating Island: Top V
+            // bento floating island: top vertical
             Rectangle {
                 id: bentoTopIslandV
                 visible: root.isIslandMode && root.isVertical && leftRowV.visible && (leftRowV.implicitHeight > 0)
@@ -913,16 +980,34 @@ PanelWindow {
                 height: leftRowV.implicitHeight + 12
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
-                border.color: (Theme?.isCyberNeon ?? false) ? Theme.primary : Theme.cardBorder
+                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
                 border.width: 1
                 z: -1
                 scale: (Settings?.bentoHoverLift ?? true) && bentoTopHoverV.hovered ? 1.015 : 1.0
                 HoverHandler { id: bentoTopHoverV }
                 Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
                 Behavior on height { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                Rectangle {
+                    visible: Theme.isAccentGlow
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    radius: parent.radius + 4
+                    color: Theme.alpha(Theme.primary, 0.22)
+                    z: -2
+                }
+                Rectangle {
+                    visible: Theme.isGlass
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 1
+                    color: Theme.glassHighlight
+                }
             }
 
-            // Bento Floating Island: Center V
+            // bento floating island: center vertical
             Rectangle {
                 id: bentoCenterIslandV
                 visible: root.isIslandMode && root.isVertical && centerRowV.visible && (centerRowV.implicitHeight > 0)
@@ -931,16 +1016,34 @@ PanelWindow {
                 height: centerRowV.implicitHeight + 16
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
-                border.color: (Theme?.isCyberNeon ?? false) ? Theme.primary : Theme.cardBorder
+                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
                 border.width: 1
                 z: -1
                 scale: (Settings?.bentoHoverLift ?? true) && bentoCenterHoverV.hovered ? 1.015 : 1.0
                 HoverHandler { id: bentoCenterHoverV }
                 Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
                 Behavior on height { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                Rectangle {
+                    visible: Theme.isAccentGlow
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    radius: parent.radius + 4
+                    color: Theme.alpha(Theme.primary, 0.22)
+                    z: -2
+                }
+                Rectangle {
+                    visible: Theme.isGlass
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 1
+                    color: Theme.glassHighlight
+                }
             }
 
-            // Bento Floating Island: Bottom V
+            // bento floating island: bottom vertical
             Rectangle {
                 id: bentoBottomIslandV
                 visible: root.isIslandMode && root.isVertical && rightRowV.visible && (rightRowV.implicitHeight > 0)
@@ -951,25 +1054,44 @@ PanelWindow {
                 height: rightRowV.implicitHeight + 12
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
-                border.color: (Theme?.isCyberNeon ?? false) ? Theme.primary : Theme.cardBorder
+                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
                 border.width: 1
                 z: -1
                 scale: (Settings?.bentoHoverLift ?? true) && bentoBottomHoverV.hovered ? 1.015 : 1.0
                 HoverHandler { id: bentoBottomHoverV }
                 Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
                 Behavior on height { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                Rectangle {
+                    visible: Theme.isAccentGlow
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    radius: parent.radius + 4
+                    color: Theme.alpha(Theme.primary, 0.22)
+                    z: -2
+                }
+                Rectangle {
+                    visible: Theme.isGlass
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 1
+                    color: Theme.glassHighlight
+                }
             }
 
             Column {
                 id: leftRowV
                 anchors.top: parent.top
-                anchors.topMargin: Theme.widgetPaddingH
+                anchors.topMargin: root.effectivePaddingH
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Theme.widgetSpacing
+                spacing: root.effectiveSpacing
 
                 Repeater {
                     model: Settings.barModulesLeft ?? []
                     delegate: Loader {
+                        id: lModLoaderV
                         required property string modelData
                         active: root.isModuleVisible(modelData) && root.isVertical
                         visible: active
@@ -977,6 +1099,13 @@ PanelWindow {
                         width: Math.round(item ? item.implicitWidth : (Theme.barHeight - 8))
                         height: Math.round(item ? item.implicitHeight : (Theme.barHeight - 8))
                         Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+
+                        Binding {
+                            target: lModLoaderV.item
+                            property: "width"
+                            value: lModLoaderV.width
+                            when: lModLoaderV.item !== null
+                        }
                     }
                 }
             }
@@ -984,44 +1113,56 @@ PanelWindow {
             Column {
                 id: centerRowV
                 anchors.centerIn: parent
-                spacing: Theme.widgetSpacing
+                spacing: root.effectiveSpacing
                 z: 10
 
-                // Live screen recording pill (vertical)
+                // fallback live screen recording pill (vertical)
                 Rectangle {
-                    visible: ScreenRecService.isRecording
+                    visible: (typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording) && !root.hasCaptureModuleOnBar
                     implicitWidth: Theme.barHeight - 8
                     implicitHeight: Theme.barHeight - 8
                     radius: Theme.radiusPill
-                    color: Theme.alpha(Theme.error ?? "#ff5449", 0.22)
-                    border.color: Theme.error ?? "#ff5449"
+                    color: recMouseV.pressed ? Theme.error : (recMouseV.containsMouse ? Theme.alpha(Theme.error, 0.28) : Theme.error_overlay)
+                    border.color: Theme.error
                     border.width: 1
+
+                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                     Rectangle {
                         anchors.centerIn: parent
                         width: 10
                         height: 10
                         radius: 5
-                        color: Theme.error ?? "#ff5449"
+                        color: recMouseV.pressed ? Theme.on_error : Theme.error
 
                         SequentialAnimation on opacity {
                             loops: Animation.Infinite
-                            running: ScreenRecService.isRecording
+                            running: typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording
                             NumberAnimation { from: 1.0; to: 0.20; duration: 650; easing.type: Easing.InOutQuad }
                             NumberAnimation { from: 0.20; to: 1.0; duration: 650; easing.type: Easing.InOutQuad }
                         }
                     }
 
                     MouseArea {
+                        id: recMouseV
                         anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: ScreenRecService.stopRecording()
+                        onClicked: (mouse) => {
+                            if (mouse.button === Qt.RightButton) {
+                                ScreenRecService?.discardRecording();
+                            } else {
+                                ScreenRecService?.stopRecording();
+                            }
+                        }
                     }
                 }
 
                 Repeater {
                     model: Settings.barModulesCenter ?? ["clock"]
                     delegate: Loader {
+                        id: cModLoaderV
                         required property string modelData
                         active: root.isModuleVisible(modelData) && root.isVertical
                         visible: active
@@ -1029,6 +1170,13 @@ PanelWindow {
                         width: Math.round(item ? item.implicitWidth : (Theme.barHeight - 8))
                         height: Math.round(item ? item.implicitHeight : (Theme.barHeight - 8))
                         Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+
+                        Binding {
+                            target: cModLoaderV.item
+                            property: "width"
+                            value: cModLoaderV.width
+                            when: cModLoaderV.item !== null
+                        }
                     }
                 }
             }
@@ -1036,13 +1184,14 @@ PanelWindow {
             Column {
                 id: rightRowV
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: Theme.widgetPaddingH
+                anchors.bottomMargin: root.effectivePaddingH
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Theme.widgetSpacing
+                spacing: root.effectiveSpacing
 
                 Repeater {
                     model: Settings.barModulesRight ?? []
                     delegate: Loader {
+                        id: rModLoaderV
                         required property string modelData
                         active: root.isModuleVisible(modelData) && root.isVertical
                         visible: active
@@ -1050,6 +1199,13 @@ PanelWindow {
                         width: Math.round(item ? item.implicitWidth : (Theme.barHeight - 8))
                         height: Math.round(item ? item.implicitHeight : (Theme.barHeight - 8))
                         Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+
+                        Binding {
+                            target: rModLoaderV.item
+                            property: "width"
+                            value: rModLoaderV.width
+                            when: rModLoaderV.item !== null
+                        }
                     }
                 }
             }

@@ -1,3 +1,4 @@
+// ScreenCapture.qml
 import QtQuick
 import QtQuick.Layouts
 import ".."
@@ -15,6 +16,9 @@ Rectangle {
     property int captureDelaySec: 0
     property int countdownRemaining: 0
     property string pendingTarget: ""
+
+    readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
+    readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
 
     readonly property var targetScreen: {
         if (root.barScreen) return root.barScreen;
@@ -40,25 +44,25 @@ Rectangle {
     radius: Theme.radiusPill
 
     color: {
-        if (root.isRecording) return Theme.error_overlay ?? Theme.alpha(Theme.error ?? "#ff5449", 0.18);
-        if (countdownTimer.running) return Theme.warn_overlay ?? Theme.primary_overlay;
+        if (cMouse.pressed) return Theme.widgetActive;
+        if (root.isRecording) return Theme.error_overlay;
+        if (countdownTimer.running) return Theme.warn_overlay;
         if (popup.open) return Theme.primary_overlay;
         if (cMouse.containsMouse) return Theme.pillHover;
         return Theme.pillBg;
     }
     border.color: {
-        if (root.isRecording) return Theme.error ?? "#ff5449";
-        if (countdownTimer.running) return Theme.warn ?? Theme.primary;
+        if (root.isRecording) return Theme.error;
+        if (countdownTimer.running) return Theme.warn;
         return Theme.pillBorder;
     }
-    border.width: (border.color === "transparent") ? 0 : 1
+    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     clip: true
 
-    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
+    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
 
-    // timer that waits for the popup surface to close (plus any user delay) before firing screenshot
     Timer {
         id: countdownTimer
         interval: 1000
@@ -74,6 +78,7 @@ Rectangle {
         }
     }
 
+    // let the popup close first so it doesn't photobomb the screenshot
     Timer {
         id: immediateShotTimer
         interval: 140
@@ -82,14 +87,14 @@ Rectangle {
     }
 
     function triggerScreenshot(mode) {
+        let wasOpen = popup.open;
         popup.open = false;
         root.pendingTarget = mode;
 
-        // region and window selectors usually open their own overlay immediately unless delay is set
         if (root.captureDelaySec > 0) {
             root.countdownRemaining = root.captureDelaySec;
             countdownTimer.restart();
-        } else if (mode === "fullscreen") {
+        } else if (wasOpen) {
             immediateShotTimer.restart();
         } else {
             root.executeScreenshot(mode);
@@ -108,11 +113,14 @@ Rectangle {
 
     function syncAnchor() {
         const pt = root.mapToItem(null, 0, 0);
-        let barFloats = Settings?.barFloating ?? false;
-        let barMarg = barFloats ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0;
         if (pt && root.visible) {
-            popup.targetRelativeX = pt.x + (root.width / 2) + barMarg;
-            popup.targetRelativeY = pt.y + (root.height / 2);
+            if (Theme.isVertical) {
+                popup.targetRelativeX = 0;
+                popup.targetRelativeY = pt.y + (root.implicitHeight / 2) + root.effectiveBarMargin;
+            } else {
+                popup.targetRelativeX = pt.x + (root.implicitWidth / 2) + root.effectiveBarMargin;
+                popup.targetRelativeY = 0;
+            }
         } else {
             popup.targetRelativeX = 0;
             popup.targetRelativeY = 0;
@@ -125,7 +133,6 @@ Rectangle {
             || (root.barMonitor && Hyprland.focusedMonitor && root.barMonitor.id === Hyprland.focusedMonitor.id);
     }
 
-    // reusable UI pieces
     component CaptureTile: Rectangle {
         id: tileRoot
         property string icon: ""
@@ -137,19 +144,20 @@ Rectangle {
         Layout.fillWidth: true
         Layout.preferredHeight: 54
         radius: Theme.radiusMd
+        // using widgetBg/widgetHover/widgetBorder so pure-black and glass modes don't turn into opaque grey bricks
         color: {
-            if (tileMouse.pressed) return tileRoot.accentRed ? (Theme.error ?? "#ff5449") : Theme.primary;
-            if (tileMouse.containsMouse) return tileRoot.accentRed ? (Theme.error_overlay ?? Theme.primary_overlay) : Theme.primary_overlay;
-            return Theme.surface_container_high;
+            if (tileMouse.pressed) return tileRoot.accentRed ? Theme.error : Theme.primary;
+            if (tileMouse.containsMouse) return tileRoot.accentRed ? Theme.error_overlay : Theme.widgetHover;
+            return Theme.widgetBg;
         }
         border.color: {
-            if (tileMouse.containsMouse) return tileRoot.accentRed ? (Theme.error ?? "#ff5449") : Theme.primary;
-            return Theme.outline_variant ?? Theme.widgetBorder;
+            if (tileMouse.containsMouse) return tileRoot.accentRed ? Theme.error : Theme.primary;
+            return Theme.widgetBorder;
         }
         border.width: 1
 
-        Behavior on color { ColorAnimation { duration: Theme.animFast } }
-        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
+        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+        Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
         ColumnLayout {
             anchors.centerIn: parent
@@ -159,10 +167,10 @@ Rectangle {
                 Layout.alignment: Qt.AlignHCenter
                 text: tileRoot.icon
                 font.family: Theme.fontIcon
-                font.pixelSize: Theme.fontSizeMd
+                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeMd
                 color: {
-                    if (tileMouse.pressed) return tileRoot.accentRed ? "#ffffff" : Theme.on_primary;
-                    return tileRoot.accentRed ? (Theme.error ?? "#ff5449") : Theme.primary;
+                    if (tileMouse.pressed) return tileRoot.accentRed ? Theme.on_error : Theme.on_primary;
+                    return tileRoot.accentRed ? Theme.error : Theme.primary;
                 }
             }
 
@@ -172,7 +180,7 @@ Rectangle {
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeXs
                 font.weight: Font.DemiBold
-                color: tileMouse.pressed ? (tileRoot.accentRed ? "#ffffff" : Theme.on_primary) : Theme.on_surface
+                color: tileMouse.pressed ? (tileRoot.accentRed ? Theme.on_error : Theme.on_primary) : Theme.on_surface
             }
         }
 
@@ -197,20 +205,21 @@ Rectangle {
         Layout.preferredHeight: 24
         Layout.preferredWidth: fillWidth ? -1 : (chipRow.implicitWidth + 16)
         radius: Theme.radiusPill
-        color: selected ? Theme.primary_overlay : (chipMouse.containsMouse ? Theme.surface_container_high : "transparent")
-        border.color: selected ? Theme.primary : (Theme.outline_variant ?? Theme.widgetBorder)
+        color: selected ? Theme.primary_overlay : (chipMouse.containsMouse ? Theme.widgetHover : "transparent")
+        border.color: selected ? Theme.primary : Theme.widgetBorder
         border.width: 1
 
-        Behavior on color { ColorAnimation { duration: Theme.animFast } }
-        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
+        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+        Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
         RowLayout {
             id: chipRow
             anchors.centerIn: parent
             spacing: 4
 
+            // hide prefix icon in text mode so we don't end up with "mic mic" or "clip clipboard"
             Text {
-                visible: chipRoot.icon !== ""
+                visible: chipRoot.icon !== "" && !Theme.isTextIconSet
                 text: chipRoot.icon
                 font.family: Theme.fontIcon
                 font.pixelSize: Theme.fontSizeXs
@@ -246,10 +255,10 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: Theme.iconCamera
             font.family: Theme.fontIcon
-            font.pixelSize: Theme.fontSizeSm
+            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
             color: popup.open || cMouse.containsMouse ? Theme.primary : Theme.on_surface
 
-            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         }
 
         Text {
@@ -275,13 +284,13 @@ Rectangle {
             width: 8
             height: 8
             radius: 4
-            color: root.isRecording ? (Theme.error ?? "#ff5449") : (Theme.warn ?? Theme.primary)
+            color: root.isRecording ? Theme.error : Theme.warn
 
             SequentialAnimation on opacity {
                 loops: Animation.Infinite
                 running: root.isRecording || countdownTimer.running
-                NumberAnimation { from: 1.0; to: 0.25; duration: 600; easing.type: Easing.InOutQuad }
-                NumberAnimation { from: 0.25; to: 1.0; duration: 600; easing.type: Easing.InOutQuad }
+                NumberAnimation { from: 1.0; to: 0.20; duration: 650; easing.type: Easing.InOutQuad }
+                NumberAnimation { from: 0.20; to: 1.0; duration: 650; easing.type: Easing.InOutQuad }
             }
         }
 
@@ -293,11 +302,10 @@ Rectangle {
             font.family: Theme.fontMono
             font.pixelSize: Theme.fontSizeXs
             font.weight: Font.Bold
-            color: root.isRecording ? (Theme.error ?? "#ff5449") : (Theme.warn ?? Theme.primary)
+            color: root.isRecording ? Theme.error : Theme.warn
         }
     }
 
-    // left click opens menu (or stops recording), right click snaps region, middle click snaps display
     MouseArea {
         id: cMouse
         anchors.fill: parent
@@ -352,18 +360,18 @@ Rectangle {
 
     PopupPanel {
         id: popup
-        screen: root.barScreen
+        screen: root.targetScreen
         cardWidth: 390
-        cardHeight: Math.round(captureLayout.implicitHeight + ((Theme.popupPadding ?? 16) * 2))
+        cardHeight: Math.round(captureLayout.implicitHeight + (Theme.popupPadding * 2))
         targetRelativeX: 0
         targetRelativeY: 0
 
         content: ColumnLayout {
             id: captureLayout
             anchors.fill: parent
-            spacing: 10
+            spacing: Theme.popupSpacing
 
-            // header with icon badge, flavor quote subtitle, and live status pill
+            // header with icon badge, rotating flavor quote, and status pill
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 10
@@ -372,16 +380,16 @@ Rectangle {
                     width: 34
                     height: 34
                     radius: Theme.radiusMd
-                    color: root.isRecording ? (Theme.error_overlay ?? Theme.primary_overlay) : Theme.primary_overlay
-                    border.color: root.isRecording ? (Theme.error ?? "#ff5449") : Theme.alpha(Theme.primary, 0.35)
+                    color: root.isRecording ? Theme.error_overlay : Theme.primary_overlay
+                    border.color: root.isRecording ? Theme.error : Theme.alpha(Theme.primary, 0.35)
                     border.width: 1
 
                     Text {
                         anchors.centerIn: parent
                         text: Theme.iconCamera
                         font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeLg
-                        color: root.isRecording ? (Theme.error ?? "#ff5449") : Theme.primary
+                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                        color: root.isRecording ? Theme.error : Theme.primary
                     }
                 }
 
@@ -398,7 +406,7 @@ Rectangle {
                     }
 
                     Text {
-                        text: Theme.getFlavor ? Theme.getFlavor("screenshot", "gpu accelerated • native wayland") : "gpu accelerated • native wayland"
+                        text: Theme.getFlavor("screenshot", "gpu accelerated • native wayland")
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface_variant
@@ -411,18 +419,18 @@ Rectangle {
                     height: 22
                     implicitWidth: statusText.implicitWidth + 14
                     radius: Theme.radiusPill
-                    color: root.isRecording ? (Theme.error_overlay ?? Theme.primary_overlay) : Theme.primary_overlay
-                    border.color: root.isRecording ? (Theme.error ?? "#ff5449") : Theme.primary
+                    color: root.isRecording ? Theme.error_overlay : (countdownTimer.running ? Theme.warn_overlay : Theme.primary_overlay)
+                    border.color: root.isRecording ? Theme.error : (countdownTimer.running ? Theme.warn : Theme.primary)
                     border.width: 1
 
                     Text {
                         id: statusText
                         anchors.centerIn: parent
-                        text: root.isRecording ? ("REC " + (ScreenRecService?.elapsedTimeString ?? "00:00")) : "ready"
+                        text: root.isRecording ? ("REC " + (ScreenRecService?.elapsedTimeString ?? "00:00")) : (countdownTimer.running ? (root.countdownRemaining + "s") : "ready")
                         font.family: Theme.fontMono
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Font.Bold
-                        color: root.isRecording ? (Theme.error ?? "#ff5449") : Theme.primary
+                        color: root.isRecording ? Theme.error : (countdownTimer.running ? Theme.warn : Theme.primary)
                     }
                 }
             }
@@ -435,6 +443,16 @@ Rectangle {
                 color: Theme.cardBg
                 border.color: Theme.cardBorder
                 border.width: 1
+                clip: true
+
+                Rectangle {
+                    visible: Theme.isGlass
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 1
+                    color: Theme.glassHighlight
+                }
 
                 ColumnLayout {
                     id: shotCol
@@ -447,9 +465,9 @@ Rectangle {
                         spacing: 6
 
                         Text {
-                            text: Theme.iconScreenshot ?? Theme.iconCamera
+                            text: Theme.iconScreenshot
                             font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeSm
+                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                             color: Theme.primary
                         }
 
@@ -463,7 +481,6 @@ Rectangle {
 
                         Item { Layout.fillWidth: true }
 
-                        // timer delay chips
                         Repeater {
                             model: [
                                 { label: "now", sec: 0 },
@@ -503,7 +520,6 @@ Rectangle {
                         }
                     }
 
-                    // output destination selector (copy + save, copy only, save only)
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
@@ -547,8 +563,18 @@ Rectangle {
                 implicitHeight: recCol.implicitHeight + 20
                 radius: Theme.radiusMd
                 color: Theme.cardBg
-                border.color: root.isRecording ? (Theme.error ?? "#ff5449") : Theme.cardBorder
+                border.color: root.isRecording ? Theme.error : Theme.cardBorder
                 border.width: 1
+                clip: true
+
+                Rectangle {
+                    visible: Theme.isGlass
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 1
+                    color: Theme.glassHighlight
+                }
 
                 ColumnLayout {
                     id: recCol
@@ -563,8 +589,8 @@ Rectangle {
                         Text {
                             text: Theme.iconPlay
                             font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeSm
-                            color: root.isRecording ? (Theme.error ?? "#ff5449") : Theme.primary
+                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                            color: root.isRecording ? Theme.error : Theme.primary
                         }
 
                         Text {
@@ -580,7 +606,7 @@ Rectangle {
                         Text {
                             text: "60 fps • gpu-screen-recorder"
                             font.family: Theme.fontMono
-                            font.pixelSize: (Theme.fontSizeXs ?? 10) - 1
+                            font.pixelSize: Math.max(8, Theme.fontSizeXs - 1)
                             color: Theme.on_surface_variant
                         }
                     }
@@ -591,8 +617,8 @@ Rectangle {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 48
                         radius: Theme.radiusSm
-                        color: Theme.error_overlay ?? Theme.alpha(Theme.error ?? "#ff5449", 0.14)
-                        border.color: Theme.error ?? "#ff5449"
+                        color: Theme.error_overlay
+                        border.color: Theme.error
                         border.width: 1
 
                         RowLayout {
@@ -604,7 +630,14 @@ Rectangle {
                                 width: 8
                                 height: 8
                                 radius: 4
-                                color: Theme.error ?? "#ff5449"
+                                color: Theme.error
+
+                                SequentialAnimation on opacity {
+                                    loops: Animation.Infinite
+                                    running: root.isRecording
+                                    NumberAnimation { from: 1.0; to: 0.20; duration: 650; easing.type: Easing.InOutQuad }
+                                    NumberAnimation { from: 0.20; to: 1.0; duration: 650; easing.type: Easing.InOutQuad }
+                                }
                             }
 
                             Text {
@@ -612,7 +645,7 @@ Rectangle {
                                 font.family: Theme.fontMono
                                 font.pixelSize: Theme.fontSizeSm
                                 font.weight: Font.Bold
-                                color: Theme.error ?? "#ff5449"
+                                color: Theme.error
                                 Layout.fillWidth: true
                             }
 
@@ -620,7 +653,7 @@ Rectangle {
                                 height: 30
                                 implicitWidth: stopTxt.implicitWidth + 18
                                 radius: Theme.radiusSm
-                                color: stopMouse.containsMouse ? Theme.alpha(Theme.error ?? "#ff5449", 0.85) : (Theme.error ?? "#ff5449")
+                                color: stopMouse.containsMouse ? Theme.alpha(Theme.error, 0.85) : Theme.error
 
                                 Text {
                                     id: stopTxt
@@ -629,7 +662,8 @@ Rectangle {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Font.Bold
-                                    color: "#ffffff"
+                                    // using on_error instead of #ffffff so it doesn't blind you on pastel M3 error colors
+                                    color: Theme.on_error
                                 }
 
                                 MouseArea {
@@ -645,8 +679,8 @@ Rectangle {
                                 height: 30
                                 implicitWidth: discTxt.implicitWidth + 16
                                 radius: Theme.radiusSm
-                                color: discMouse.containsMouse ? Theme.alpha(Theme.error ?? "#ff5449", 0.2) : "transparent"
-                                border.color: Theme.error ?? "#ff5449"
+                                color: discMouse.containsMouse ? Theme.error_overlay : "transparent"
+                                border.color: Theme.error
                                 border.width: 1
 
                                 Text {
@@ -656,7 +690,7 @@ Rectangle {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Font.Medium
-                                    color: Theme.error ?? "#ff5449"
+                                    color: Theme.error
                                 }
 
                                 MouseArea {
@@ -670,7 +704,7 @@ Rectangle {
                         }
                     }
 
-                    // idle recording triggers (matching the region | window | display order)
+                    // idle recording triggers
                     RowLayout {
                         visible: !root.isRecording
                         Layout.fillWidth: true
@@ -707,7 +741,6 @@ Rectangle {
                         }
                     }
 
-                    // audio routing chips
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
@@ -730,6 +763,7 @@ Rectangle {
                             delegate: MiniChip {
                                 required property var modelData
                                 label: modelData.label
+                                icon: modelData.icon
                                 fillWidth: true
                                 selected: root.activeAudio === modelData.id
                                 onClicked: {
