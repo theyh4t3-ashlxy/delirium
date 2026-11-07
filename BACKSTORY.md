@@ -1,8 +1,29 @@
 # backstory & the doctrine
 
-> [!WARNING]
-> this repository is an active biohazard containment zone.  
-> if you came here looking for cute pastel catppuccin configs, cozy lofi anime wallpapers, and gentle unixporn dotfiles to show your discord friends, turn around immediately. go use `caelestia` or `end-4`. this place is an unhinged digital asylum built on chronic insomnia, thermal throttling, caffeine toxicity, and pure developer spite.
+## the turn-key paradox: why you should probably use caelestia or end-4
+
+let us be completely transparent: if you want a polished, reliable, out-of-the-box wayland setup where volume sliders just work, bluetooth doesn't require a forensic terminal autopsy, and you can post cozy pastel screenshots to discord without questioning your sanity, do not install this repository.
+
+go install `caelestia` or `end-4`.
+
+those are mature, sane, community-engineered rice suites built by people who actually want users to have a pleasant computing experience. they have documentation, support channels, and defaults that won't panic if your battery percentage reports an integer instead of a float.
+
+`delirium` is the exact opposite of a turn-key distribution. it is a hyper-specific, deeply obsessive digital operating state tailored to a 15-year-old's sensory neuroses, hardware thermal containment, and pathological rejection of corporate developer defaults.
+
+### why build from scratch then?
+
+because when you use a prebuilt rice, you are renting someone else's taste.
+
+the moment you crave:
+- **zero `.json` architecture**: evicting nested curly brackets and quotes from local state entirely in favor of flat key-value tokens.
+- **pure qml layer-shell composition**: abandoning bloated waybar setups for dynamic qtquick anchors with continuous bezier curves and fluid subsurfaces.
+- **hardware-level firmware hacking**: reverse-engineering thinkpad embedded controller registers to shock a false-positive bd-prochot throttle latch back to life.
+- **deterministic nixos immutability**: ensuring an update can never brick your system because generation rollbacks are instant.
+- **embedded lua display scripting**: driving hyprland through runtime closures rather than brittle static config syntax.
+
+...you realize prebuilt rices cannot give you that. you have to build it yourself, line by painful line, in the dark at 4 am.
+
+steal our code. rip out our continuous bezier scoop math, our matugen template pipelines, our native python desktop controller, or our anti-prochot watchdog loop. customize the living hell out of your system until every single byte reflects your own brain. but don't clone this expecting a frictionless appliance.
 
 ---
 

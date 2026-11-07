@@ -33,9 +33,12 @@ everything between your wallpaper and your eyeballs:
 
 ## how to run without burning your house down
 ```bash
-# launch shell
-quickshell
+# inspect active shell status and memory footprint
+cli status
 
-# or using the shortcut alias
-qs
+# gracefully reload without surface or layer-shell conflicts
+cli reload
+
+# switch between quickshell and brain_shell
+cli shell toggle
 ```

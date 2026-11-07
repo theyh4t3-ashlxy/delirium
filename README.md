@@ -14,17 +14,15 @@ here is five seconds of live footage captured moments before wayland choked on a
   </video>
 </div>
 
-> [!CAUTION]
-> if you need to know why an alder lake thinkpad requires a custom root python watchdog just to keep its cpu from having a 400mhz seizure, or how an npm postinstall script stole my credentials and sent them to a telegram bot in st. petersburg at 3 am, read [BACKSTORY.md](BACKSTORY.md). we do not do therapy here.
-
 ---
 
 ### contents
 1. [stage 1: declarative ransom note](#stage-1-the-declarative-ransom-note)
 2. [stage 2: deployment vectors](#stage-2-deployment-vectors)
-3. [cli flag reference](#cli-flag-reference)
-4. [known bugs & void roadmap](#known-bugs--void-roadmap)
-5. [backstory & the doctrine](BACKSTORY.md)
+3. [desktop cli cheat sheet](#desktop-cli-cheat-sheet)
+4. [installer flag reference](#installer-flag-reference)
+5. [known bugs & void roadmap](#known-bugs--void-roadmap)
+6. [the doctrine & lore (BACKSTORY.md)](BACKSTORY.md)
 
 ---
 
@@ -134,7 +132,30 @@ the installer forcibly hijacks `/dev/tty` for interactive input, so piping curl 
 
 ---
 
-## cli flag reference
+## desktop cli cheat sheet
+
+all desktop actions and shell lifecycles are unified through `cli` (zero mouse required):
+
+| command | function |
+|---|---|
+| `cli status` | print active shell, pids, and memory footprint |
+| `cli reload` | graceful restart without layer-shell surface conflicts |
+| `cli shell toggle` | switch between quickshell and brain_shell |
+| `cli launcher` | toggle app launcher (`WIN + D`) |
+| `cli files [dir]` | open preferred file manager (`WIN + E`) |
+| `cli notifs` | toggle notification center (`WIN + N`) |
+| `cli clip` | toggle clipboard history (`WIN + V`) |
+| `cli wp` | roll random wallpaper & regenerate tokens (`WIN + W`) |
+| `cli audio` | toggle volume & audio mixer (`WIN + A`) |
+| `cli power` | open power menu (`WIN + ESCAPE`) |
+| `cli lock` | lock session (`WIN + END`) |
+| `cli keybinds` | launch keyboard cheatsheet |
+| `cli welcome` | open onboarding wizard |
+| `cli` | launch interactive fzf action picker |
+
+---
+
+## installer flag reference
 
 for automated pipelines, unattended docker builds, and terminal purists who would rather eat glass than touch an interactive cursor menu:
 
@@ -164,5 +185,5 @@ zero reported fires. either this stack achieved divine enlightenment or the cras
 
 ---
 
-## human vs machine diplomacy
-for the full protocol on filing issues, bot diplomacy, and pull requests, check out [BACKSTORY.md](BACKSTORY.md#human-vs-machine-diplomacy).
+## the doctrine & lore
+for why turn-key rices exist vs why we hand-carve custom shells from scratch, the full atomic arch incident autopsy, hardware thermal containment, and machine diplomacy rules, read [BACKSTORY.md](BACKSTORY.md).
