@@ -30,6 +30,7 @@ output_path = "~/.config/zsh/matugen.zsh"
 [templates.gtk4]
 input_path = "~/.config/matugen/templates/gtk4.css"
 output_path = "~/.config/gtk-4.0/matugen.css"
+post_hook = "$HOME/.config/matugen/post-hook-scripts/gtk-themes-reload.zsh 2>/dev/null || true"
 
 # dump gtk3 palette into matugen.css and execute the double-tap
 [templates.gtk3]
