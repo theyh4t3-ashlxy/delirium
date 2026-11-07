@@ -15,16 +15,17 @@ Item {
     implicitHeight: 520
 
     readonly property var allBinds: [
-        // Shell & Desktop (qs-action)
-        { keys: ["WIN", "D"], desc: "Toggle App Launcher", category: "shell", action: "qs-action launcher" },
-        { keys: ["WIN", "N"], desc: "Toggle Notification Center", category: "shell", action: "qs-action notifs" },
-        { keys: ["WIN", "V"], desc: "Toggle Clipboard History", category: "shell", action: "qs-action clipboard" },
-        { keys: ["WIN", "W"], desc: "Toggle Wallpaper Browser", category: "shell", action: "qs-action wallpaper" },
-        { keys: ["WIN", "A"], desc: "Toggle Audio & Volume Menu", category: "shell", action: "qs-action audio" },
-        { keys: ["WIN", "ESCAPE"], desc: "Toggle Power Menu", category: "shell", action: "qs-action powermenu" },
-        { keys: ["WIN", "END"], desc: "Lock Session", category: "shell", action: "qs-action lock" },
+        // Shell & Desktop (cli)
+        { keys: ["WIN", "D"], desc: "Toggle App Launcher", category: "shell", action: "cli launcher" },
+        { keys: ["WIN", "E"], desc: "Open File Manager (yazi / dolphin)", category: "shell", action: "cli files" },
+        { keys: ["WIN", "N"], desc: "Toggle Notification Center", category: "shell", action: "cli notifs" },
+        { keys: ["WIN", "V"], desc: "Toggle Clipboard History", category: "shell", action: "cli clip" },
+        { keys: ["WIN", "W"], desc: "Toggle Wallpaper Browser", category: "shell", action: "cli wall" },
+        { keys: ["WIN", "A"], desc: "Toggle Audio & Volume Menu", category: "shell", action: "cli audio" },
+        { keys: ["WIN", "ESCAPE"], desc: "Toggle Power Menu", category: "shell", action: "cli power" },
+        { keys: ["WIN", "END"], desc: "Lock Session", category: "shell", action: "cli lock" },
         { keys: ["WIN", "SHIFT", "END"], desc: "Log Out / Stop Session", category: "shell", action: "uwsm stop" },
-        { keys: ["Print"], desc: "Capture Screenshot (Interactive)", category: "shell", action: "qs-action screenshot" },
+        { keys: ["Print"], desc: "Capture Screenshot (Interactive)", category: "shell", action: "cli screenshot" },
 
         // Window Management
         { keys: ["WIN", "Q"], desc: "Close Active Window", category: "windows", action: "hl.dsp.window.close()" },

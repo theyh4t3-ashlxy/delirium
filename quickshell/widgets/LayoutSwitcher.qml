@@ -14,11 +14,10 @@ Rectangle {
     property var barScreen: null
     property var barMonitor: null
 
-    // ── layout state ───────────────────────────────────────────────────────
+    // actual built-in hyprland 0.54+ layout names (scrolling, not scroller)
     property string currentLayout: "dwindle"
     property int numWindows: 0
-    property bool isMonocleActive: false
-    property var availableLayouts: ["dwindle", "master", "scroller", "monocle"]
+    property var availableLayouts: ["dwindle", "master", "scrolling", "monocle"]
 
     readonly property var layoutDefinitions: [
         {
@@ -33,25 +32,24 @@ Rectangle {
             title: "master layout",
             badge: "master + stack",
             icon: "◫",
-            desc: "keeps a primary master window alongside stacked slave windows."
+            desc: "keeps a primary master window alongside stacked side windows."
         },
         {
-            id: "scroller",
+            id: "scrolling",
             title: "scrolling layout",
             badge: "infinite tape",
             icon: "↔",
-            desc: "places windows on an infinitely scrolling horizontal tape, ideal for ultrawides."
+            desc: "places windows on an infinitely scrolling horizontal tape, great for ultrawides."
         },
         {
             id: "monocle",
             title: "monocle layout",
-            badge: "maximized",
+            badge: "deck stack",
             icon: "󰊓",
-            desc: "maximizes the active window to fill the screen, keeping others stacked behind."
+            desc: "stretches the focused window across the workspace and stacks the rest behind it."
         }
     ]
 
-    // ── physical bar sizing ────────────────────────────────────────────────
     implicitWidth: {
         if (Theme?.isVertical ?? false) return (Theme?.barHeight ?? 32) - 8;
         return (lMouse.containsMouse || popup.open)
@@ -60,13 +58,15 @@ Rectangle {
     }
     implicitHeight: (Theme?.isVertical ?? false) ? Math.max(36, pillCol.implicitHeight + 12) : ((Theme?.barHeight ?? 32) - 8)
     radius: Theme?.radiusPill ?? 999
-    color: popup.open ? (Theme?.primary_overlay ?? "#33ffffff") : (lMouse.containsMouse ? (Theme?.pillHover ?? "#22ffffff") : (Theme?.pillBg ?? "#11ffffff"))
+    color: popup.open
+        ? (Theme?.primary_overlay ?? "#33ffffff")
+        : (lMouse.containsMouse ? (Theme?.pillHover ?? "#22ffffff") : (Theme?.pillBg ?? "#11ffffff"))
     border.color: (Theme?.isCyberNeon ?? false) ? (Theme?.primary ?? "#00ffff") : (Theme?.pillBorder ?? "transparent")
     border.width: ((Theme?.isCyberNeon ?? false) || ((Theme?.pillBorder ?? "transparent") !== "transparent")) ? 1 : 0
     visible: Settings?.showLayoutSwitcher ?? true
 
-    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120 } }
-    Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 120 } }
+    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
+    Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 120; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
     Behavior on implicitWidth {
         NumberAnimation {
             duration: Theme?.animFast ?? 120
@@ -78,30 +78,39 @@ Rectangle {
     Behavior on scale {
         NumberAnimation {
             duration: Theme?.animFast ?? 120
-            easing.type: Easing.OutQuad
+            easing.type: Theme?.animEasing ?? Easing.OutQuad
         }
     }
 
-    // ── helpers: icons & formatted labels ──────────────────────────────────
-    function getLayoutIcon(layout) {
-        let l = (layout || "").toLowerCase();
+    // normalize any old "scroller" configs to "scrolling" so nothing gets stuck
+    function normalizeLayoutName(layout: string): string {
+        let l = (layout || "").trim().toLowerCase();
+        if (l === "scroller" || l === "scroll") return "scrolling";
+        return l;
+    }
+
+    function getLayoutIcon(layout: string): string {
+        let l = normalizeLayoutName(layout);
         if (l === "dwindle") return "⊞";
         if (l === "master") return "◫";
-        if (l === "scroller" || l === "scrolling") return "↔";
+        if (l === "scrolling") return "↔";
         if (l === "monocle") return "󰊓";
         return "";
     }
 
-    function getLayoutLabel(layout) {
-        let l = (layout || "").toLowerCase();
+    function getLayoutLabel(layout: string): string {
+        let l = normalizeLayoutName(layout);
         if (l === "dwindle") return "dwindle";
         if (l === "master") return "master";
-        if (l === "scroller" || l === "scrolling") return "scroll";
+        if (l === "scrolling") return "scroll";
         if (l === "monocle") return "monocle";
         return l !== "" ? l : "layout";
     }
 
-    // ── query active hyprland layout (debounced) ───────────────────────────
+    /*
+    ask hyprctl what the workspace is actually doing instead of trusting
+    our own optimistic state
+    */
     Process {
         id: queryProc
         command: ["hyprctl", "-j", "activeworkspace"]
@@ -115,13 +124,8 @@ Rectangle {
                         if (obj.windows !== undefined) {
                             root.numWindows = obj.windows;
                         }
-                        // monocle takes precedence over underlying tiled layout
-                        if (obj.hasfullscreen) {
-                            root.isMonocleActive = true;
-                            root.currentLayout = "monocle";
-                        } else if (obj.tiledLayout) {
-                            root.isMonocleActive = false;
-                            root.currentLayout = obj.tiledLayout.toLowerCase();
+                        if (obj.tiledLayout) {
+                            root.currentLayout = root.normalizeLayoutName(obj.tiledLayout);
                         }
                     }
                 } catch (e) {}
@@ -147,11 +151,15 @@ Rectangle {
     Connections {
         target: Hyprland
         function onRawEvent(event) {
-            if (event.name === "workspace" || 
-                event.name === "focusedmon" || 
-                event.name === "fullscreen" || 
-                event.name === "openwindow" || 
-                event.name === "closewindow") {
+            let n = event?.name ?? "";
+            if (n === "workspace" ||
+                n === "workspacev2" ||
+                n === "focusedmon" ||
+                n === "focusedmonv2" ||
+                n === "fullscreen" ||
+                n === "openwindow" ||
+                n === "closewindow" ||
+                n === "configreloaded") {
                 root.refreshLayout();
             }
         }
@@ -164,17 +172,22 @@ Rectangle {
         onTriggered: root.refreshLayout()
     }
 
-    // ── layout switch dispatcher (hyprland 0.55+ lua engine) ───────────────
+    /*
+    shove the new layout into both general.layout and the active workspace rule
+    so per-workspace rules don't silently ignore us
+    */
     Process {
         id: setProc
         running: false
         stdout: StdioCollector {
             id: setOut
             onStreamFinished: {
-                // fallback to legacy keyword if hl.config is not recognized
-                if (setOut.text.includes("error") || setOut.text.includes("unknown")) {
+                let out = (setOut.text || "").toLowerCase();
+                if (out.includes("error") || out.includes("unknown") || out.includes("invalid")) {
                     legacyProc.command = ["hyprctl", "keyword", "general:layout", root.currentLayout];
                     legacyProc.running = true;
+                } else {
+                    root.refreshLayout();
                 }
             }
         }
@@ -183,38 +196,40 @@ Rectangle {
     Process {
         id: legacyProc
         running: false
+        onExited: root.refreshLayout()
     }
 
-    function applyLayout(layoutName) {
-        let target = (layoutName || "").trim().toLowerCase();
+    function applyLayout(layoutName: string) {
+        let target = normalizeLayoutName(layoutName);
         if (!target) return;
-
-        if (target === "monocle") {
-            if (!root.isMonocleActive) {
-                Hyprland.dispatch("fullscreen 1");
-            }
-            root.isMonocleActive = true;
-            root.currentLayout = "monocle";
-            return;
-        }
-
-        if (root.isMonocleActive) {
-            Hyprland.dispatch("fullscreen 0");
-            root.isMonocleActive = false;
-        }
 
         root.currentLayout = target;
 
-        // stop ongoing process if clicking rapidly
         if (setProc.running) setProc.running = false;
+        if (legacyProc.running) legacyProc.running = false;
 
-        // execute via hyprland 0.55+ lua evaluator directly
-        setProc.command = ["hyprctl", "eval", `hl.config({ general = { layout = "${target}" } })`];
-        setProc.running = true;
+        let safeTarget = target.replace(/[^a-z0-9_:-]/gi, "");
+        if (!safeTarget) return;
+
+        if (Hyprland?.usingLua ?? true) {
+            let luaCode = `
+                hl.config({ general = { layout = "${safeTarget}" } })
+                local ws = hl.get_active_special_workspace() or hl.get_active_workspace()
+                if ws then
+                    local sel = ws.special and tostring(ws.name) or (ws.id > 0 and tostring(ws.id) or ("name:" .. tostring(ws.name)))
+                    hl.workspace_rule({ workspace = sel, layout = "${safeTarget}" })
+                end
+            `.trim().replace(/\s+/g, " ");
+            setProc.command = ["hyprctl", "eval", luaCode];
+            setProc.running = true;
+        } else {
+            legacyProc.command = ["hyprctl", "keyword", "general:layout", safeTarget];
+            legacyProc.running = true;
+        }
     }
 
-    function addCustomLayout(layoutName) {
-        let clean = (layoutName || "").trim().toLowerCase();
+    function addCustomLayout(layoutName: string) {
+        let clean = normalizeLayoutName(layoutName);
         if (!clean) return;
         if (!availableLayouts.includes(clean)) {
             availableLayouts = [...availableLayouts, clean];
@@ -236,7 +251,6 @@ Rectangle {
         applyLayout(availableLayouts[prevIdx]);
     }
 
-    // ── popup geometry alignment ───────────────────────────────────────────
     function updatePosition() {
         let pt = root.mapToItem(null, 0, 0);
         let barFloats = Settings?.barFloating ?? false;
@@ -250,7 +264,6 @@ Rectangle {
         }
     }
 
-    // ── bar pill contents: horizontal ──────────────────────────────────────
     Row {
         id: pillRow
         visible: !(Theme?.isVertical ?? false)
@@ -261,9 +274,9 @@ Rectangle {
             id: iconText
             anchors.verticalCenter: parent.verticalCenter
             text: root.getLayoutIcon(root.currentLayout)
-            font.family: Theme?.fontFamily ?? "sans-serif"
-            font.pixelSize: (Theme?.fontSizeSm ?? 12) + 2
-            font.weight: Font.Bold
+            font.family: Theme?.fontMono ?? "monospace"
+            font.pixelSize: Theme?.fontSizeMd ?? 13
+            font.weight: Theme?.fontWeightBold ?? Font.Bold
             color: popup.open ? Theme.primary : Theme.on_surface
         }
 
@@ -272,8 +285,8 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: root.getLayoutLabel(root.currentLayout)
             font.family: Theme?.fontFamily ?? "sans-serif"
-            font.pixelSize: Theme?.fontSizeXs ?? 11
-            font.weight: Font.Medium
+            font.pixelSize: Theme?.fontSizeXs ?? 10
+            font.weight: Theme?.fontWeightMedium ?? Font.Medium
             color: popup.open ? Theme.primary : Theme.on_surface_variant
         }
 
@@ -283,14 +296,13 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: root.numWindows.toString()
             font.family: Theme?.fontMono ?? "monospace"
-            font.pixelSize: 10
-            font.weight: Font.DemiBold
+            font.pixelSize: Theme?.fontSizeXs ?? 9
+            font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
             color: Theme?.primary ?? "#00ffff"
             opacity: 0.85
         }
     }
 
-    // ── bar pill contents: vertical ────────────────────────────────────────
     Column {
         id: pillCol
         visible: Theme?.isVertical ?? false
@@ -300,9 +312,9 @@ Rectangle {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.getLayoutIcon(root.currentLayout)
-            font.family: Theme?.fontFamily ?? "sans-serif"
+            font.family: Theme?.fontMono ?? "monospace"
             font.pixelSize: Theme?.fontSizeSm ?? 12
-            font.weight: Font.Bold
+            font.weight: Theme?.fontWeightBold ?? Font.Bold
             color: popup.open ? Theme.primary : Theme.on_surface
         }
 
@@ -311,8 +323,8 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.numWindows.toString()
             font.family: Theme?.fontMono ?? "monospace"
-            font.pixelSize: 9
-            font.weight: Font.DemiBold
+            font.pixelSize: Theme?.fontSizeXs ?? 9
+            font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
             color: Theme?.primary ?? "#00ffff"
         }
     }
@@ -323,7 +335,6 @@ Rectangle {
         updatePos: () => root.updatePosition()
     }
 
-    // ── mouse area: click to toggle/cycle, wheel to step ───────────────────
     MouseArea {
         id: lMouse
         anchors.fill: parent
@@ -357,7 +368,6 @@ Rectangle {
         }
     }
 
-    // ── ipc listeners ──────────────────────────────────────────────────────
     Connections {
         target: Settings
         function onRequestLayoutSwitcherToggle() {
@@ -373,7 +383,6 @@ Rectangle {
         }
     }
 
-    // ── layout gui selector popup ──────────────────────────────────────────
     PopupPanel {
         id: popup
         panelWidth: 360
@@ -386,24 +395,25 @@ Rectangle {
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 14
-            spacing: 10
+            anchors.margins: Theme?.popupPadding ?? 14
+            spacing: Theme?.popupSpacing ?? 10
 
-            // ── header ─────────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 8
 
                 Rectangle {
-                    width: 32; height: 32; radius: 16
+                    width: 32
+                    height: 32
+                    radius: Theme?.radiusSm ?? 8
                     color: Theme?.primary_overlay ?? "#33ffffff"
 
                     Text {
                         anchors.centerIn: parent
                         text: root.getLayoutIcon(root.currentLayout)
-                        font.family: Theme?.fontFamily ?? "sans-serif"
-                        font.pixelSize: 16
-                        font.weight: Font.Bold
+                        font.family: Theme?.fontMono ?? "monospace"
+                        font.pixelSize: Theme?.fontSizeLg ?? 15
+                        font.weight: Theme?.fontWeightBold ?? Font.Bold
                         color: Theme.primary
                     }
                 }
@@ -416,12 +426,12 @@ Rectangle {
                         text: "window tiling layouts"
                         font.family: Theme?.fontFamily ?? "sans-serif"
                         font.pixelSize: Theme?.fontSizeSm ?? 12
-                        font.weight: Font.Bold
+                        font.weight: Theme?.fontWeightBold ?? Font.Bold
                         color: Theme.on_surface
                     }
 
                     Text {
-                        text: "switch tiling engine or configure lua layout"
+                        text: "switch tiling engine or eval custom lua layout"
                         font.family: Theme?.fontFamily ?? "sans-serif"
                         font.pixelSize: Theme?.fontSizeXs ?? 10
                         color: Theme.on_surface_variant
@@ -429,14 +439,18 @@ Rectangle {
                 }
 
                 Rectangle {
-                    width: 26; height: 26; radius: 13
-                    color: closeMouse.containsMouse ? (Theme?.surface_container_highest ?? "#33ffffff") : "transparent"
+                    width: 26
+                    height: 26
+                    radius: Theme?.radiusPill ?? 999
+                    color: closeMouse.containsMouse ? (Theme?.pillHover ?? "#33ffffff") : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120 } }
 
                     Text {
                         anchors.centerIn: parent
                         text: Theme?.iconClose ?? "✕"
                         font.family: Theme?.fontIcon ?? "sans-serif"
-                        font.pixelSize: 11
+                        font.pixelSize: Theme?.fontSizeSm ?? 11
                         color: Theme.on_surface_variant
                     }
 
@@ -452,11 +466,10 @@ Rectangle {
 
             Rectangle {
                 Layout.fillWidth: true
-                height: 1
+                height: Theme?.popupDividerHeight ?? 1
                 color: Theme?.cardBorder ?? Qt.rgba(1, 1, 1, 0.08)
             }
 
-            // ── layout cards grid ──────────────────────────────────────────
             ScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -465,7 +478,7 @@ Rectangle {
 
                 ColumnLayout {
                     width: ScrollView.view ? ScrollView.view.availableWidth : parent.width
-                    spacing: 8
+                    spacing: Theme?.popupCardGap ?? 8
 
                     Repeater {
                         model: root.layoutDefinitions
@@ -480,17 +493,19 @@ Rectangle {
                             readonly property bool isCurrent: root.currentLayout === modelData.id
                             color: isCurrent
                                 ? (Theme?.primary_overlay ?? "#33ffffff")
-                                : (cardMouse.containsMouse ? (Theme?.surface_container_high ?? "#22ffffff") : (Theme?.surface_container ?? "#11ffffff"))
+                                : (cardMouse.pressed
+                                    ? Theme.statePress(Theme.cardBg, Theme.on_surface)
+                                    : (cardMouse.containsMouse ? (Theme?.pillHover ?? "#22ffffff") : (Theme?.cardBg ?? "#11ffffff")))
                             border.color: isCurrent ? Theme.primary : (Theme?.cardBorder ?? Qt.rgba(1, 1, 1, 0.06))
                             border.width: isCurrent ? 1.5 : 1
 
-                            Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120 } }
-                            Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 120 } }
+                            Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
+                            Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 120; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
 
                             ColumnLayout {
                                 id: cardCol
                                 anchors.fill: parent
-                                anchors.margins: 10
+                                anchors.margins: Theme?.popupCardPadding ?? 10
                                 spacing: 4
 
                                 RowLayout {
@@ -499,9 +514,9 @@ Rectangle {
 
                                     Text {
                                         text: layoutCard.modelData.icon
-                                        font.family: Theme?.fontFamily ?? "sans-serif"
-                                        font.pixelSize: 15
-                                        font.weight: Font.Bold
+                                        font.family: Theme?.fontMono ?? "monospace"
+                                        font.pixelSize: Theme?.fontSizeLg ?? 15
+                                        font.weight: Theme?.fontWeightBold ?? Font.Bold
                                         color: layoutCard.isCurrent ? Theme.primary : Theme.on_surface
                                     }
 
@@ -509,25 +524,25 @@ Rectangle {
                                         text: layoutCard.modelData.title
                                         font.family: Theme?.fontFamily ?? "sans-serif"
                                         font.pixelSize: Theme?.fontSizeSm ?? 12
-                                        font.weight: Font.DemiBold
+                                        font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
                                         color: layoutCard.isCurrent ? Theme.primary : Theme.on_surface
                                     }
 
                                     Rectangle {
                                         implicitWidth: badgeText.implicitWidth + 10
                                         height: 18
-                                        radius: 9
-                                        color: layoutCard.isCurrent 
-                                            ? (Theme?.alpha ? Theme.alpha(Theme.primary, 0.2) : Qt.rgba(0,1,1,0.2)) 
-                                            : (Theme?.surface_container_highest ?? "#22ffffff")
+                                        radius: Theme?.radiusPill ?? 999
+                                        color: layoutCard.isCurrent
+                                            ? (Theme?.alpha ? Theme.alpha(Theme.primary, 0.2) : Qt.rgba(0, 1, 1, 0.2))
+                                            : (Theme?.pillBg ?? "#22ffffff")
 
                                         Text {
                                             id: badgeText
                                             anchors.centerIn: parent
                                             text: layoutCard.modelData.badge
                                             font.family: Theme?.fontFamily ?? "sans-serif"
-                                            font.pixelSize: 9
-                                            font.weight: Font.Medium
+                                            font.pixelSize: Theme?.fontSizeXs ?? 9
+                                            font.weight: Theme?.fontWeightMedium ?? Font.Medium
                                             color: layoutCard.isCurrent ? Theme.primary : Theme.on_surface_variant
                                         }
                                     }
@@ -536,9 +551,10 @@ Rectangle {
 
                                     Text {
                                         visible: layoutCard.isCurrent
-                                        text: "✓"
-                                        font.pixelSize: 12
-                                        font.weight: Font.Bold
+                                        text: Theme?.iconCheck ?? "✓"
+                                        font.family: Theme?.fontIcon ?? "sans-serif"
+                                        font.pixelSize: Theme?.fontSizeSm ?? 12
+                                        font.weight: Theme?.fontWeightBold ?? Font.Bold
                                         color: Theme.primary
                                     }
                                 }
@@ -547,7 +563,7 @@ Rectangle {
                                     Layout.fillWidth: true
                                     text: layoutCard.modelData.desc
                                     font.family: Theme?.fontFamily ?? "sans-serif"
-                                    font.pixelSize: 10
+                                    font.pixelSize: Theme?.fontSizeXs ?? 10
                                     color: Theme.on_surface_variant
                                     wrapMode: Text.Wrap
                                     lineHeight: 1.15
@@ -567,7 +583,7 @@ Rectangle {
                         }
                     }
 
-                    // ── custom lua layout card ─────────────────────────────
+                    // escape hatch for people running custom lua layout generators
                     Rectangle {
                         id: customCard
                         Layout.fillWidth: true
@@ -577,14 +593,14 @@ Rectangle {
                         readonly property bool isCustomActive: !root.layoutDefinitions.some(d => d.id === root.currentLayout)
                         color: isCustomActive
                             ? (Theme?.primary_overlay ?? "#33ffffff")
-                            : (Theme?.surface_container ?? "#11ffffff")
+                            : (Theme?.cardBg ?? "#11ffffff")
                         border.color: isCustomActive ? Theme.primary : (Theme?.cardBorder ?? Qt.rgba(1, 1, 1, 0.06))
                         border.width: isCustomActive ? 1.5 : 1
 
                         ColumnLayout {
                             id: customCol
                             anchors.fill: parent
-                            anchors.margins: 10
+                            anchors.margins: Theme?.popupCardPadding ?? 10
                             spacing: 6
 
                             RowLayout {
@@ -593,8 +609,9 @@ Rectangle {
 
                                 Text {
                                     text: ""
-                                    font.pixelSize: 13
-                                    font.weight: Font.Bold
+                                    font.family: Theme?.fontMono ?? "monospace"
+                                    font.pixelSize: Theme?.fontSizeMd ?? 13
+                                    font.weight: Theme?.fontWeightBold ?? Font.Bold
                                     color: Theme.primary
                                 }
 
@@ -602,25 +619,25 @@ Rectangle {
                                     text: "custom lua layout"
                                     font.family: Theme?.fontFamily ?? "sans-serif"
                                     font.pixelSize: Theme?.fontSizeSm ?? 12
-                                    font.weight: Font.DemiBold
+                                    font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
                                     color: Theme.on_surface
                                 }
 
                                 Rectangle {
                                     implicitWidth: luaBadge.implicitWidth + 10
                                     height: 18
-                                    radius: 9
-                                    color: customCard.isCustomActive 
-                                        ? (Theme?.alpha ? Theme.alpha(Theme.primary, 0.2) : Qt.rgba(0,1,1,0.2)) 
-                                        : (Theme?.surface_container_highest ?? "#22ffffff")
+                                    radius: Theme?.radiusPill ?? 999
+                                    color: customCard.isCustomActive
+                                        ? (Theme?.alpha ? Theme.alpha(Theme.primary, 0.2) : Qt.rgba(0, 1, 1, 0.2))
+                                        : (Theme?.pillBg ?? "#22ffffff")
 
                                     Text {
                                         id: luaBadge
                                         anchors.centerIn: parent
                                         text: "lua engine"
                                         font.family: Theme?.fontFamily ?? "sans-serif"
-                                        font.pixelSize: 9
-                                        font.weight: Font.Medium
+                                        font.pixelSize: Theme?.fontSizeXs ?? 9
+                                        font.weight: Theme?.fontWeightMedium ?? Font.Medium
                                         color: customCard.isCustomActive ? Theme.primary : Theme.on_surface_variant
                                     }
                                 }
@@ -629,18 +646,19 @@ Rectangle {
 
                                 Text {
                                     visible: customCard.isCustomActive
-                                    text: "✓"
-                                    font.pixelSize: 12
-                                    font.weight: Font.Bold
+                                    text: Theme?.iconCheck ?? "✓"
+                                    font.family: Theme?.fontIcon ?? "sans-serif"
+                                    font.pixelSize: Theme?.fontSizeSm ?? 12
+                                    font.weight: Theme?.fontWeightBold ?? Font.Bold
                                     color: Theme.primary
                                 }
                             }
 
                             Text {
                                 Layout.fillWidth: true
-                                text: "evaluates custom layout parameters or plugin engines via hyprctl eval."
+                                text: "passes a custom layout or plugin name into hyprctl eval."
                                 font.family: Theme?.fontFamily ?? "sans-serif"
-                                font.pixelSize: 10
+                                font.pixelSize: Theme?.fontSizeXs ?? 10
                                 color: Theme.on_surface_variant
                                 wrapMode: Text.Wrap
                             }
@@ -652,9 +670,9 @@ Rectangle {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     height: 28
-                                    radius: 6
-                                    color: Theme?.surface_container_highest ?? "#22ffffff"
-                                    border.color: luaInput.activeFocus ? Theme.primary : "transparent"
+                                    radius: Theme?.radiusXs ?? 4
+                                    color: Theme?.pillBg ?? "#22ffffff"
+                                    border.color: luaInput.activeFocus ? Theme.primary : (Theme?.pillBorder ?? "transparent")
                                     border.width: 1
 
                                     TextInput {
@@ -664,7 +682,7 @@ Rectangle {
                                         anchors.rightMargin: 8
                                         verticalAlignment: TextInput.AlignVCenter
                                         font.family: Theme?.fontMono ?? "monospace"
-                                        font.pixelSize: 11
+                                        font.pixelSize: Theme?.fontSizeSm ?? 11
                                         color: Theme.on_surface
                                         clip: true
                                         text: ""
@@ -681,8 +699,8 @@ Rectangle {
                                             anchors.left: parent.left
                                             anchors.verticalCenter: parent.verticalCenter
                                             text: "enter custom layout name..."
-                                            font.family: Theme?.fontSans ?? "sans-serif"
-                                            font.pixelSize: 10
+                                            font.family: Theme?.fontFamily ?? "sans-serif"
+                                            font.pixelSize: Theme?.fontSizeXs ?? 10
                                             color: Theme.on_surface_variant
                                             opacity: 0.6
                                             visible: luaInput.text === "" && !luaInput.activeFocus
@@ -695,18 +713,20 @@ Rectangle {
                                 Rectangle {
                                     width: applyBtnText.implicitWidth + 16
                                     height: 28
-                                    radius: 6
-                                    color: applyMouse.containsMouse ? (Theme?.primary_overlay ?? "#33ffffff") : (Theme?.surface_container_high ?? "#22ffffff")
+                                    radius: Theme?.radiusXs ?? 4
+                                    color: applyMouse.containsMouse ? (Theme?.primary_overlay ?? "#33ffffff") : (Theme?.pillBg ?? "#22ffffff")
                                     border.color: Theme.primary
                                     border.width: 1
+
+                                    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120 } }
 
                                     Text {
                                         id: applyBtnText
                                         anchors.centerIn: parent
                                         text: "apply"
-                                        font.family: Theme?.fontSans ?? "sans-serif"
-                                        font.pixelSize: 10
-                                        font.weight: Font.Bold
+                                        font.family: Theme?.fontFamily ?? "sans-serif"
+                                        font.pixelSize: Theme?.fontSizeXs ?? 10
+                                        font.weight: Theme?.fontWeightBold ?? Font.Bold
                                         color: Theme.primary
                                     }
 

@@ -8,7 +8,7 @@ alias nrun="nix run nixpkgs#"
 alias nix-gens="nixos-rebuild list-generations"
 alias neovim="nvim"
 
-# sudo with a trailing space so zsh actually expands your aliases instead of choking
+# sudo with trailing space for alias expansion
 alias sudo="sudo "
 
 # purge old dead nix store paths while keeping 7 days of rollbacks
@@ -22,7 +22,7 @@ cleanup() {
     print -P "%F{green}󰄲 nix store cleanup complete%f"
 }
 
-# safe file destruction with mandatory speed bumps
+# safe file operations with speed bumps
 alias rm="rm -I"
 alias cp="cp -iv"
 alias mv="mv -iv"
@@ -31,7 +31,7 @@ alias chown="chown --preserve-root"
 alias chmod="chmod --preserve-root"
 alias chgrp="chgrp --preserve-root"
 
-# launch GUI file manager without hijacking stdout or locking directory
+# launch GUI file manager without hijacking stdout
 fm() {
     if (( $+commands[dolphin] )); then
         dolphin "${1:-.}" >/dev/null 2>&1 &!
@@ -42,7 +42,7 @@ fm() {
     fi
 }
 
-# yazi wrapper so exiting drops me in the current folder
+# yazi wrapper with cwd sync on exit
 yz() {
     local tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
     yazi "$@" --cwd-file="$tmp"
@@ -52,62 +52,29 @@ yz() {
     rm -f -- "$tmp"
 }
 
-# git shortcuts so i can commit crimes faster
+# terminal git gui
 if (( $+commands[lazygit] )); then
     alias lg="lazygit"
 fi
-alias gs="git status -sb"
-alias gd="git diff"
-alias gds="git diff --staged"
-alias gp="git push"
-alias gpf="git push --force-with-lease"
-alias gpl="git pull --rebase"
-alias gc="git commit -m"
-alias gca="git commit --amend"
-alias gcam="git commit -am"
-alias ga="git add"
-alias gaa="git add -A"
-alias gl="git log --oneline --graph --decorate -n 15"
-alias glog="git log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
-alias gco="git checkout"
-alias gcb="git checkout -b"
-alias gsw="git switch"
-alias gswc="git switch -c"
-alias gst="git stash"
-alias gstp="git stash pop"
-alias gstd="git stash drop"
-alias grh="git reset --hard"
-alias grs="git restore"
-alias grss="git restore --staged"
-alias gcount="git shortlog -sn"
 
-# steal color hex off screen
+# screen color picker
 alias color="hyprpicker -a"
 
-# type file name to edit it directly
-alias -s {qml,lua,conf,toml,json,zsh,sh,css,md,txt,yaml,yml}=${EDITOR:-micro}
-
-# pipe magic: lazy shorthand for unix plumbing
-alias -g G='| grep -i'
-alias -g L='| less'
-alias -g F='| fzf'
-alias -g B='| bat'
-alias -g H='| head'
-alias -g T='| tail'
-alias -g W='| wc -l'
-alias -g C='| wl-copy'
-alias -g N='>/dev/null 2>&1'
-alias -g E='2>&1'
-
-# directory stack & fast jumps
+# directory stack & jumps
 alias d="dirs -v"
 alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'
 alias .....='cd ../../../..'
 alias -- -='cd -'
+alias dots="cd $HOME/.local/share/dotfiles"
 
-# directory warps
+# quick terminal commands
+alias q="exit"
+alias cl="clear"
+alias config="settings"
+
+# directory shortcuts
 hash -d dots="$HOME/.local/share/dotfiles"
 hash -d hypr="$HOME/.local/share/dotfiles/hypr"
 hash -d qs="$HOME/.local/share/dotfiles/quickshell"
@@ -115,43 +82,17 @@ hash -d nix="$HOME/.local/share/dotfiles/nixos"
 hash -d wp="$HOME/.wallpapers"
 hash -d conf="$HOME/.config"
 
-# nmtui with an actual dark aesthetic palette
+# nmtui with dark palette
 alias nmtui='NEWT_COLORS="root=black,black:border=gray,black:window=black,black:title=lightgray,black:button=black,cyan:actbutton=cyan,black:compactbutton=black,gray:checkbox=black,gray:actcheckbox=cyan,black:entry=white,black:label=gray,black:listbox=lightgray,black:actlistbox=black,cyan:textbox=lightgray,black:acttextbox=black,cyan:helpline=gray,black:roottext=gray,black" command nmtui'
 
-# antigravity cli - uses compiled system binary once rebuilt, fallback until then
+# antigravity cli fallback
 if (( ! $+commands[agy] )); then
     alias agy="nix run 'github:jacopone/antigravity-nix#google-antigravity-cli'"
 fi
 
-# quick shell reload
+# shell reload
 alias reload="exec zsh"
 alias sz="source \${ZDOTDIR:-\$HOME/.config/zsh}/sources.zsh"
-
-# git commit crimes with procedural chaotic messages
-yolo() {
-    local messages=(
-        "i have no idea why this works but it does"
-        "cursed fix for cursed code"
-        "revert this before anyone looks"
-        "it compiled on my machine so it's prod ready"
-        "wip: do not read this commit"
-        "fixing a bug i created 10 minutes ago"
-        "delete this branch and pretend it never happened"
-        "refactored into an even worse state"
-        "emergency commit before my laptop dies"
-        "pure vibes no thoughts"
-        "surely this won't break production"
-        "trust me bro"
-        "my code is beautiful don't look at it"
-        "temporary fix (permanent)"
-    )
-    local msg="${messages[$(( RANDOM % ${#messages[@]} + 1 ))]}"
-    if [[ -n "$1" ]]; then
-        msg="$*"
-    fi
-    print -P "%F{yellow}󰄛 yolo commit:%f %F{magenta}\"$msg\"%f"
-    git add -A && git commit -m "$msg" && git push
-}
 
 # explain last exit code with dry humiliation
 why() {
@@ -171,6 +112,10 @@ why() {
     esac
 }
 alias ouch="why"
+
+# desktop shell switching & management
+alias qs-switch="cli shell"
+alias qs-reload="cli reload"
 
 # repeat last command with sudo
 please() {

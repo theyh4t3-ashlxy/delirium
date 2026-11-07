@@ -35,7 +35,6 @@ PanelWindow {
         right: true
     }
 
-    // active toast list
     property var toastList: []
 
     visible: toastList.length > 0
@@ -44,6 +43,18 @@ PanelWindow {
         item: toastBox
     }
 
+    function normalizeImageUri(img: string): string {
+        if (!img || typeof img !== "string") return "";
+        if (img.startsWith("image://") || img.startsWith("file://")) return img;
+        if (img.startsWith("/")) return "file://" + img;
+        return "";
+    }
+
+    /*
+    clone notification properties into a plain js object so dangling c++ pointers
+    don't segfault the shell, and track _entered/_elapsedMs so array updates don't
+    make existing toasts fly in a second time
+    */
     function sanitize(notif): var {
         if (!notif) return null;
         if (notif.__sanitized) return notif;
@@ -75,13 +86,20 @@ PanelWindow {
             summary: String(notif.summary ?? ""),
             body: String(notif.body ?? ""),
             appName: String(notif.appName ?? "system"),
+            desktopEntry: String(notif.desktopEntry ?? ""),
             appIcon: String(notif.appIcon ?? ""),
             urgency: Number(notif.urgency ?? 1),
             expireTimeout: Number(notif.expireTimeout ?? -1),
-            image: String(notif.image ?? ""),
+            image: root.normalizeImageUri(String(notif.image ?? "")),
             actions: safeActions,
+            _entered: false,
+            _elapsedMs: 0,
             dismiss: function() {
-                NotificationService.dismiss(notifId);
+                if (NotificationService?.dismiss) {
+                    NotificationService.dismiss(notifId);
+                } else if (typeof notif.dismiss === "function") {
+                    try { notif.dismiss(); } catch (e) {}
+                }
             }
         };
     }
@@ -97,13 +115,9 @@ PanelWindow {
             if (!safe) return;
 
             let updated = root.toastList.filter(n => n && n.id !== safe.id);
+            // evict oldest toast from screen without deleting it from notification history
             while (updated.length >= 5) {
-                let dropped = updated.shift();
-                if (dropped && dropped.id !== undefined && dropped.id !== null) {
-                    NotificationService.dismiss(dropped.id);
-                } else if (dropped && typeof dropped.dismiss === "function") {
-                    try { dropped.dismiss(); } catch (e) {}
-                }
+                updated.shift();
             }
             updated.push(safe);
             root.toastList = updated;
@@ -119,14 +133,26 @@ PanelWindow {
         }
     }
 
-    function removeToast(notif) {
+    // remove from screen only (used when the 5s timer runs out so history stays in the bell popup)
+    function expireToast(notif) {
         if (!notif) return;
         let id = (typeof notif === "object") ? notif.id : notif;
         if (id !== undefined && id !== null) {
-            NotificationService.dismiss(id);
             root.toastList = root.toastList.filter(n => n && n.id !== id);
         } else {
             root.toastList = root.toastList.filter(n => n && n !== notif);
+        }
+    }
+
+    // nuke from both screen and notification center history (when user clicks X)
+    function dismissToastPermanently(notif) {
+        if (!notif) return;
+        let id = (typeof notif === "object") ? notif.id : notif;
+        root.expireToast(notif);
+        if (id !== undefined && id !== null && NotificationService?.dismiss) {
+            NotificationService.dismiss(id);
+        } else if (typeof notif?.dismiss === "function") {
+            try { notif.dismiss(); } catch (e) {}
         }
     }
 
@@ -138,14 +164,14 @@ PanelWindow {
     readonly property int screenBorder: Settings?.screenBorderWidth ?? 0
     readonly property int cornerOffset: (Settings?.screenCornerRadius ?? 16) + (Settings?.notificationCornerStyle === "concave" ? (Math.round(root.scoopH) + 6) : 8)
 
-    // positioning container relative to chosen screen edge
+    // account for left/right vertical bars too so toasts don't park on top of the bar
     Item {
         id: toastBox
         width: 360
         height: Math.max(1, toastCol.implicitHeight)
 
-        x: isEdgeLeft ? root.screenBorder
-         : isEdgeRight ? (root.width - width - root.screenBorder)
+        x: isEdgeLeft ? ((root.isLeft ? Theme.barHeight : 0) + root.screenBorder)
+         : isEdgeRight ? (root.width - width - (root.isRight ? Theme.barHeight : 0) - root.screenBorder)
          : Math.round((root.width - width) / 2)
 
         y: isEdgeTop ? (root.isTop ? (Theme.barHeight + root.screenBorder) : root.screenBorder)
@@ -174,8 +200,11 @@ PanelWindow {
                     dockRight: root.isRight
                     Layout.fillWidth: true
 
+                    onExpired: {
+                        root.expireToast(modelData);
+                    }
                     onDismissed: {
-                        root.removeToast(modelData);
+                        root.dismissToastPermanently(modelData);
                     }
                 }
             }

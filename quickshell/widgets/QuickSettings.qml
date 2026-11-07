@@ -241,7 +241,7 @@ Rectangle {
         function switchShell(target) {
             if (!target) return;
             if (running) running = false;
-            command = [root.userHome + "/.local/bin/qs-switch", target];
+            command = [root.userHome + "/.local/bin/cli", "shell", target];
             running = true;
         }
         function restartCurrent() {

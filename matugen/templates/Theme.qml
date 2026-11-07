@@ -7,7 +7,7 @@ Singleton {
     id: root
     readonly property var cfg: (typeof Settings !== "undefined" ? Settings : null)
 
-    // reactive zero-restart theming watcher for palette.css
+    // watching palette.css like a hawk so we don't have to restart the whole shell
     property var paletteWatcher: FileView {
         path: (Quickshell.env("XDG_CONFIG_HOME") || ((Quickshell.env("HOME") || "") + "/.config")) + "/quickshell/palette.css"
         watchChanges: true
@@ -20,7 +20,7 @@ Singleton {
         precision: SystemClock.Minutes
     }
 
-    // native hardware-accelerated wallpaper color quantizer for adaptive material vibrancy
+    // squinting at the wallpaper to guess how obnoxious the colors are
     ColorQuantizer {
         id: wpQuantizer
         depth: 2
@@ -106,8 +106,10 @@ Singleton {
     readonly property color inverse_primary:        "{{colors.inverse_primary.default.hex}}"
     readonly property color source_color:           "{{colors.source_color.default.hex}}"
 
-    // math black magic so the engine doesn't combust,
-    // upgraded to approximate linear color space so gradients don't look like dishwater
+    /*
+    math black magic so the engine doesn't combust,
+    upgraded to approximate linear color space so gradients don't look like dishwater
+    */
     function alpha(c: color, a: real): color {
         // qml color coercion is weird, catch absolute garbage
         if (c === undefined || c.r === undefined) return Qt.rgba(0, 0, 0, 0);
@@ -118,18 +120,16 @@ Singleton {
     function blend(c1: color, c2: color, t: real): color {
         if (c1 === undefined || c1.r === undefined) return (c2 !== undefined) ? c2 : Qt.rgba(0, 0, 0, 0);
         if (c2 === undefined || c2.r === undefined) return c1;
-        
-        // fixed the variable reference error that would have segfaulted your ui
+
         let f = (typeof t !== "number" || isNaN(t)) ? 0.0 : Math.max(0.0, Math.min(1.0, t));
         let inv = 1.0 - f;
-        
-        // gamma correction approximation (squaring the channels)
-        // prevents the muddy grey deadzone in the middle of standard srgb transitions
+
+        // squaring the channels so the middle of the gradient doesn't turn into wet concrete
         return Qt.rgba(
             Math.sqrt((c1.r * c1.r * inv) + (c2.r * c2.r * f)),
             Math.sqrt((c1.g * c1.g * inv) + (c2.g * c2.g * f)),
             Math.sqrt((c1.b * c1.b * inv) + (c2.b * c2.b * f)),
-            (c1.a * inv) + (c2.a * f) // alpha is inherently linear
+            (c1.a * inv) + (c2.a * f)
         );
     }
 
@@ -159,6 +159,57 @@ Singleton {
         return on_surface;
     }
 
+    /*
+    centralized icon detective so we stop copy-pasting the same 45-line
+    for-loop into every single widget like cavemen
+    */
+    function resolveAppIcon(winClass: string): string {
+        if (!winClass) return "";
+        let base = winClass.trim().toLowerCase();
+        if (!base) return "";
+
+        if (typeof DesktopEntries !== "undefined" && DesktopEntries?.applications?.values) {
+            let apps = DesktopEntries.applications.values;
+            for (let i = 0; i < apps.length; i++) {
+                let a = apps[i];
+                if (!a) continue;
+                let aid = (a.id ?? "").toLowerCase().replace(/\.desktop$/, "");
+                let wm = (a.startupWmClass ?? "").toLowerCase();
+                if (aid === base || wm === base) {
+                    if (a.icon) {
+                        let p = Quickshell.iconPath(a.icon);
+                        if (p) return p;
+                    }
+                }
+            }
+        }
+
+        let candidates = [
+            base,
+            base.replace(/-/g, ""),
+            base.replace(/_bin$/, ""),
+            base.replace(/-bin$/, "")
+        ];
+        if (Quickshell?.hasThemeIcon && Quickshell.hasThemeIcon(base + "-browser")) {
+            candidates.unshift(base + "-browser");
+        }
+        let parts = base.split(".");
+        if (parts.length > 1) {
+            candidates.push(parts[parts.length - 1]);
+        }
+        for (let i = 0; i < candidates.length; i++) {
+            let cand = candidates[i];
+            if (!cand) continue;
+            if (Quickshell?.hasThemeIcon && !Quickshell.hasThemeIcon(cand)) continue;
+            let p = Quickshell.iconPath(cand);
+            if (p) return p;
+        }
+        if (Quickshell?.hasThemeIcon && Quickshell.hasThemeIcon("application-x-executable")) {
+            return Quickshell.iconPath("application-x-executable");
+        }
+        return "";
+    }
+
     // radioactive state tints and depression overlays
     readonly property color primary_overlay:        alpha(primary, 0.18)
     readonly property color secondary_overlay:      alpha(secondary, 0.18)
@@ -169,7 +220,7 @@ Singleton {
     readonly property color on_warn_container:      on_tertiary_container
     readonly property color warn_overlay:           tertiary_overlay
 
-    // official material 3 interaction state layers (8% hover, 10% focus, 12% press, 16% drag)
+    // google's sacred opacity percentages for button pokes
     function stateHover(baseColor: color, contentColor: color): color {
         return blend(baseColor, (contentColor !== undefined && contentColor !== "" ? contentColor : on_surface), 0.08);
     }
@@ -269,16 +320,16 @@ Singleton {
     readonly property string screenCornerMode:      cfg?.screenCornerMode ?? "all"
     readonly property string cornerColorMode:       cfg?.cornerColorMode ?? "bar"
     readonly property string barStyle:              cfg?.barStyle ?? "glass"
-    readonly property int    scoopRadius:       cfg?.scoopRadius ?? 16
-    readonly property bool   isGlass:           barStyle === "glass" || barStyle === "glass-frost"
-    readonly property bool   isGlassFrost:      barStyle === "glass-frost"
-    readonly property bool   isCyberNeon:       barStyle === "cyber-neon"
-    readonly property bool   isAccentGlow:      barStyle === "accent-glow"
-    readonly property bool   isPureBlack:       barStyle === "pure-black"
-    readonly property bool   isBento:           barStyle === "bento-floating"
-    readonly property bool   isTranslucent:     barStyle === "translucent"
-    readonly property bool   isMonochrome:      barStyle === "monochrome"
-    readonly property bool   isTextIconSet:     iconSet === "kaomoji" || iconSet === "text"
+    readonly property int    scoopRadius:           cfg?.scoopRadius ?? 16
+    readonly property bool   isGlass:               barStyle === "glass" || barStyle === "glass-frost"
+    readonly property bool   isGlassFrost:          barStyle === "glass-frost"
+    readonly property bool   isCyberNeon:           barStyle === "cyber-neon"
+    readonly property bool   isAccentGlow:          barStyle === "accent-glow"
+    readonly property bool   isPureBlack:           barStyle === "pure-black"
+    readonly property bool   isBento:               barStyle === "bento-floating"
+    readonly property bool   isTranslucent:         barStyle === "translucent"
+    readonly property bool   isMonochrome:          barStyle === "monochrome"
+    readonly property bool   isTextIconSet:         iconSet === "kaomoji" || iconSet === "text"
 
     // color casino determining which glass shader liquefies your gpu today
     function getStyleColor(role: string, bs: string): color {
@@ -466,27 +517,26 @@ Singleton {
         return barBorderColor;
     }
 
-    // shared default popup dimensions for widgets that still use fixed-size panels
+    // fallback guardrails so popups don't shrink into a single pixel or eat the monitor
     readonly property int    popupWidth:             460
     readonly property int    popupHeight:            580
-    // popup sizing is kept here; individual widgets derive their actual size from content
-    readonly property int    popupMinWidth:         320
-    readonly property int    popupMaxWidth:         620
-    readonly property int    popupMinHeight:        180
-    readonly property int    popupMaxHeight:        760
+    readonly property int    popupMinWidth:          320
+    readonly property int    popupMaxWidth:          620
+    readonly property int    popupMinHeight:         180
+    readonly property int    popupMaxHeight:         760
     readonly property int    popupWorkspaceMaxHeight: 460
-    readonly property int    popupPadding:          16
-    readonly property int    popupSpacing:          10
-    readonly property int    popupDividerHeight:    1
-    readonly property int    popupCardHeight:       44
+    readonly property int    popupPadding:           16
+    readonly property int    popupSpacing:           10
+    readonly property int    popupDividerHeight:     1
+    readonly property int    popupCardHeight:        44
     readonly property int    popupCardMinWidth:      190
     readonly property int    popupCardGap:           6
     readonly property int    popupCardPadding:       8
     readonly property int    popupCardIconSize:      26
     readonly property int    popupActionHeight:      32
-    readonly property int    popupColumns:            2
+    readonly property int    popupColumns:           2
 
-    // workspace widget geometry
+    // workspace dot math that took way too many reloads to center
     readonly property int    workspaceDotSize:       8
     readonly property int    workspaceIndicatorSize: 8
     readonly property int    workspaceIndicatorMin:  8
@@ -494,7 +544,7 @@ Singleton {
     readonly property int    workspaceActiveSize:    20
     readonly property int    workspaceWidgetPadding: Math.max(widgetPaddingH, widgetPaddingV)
 
-    readonly property int    thumbSize:             180
+    readonly property int    thumbSize:              180
 
     readonly property real   animSpeedMult: {
         let sp = cfg?.animSpeed ?? "normal";
@@ -521,7 +571,7 @@ Singleton {
     readonly property int    workspaceTrailDuration:Math.round(260 * animSpeedMult)
     readonly property bool   workspaceActiveTrail:  cfg?.workspaceActiveTrail ?? true
 
-    // Cubic bezier control points [cx1, cy1, cx2, cy2, endx, endy] for Qt Quick Easing.BezierSpline
+    // magic numbers pretending to be physics for qt's bezier spline
     readonly property var    hyprlandBezier:            [0.05, 0.9, 0.1, 1.05, 1.0, 1.0]
     readonly property var    hyprlandExitBezier:        [0.3, 0.0, 0.8, 0.15, 1.0, 1.0]
     readonly property var    smoothBezier:              [0.16, 1.0, 0.3, 1.0, 1.0, 1.0]
@@ -555,7 +605,7 @@ Singleton {
         if (c === "emphasized-accel") return motionEmphasizedAccel;
         if (c === "linear") return [0.0, 0.0, 1.0, 1.0, 1.0, 1.0];
 
-        // Parse custom cubic-bezier(x1, y1, x2, y2) or "x1, y1, x2, y2"
+        // regex praying the user typed four valid floats
         let m = c.match(/^(?:cubic-bezier\s*\(\s*)?([0-9.-]+)\s*,\s*([0-9.-]+)\s*,\s*([0-9.-]+)\s*,\s*([0-9.-]+)(?:\s*\))?$/);
         if (m) {
             let p1 = parseFloat(m[1]), p2 = parseFloat(m[2]), p3 = parseFloat(m[3]), p4 = parseFloat(m[4]);
@@ -669,8 +719,7 @@ Singleton {
     readonly property string fontMaterialOutlined:  (loaderMatOutlined.status === FontLoader.Ready && loaderMatOutlined.name) ? loaderMatOutlined.name : "Material Symbols Outlined"
     readonly property string fontMaterialSharp:     (loaderMatSharp.status === FontLoader.Ready && loaderMatSharp.name) ? loaderMatSharp.name : "Material Symbols Sharp"
     readonly property string fontSegoe:             (loaderSegoe.status === FontLoader.Ready && loaderSegoe.name) ? loaderSegoe.name : (cfg?.fontWindows ?? "Segoe Fluent Icons")
-    // Font Awesome 6 Free uses the family name "Font Awesome 6 Free".
-    // "Solid" is the style/weight, not a second family name.
+    // font awesome 6 free gets mad if you put "solid" in the family name instead of the weight
     readonly property string fontAwesome:           (loaderFaSolid.status === FontLoader.Ready && loaderFaSolid.name)
         ? loaderFaSolid.name
         : (cfg?.fontAwesome ?? "Font Awesome 6 Free")
@@ -693,7 +742,7 @@ Singleton {
         "check": "(✓)", "checkCircle": "(✓)", "settings": "(*_*)", "gear": "(*_*)", "save": "(⤓)",
         "refresh": "(↺)", "trash": "(⌫)", "clipboard": "(≡)", "tray": "[..]", "grid": "[#]",
         "note": "(✎)", "edit": "(✎)", "coffee": "(旦)", "clock": "(◷)", "cpu": "[cpu]",
-        "mem": "[ram]", "thermo": "[°c]", "eye": "(•‿•)", "eyeOff": "(-_-)", "heart": "(♡)",
+        "mem": "[ram]", "thermo": "[°c]", "eye": "(•‿•)", "eyeOff": "(-_-)", "heart": "(♡)", "pin": "(⌖)",
         "download": "(↓)", "folder": "[dir]", "globe": "(⊕)", "camera": "[o]", "crop": "[#]",
         "screenshot": "[o]", "volMute": "(-_-)", "volLow": "(・ω・)", "volMid": "(ᵔᴥᵔ)", "volHigh": "(≧◡≦)",
         "mic": "(¶)", "micMute": "(x_x)", "palette": "(※)", "headphones": "(d-_-b)", "equalizer": "|||",
@@ -716,7 +765,7 @@ Singleton {
         "check": "ok", "checkCircle": "ok", "settings": "cfg", "gear": "cfg", "save": "save",
         "refresh": "reload", "trash": "del", "clipboard": "clip", "tray": "tray", "grid": "grid",
         "note": "note", "edit": "edit", "coffee": "cafe", "clock": "time", "cpu": "cpu",
-        "mem": "mem", "thermo": "temp", "eye": "show", "eyeOff": "hide", "heart": "fav",
+        "mem": "mem", "thermo": "temp", "eye": "show", "eyeOff": "hide", "heart": "fav", "pin": "pin",
         "download": "down", "folder": "dir", "globe": "web", "camera": "cam", "crop": "crop",
         "screenshot": "shot", "volMute": "mute", "volLow": "vol-", "volMid": "vol", "volHigh": "vol+",
         "mic": "mic", "micMute": "no-mic", "palette": "theme", "headphones": "audio", "equalizer": "eq",
@@ -734,9 +783,7 @@ Singleton {
         "user": "user", "shield": "safe", "expand": "max", "collapse": "min"
     })
 
-    // semantic Font Awesome 6 Free glyph table.
-    // Keeping this keyed by meaning prevents stale per-call codepoints from
-    // leaking into the wrong font family.
+    // giant lookup table of unicode hexes because font awesome can't agree with anyone else
     readonly property var fontAwesomeMap: Object.freeze({
         "nixos": "\uF17C",
         "nix": "\uF17C",
@@ -764,6 +811,7 @@ Singleton {
         "eye": "\uF06E",
         "eyeOff": "\uF070",
         "heart": "\uF004",
+        "pin": "\uF08D",
         "download": "\uF019",
         "folder": "\uF07B",
         "globe": "\uF0AC",
@@ -839,13 +887,13 @@ Singleton {
         "keyboard": "\uF11C"
     })
 
-    // Nerd Fonts v3.5 distro logo codepoints: Arch F303, NixOS F313, Tux F31A.
+    // nerd font glyphs that look like empty boxes in half the text editors
     readonly property var nerdMap: Object.freeze({
         "arch": "\uF303", "nix": "\uF313", "nixos": "\uF313", "distro": "\uF313", "appLauncher": "󰀻", "workspaces": "󱂬", "search": "", "close": "",
         "check": "", "checkCircle": "", "settings": "", "gear": "", "save": "",
         "refresh": "", "trash": "", "clipboard": "󰅌", "tray": "󱊖", "grid": "󰕰",
         "note": "󰏫", "edit": "󰏫", "coffee": "󰛊", "clock": "󰥔", "cpu": "󰍛",
-        "mem": "󰘚", "thermo": "󰔏", "eye": "󰈈", "eyeOff": "󰈉", "heart": "󰋑",
+        "mem": "󰘚", "thermo": "󰔏", "eye": "󰈈", "eyeOff": "󰈉", "heart": "󰋑", "pin": "󰐃",
         "download": "󰇚", "folder": "󰉋", "globe": "󰖟", "camera": "󰄀", "crop": "󰩨",
         "screenshot": "󰹑", "volMute": "󰝟", "volLow": "󰕿", "volMid": "󰖀", "volHigh": "󰕾",
         "mic": "󰍬", "micMute": "󰍭", "palette": "󰏘", "headphones": "󰋋", "equalizer": "󰓃",
@@ -959,61 +1007,61 @@ Singleton {
     }
 
     function getVolumeIcon(volRatio: real, isMuted: bool): string {
-            if (isMuted || volRatio === undefined || isNaN(volRatio) || volRatio <= 0.001) {
-                return (iconSet === "kaomoji") ? kaomojiMap.volMute : (iconSet === "text") ? textMap.volMute : (iconSet === "nerd") ? nerdMap.volMute : iconVolMute;
-            }
-            let pct = Math.round(volRatio * 100);
-            if (iconSet === "kaomoji") {
-                if (pct > 100) return kaoFire;
-                if (pct <= 33) return kaomojiMap.volLow;
-                if (pct <= 66) return kaomojiMap.volMid;
-                return kaomojiMap.volHigh;
-            }
-            if (iconSet === "text") {
-                if (pct > 100) return "max!";
-                if (pct <= 33) return textMap.volLow;
-                if (pct <= 66) return textMap.volMid;
-                return textMap.volHigh;
-            }
-            if (iconSet === "nerd") {
-                if (pct <= 33) return nerdMap.volLow;
-                if (pct <= 66) return nerdMap.volMid;
-                return nerdMap.volHigh;
-            }
-            if (iconSet === "windows") {
-                if (pct <= 33) return "\uE993";
-                if (pct <= 66) return "\uE994";
-                return "\uE995";
-            }
-            if (iconSet === "awesome") {
-                if (pct <= 33) return fontAwesomeMap.volLow;
-                if (pct <= 66) return fontAwesomeMap.volMid;
-                return fontAwesomeMap.volHigh;
-            }
-            if (pct <= 33) return "\uE04E";
-            if (pct <= 66) return "\uE04D";
-            return "\uE050";
+        if (isMuted || volRatio === undefined || isNaN(volRatio) || volRatio <= 0.001) {
+            return (iconSet === "kaomoji") ? kaomojiMap.volMute : (iconSet === "text") ? textMap.volMute : (iconSet === "nerd") ? nerdMap.volMute : iconVolMute;
         }
-    
-        function getBrightnessIcon(pct: int): string {
-            let p = (pct === undefined || isNaN(pct)) ? 50 : pct;
-            if (iconSet === "kaomoji") {
-                if (p <= 20) return kaoSleepy;
-                if (p >= 85) return kaoSparkle;
-                return kaomojiMap.brightness;
-            }
-            if (iconSet === "text") {
-                if (p <= 25) return "dim";
-                if (p >= 85) return "max";
-                return textMap.brightness;
-            }
-            if (iconSet === "nerd") {
-                if (p <= 30) return "󰃞";
-                if (p <= 70) return "󰃟";
-                return "󰃠";
-            }
-            return p <= 25 ? iconMoon : iconBrightness;
+        let pct = Math.round(volRatio * 100);
+        if (iconSet === "kaomoji") {
+            if (pct > 100) return kaoFire;
+            if (pct <= 33) return kaomojiMap.volLow;
+            if (pct <= 66) return kaomojiMap.volMid;
+            return kaomojiMap.volHigh;
         }
+        if (iconSet === "text") {
+            if (pct > 100) return "max!";
+            if (pct <= 33) return textMap.volLow;
+            if (pct <= 66) return textMap.volMid;
+            return textMap.volHigh;
+        }
+        if (iconSet === "nerd") {
+            if (pct <= 33) return nerdMap.volLow;
+            if (pct <= 66) return nerdMap.volMid;
+            return nerdMap.volHigh;
+        }
+        if (iconSet === "windows") {
+            if (pct <= 33) return "\uE993";
+            if (pct <= 66) return "\uE994";
+            return "\uE995";
+        }
+        if (iconSet === "awesome") {
+            if (pct <= 33) return fontAwesomeMap.volLow;
+            if (pct <= 66) return fontAwesomeMap.volMid;
+            return fontAwesomeMap.volHigh;
+        }
+        if (pct <= 33) return "\uE04E";
+        if (pct <= 66) return "\uE04D";
+        return "\uE050";
+    }
+
+    function getBrightnessIcon(pct: int): string {
+        let p = (pct === undefined || isNaN(pct)) ? 50 : pct;
+        if (iconSet === "kaomoji") {
+            if (p <= 20) return kaoSleepy;
+            if (p >= 85) return kaoSparkle;
+            return kaomojiMap.brightness;
+        }
+        if (iconSet === "text") {
+            if (p <= 25) return "dim";
+            if (p >= 85) return "max";
+            return textMap.brightness;
+        }
+        if (iconSet === "nerd") {
+            if (p <= 30) return "󰃞";
+            if (p <= 70) return "󰃟";
+            return "󰃠";
+        }
+        return p <= 25 ? iconMoon : iconBrightness;
+    }
 
     function getWifiIcon(signalPct: int, isConnected: bool, isEthernet: bool): string {
         if (isEthernet) return (iconSet === "kaomoji") ? "[eth]" : (iconSet === "text") ? "eth" : (iconSet === "nerd") ? "󰈀" : iconEthernet;
@@ -1050,7 +1098,7 @@ Singleton {
         return "\uE63E";
     }
 
-    // semantic icon mappings across Material, Nerd Font, Segoe Fluent, and Font Awesome
+    // four different icon fonts taped together with hope
     readonly property string iconDistro:            getIcon("\uE30A", "\uE71D", "\uF17C", "nixos")
     readonly property string iconNix:               getIcon("\uE30A", "\uE71D", "\uF17C", "nix")
     readonly property string iconArch:              getIcon("\uE30A", "\uE71D", "\uF17C", "arch")
@@ -1078,6 +1126,7 @@ Singleton {
     readonly property string iconEye:               getIcon("\uE8F4", "\uE7B3", "", "eye")
     readonly property string iconEyeOff:            getIcon("\uE8F5", "\uED1A", "", "eyeOff")
     readonly property string iconHeart:             getIcon("\uE87E", "\uEB51", "", "heart")
+    readonly property string iconPin:               getIcon("\uE6AA", "\uE718", "\uF08D", "pin")
     readonly property string iconDownload:          getIcon("\uF090", "\uE896", "", "download")
     readonly property string iconFolder:            getIcon("\uE2C7", "\uE838", "", "folder")
     readonly property string iconGlobe:             getIcon("\uE64C", "\uE774", "\uF0AC", "globe")
@@ -1201,243 +1250,182 @@ Singleton {
         return (text ?? "").toLowerCase();
     }
 
-    // static quote battery designed to psychically damage whoever looks at it
+    /*
+    quote roulette: part relatable linux habits, part cozy check-ins,
+    part classic tech quotes, and part unhinged sleep deprivation
+    */
     readonly property var flavorQuotes: Object.freeze({
         "network_on": [
-            "tcp handshake accepted. corporate surveillance resumed",
-            "sending telemetry to fourteen different ad networks",
-            "bgp routes stable, unfortunately",
+            "pinging 1.1.1.1 just to check if the router is mad at me",
+            "\"no matter where you go, everyone's connected.\" — lain",
+            "47 browser tabs open for one tiny nix error",
+            "ssh session hanging because i switched wifi networks",
             "downloading node_modules (heat death of universe pending)",
-                                                      "stuffing uncompressed packets into kernel socket",
-                                                      "direct fiber link tunneling to the digital abyss",
-                                                      "pinging 1.1.1.1 just to make sure the earth is still here",
-                                                      "negotiating 10gbe link speed purely out of spite",
-                                                      "packet sniffing every zero and one",
-                                                      "wifi wpa3 handshake verified: hello darkness",
-                                                      "resolving dns... local cache is poisoned anyway",
-                                                      "dhcp lease renewed for another 24 hours of suffering",
-                                                      "tls 1.3 encrypted despair flowing smoothly",
-                                                      "ipv6 neighbor discovery screaming into the void"
+            "git push --force and pray nobody notices",
+            "latency low, packets clean, everything humming along",
+            "copy-pasting a pipewire fix from a 2022 reddit thread",
+            "\"there is no cloud, it's just someone else's computer.\"",
+            "it's always dns. literally always dns",
+            "bgp routes stable, unfortunately",
+            "tailscale tunnel up, homelab reachable from the couch"
         ],
         "network_off": [
             "dns resolution failed: finally, inner peace",
             "rfc 1149 (ip over avian carriers) standby",
-                                                      "127.0.0.1 is the only safe place left",
-                                                      "eth0 interface is pretending to be dead",
-                                                      "airgapped paranoia protocol activated",
-                                                      "no packets, no masters, pure anarchy",
-                                                      "cut the fiber cord, escaped the simulation",
-                                                      "hardware killswitch toggled with unnecessary aggression",
-                                                      "living inside a faraday cage made of bad life choices",
-                                                      "tx/rx bytes: 0. total isolation achieved",
-                                                      "networkmanager daemon gave up and went to sleep",
-                                                      "rfkill blocked all rf adapters. we are untraceable"
+            "127.0.0.1 is the only safe place left",
+            "offline mode: time to read man pages like it's 1997",
+            "networkmanager gave up and honestly i respect that",
+            "no packets, no masters, pure local computing",
+            "airgapped paranoia protocol activated",
+            "good excuse to finally clean up ~/downloads",
+            "eth0 pretending to be dead so we don't have to answer emails"
         ],
         "battery_charging": [
-            "converting coal exhaust into lithium dendrites",
-            "trickle charging because the thermal paste is dust",
             "shoving 65 watts into a swollen spicy pillow",
             "usb-c pd negotiating for its life",
-            "mainlining raw high-voltage current",
+            "plugged in: cpu governor immediately goes feral",
+            "top-up in progress, grab a coffee too",
             "electrons aggressively cramming into lithium cages",
-            "recharging anger cells at maximum amperage",
-            "lithium pouch swelling with righteous indignation",
-            "drawing enough watts to flicker the kitchen lights",
-            "acpi reports state: charging (and overheating)",
-                                                      "pmux controller silently screaming under 20 amps",
-                                                      "pumping grid juice into degrading cell chemistry"
+            "charging up before moving back to the couch",
+            "acpi reports state: charging (and warming your lap)",
+            "feeding fresh wall juice straight into the compile job"
         ],
         "battery_low": [
-            "acpi throws a critical warning, i ignore it",
             "running on kernel panic adrenaline and 2% reserve",
-            "the pmux is begging for mercy",
-            "about to drop state to hibernate and corrupt the swapfile",
-            "running purely on stubbornness and spite",
-            "one gentle sneeze and the display goes dark",
-            "initiating fade-to-black speedrun",
-            "voltage curve dropping faster than my self esteem",
-            "two percent remaining and twenty buffers unsaved",
-            "display backlight dimming into the shadow realm",
+            "where did i leave the usb-c brick...",
+            "two percent left and twenty neovim buffers unsaved",
+            "tlp fighting for its life right now",
+            "one electron tab away from sudden poweroff",
+            "dimming the screen and praying the charger is nearby",
             "upower daemon is actively drafting a will",
-            "cell voltage below 3.2v. catastrophic failure imminent"
+            "save your work right now, future you will thank you"
         ],
         "battery_full": [
-            "lithium cells balanced and ready to degrade",
-            "100% capacity (actually 87% design capacity)",
-                                                      "overcharge protection working overtime",
-                                                      "drawing idle power directly from the wall",
-                                                      "brimming with unbridled electrical violence",
-                                                      "unplug me before the desk spontaneously combusts",
-                                                      "power reserve peaked: untouchable machine god",
-                                                      "zero dependency on the electrical socket hegemony",
-                                                      "bms reports full charge. bms is probably lying",
-                                                      "ac adapter trickling 1w just to feel important"
+            "100% charged (84% actual battery health, don't look at it)",
+            "topped off and ready to wander away from the desk",
+            "charge threshold holding steady, lithium cells chilling",
+            "unplug me before the desk spontaneously combusts",
+            "bms reports full charge. bms is probably lying",
+            "full battery, clean workspace, zero excuses"
         ],
         "media_playing": [
-            "decoding flac just to output it through cheap bluetooth earbuds",
-            "pipewire graph actively dropping frames",
-            "spotify hogging 2gb of ram for electron bloat",
-            "audio ring buffer barely keeping up with my anxiety",
-            "vibing at criminally irresponsible volumes",
-            "acoustic compression waves rattling eardrums",
-            "aux cord privileges completely uncontested",
-            "blasting compressed 320kbps audio straight into skull",
-            "the dac is working harder than our politicians",
-            "injecting rhythm directly into the central nervous system",
-            "mpris interface broadcasting bad music taste to dbus"
+            "decoding flac just to output it through bluetooth earbuds",
+            "cava bars dancing in a terminal corner for no reason",
+            "soundtrack locked in, flow state engaged",
+            "pipewire graph miraculously not dropping frames today",
+            "spotify eating 1.4gb of ram for a 3-minute song",
+            "\"music is the shorthand of emotion.\" — leo tolstoy",
+            "good headphones + late night terminal session = peak peace",
+            "mpris broadcasting questionable music taste over dbus"
         ],
         "media_quiet": [
-            "null sink selected. audio going into the void",
-            "alsa is exclusively locking the hardware, again",
-            "dead silence. the fans are spinning up though",
-            "waiting for the inevitable system bell beep",
-            "not a single banger detected within 50 miles",
-            "exact zero decibels detected by audio server",
+            "nothing playing except the gentle hum of case fans",
+            "wireplumber suspended the sink to save 0.1 watts",
+            "quiet room, quiet thoughts, clean focus",
+            "waiting for the inevitable terminal bell beep",
             "letting the dac enjoy an unpaid lunch break",
-            "nothing playing except the coil whine in g-flat",
-            "soundcard slumbering in complete acoustic deprivation",
-            "wireplumber suspended the sink to save 0.1 watts"
+            "\"silence is a source of great strength.\" — lao tzu",
+            "put on a lo-fi album or enjoy the peace and quiet"
         ],
         "notes_empty": [
             "vim buffer empty. brain buffer empty",
-            "zero inodes allocated for original thoughts",
-            "the sqlite db is entirely vacuumed",
-            "no tasks. just existential dread",
-            "head totally empty, smooth like polished marble",
-            "zero schemes, zero notes, absolute zen emptiness",
-            "braincache totally flushed to /dev/null",
-            "not even a single grocery item rattling in the void",
-            "tmpfs cleared. no lingering responsibilities",
-            "the markdown file contains 0 bytes. nature is healing"
+            "todo list cleared. go touch grass or play something",
+            "zero tasks pending, honestly feels illegal",
+            "the markdown file contains 0 bytes. nature is healing",
+            "\"simplicity is prerequisite for reliability.\" — dijkstra",
+            "nothing urgent written down, take a breath",
+            "no lingering chores rattling around in /tmp"
         ],
         "notifs_empty": [
-            "dbus is totally quiet. highly suspicious",
-            "no websockets connected. nobody cares",
-            "zero unread emails. the spam filter is catching up",
-            "dunst daemon is bored to tears",
-            "absolute zero drama reported in local airspace",
-            "notification inbox declared a nature sanctuary",
-            "nobody has pinged me and the world is temporarily healed",
-            "zero `@everyone` tags ruining my sleep cycle",
-            "no pings, no screams, no jira tickets kicking the door down",
-            "event loop is completely idle. peace at last"
+            "zero `@everyone` pings ruining the vibe today",
+            "inbox zero. nobody needs anything from you right now",
+            "dbus is suspiciously quiet, enjoy it while it lasts",
+            "no pings, no alerts, no jira tickets kicking the door down",
+            "notification daemon taking a well-deserved nap",
+            "peace and quiet in local airspace"
         ],
         "dnd_on": [
-            "sigkill sent to all social interactions",
             "routing all dbus notifications straight to /dev/null",
+            "do not disturb: deep in the dotfiles, send help later",
+            "if you ping me right now i will compile webkit on your router",
+            "\"leave me alone, i know what i'm doing.\" — kimi räikkönen",
+            "focus mode active: world muted, compiler warm",
             "firewalling port 80 of my personal boundaries",
-            "tcp rst sent to reality",
-            "anti-social defense perimeter active",
-            "do not look at me, do not perceive me",
-            "touch grass protocol enforced by martial law",
-            "notification daemon bound and gagged in the basement",
-            "if you ping me right now i will compile gentoo on your router",
-            "silent mode: active hostile disinterest engaged"
+            "locked in. notifications can wait till tomorrow"
         ],
         "volume_muted": [
-            "hardware switch engaged. paranoia validated",
-            "sending all pcm streams into the void",
-            "volume set to 0. alsa still clipping somehow",
-            "pulseaudio dummy output vibes",
+            "muted just in case auto-playing video tries something funny",
+            "sending all pcm streams straight into the void",
+            "muted on discord—Wait let me double check the mic icon too",
             "silence dialed to eleven",
-            "muted so youtube ads don't detonate my soul",
-            "wireplumber ordered to execute total radio silence",
-            "not a single decibel sneaking out of this sound server",
-            "master fader pulled all the way to negative infinity"
+            "wireplumber ordered to execute total radio silence"
         ],
         "volume_high": [
-            "clipping the digital preamp to feel alive",
-            "overdriving the dac because the mix is garbage",
-            "approaching absolute 0dbfs. prepare for distortion",
-            "destroying dynamic range intentionally",
-            "permanent hearing loss tutorial (any%)",
-                                                      "speaker cones begging for humanitarian intervention",
-                                                      "decibels exceeding osha recommendations",
-                                                      "if the desk isn't vibrating you aren't doing it right",
-                                                      "treating the tympanic membrane with total disrespect",
-                                                      "pushing the amplifier into severe thermal throttling"
+            "permanent hearing loss speedrun (any%)",
+            "pushing pipewire past 100% because the mix is quiet",
+            "approaching 0dbfs, RIP to your eardrums if a notification hits",
+            "speaker cones begging for humanitarian intervention",
+            "vibing at slightly irresponsible decibels"
         ],
         "brightness_high": [
-            "pwm flickering at maximum duty cycle",
-            "backlight inverter screaming in high frequency",
-            "burning the status bar permanently into the oled",
-            "compiling light theme with 400 nits of pure pain",
             "deploying tactical flashbang straight into corneas",
-            "illuminating entire apartment with raw screen glow",
-            "corneal crisping level: well-done",
-            "using the monitor to warm my frozen hands",
-            "pushing 100% luminance just to read bad code"
+            "accidentally opened a white webpage at 2am",
+            "pushing 100% luminance just to read dark mode text in sunlight",
+            "burning the status bar permanently into the panel",
+            "bright and crisp, posture check while you're looking"
         ],
         "brightness_low": [
-            "sub-pixel rendering disabled by darkness",
-            "backlight off. reading the lcd via desk lamp",
-            "saving 0.4 watts on backlight power",
-            "operating below the threshold of human perception",
-            "vampire cave ambience successfully calibrated",
+            "cozy late-night dim mode engaged",
             "saving optical nerves from certain destruction",
-            "three photons escaping the display per lunar cycle",
-            "screen dim enough to hide my shame",
-            "contrast ratio completely destroyed by ambient light"
+            "saving 0.4 watts on backlight power like a true minimalist",
+            "vampire cave ambience calibrated to perfection",
+            "easy on the eyes, take a break if you're squinting"
         ],
         "idle_inhibited": [
-            "systemd-inhibit holds the lock. we die like men",
-            "caffeine-ng actively lying to the x server",
-            "wayland idle protocol suppressed",
-            "burning screen phosphors on an ssh session",
-            "machine pumped full of intravenous espresso",
-            "no sleeping allowed on this workstation",
-            "inhibit lock engaged: stay awake or face destruction",
-            "we do not sleep until the build finishes",
-            "dpms blocked by obscure dbus method call"
+            "caffeine active: we do not sleep until the build finishes",
+            "wayland idle inhibitor holding the screen hostage",
+            "staying awake so the long download doesn't drop",
+            "machine pumped full of virtual espresso",
+            "dpms politely told to mind its own business"
         ],
         "idle_normal": [
-            "dpms standby countdown initiated",
-            "cpu scaling governor set to powersave",
-            "c-states dropping deeper than my self esteem",
-            "waiting for the screensaver segmentation fault",
-            "ready to take an afternoon nap at any second",
-            "circuits cooling down into peaceful slumber",
-            "acpi power management waiting patiently in the wings",
-            "display panel preparing its peaceful descent into darkness",
-            "system idle. existential dread loading"
+            "cpu governor chilling in powersave",
+            "all quiet on the desktop, relax your shoulders",
+            "c-states dropping deep, thermals nice and cool",
+            "system breathing easy, zero runaway processes",
+            "ready for a coffee break whenever you are"
         ],
         "system": [
-            "oom killer is sizing up the electron apps",
-            "kswapd0 is consuming 100% cpu",
-            "load average: 14.2, 12.8, 10.1. this is fine",
-            "dmesg is a horror novel",
-            "segfault at rip 0000. ignored",
-            "thermald is throttling the cpu to 800mhz",
-            "pure functional bliss running on nixos",
-            "garbage collecting my regrets from the nix store",
-            "memory leaks kept under strict surveillance",
-            "btop shows everything is fine so do not question it",
-            "swap space carrying the entire weight of my sins",
-            "four hundred uncommitted git changes staring back into the abyss",
-            "running 40 days of uptime out of pure cowardice to reboot",
-            "journalctl is mostly just stack traces at this point",
-            "xorg is using 4gb of ram and nobody knows why"
+            "spent 3 hours ricing quickshell to avoid a 10-minute task",
+            "opened a terminal, typed ls, immediately closed it",
+            "hyprland.lua indexing workspaces from 1 like a sociopath",
+            "\"talk is cheap. show me the code.\" — linus torvalds",
+            "\"an idiot admires complexity, a genius admires simplicity.\" — terry davis",
+            "\"do one thing and do it well.\" — douglas mcilroy",
+            "all services green, thermals cool, dotfiles looking clean",
+            "forgetting the tar flags and checking --help for the 500th time",
+            "six terminals open just to show off btop and fastfetch",
+            "nix store eating 80gb of disk space, time to garbage collect",
+            "discord screenshare showing a black window on wayland again",
+            "git commit -m 'fix' followed by git commit -m 'actually fix'",
+            "oom killer quietly sizing up the electron apps",
+            "rewrote my config in lua and it actually worked on reload",
+            "\"beware of bugs in the above code; i have only proved it correct.\" — knuth",
+            "hydrated? posture okay? alright, carry on",
+            "running 30 days of uptime out of pure refusal to close my tabs"
         ],
         "screenshot": [
-            "xwd dumping raw root window buffer",
-            "wl-clipboard pipe broken, image lost",
-            "flameshot segfaulting on multimonitor setup",
-            "allocating 40mb of ram for a 10kb png",
-            "capturing wayland surface with absolute disrespect",
-            "taking a screenshot? u snitch",
+            "grim + slurp: fastest snitch in the west",
+            "copied to wl-clipboard, ready to paste into the chat",
             "saving receipts for the group chat",
-            "snitch mode: engaged",
-            "pixels acquired, dignity lost",
-            "your fbi agent is judging you heavily",
-            "digital kleptomania at its finest",
-            "piracy is a crime but stealing pixels is fine",
-            "evidence secured for the tribunal",
-            "right click save as, but violent",
-            "another jpeg for the evidence folder"
+            "showing off the rice on r/unixporn?",
+            "another png added to ~/pictures/screenshots that you'll never delete",
+            "pixels acquired, framing looks clean",
+            "allocating 40mb of ram for a 12kb screenshot"
         ]
     })
 
-    // hooked straight into the clock pulse so unhinged thoughts rot reactively every 60s
+    // hooked straight into the clock pulse so thoughts rotate every 60s
     function getFlavor(category: string, fallback: string): string {
         if (!cfg?.unhingedFlavor) return (fallback ?? "").toLowerCase();
         let list = flavorQuotes[category];
@@ -1447,4 +1435,3 @@ Singleton {
         return (list[totalMinutes % list.length] ?? fallback ?? "").toLowerCase();
     }
 }
-

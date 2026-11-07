@@ -12,7 +12,7 @@ local function mbind(key, dsp, opts)
 end
 
 local function action(act)
-	return hl.dsp.exec_cmd(home .. "/.local/bin/qs-action " .. act)
+	return hl.dsp.exec_cmd(home .. "/.local/bin/cli " .. act)
 end
 
 -- Core window management
@@ -37,6 +37,7 @@ end)
 
 -- Unified desktop & shell controls (dynamically routed to quickshell / brain_shell)
 mbind("D", action("launcher"))
+mbind("E", action("files"))
 mbind("S", action("dashboard"))
 mbind("Z", action("notes"))
 mbind("N", action("notifs"))
@@ -98,8 +99,8 @@ local single_toggles = {
 	XF86AudioMute = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
 	XF86AudioMicMute = "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
 	XF86WLAN = "nmcli radio wifi toggle",
-	XF86Favorites = home .. "/.local/bin/qs-action lock",
-	XF86NotificationCenter = home .. "/.local/bin/qs-action notifs",
+	XF86Favorites = home .. "/.local/bin/cli lock",
+	XF86NotificationCenter = home .. "/.local/bin/cli notifs",
 	XF86PickupPhone = "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
 	XF86HangupPhone = "playerctl play-pause",
 }

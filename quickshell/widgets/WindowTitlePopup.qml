@@ -15,87 +15,87 @@ PopupPanel {
     property alias contentHeight: root.cardHeight
 
     readonly property var activeTop: Hyprland.activeToplevel
-    readonly property string winTitle: (activeTop?.title ?? "").trim()
+    readonly property string winTitle: (activeTop?.title ?? activeTop?.wayland?.title ?? "").trim()
     readonly property string winClass: {
         if (!activeTop) return "";
-        let c = "";
-        if (activeTop.lastIpcObject) {
-            c = activeTop.lastIpcObject["class"] || activeTop.lastIpcObject.initialClass || "";
-        }
-        if (!c && activeTop.waylandHandle) c = activeTop.waylandHandle.appId;
-        if (!c && activeTop.appId) c = activeTop.appId;
+        let ipc = activeTop.lastIpcObject;
+        let c = ipc ? (ipc["class"] || ipc.initialClass || "") : "";
+        if (!c && activeTop.wayland) c = activeTop.wayland.appId;
+        if (!c && activeTop.handle) c = activeTop.handle.appId;
         return (c || "").trim();
     }
-    readonly property bool isWindowFloating: Boolean(activeTop?.floating ?? (activeTop?.lastIpcObject ? activeTop.lastIpcObject.floating : false))
-    readonly property bool isFullscreen: Boolean(activeTop?.fullscreen ?? (activeTop?.lastIpcObject ? activeTop.lastIpcObject.fullscreen : false))
+
+    readonly property bool isWindowFloating: Boolean(activeTop?.lastIpcObject?.floating ?? false)
+    readonly property bool isFullscreen: Boolean(activeTop?.wayland?.fullscreen ?? activeTop?.lastIpcObject?.fullscreen ?? false)
+    readonly property bool isPinned: Boolean(activeTop?.lastIpcObject?.pinned ?? false)
+
+    /*
+    hyprland 0.55+ switched to lua so sending legacy strings when usingLua is true
+    just gets eaten by the void. also hl.dsp.window.kill() murders the whole pid
+    tree, so we use close() unless we want all 40 browser tabs to evaporate
+    */
+    function dispatchWindowAction(action: string) {
+        let lua = Boolean(Hyprland?.usingLua);
+        if (action === "float") {
+            if (lua) Hyprland.dispatch("hl.dsp.window.float({ action = 'toggle' })");
+            else if (Settings?.dispatchToggleFloat) Settings.dispatchToggleFloat();
+            else Hyprland.dispatch("togglefloating");
+        } else if (action === "fullscreen") {
+            if (lua) Hyprland.dispatch("hl.dsp.window.fullscreen()");
+            else if (Settings?.dispatchToggleFullscreen) Settings.dispatchToggleFullscreen();
+            else Hyprland.dispatch("fullscreen 0");
+        } else if (action === "pin") {
+            if (lua) Hyprland.dispatch("hl.dsp.window.pin()");
+            else if (Settings?.dispatchPinWindow) Settings.dispatchPinWindow();
+            else Hyprland.dispatch("pin");
+        } else if (action === "close") {
+            if (lua) Hyprland.dispatch("hl.dsp.window.close()");
+            else if (Settings?.dispatchCloseWindow) Settings.dispatchCloseWindow();
+            else Hyprland.dispatch("killactive");
+        }
+        Hyprland.refreshToplevels();
+    }
+
+    onOpenChanged: {
+        if (open) Hyprland.refreshToplevels();
+    }
+
+    // force quickshell to actually update lastIpcObject when window state mutates
+    Connections {
+        target: Hyprland
+        enabled: root.open
+        function onRawEvent(event) {
+            let n = event?.name ?? "";
+            if (n === "changefloatingmode" || n === "fullscreen" || n === "pin" || n === "activewindow" || n === "windowtitlev2") {
+                Hyprland.refreshToplevels();
+            }
+        }
+    }
 
     content: ColumnLayout {
         id: winContentLayout
         anchors.fill: parent
         spacing: Theme.popupSpacing
 
-        // Header
+        // top bar with the app icon and whatever identity crisis the window is having
         RowLayout {
             Layout.fillWidth: true
-            spacing: 10
+            spacing: Theme.popupSpacing
 
             Rectangle {
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
                 radius: Theme.radiusSm
-                color: Theme.surface_container_high
+                color: Theme.cardBg
+                border.color: Theme.cardBorder
+                border.width: 1
 
                 IconImage {
                     id: popupAppIcon
                     anchors.centerIn: parent
                     width: 20
                     height: 20
-                    source: {
-                        if (!root.winClass) return "";
-                        let base = root.winClass.toLowerCase();
-
-                        // Check DesktopEntries first for authoritative .desktop icon
-                        if (typeof DesktopEntries !== "undefined" && DesktopEntries?.applications?.values) {
-                            let apps = DesktopEntries.applications.values;
-                            for (let i = 0; i < apps.length; i++) {
-                                let a = apps[i];
-                                if (!a) continue;
-                                let aid = (a.id ?? "").toLowerCase().replace(/\.desktop$/, "");
-                                let wm = (a.startupWmClass ?? "").toLowerCase();
-                                if (aid === base || wm === base) {
-                                    if (a.icon) {
-                                        let p = Quickshell.iconPath(a.icon);
-                                        if (p) return p;
-                                    }
-                                }
-                            }
-                        }
-
-                        let candidates = [
-                            base,
-                            base.replace(/-/g, ""),
-                            base.replace(/_bin$/, ""),
-                            base.replace(/-bin$/, "")
-                        ];
-                        if (Quickshell?.hasThemeIcon && Quickshell.hasThemeIcon(base + "-browser")) {
-                            candidates.unshift(base + "-browser");
-                        }
-                        let parts = base.split(".");
-                        if (parts.length > 1) {
-                            candidates.push(parts[parts.length - 1]);
-                        }
-                        for (let i = 0; i < candidates.length; i++) {
-                            let cand = candidates[i];
-                            if (!cand) continue;
-                            if (Quickshell?.hasThemeIcon && !Quickshell.hasThemeIcon(cand)) continue;
-                            let p = Quickshell.iconPath(cand);
-                            if (p) return p;
-                        }
-                        if (Quickshell?.hasThemeIcon && Quickshell.hasThemeIcon("application-x-executable")) {
-                            return Quickshell.iconPath("application-x-executable");
-                        }
-                        return "";
-                    }
+                    source: Theme.resolveAppIcon ? Theme.resolveAppIcon(root.winClass) : ""
                     visible: source !== "" && status !== Image.Error
                 }
 
@@ -114,19 +114,24 @@ PopupPanel {
                 spacing: 2
 
                 Text {
+                    Layout.fillWidth: true
                     text: (root.winClass.length > 0 ? root.winClass : "desktop").toLowerCase()
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeMd
-                    font.weight: Font.Bold
+                    font.weight: Theme.fontWeightBold
                     color: Theme.on_surface
                     elide: Text.ElideRight
                 }
 
                 Text {
-                    text: root.activeTop ? "focused window" : "no active window"
+                    Layout.fillWidth: true
+                    text: root.activeTop
+                        ? (root.isPinned ? "pinned & floating" : "focused window")
+                        : Theme.getVibe(Theme.kaoEmpty, "no active window", "no active window")
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.on_surface_variant
+                    elide: Text.ElideRight
                 }
             }
 
@@ -135,48 +140,55 @@ PopupPanel {
                 height: 22
                 implicitWidth: statusText.implicitWidth + 14
                 radius: Theme.radiusPill
-                color: root.isWindowFloating ? Theme.secondary_container : Theme.surface_container_highest
+                color: root.isWindowFloating ? Theme.secondary_container : Theme.pillBg
+                border.color: root.isWindowFloating ? "transparent" : Theme.pillBorder
+                border.width: root.isWindowFloating ? 0 : 1
+
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                 Text {
                     id: statusText
                     anchors.centerIn: parent
-                    text: root.isWindowFloating ? "floating" : "tiled"
+                    text: root.isPinned ? "pinned" : (root.isWindowFloating ? "floating" : "tiled")
                     font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    font.weight: Font.Medium
+                    font.pixelSize: Theme.fontSizeXs
+                    font.weight: Theme.fontWeightMedium
                     color: root.isWindowFloating ? Theme.on_secondary_container : Theme.on_surface_variant
                 }
             }
         }
 
-        // Full Title Card
+        // box holding the actual title or an existential crisis quote if staring at wallpaper
         Rectangle {
             Layout.fillWidth: true
-            implicitHeight: 70
+            implicitHeight: Math.max(66, titleCol.implicitHeight + (Theme.popupCardPadding * 2) + 4)
             radius: Theme.radiusMd
-            color: Theme.surface_container
-            border.color: Theme.glassBorder
+            color: Theme.cardBg
+            border.color: Theme.cardBorder
             border.width: 1
 
             ColumnLayout {
+                id: titleCol
                 anchors.fill: parent
-                anchors.margins: 10
+                anchors.margins: Theme.popupCardPadding + 2
                 spacing: 4
 
                 Text {
-                    text: "window title"
+                    text: root.activeTop ? "window title" : "status"
                     font.family: Theme.fontFamily
-                    font.pixelSize: 10
+                    font.pixelSize: Theme.fontSizeXs
                     color: Theme.on_surface_variant
                 }
 
                 Text {
                     Layout.fillWidth: true
-                    text: (root.winTitle.length > 0 ? root.winTitle : "no window focused").toLowerCase()
+                    text: (root.winTitle.length > 0
+                        ? root.winTitle
+                        : Theme.getFlavor("system", "no window focused")).toLowerCase()
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSm
-                    font.weight: Font.Medium
-                    color: Theme.on_surface
+                    font.weight: Theme.fontWeightMedium
+                    color: root.activeTop ? Theme.on_surface : Theme.on_surface_variant
                     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                     maximumLineCount: 2
                     elide: Text.ElideRight
@@ -184,145 +196,117 @@ PopupPanel {
             }
         }
 
-        // Actions Row
+        // four buttons to bully the active window into submission
         RowLayout {
             Layout.fillWidth: true
-            spacing: 8
+            spacing: Theme.popupCardGap
 
-            Rectangle {
-                Layout.fillWidth: true
-                height: 36
-                radius: Theme.radiusSm
-                color: root.isWindowFloating ? Theme.primary : Theme.surface_container_high
-                border.color: Theme.glassBorder
-                border.width: 1
+            Repeater {
+                model: [
+                    {
+                        key: "float",
+                        label: "float",
+                        icon: Theme.iconCrop,
+                        active: root.isWindowFloating,
+                        danger: false,
+                        enabled: root.activeTop !== null
+                    },
+                    {
+                        key: "fullscreen",
+                        label: "fullscreen",
+                        icon: Theme.iconExpand,
+                        active: root.isFullscreen,
+                        danger: false,
+                        enabled: root.activeTop !== null
+                    },
+                    {
+                        key: "pin",
+                        label: "pin",
+                        icon: Theme.iconHeart,
+                        active: root.isPinned,
+                        danger: false,
+                        // hyprland silently ignores pinning tiled windows anyway
+                        enabled: root.activeTop !== null && root.isWindowFloating
+                    },
+                    {
+                        key: "close",
+                        label: "kill",
+                        icon: Theme.iconClose,
+                        active: false,
+                        danger: true,
+                        enabled: root.activeTop !== null
+                    }
+                ]
 
-                RowLayout {
-                    anchors.centerIn: parent
-                    spacing: 4
+                delegate: Rectangle {
+                    id: actionBtn
+                    required property var modelData
 
-                    Text {
-                        text: Theme.iconCrop
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeSm
-                        color: root.isWindowFloating ? Theme.on_primary : Theme.on_surface
+                    Layout.fillWidth: true
+                    height: Theme.popupActionHeight + 4
+                    radius: Theme.radiusSm
+                    opacity: modelData.enabled ? 1.0 : 0.42
+
+                    readonly property color baseBg: {
+                        if (modelData.danger) return Theme.error_container;
+                        if (modelData.active) return Theme.primary;
+                        return Theme.pillBg;
+                    }
+                    readonly property color fgColor: {
+                        if (modelData.danger) return Theme.on_error_container;
+                        if (modelData.active) return Theme.on_primary;
+                        return Theme.on_surface;
                     }
 
-                    Text {
-                        text: "float"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        color: root.isWindowFloating ? Theme.on_primary : Theme.on_surface
-                    }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: Settings.dispatchToggleFloat()
-                }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                height: 36
-                radius: Theme.radiusSm
-                color: root.isFullscreen ? Theme.primary : Theme.surface_container_high
-                border.color: Theme.glassBorder
-                border.width: 1
-
-                RowLayout {
-                    anchors.centerIn: parent
-                    spacing: 4
-
-                    Text {
-                        text: Theme.iconExpand
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeSm
-                        color: root.isFullscreen ? Theme.on_primary : Theme.on_surface
+                    color: {
+                        if (!modelData.enabled) return baseBg;
+                        if (btnMouse.pressed) return Theme.statePress(baseBg, fgColor);
+                        if (btnMouse.containsMouse) return ( !modelData.danger && !modelData.active ) ? Theme.pillHover : Theme.stateHover(baseBg, fgColor);
+                        return baseBg;
                     }
 
-                    Text {
-                        text: "fullscreen"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        color: root.isFullscreen ? Theme.on_primary : Theme.on_surface
-                    }
-                }
+                    border.color: (modelData.danger || modelData.active) ? "transparent" : Theme.pillBorder
+                    border.width: (modelData.danger || modelData.active || border.color === "transparent") ? 0 : 1
 
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: Settings.dispatchToggleFullscreen()
-                }
-            }
+                    scale: (btnMouse.pressed && modelData.enabled) ? 0.96 : 1.0
 
-            Rectangle {
-                Layout.fillWidth: true
-                height: 36
-                radius: Theme.radiusSm
-                color: Theme.surface_container_high
-                border.color: Theme.glassBorder
-                border.width: 1
+                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+                    Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+                    Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
 
-                RowLayout {
-                    anchors.centerIn: parent
-                    spacing: 4
+                    RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 4
 
-                    Text {
-                        text: Theme.iconHeart
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeSm
-                        color: Theme.on_surface
+                        Text {
+                            visible: !Theme.isTextIconSet
+                            text: actionBtn.modelData.icon
+                            font.family: Theme.fontIcon
+                            font.pixelSize: Theme.fontSizeSm
+                            color: actionBtn.fgColor
+                        }
+
+                        Text {
+                            text: actionBtn.modelData.label
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: actionBtn.modelData.danger ? Theme.fontWeightBold : Theme.fontWeightMedium
+                            color: actionBtn.fgColor
+                        }
                     }
 
-                    Text {
-                        text: "pin"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        color: Theme.on_surface
-                    }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: Settings.dispatchPinWindow()
-                }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                height: 36
-                radius: Theme.radiusSm
-                color: Theme.error_container
-
-                RowLayout {
-                    anchors.centerIn: parent
-                    spacing: 4
-
-                    Text {
-                        text: Theme.iconClose
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeSm
-                        color: Theme.on_error_container
-                    }
-
-                    Text {
-                        text: "kill"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
-                        color: Theme.on_error_container
-                    }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        Settings.dispatchCloseWindow();
-                        root.open = false;
+                    MouseArea {
+                        id: btnMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        enabled: actionBtn.modelData.enabled
+                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                        onClicked: {
+                            root.dispatchWindowAction(actionBtn.modelData.key);
+                            if (actionBtn.modelData.key === "close") {
+                                root.open = false;
+                            }
+                        }
                     }
                 }
             }

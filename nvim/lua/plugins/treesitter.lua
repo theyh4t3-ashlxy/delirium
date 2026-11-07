@@ -8,10 +8,16 @@ return {
         if not ok then
             return
         end
+
+        local has_compiler = vim.fn.executable("cc") == 1
+            or vim.fn.executable("gcc") == 1
+            or vim.fn.executable("clang") == 1
+            or vim.fn.executable("zig") == 1
+
         configs.setup({
             highlight = { enable = true },
             indent = { enable = true },
-            ensure_installed = {
+            ensure_installed = has_compiler and {
                 "lua",
                 "nix",
                 "python",
@@ -20,8 +26,8 @@ return {
                 "markdown_inline",
                 "json",
                 "toml",
-            },
-            auto_install = true,
+            } or {},
+            auto_install = has_compiler,
         })
     end,
 }

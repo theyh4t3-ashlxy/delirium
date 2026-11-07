@@ -6,16 +6,22 @@ M.cooldown_ms = 2500
 M.last_roast = 0
 
 local roasts = {
-    "⚠️ Arrow keys detected! What is this, 1998? Use IJKL.",
-    "🚨 Bill Gates called. Even he thinks you should be using IJKL.",
-    "💀 Arrow keys? Did GTA 6 drop while I wasn't looking? Use IJKL.",
-    "🛑 Your fingers are literally 2 inches away from IJKL. Don't reach for the arrow keys!",
-    "📉 My brother in Christ, you literally asked for IJKL. Use it!",
-    "🤦 Reaching for the arrow keys like it's Microsoft Excel. Keep your hands on the home row.",
-    "🎮 This isn't CoolMathGames. Use IJKL like a true Neovim artisan.",
-    "🙅‍♂️ Arrow keys rejected. Muscle memory under active reconstruction.",
-    "👀 I saw that. I (up), J (left), K (down), L (right). It's that simple.",
-    "⚡ Break the habit before GTA 6 comes out. Hands back on IJKL!",
+    "reaching for the arrows like a lost vscode tourist. ijkl is literally right there.",
+    "you customized a whole modal editor just to navigate like it's windows notepad. tragic.",
+    "muscle memory failed. hand drifted six inches to the right into pure digital shame.",
+    "cold terminal, stale coffee, and you're still clicking arrow keys. bram moolenaar is sighing.",
+    "arrow keys detected. your home row is weeping. use i (up), j (left), k (down), l (right).",
+    "you spent hours configuring dotfiles just to use arrow keys. let that sink in.",
+    "the arrow cluster is for people who enjoy wrist pain and 500ms latency. get back on ijkl.",
+    "what are you doing over there on the arrow keys. there is nothing for you there. go back.",
+    "the grim reality of modal editing is that your hands shouldn't leave the home row. use ijkl.",
+    "four arrow keys won't save your codebase. ijkl will at least save your dignity.",
+    "arrow key reflex detected. tactile shame initiated. use ijkl.",
+    "why did we remap your entire editor to ijkl if you're gonna crawl back to the arrows like that.",
+    "every time you press an arrow key, another bloated electron app gets spawned. stop.",
+    "that physical reach to the bottom right corner of your keyboard just took two years off my lifespan.",
+    "arrow keys. genuinely embarrassing. hands back on ijkl.",
+    "congratulations, you defeated the entire purpose of a modal text editor in one keystroke.",
 }
 
 function M.roast()
@@ -29,13 +35,13 @@ function M.roast()
 
     local idx = math.random(1, #roasts)
     local msg = roasts[idx]
-    vim.notify(msg, vim.log.levels.WARN, { title = "Roast Mode 🔥" })
+    vim.notify(msg, vim.log.levels.WARN, { title = "grim reality" })
 end
 
 function M.toggle()
     M.enabled = not M.enabled
-    local state = M.enabled and "ENABLED 🔥" or "DISABLED 😴"
-    vim.notify("Roast Mode is now " .. state, vim.log.levels.INFO, { title = "Roast Mode" })
+    local state = M.enabled and "enabled. suffer." or "disabled. coward."
+    vim.notify("roast mode is now " .. state, vim.log.levels.INFO, { title = "grim reality" })
 end
 
 -- command and user mapping

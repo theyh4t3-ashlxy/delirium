@@ -1,25 +1,28 @@
-# micro because vim trapped me for 4 hours once
-export EDITOR="micro"
-export VISUAL="micro"
+# editor preference linked to user_prefs.conf
+export EDITOR="${PREFERRED_EDITOR:-micro}"
+export VISUAL="${PREFERRED_EDITOR:-micro}"
 export PAGER="less"
 export LANG="en_US.UTF-8"
 export TZDIR="/etc/zoneinfo"
 export TZ="America/Chicago"
 export QT_LOGGING_RULES="quickshell.dbus.warning=false;quickshell.service.powerprofiles.warning=false"
-# qt theming: defer to portal/gtk theme instead of missing kde breeze
-# export QT_QPA_PLATFORMTHEME="kde"
-# export QT_STYLE_OVERRIDE="Breeze"
 
-# less that doesnt leave ghost text all over my screen
+# less clean display
 export LESS="-R -F -X -i"
 
-# stop dumping garbage in my home folder challenge (impossible)
+# colorized man pages using bat syntax highlighting
+if (( $+commands[bat] )); then
+    export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+    export MANROFFOPT="-c"
+fi
+
+# xdg base directories
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_CACHE_HOME="$HOME/.cache"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_STATE_HOME="$HOME/.local/state"
 
-# where the binaries live
+# binary search path
 typeset -U path
 path=(
     "$HOME/.local/bin"
@@ -32,7 +35,7 @@ path=(
 )
 export PATH
 
-# make nmtui/whiptail dark and sleek instead of 1993 ms-dos blue screen
+# nmtui / whiptail dark palette
 export NEWT_COLORS="root=white,black:border=gray,black:window=white,black:shadow=black,gray:title=cyan,black:button=black,lightgray:actbutton=black,cyan:compactbutton=lightgray,black:checkbox=lightgray,black:actcheckbox=black,cyan:entry=white,gray:disentry=gray,black:label=lightgray,black:listbox=lightgray,black:actlistbox=black,cyan:sellistbox=black,cyan:actsellistbox=black,cyan:textbox=lightgray,black:acttextbox=lightgray,black:helpline=gray,black:roottext=gray,black:emptyscale=gray,black:fullscale=cyan,black"
 
 # flatpak desktop applications and icons
@@ -40,4 +43,3 @@ export XDG_DATA_DIRS="$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/
 
 # bat syntax theme
 export BAT_THEME="base16"
-

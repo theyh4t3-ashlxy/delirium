@@ -15,5 +15,4 @@ python and zsh resolve that without the headache.
 - `detect-backlight.zsh`: auto-detects primary backlight device from sysfs.
 - `detect-brainshell.zsh`: checks whether brain_shell is installed in local paths.
 - `write-file.zsh`: writes or touches state and config files while guaranteeing parent directories exist.
-- `qs-switch`: when you want to use `brain_shell` or my shell. whatever go use `brain_shell` though.
-- `qs-action`: command line action dispatcher for quickshell ipc calls.
+- `cli.py`: unified desktop controller for shell switching, instant reloads, and desktop action ipc dispatching.

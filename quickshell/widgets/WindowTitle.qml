@@ -12,15 +12,13 @@ Rectangle {
     property var barMonitor: null
 
     readonly property var activeTop: Hyprland?.activeToplevel
-    readonly property string rawTitle: (activeTop?.title ?? "").trim()
+    readonly property string rawTitle: (activeTop?.title ?? activeTop?.wayland?.title ?? "").trim()
     readonly property string rawClass: {
         if (!activeTop) return "";
-        let c = "";
-        if (activeTop.lastIpcObject) {
-            c = activeTop.lastIpcObject["class"] || activeTop.lastIpcObject.initialClass || "";
-        }
-        if (!c && activeTop.waylandHandle) c = activeTop.waylandHandle.appId;
-        if (!c && activeTop.appId) c = activeTop.appId;
+        let ipc = activeTop.lastIpcObject;
+        let c = ipc ? (ipc["class"] || ipc.initialClass || "") : "";
+        if (!c && activeTop.wayland) c = activeTop.wayland.appId;
+        if (!c && activeTop.handle) c = activeTop.handle.appId;
         return (c || "").trim();
     }
     readonly property bool isDesktop: !activeTop || rawTitle.length === 0
@@ -29,58 +27,15 @@ Rectangle {
         : "desktop"
     readonly property string displayTitle: (!isDesktop ? rawTitle : fallbackText).toLowerCase()
 
-    // dynamic app icon resolution
-    readonly property string resolvedIcon: {
-        if (isDesktop || !rawClass) return "";
-        let base = rawClass.toLowerCase();
-
-        // Check DesktopEntries first for authoritative .desktop icon
-        if (typeof DesktopEntries !== "undefined" && DesktopEntries?.applications?.values) {
-            let apps = DesktopEntries.applications.values;
-            for (let i = 0; i < apps.length; i++) {
-                let a = apps[i];
-                if (!a) continue;
-                let aid = (a.id ?? "").toLowerCase().replace(/\.desktop$/, "");
-                let wm = (a.startupWmClass ?? "").toLowerCase();
-                if (aid === base || wm === base) {
-                    if (a.icon) {
-                        let p = Quickshell.iconPath(a.icon);
-                        if (p) return p;
-                    }
-                }
-            }
-        }
-
-        let candidates = [
-            base,
-            base.replace(/-/g, ""),
-            base.replace(/_bin$/, ""),
-            base.replace(/-bin$/, "")
-        ];
-        if (Quickshell?.hasThemeIcon && Quickshell.hasThemeIcon(base + "-browser")) {
-            candidates.unshift(base + "-browser");
-        }
-        let parts = base.split(".");
-        if (parts.length > 1) {
-            candidates.push(parts[parts.length - 1]);
-        }
-        for (let i = 0; i < candidates.length; i++) {
-            let cand = candidates[i];
-            if (!cand) continue;
-            if (Quickshell?.hasThemeIcon && !Quickshell.hasThemeIcon(cand)) continue;
-            let p = Quickshell.iconPath(cand);
-            if (p) return p;
-        }
-        if (Quickshell?.hasThemeIcon && Quickshell.hasThemeIcon("application-x-executable")) {
-            return Quickshell.iconPath("application-x-executable");
-        }
-        return "";
-    }
+    // let Theme.qml do the heavy lifting instead of duplicating the desktop entry crawl here
+    readonly property string resolvedIcon: (!isDesktop && rawClass && Theme?.resolveAppIcon)
+        ? Theme.resolveAppIcon(rawClass)
+        : ""
     readonly property bool showAppIcon: (Settings?.windowTitleShowIcon ?? true)
     readonly property bool hasAppIcon: showAppIcon && resolvedIcon !== ""
     readonly property string iconName: resolvedIcon
 
-    // measurement element for unconstrained text width
+    // invisible ghost text just to figure out how wide this pill wants to be
     Text {
         id: titleMeasure
         visible: false
@@ -111,8 +66,8 @@ Rectangle {
     border.color: Theme?.pillBorder ?? "transparent"
     border.width: (Theme?.pillBorder ?? "transparent") === "transparent" ? 0 : 1
 
-    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 150 } }
-    Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 150 } }
+    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 150; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
+    Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 150; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
     Behavior on implicitWidth { NumberAnimation { duration: Theme?.animFast ?? 150; easing.type: Theme?.animEasing ?? Easing.OutQuad } }
 
     WindowTitlePopup {
@@ -183,8 +138,7 @@ Rectangle {
         z: 10
         onClicked: (mouse) => {
             if (mouse.button === Qt.LeftButton) {
-                let pt = windowTitleRoot.mapToItem(null, 0, 0);
-                winPopup.targetRelativeX = pt ? (pt.x + (windowTitleRoot.width / 2)) : 0;
+                windowTitleRoot.updatePopupPos();
                 if (!winPopup.open) {
                     winPopup.pinned = true;
                     winPopup.open = true;
@@ -195,9 +149,9 @@ Rectangle {
                     winPopup.open = false;
                 }
             } else if (mouse.button === Qt.RightButton) {
-                if (Settings) Settings.dispatchCloseWindow();
+                winPopup.dispatchWindowAction("close");
             } else if (mouse.button === Qt.MiddleButton) {
-                if (Settings) Settings.dispatchToggleFloat();
+                winPopup.dispatchWindowAction("float");
             }
         }
     }
@@ -206,16 +160,14 @@ Rectangle {
         target: Settings
         function onRequestWindowTitleToggle() {
             if (!windowTitleRoot.barScreen || Quickshell.screens.length <= 1 || (windowTitleRoot.barMonitor && Hyprland.focusedMonitor && windowTitleRoot.barMonitor.id === Hyprland.focusedMonitor.id)) {
-                let pt = windowTitleRoot.mapToItem(null, 0, 0);
-                winPopup.targetRelativeX = pt ? (pt.x + (windowTitleRoot.width / 2)) : 0;
+                windowTitleRoot.updatePopupPos();
                 winPopup.pinned = !winPopup.open;
                 winPopup.open = !winPopup.open;
             }
         }
         function onRequestWindowTitleOpen() {
             if (!windowTitleRoot.barScreen || Quickshell.screens.length <= 1 || (windowTitleRoot.barMonitor && Hyprland.focusedMonitor && windowTitleRoot.barMonitor.id === Hyprland.focusedMonitor.id)) {
-                let pt = windowTitleRoot.mapToItem(null, 0, 0);
-                winPopup.targetRelativeX = pt ? (pt.x + (windowTitleRoot.width / 2)) : 0;
+                windowTitleRoot.updatePopupPos();
                 winPopup.pinned = true;
                 winPopup.open = true;
             }

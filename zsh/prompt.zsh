@@ -164,6 +164,12 @@ _gp_preexec() {
 }
 
 _gp_mood() {
+    if [[ "${KAOMOJI_SET:-reactive}" == (none|off|disabled|false) ]]; then
+        _GP_FACE=""
+        _GP_BANTER=""
+        return 0
+    fi
+
     local state=happy key
     local -a faces words
 
@@ -233,6 +239,9 @@ _gp_mood() {
         rage)
             faces=('(╯°□°)╯彡┻━┻' '(ノಠ益ಠ)ノ' '(╬ಠ益ಠ)')
             ;;
+        doom)
+            faces=('(눈_눈)' '(x_x)' '(¬_¬ )' '(⚆_⚆)' '(-_-)')
+            ;;
         ascii)
             case "$state" in
                 error|conflict) faces=('(>_<)' '(x_x)' 'D:') ;;
@@ -261,8 +270,11 @@ _gp_build() {
     _gp_literal "${PROMPT_SYMBOL:-❯}"
     symbol="${acc}${REPLY}%f"
 
-    _gp_literal "$_GP_FACE"
-    face="${acc}${REPLY}%f"
+    local face=""
+    if [[ -n "$_GP_FACE" ]]; then
+        _gp_literal "$_GP_FACE"
+        face="${acc}${REPLY}%f"
+    fi
 
     identity="${pri}%n${out}@${sec}%m%f"
     dir="${ter}%~%f"
@@ -295,36 +307,36 @@ _gp_build() {
 
     case "$style" in
         single-line)
-            _GP_LEFT="${face} ${identity} ${out}in ${dir}${context} ${symbol} "
+            _GP_LEFT="${face:+${face} }${identity} ${out}in ${dir}${context} ${symbol} "
             ;;
         minimal)
-            _GP_LEFT="${face} ${dir}${context} ${symbol} "
+            _GP_LEFT="${face:+${face} }${dir}${context} ${symbol} "
             ;;
         bracket)
-            _GP_LEFT="${out}[${identity} ${dir}${out}]%f ${face}${context} ${symbol} "
+            _GP_LEFT="${out}[${identity} ${dir}${out}]%f${face:+ ${face}}${context} ${symbol} "
             ;;
         gremlin)
             _GP_LEFT=$'\n'"${identity} ${out}in ${dir}${context}"
-            _GP_LEFT+=$'\n'"${face} "
+            _GP_LEFT+=$'\n'"${face:-${symbol}} "
             ;;
         kaomoji-speech)
-            _GP_LEFT=$'\n'"${face} ${out}「${dir}${out}」%f ${identity}${context}"
+            _GP_LEFT=$'\n'"${face:+${face} }${out}「${dir}${out}」%f ${identity}${context}"
             _GP_LEFT+=$'\n'"${out}╰─%f ${symbol} "
             ;;
         cyberpunk)
-            _GP_LEFT=$'\n'"${out}┌──[ ${identity} ${out}:: ${dir} ${out}]%f ${face}${context}"
+            _GP_LEFT=$'\n'"${out}┌──[ ${identity} ${out}:: ${dir} ${out}]%f${face:+ ${face}}${context}"
             _GP_LEFT+=$'\n'"${out}└──╼%f ${symbol} "
             ;;
         capsule)
-            _GP_LEFT=$'\n'"${out}${identity}${out} ${dir}${out}%f ${face}${context}"
+            _GP_LEFT=$'\n'"${out}${identity}${out} ${dir}${out}%f${face:+ ${face}}${context}"
             _GP_LEFT+=$'\n'" ${symbol} "
             ;;
         two-line)
-            _GP_LEFT=$'\n'"${out}╭─[ ${identity} ${out}in ${dir} ${out}]%f ${face}${context}"
+            _GP_LEFT=$'\n'"${out}╭─[ ${identity} ${out}in ${dir} ${out}]%f${face:+ ${face}}${context}"
             _GP_LEFT+=$'\n'"${out}╰─%f ${symbol} "
             ;;
         unhinged|*)
-            _GP_LEFT=$'\n'"${out}╭── ${face} ${identity} ${out}in ${dir}${context}"
+            _GP_LEFT=$'\n'"${out}╭── ${face:+${face} }${identity} ${out}in ${dir}${context}"
             _GP_LEFT+=$'\n'"${out}╰───%f${symbol} "
             ;;
     esac
@@ -334,7 +346,7 @@ _gp_build() {
     (( _GP_EXIT != 0 )) &&
         _GP_RIGHT+="${err}✘ ${_GP_EXIT}%f "
 
-    if [[ "${SHOW_PROMPT_BANTER:-true}" == true ]] &&
+    if [[ "${SHOW_PROMPT_BANTER:-true}" == true && -n "$_GP_BANTER" ]] &&
        (( ${COLUMNS:-80} >= 110 )); then
         _gp_literal "$_GP_BANTER"
         _GP_RIGHT+="${out}${REPLY}%f "
@@ -352,7 +364,9 @@ _gp_build() {
         _GP_RIGHT+="${sec}${elapsed}%f "
     fi
 
-    _GP_RIGHT+="${out}%T%f"
+    if [[ "${SHOW_TIMESTAMP:-true}" == true ]]; then
+        _GP_RIGHT+="${out}%T%f"
+    fi
     return 0
 }
 

@@ -11,13 +11,19 @@ Rectangle {
 
     required property var notificationItem
     readonly property var notif: notificationItem
+
+    // expired = timer ran out (keep in bell popup); dismissed = user clicked X / middle-click
+    signal expired()
     signal dismissed()
+
+    readonly property bool isCritical: notif?.urgency === 2
+    readonly property color accentColor: isCritical ? Theme.error : Theme.primary
 
     property int timeoutMs: {
         if (!notif) return 5000;
         if (notif.expireTimeout > 0) return notif.expireTimeout;
         if (notif.expireTimeout === 0) return 0;
-        return notif.urgency === 2 ? 10000 : (Settings?.notificationTimeout ?? 5000);
+        return isCritical ? 10000 : (Settings?.notificationTimeout ?? 5000);
     }
 
     property bool dockTop: (Settings?.barPosition ?? "top") === "top" || (Settings?.barPosition ?? "top") === "up"
@@ -33,14 +39,19 @@ Rectangle {
 
     readonly property bool isConcave: (Settings?.notificationCornerStyle ?? "concave") === "concave"
     readonly property real scoopR: Math.min(18, Math.max(8, Theme?.scoopRadiusX ?? 14))
-    readonly property color cardBg: Theme?.popupBg ?? Theme?.surface ?? "#1e1e2e"
-    readonly property color cardBorderColor: notif?.urgency === 2 ? Theme.error : (Theme?.popupBorderColor ?? Theme?.widgetBorder ?? "#33ffffff")
+    readonly property color cardBg: isCritical
+        ? Theme.blend(Theme.popupBg, Theme.error, 0.12)
+        : (Theme?.popupBg ?? Theme?.surface ?? "#1e1e2e")
+    readonly property color cardBorderColor: isCritical
+        ? Theme.error
+        : (Theme?.popupBorderColor ?? Theme?.widgetBorder ?? "#33ffffff")
     readonly property real cardBorderWidth: Theme?.popupBorderWidth ?? 1
 
     width: 360
-    implicitHeight: col.implicitHeight + (col.anchors.topMargin ?? 14) + (col.anchors.bottomMargin ?? 18)
+    implicitHeight: col.implicitHeight + col.anchors.topMargin + (root.timeoutMs > 0 ? 18 : 14)
     height: implicitHeight
     Layout.preferredHeight: implicitHeight
+
     readonly property real defaultRadius: Theme?.popupRadius ?? Theme?.radiusMd ?? 14
     radius: !isConcave ? defaultRadius : 0
     topLeftRadius: !isConcave ? defaultRadius : (isEdgeRight || isEdgeBottom ? defaultRadius : 0)
@@ -52,9 +63,8 @@ Rectangle {
     border.width: cardBorderWidth
     clip: false
 
-    // Concave flares melting into the screen bezel
+    // concave flares melting the card into the screen bezel
     ConcaveCorner {
-        id: flareTopRight
         visible: root.isConcave && root.isEdgeRight
         width: root.scoopR
         height: root.scoopR
@@ -73,7 +83,6 @@ Rectangle {
     }
 
     ConcaveCorner {
-        id: flareBottomRight
         visible: root.isConcave && root.isEdgeRight
         width: root.scoopR
         height: root.scoopR
@@ -92,7 +101,6 @@ Rectangle {
     }
 
     ConcaveCorner {
-        id: flareTopLeft
         visible: root.isConcave && root.isEdgeLeft
         width: root.scoopR
         height: root.scoopR
@@ -111,7 +119,6 @@ Rectangle {
     }
 
     ConcaveCorner {
-        id: flareBottomLeft
         visible: root.isConcave && root.isEdgeLeft
         width: root.scoopR
         height: root.scoopR
@@ -130,7 +137,6 @@ Rectangle {
     }
 
     ConcaveCorner {
-        id: flareTopEdgeL
         visible: root.isConcave && root.isEdgeTop
         width: root.scoopR
         height: root.scoopR
@@ -149,7 +155,6 @@ Rectangle {
     }
 
     ConcaveCorner {
-        id: flareTopEdgeR
         visible: root.isConcave && root.isEdgeTop
         width: root.scoopR
         height: root.scoopR
@@ -168,7 +173,6 @@ Rectangle {
     }
 
     ConcaveCorner {
-        id: flareBottomEdgeL
         visible: root.isConcave && root.isEdgeBottom
         width: root.scoopR
         height: root.scoopR
@@ -187,7 +191,6 @@ Rectangle {
     }
 
     ConcaveCorner {
-        id: flareBottomEdgeR
         visible: root.isConcave && root.isEdgeBottom
         width: root.scoopR
         height: root.scoopR
@@ -205,21 +208,35 @@ Rectangle {
         borderColor: root.cardBorderColor
     }
 
-    // safely resolve icon path to prevent qrc missing-icon warnings
+    // check theme icon existence first so qt doesn't cry about missing qrc paths
     readonly property string resolvedIcon: {
-        if (!root.notif?.appIcon) return "";
-        let path = Quickshell.iconPath(root.notif.appIcon);
-        return path || "";
+        if (!root.notif) return "";
+        let icon = root.notif.appIcon || "";
+        if (icon) {
+            if (icon.startsWith("image://") || icon.startsWith("file://")) return icon;
+            if (icon.startsWith("/")) return "file://" + icon;
+            if (Quickshell?.hasThemeIcon && Quickshell.hasThemeIcon(icon)) {
+                return Quickshell.iconPath(icon);
+            }
+            let lower = icon.toLowerCase();
+            if (Quickshell?.hasThemeIcon && Quickshell.hasThemeIcon(lower)) {
+                return Quickshell.iconPath(lower);
+            }
+        }
+        if (Theme?.resolveAppIcon) {
+            return Theme.resolveAppIcon(root.notif.desktopEntry || root.notif.appIcon || root.notif.appName || "");
+        }
+        return "";
     }
 
-    // dynamic slide & fade entrance/exit
     readonly property real slideDistance: 120
     readonly property real ingressOffsetX: isEdgeLeft ? -slideDistance : (isEdgeRight ? slideDistance : 0)
     readonly property real ingressOffsetY: isEdgeTop ? -slideDistance : (isEdgeBottom ? slideDistance : 0)
 
-    property real slideOffsetX: root.ingressOffsetX
-    property real slideOffsetY: root.ingressOffsetY
-    property real cardOpacity: 0.0
+    property real slideOffsetX: (notif?._entered) ? 0 : root.ingressOffsetX
+    property real slideOffsetY: (notif?._entered) ? 0 : root.ingressOffsetY
+    property real cardOpacity: (notif?._entered) ? 1.0 : 0.0
+    property bool _userDismissed: false
 
     transform: Translate {
         x: root.slideOffsetX
@@ -228,8 +245,10 @@ Rectangle {
     opacity: root.cardOpacity
 
     Component.onCompleted: {
-        console.log("NotifCard debug: isConcave=" + isConcave + " isEdgeRight=" + isEdgeRight + " scoopR=" + scoopR);
-        enterAnim.restart();
+        if (root.notif && !root.notif._entered) {
+            root.notif._entered = true;
+            enterAnim.restart();
+        }
     }
 
     ParallelAnimation {
@@ -240,7 +259,7 @@ Rectangle {
             from: root.ingressOffsetX
             to: 0
             duration: Theme?.animNormal ?? 200
-            easing.type: Theme?.animEasing ?? Easing.OutCubic
+            easing.type: Theme?.animEasingEntrance ?? Easing.OutCubic
         }
         NumberAnimation {
             target: root
@@ -248,7 +267,7 @@ Rectangle {
             from: root.ingressOffsetY
             to: 0
             duration: Theme?.animNormal ?? 200
-            easing.type: Theme?.animEasing ?? Easing.OutCubic
+            easing.type: Theme?.animEasingEntrance ?? Easing.OutCubic
         }
         NumberAnimation {
             target: root
@@ -267,26 +286,33 @@ Rectangle {
             property: "slideOffsetX"
             to: root.ingressOffsetX
             duration: Theme?.animFast ?? 120
-            easing.type: Easing.InCubic
+            easing.type: Theme?.animEasingExit ?? Easing.InCubic
         }
         NumberAnimation {
             target: root
             property: "slideOffsetY"
             to: root.ingressOffsetY
             duration: Theme?.animFast ?? 120
-            easing.type: Easing.InCubic
+            easing.type: Theme?.animEasingExit ?? Easing.InCubic
         }
         NumberAnimation {
             target: root
             property: "cardOpacity"
             to: 0.0
             duration: Theme?.animFast ?? 120
-            easing.type: Easing.InCubic
+            easing.type: Theme?.animEasingExit ?? Easing.InCubic
         }
-        onFinished: root.dismissed()
+        onFinished: {
+            if (root._userDismissed) {
+                root.dismissed();
+            } else {
+                root.expired();
+            }
+        }
     }
 
-    function dismissToast() {
+    function closeToast(permanent: bool) {
+        root._userDismissed = permanent;
         progressTimer.stop();
         exitAnim.restart();
     }
@@ -296,8 +322,7 @@ Rectangle {
         if (!isHovered) _lastTick = Date.now();
     }
 
-    // elapsed timer avoids setPaused() warnings on NumberAnimation
-    property real elapsedMs: 0
+    property real elapsedMs: notif?._elapsedMs ?? 0
     property real _lastTick: 0
     readonly property real progressRatio: root.timeoutMs > 0 ? Math.max(0.0, 1.0 - (elapsedMs / root.timeoutMs)) : 1.0
 
@@ -310,26 +335,40 @@ Rectangle {
             let now = Date.now();
             if (root._lastTick > 0) {
                 root.elapsedMs += (now - root._lastTick);
+                if (root.notif) root.notif._elapsedMs = root.elapsedMs;
             }
             root._lastTick = now;
             if (root.elapsedMs >= root.timeoutMs) {
-                root.dismissToast();
+                root.closeToast(false);
             }
         }
     }
 
+    // middle-click to dismiss permanently, right-click to shoo the toast off screen
     MouseArea {
         id: cardMouse
         anchors.fill: parent
         hoverEnabled: true
+        acceptedButtons: Qt.MiddleButton | Qt.RightButton
         cursorShape: Qt.ArrowCursor
+        onClicked: (mouse) => {
+            if (mouse.button === Qt.MiddleButton) {
+                root.closeToast(true);
+            } else if (mouse.button === Qt.RightButton) {
+                root.closeToast(false);
+            }
+        }
     }
 
+    // anchored to top/left/right only so wrapped text never causes a height binding loop
     ColumnLayout {
         id: col
-        anchors.fill: parent
-        anchors.margins: 14
-        anchors.bottomMargin: root.timeoutMs > 0 ? 18 : 14
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.topMargin: 14
+        anchors.leftMargin: 14
+        anchors.rightMargin: 14
         spacing: 8
 
         RowLayout {
@@ -337,10 +376,12 @@ Rectangle {
             spacing: 8
 
             Rectangle {
-                Layout.preferredWidth: 22
-                Layout.preferredHeight: 22
+                Layout.preferredWidth: 24
+                Layout.preferredHeight: 24
                 radius: Theme?.radiusSm ?? 6
-                color: Theme?.surface_container_highest ?? "#2a2a3c"
+                color: Theme?.pillBg ?? "#2a2a3c"
+                border.color: Theme?.pillBorder ?? "transparent"
+                border.width: 1
                 clip: true
 
                 IconImage {
@@ -354,46 +395,59 @@ Rectangle {
 
                 Text {
                     anchors.centerIn: parent
-                    visible: root.resolvedIcon === "" || notifIconImg.status === Image.Error
-                    text: Theme?.iconBell ?? "󰂚"
+                    visible: !notifIconImg.visible
+                    text: root.isCritical ? Theme.iconFlame : (Theme?.iconBell ?? "󰂚")
                     font.family: Theme?.fontIcon ?? Theme?.fontMono
-                    font.pixelSize: 12
-                    color: Theme?.primary ?? "#89b4fa"
+                    font.pixelSize: Theme?.fontSizeXs ?? 12
+                    color: root.accentColor
                 }
             }
 
             Text {
                 text: (root.notif?.appName || "system").toLowerCase()
-                font.family: Theme?.fontFamily ?? "sans-serif"
+                font.family: Theme?.fontMono ?? "monospace"
                 font.pixelSize: Theme?.fontSizeXs ?? 11
-                font.weight: Font.Bold
-                color: Theme?.primary ?? "#89b4fa"
+                font.weight: Theme?.fontWeightBold ?? Font.Bold
+                color: root.accentColor
                 Layout.fillWidth: true
                 elide: Text.ElideRight
             }
 
+            Rectangle {
+                visible: root.isCritical
+                height: 18
+                implicitWidth: urgentTxt.implicitWidth + 10
+                radius: Theme.radiusPill
+                color: Theme.error_overlay
+                border.color: Theme.error
+                border.width: 1
+
+                Text {
+                    id: urgentTxt
+                    anchors.centerIn: parent
+                    text: "urgent"
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeXs
+                    font.weight: Theme.fontWeightBold
+                    color: Theme.error
+                }
+            }
+
             IconButton {
                 icon: Theme?.iconClose ?? "󰅖"
-                iconSize: 12
-                Layout.preferredWidth: 20
-                Layout.preferredHeight: 20
+                iconSize: Theme?.fontSizeXs ?? 11
+                Layout.preferredWidth: 22
+                Layout.preferredHeight: 22
                 tooltip: "dismiss"
-                onClicked: {
-                    root.dismissToast();
-                    if (root.notif?.id !== undefined && root.notif?.id !== null) {
-                        NotificationService.dismiss(root.notif.id);
-                    } else if (root.notif && typeof root.notif.dismiss === "function") {
-                        try { root.notif.dismiss(); } catch (e) {}
-                    }
-                }
+                onClicked: root.closeToast(true)
             }
         }
 
         Text {
             text: (root.notif?.summary ?? "").toLowerCase()
-            font.family: Theme?.fontFamily ?? "sans-serif"
-            font.pixelSize: Theme?.fontSizeMd ?? 14
-            font.weight: Font.DemiBold
+            font.family: Theme?.fontDisplay ?? Theme?.fontFamily ?? "sans-serif"
+            font.pixelSize: Theme?.fontSizeSm ?? 13
+            font.weight: Theme?.fontWeightBold ?? Font.DemiBold
             color: Theme?.on_surface ?? "#cdd6f4"
             Layout.fillWidth: true
             wrapMode: Text.Wrap
@@ -401,28 +455,28 @@ Rectangle {
         }
 
         Text {
-            text: (root.notif?.body ?? "").toLowerCase()
+            text: (root.notif?.body ?? "").replace(/<[^>]*>/g, "").toLowerCase()
             font.family: Theme?.fontFamily ?? "sans-serif"
-            font.pixelSize: Theme?.fontSizeSm ?? 12
+            font.pixelSize: Theme?.fontSizeXs ?? 11
             color: Theme?.on_surface_variant ?? "#a6adc8"
             Layout.fillWidth: true
             wrapMode: Text.Wrap
-            textFormat: Text.AutoText
-            baseUrl: "file:///"
             visible: text !== ""
             maximumLineCount: 6
             elide: Text.ElideRight
         }
 
-        Rectangle {
+        ClippingRectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 120
             radius: Theme?.radiusSm ?? 6
-            color: "transparent"
-            clip: true
-            visible: Boolean(root.notif?.image)
+            color: Theme?.cardBg ?? "transparent"
+            border.color: Theme?.cardBorder ?? "transparent"
+            border.width: 1
+            visible: Boolean(root.notif?.image) && previewImg.status !== Image.Error
 
             Image {
+                id: previewImg
                 anchors.fill: parent
                 source: root.notif?.image ?? ""
                 fillMode: Image.PreserveAspectCrop
@@ -442,20 +496,27 @@ Rectangle {
                     required property var modelData
                     Layout.fillWidth: true
                     height: 28
-                    radius: Theme?.radiusSm ?? 6
-                    color: actMouse.containsMouse ? Theme.primary_overlay : Theme.surface_container_highest
-                    border.color: Theme?.widgetBorder ?? "#33ffffff"
+                    radius: actMouse.pressed ? Theme.radiusPill : (Theme?.radiusSm ?? 6)
+                    color: actMouse.pressed
+                        ? root.accentColor
+                        : (actMouse.containsMouse
+                            ? (root.isCritical ? Theme.error_overlay : Theme.primary_overlay)
+                            : Theme.pillBg)
+                    border.color: actMouse.containsMouse ? root.accentColor : (Theme?.pillBorder ?? "#33ffffff")
                     border.width: 1
 
-                    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120 } }
+                    Behavior on radius { NumberAnimation { duration: Theme?.animFast ?? 120 } }
+                    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
 
                     Text {
                         anchors.centerIn: parent
                         text: (modelData?.text || modelData?.id || "action").toLowerCase()
                         font.family: Theme?.fontFamily ?? "sans-serif"
                         font.pixelSize: Theme?.fontSizeXs ?? 11
-                        font.weight: Font.Medium
-                        color: actMouse.containsMouse ? Theme.primary : Theme.on_surface
+                        font.weight: Theme?.fontWeightBold ?? Font.Medium
+                        color: actMouse.pressed
+                            ? (root.isCritical ? Theme.on_error : Theme.on_primary)
+                            : (actMouse.containsMouse ? root.accentColor : Theme.on_surface)
                         elide: Text.ElideRight
                         width: parent.width - 12
                         horizontalAlignment: Text.AlignHCenter
@@ -470,7 +531,7 @@ Rectangle {
                             if (modelData && typeof modelData.invoke === "function") {
                                 modelData.invoke();
                             }
-                            root.dismissToast();
+                            root.closeToast(true);
                         }
                     }
                 }
@@ -486,14 +547,14 @@ Rectangle {
         anchors.rightMargin: root.isConcave ? (root.scoopR + 4) : 0
         height: 3
         radius: 1.5
-        color: Theme?.surface_container_highest ?? "#2a2a3c"
+        color: Theme?.pillBg ?? "#2a2a3c"
         visible: root.timeoutMs > 0
 
         Rectangle {
             id: progressBar
             height: parent.height
             radius: 1.5
-            color: notif?.urgency === 2 ? Theme.error : Theme.primary
+            color: root.accentColor
             width: parent.width * root.progressRatio
         }
     }

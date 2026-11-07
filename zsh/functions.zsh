@@ -67,12 +67,6 @@ _calc() {
 }
 alias calc="noglob _calc"
 
-reload-qs() {
-    { qs kill; qs -d; } > /dev/null 2>&1
-    print -P "%F{green}󰄲 quickshell daemon reloaded :3%f"
-}
-alias restart-qs="reload-qs"
-
 # fuzzy find inside files with ripgrep and bat preview
 fif() {
     if ! (( $+commands[rg] )) || ! (( $+commands[fzf] )); then

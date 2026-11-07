@@ -28,5 +28,6 @@ every desktop pill, flyout drawer, audio mixer, and workspace indicator lives he
 - `VolumeControl.qml`: wireplumber pipewire mixer with master volume, sink selection, default routing via `wpctl`, and audio mixer launching via `open-mixer.zsh`.
 - `WallpaperBrowser.qml`: visual grid wallpaper gallery with category filtering and instant palette generation without recursive binding loops.
 - `WindowTitle.qml`: active hyprland window title pill that extracts app icons and window names cleanly.
-- `WelcomeWizard.qml`: first-boot setup wizard with brain_shell auto-detection via `detect-brainshell.zsh` and wallpaper ricing presets.
+- `KeybindsPreview.qml`: interactive visual keyboard cheatsheet mapping every hyprland keybind, window manipulation shortcut, and `cli` desktop action with category filtering.
+- `WelcomeWizard.qml`: full 5-step interactive onboarding suite styled exclusively with `Theme.qml` tokens. features live material 3 palette previews, wallpaper dice roller, dual shell comparative inspector, editor and file manager preference sync, hardware thermal containment card, and live action key test pad.
 - `Workspaces.qml`: fluid hyprland workspace switcher featuring urgent state flashing, active workspace indicators, and scroll-to-switch bindings.

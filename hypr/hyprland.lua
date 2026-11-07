@@ -12,5 +12,5 @@ require("gestures")
 -- HyprMod managed settings
 require("hyprmod")
 
--- shell controls and keybinds are unified in binds.lua via qs-action
+-- shell controls and keybinds are unified in binds.lua via cli
 

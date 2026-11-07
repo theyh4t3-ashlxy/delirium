@@ -332,13 +332,11 @@ setup_directories_and_permissions() {
     execute mkdir -p "$HOME/.local/bin" "$HOME/.local/state/quickshell"
     execute mkdir -p "$BACKUP_DIR"
 
-    for helper in qs-switch qs-action; do
-        if [[ -f "$DOTS_DIR/quickshell/scripts/$helper" ]]; then
-            execute cp -f "$DOTS_DIR/quickshell/scripts/$helper" "$HOME/.local/bin/$helper"
-            execute chmod +x "$HOME/.local/bin/$helper"
-            log_ok "installed $helper -> ~/.local/bin/$helper"
-        fi
-    done
+    if [[ -f "$DOTS_DIR/quickshell/scripts/cli.py" ]]; then
+        execute ln -sf "$DOTS_DIR/quickshell/scripts/cli.py" "$HOME/.local/bin/cli"
+        execute chmod +x "$DOTS_DIR/quickshell/scripts/cli.py"
+        log_ok "installed cli -> ~/.local/bin/cli"
+    fi
 
     # fetch icon fonts if missing from ~/.local/share/fonts
     local font_dir="$DATA_DIR/fonts"
@@ -371,8 +369,6 @@ setup_directories_and_permissions() {
     if [[ -w "$DOTS_DIR" ]]; then
         local -a script_targets=(
             "$DOTS_DIR"/quickshell/scripts/*.(sh|py)(N.)
-            "$DOTS_DIR"/quickshell/scripts/qs-switch(N.)
-            "$DOTS_DIR"/quickshell/scripts/qs-action(N.)
             "$DOTS_DIR"/matugen/post-hook-scripts/*.(zsh|sh)(N.)
             "$DOTS_DIR"/install.zsh(N.)
         )

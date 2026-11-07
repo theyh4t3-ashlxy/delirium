@@ -12,24 +12,32 @@ opt.tabstop = 4
 opt.expandtab = true
 opt.smartindent = true
 
--- sync clipboard with wayland (wl-copy / wl-paste)
-opt.clipboard = "unnamedplus"
+-- window splits open naturally
+opt.splitbelow = true
+opt.splitright = true
 
--- persistent undo so closing nvim doesnt destroy my history
+-- no annoying swap files (persistent undo handles recovery)
+opt.swapfile = false
 opt.undofile = true
 
 -- search settings
 opt.ignorecase = true
 opt.smartcase = true
+opt.inccommand = "split"
 
--- terminal colors & styling
-opt.termguicolors = true
-opt.signcolumn = "yes"
+-- display & navigation
+opt.wrap = false
+opt.smoothscroll = true
 opt.scrolloff = 8
+opt.signcolumn = "yes"
+opt.termguicolors = true
+
+-- sync clipboard with wayland (wl-copy / wl-paste)
+opt.clipboard = "unnamedplus"
 
 -- snappy response times
 opt.updatetime = 50
 opt.timeoutlen = 300
 
--- mouse support because clicking things is valid
+-- mouse support
 opt.mouse = "a"

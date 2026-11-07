@@ -14,8 +14,8 @@ here is five seconds of live footage captured moments before wayland choked on a
   </video>
 </div>
 
-> [!TIP]
-> want the full unhinged origin story, the gory details of how arch linux stole my identity, or why autonomous bots maintain this repo while humans sleep? read [BACKSTORY.md](BACKSTORY.md).
+> [!CAUTION]
+> if you need to know why an alder lake thinkpad requires a custom root python watchdog just to keep its cpu from having a 400mhz seizure, or how an npm postinstall script stole my credentials and sent them to a telegram bot in st. petersburg at 3 am, read [BACKSTORY.md](BACKSTORY.md). we do not do therapy here.
 
 ---
 

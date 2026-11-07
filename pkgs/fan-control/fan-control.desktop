@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Fan Control
+GenericName=ThinkPad Fan Controller
+Comment=ThinkPad thermal curve and fan speed management
+Exec=fan-control
+Icon=preferences-system-power
+Terminal=false
+Type=Application
+Categories=Settings;HardwareSettings;System;
+StartupNotify=true
+StartupWMClass=io.github.fancontrol

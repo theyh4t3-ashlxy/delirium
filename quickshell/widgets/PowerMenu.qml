@@ -4,18 +4,25 @@ import ".."
 import "../controls"
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Hyprland
 
 Rectangle {
     id: root
+
+    property var barScreen: null
+    property var barMonitor: null
+
     implicitWidth: (Theme?.isVertical ?? false) ? ((Theme?.barHeight ?? 48) - 8) : (pwrRow.implicitWidth + 24)
     implicitHeight: (Theme?.barHeight ?? 48) - 8
     radius: Theme.radiusPill
-    color: popup.open ? Theme.error_overlay : (pwrMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-    border.color: Theme.pillBorder
-    border.width: (Theme?.pillBorder ?? "transparent") === "transparent" ? 0 : 1
+    color: popup.open
+        ? Theme.error_overlay
+        : (pwrMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+    border.color: popup.open ? Theme.error : Theme.pillBorder
+    border.width: (popup.open || (Theme?.pillBorder ?? "transparent") !== "transparent") ? 1 : 0
 
-    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
+    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
     Row {
         id: pwrRow
@@ -33,11 +40,9 @@ Rectangle {
 
     function syncAnchor() {
         let pos = root.mapToItem(null, 0, 0);
-        if (Theme?.isVertical) {
-            popup.targetRelativeY = (pos?.y ?? 0) + (root.height / 2);
-        } else {
-            popup.targetRelativeX = (pos?.x ?? 0) + (root.width / 2);
-        }
+        if (!pos) return;
+        popup.targetRelativeX = pos.x + (root.width / 2);
+        popup.targetRelativeY = pos.y + (root.height / 2);
     }
 
     HoverFlyoutHandler {
@@ -68,15 +73,11 @@ Rectangle {
     Connections {
         target: Settings
         function onRequestPowerMenuToggle() {
-            let pos = root.mapToItem(null, 0, 0);
-            popup.targetRelativeX = pos ? (pos.x + (root.width / 2)) : 0;
-            popup.targetRelativeY = pos ? (pos.y + (root.height / 2)) : 0;
+            root.syncAnchor();
             popup.open = !popup.open;
         }
         function onRequestPowerMenuOpen() {
-            let pos = root.mapToItem(null, 0, 0);
-            popup.targetRelativeX = pos ? (pos.x + (root.width / 2)) : 0;
-            popup.targetRelativeY = pos ? (pos.y + (root.height / 2)) : 0;
+            root.syncAnchor();
             popup.open = true;
         }
         function onRequestPowerMenuClose() {
@@ -86,9 +87,9 @@ Rectangle {
 
     PopupPanel {
         id: popup
-        cardWidth: 440
+        screen: root.barScreen
+        cardWidth: 420
         cardHeight: Math.max(Theme.popupMinHeight, Math.min(Theme.popupMaxHeight, powerContentLayout.implicitHeight + (Theme.popupPadding * 2)))
-        targetRelativeX: root.x + (root.width / 2)
 
         property string pendingAction: ""
         property int confirmCountdown: 0
@@ -119,14 +120,22 @@ Rectangle {
 
         readonly property string sessionScriptPath: decodeURIComponent(Qt.resolvedUrl("../scripts/session.py").toString().replace(/^file:\/\//, ""))
 
-        function triggerAction(actionKey, needsConfirm) {
+        function executeSessionAction(actionKey: string) {
+            // if session.py still calls legacy `hyprctl dispatch exit`, lua mode will ignore it
+            if (actionKey === "logout" && (Hyprland?.usingLua ?? false)) {
+                Hyprland.dispatch("hl.dsp.exit()");
+            }
+            Quickshell.execDetached(["python3", sessionScriptPath, actionKey]);
+        }
+
+        function triggerAction(actionKey: string, needsConfirm: bool) {
             if (needsConfirm) {
                 if (popup.pendingAction === actionKey) {
                     confirmTimer.stop();
                     popup.pendingAction = "";
                     popup.confirmCountdown = 0;
                     popup.open = false;
-                    Quickshell.execDetached(["python3", sessionScriptPath, actionKey]);
+                    executeSessionAction(actionKey);
                 } else {
                     popup.pendingAction = actionKey;
                     popup.confirmCountdown = 3;
@@ -134,57 +143,59 @@ Rectangle {
                 }
             } else {
                 popup.open = false;
-                Quickshell.execDetached(["python3", sessionScriptPath, actionKey]);
+                executeSessionAction(actionKey);
             }
         }
 
         content: ColumnLayout {
             id: powerContentLayout
             anchors.fill: parent
-            spacing: Theme?.widgetSpacing ?? 12
+            spacing: Theme.popupSpacing
 
-            // User Profile & System Header
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 12
+                spacing: 10
 
                 Rectangle {
-                    Layout.preferredWidth: 38
-                    Layout.preferredHeight: 38
-                    radius: Theme.radiusPill
-                    color: Theme.surface_container_highest
+                    Layout.preferredWidth: 36
+                    Layout.preferredHeight: 36
+                    radius: Theme.radiusSm
+                    color: Theme.error_overlay
+                    border.color: Theme.alpha(Theme.error, 0.35)
+                    border.width: 1
 
                     Text {
                         anchors.centerIn: parent
                         text: Theme.iconPower ?? "󰐥"
                         font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeSm
-                        color: Theme.primary
+                        font.pixelSize: Theme.fontSizeMd
+                        color: Theme.error
                     }
                 }
 
                 ColumnLayout {
+                    Layout.fillWidth: true
                     spacing: 2
 
                     Text {
                         text: "session & power"
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeLg
-                        font.weight: Font.Bold
+                        font.pixelSize: Theme.fontSizeMd
+                        font.weight: Theme.fontWeightBold
                         color: Theme.on_surface
                     }
 
                     Text {
-                        text: Theme.getVibe(Theme.kaoChaos + " choose your destiny", "󰐥 session manager", "manage current desktop session")
+                        Layout.fillWidth: true
+                        text: Theme.getFlavor(
+                            "system",
+                            Theme.getVibe(Theme.kaoChaos + " choose your destiny", "manage desktop session", "manage desktop session")
+                        )
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface_variant
+                        elide: Text.ElideRight
                     }
-                }
-
-                // stops close button from huddling with the title on the left
-                Item {
-                    Layout.fillWidth: true
                 }
 
                 IconButton {
@@ -197,248 +208,173 @@ Rectangle {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 1
-                color: Theme.widgetBorder
+                height: Theme.popupDividerHeight
+                color: Theme.cardBorder
             }
 
-            // Power Actions Grid (Lock, Suspend, Logout, Reboot, Shutdown)
+            /*
+            five ways to abandon your current workflow, driven by one repeater
+            so we don't have 200 lines of copy-pasted rectangles
+            */
             GridLayout {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
                 columns: 3
-                rowSpacing: 10
-                columnSpacing: 10
+                rowSpacing: Theme.popupCardGap + 2
+                columnSpacing: Theme.popupCardGap + 2
 
-                // Lock Screen Card
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.preferredWidth: 1
-                    Layout.preferredHeight: 1
-                    radius: Theme.radiusMd
-                    color: lockMouse.containsMouse ? Theme.surface_container_highest : Theme.surface_container_high
-                    border.color: lockMouse.containsMouse ? Theme.primary : "transparent"
-                    border.width: 1
+                Repeater {
+                    model: [
+                        {
+                            key: "lock",
+                            label: "lock",
+                            sub: "",
+                            icon: Theme.iconLock ?? "󰌾",
+                            span: 1,
+                            confirm: false,
+                            role: "primary"
+                        },
+                        {
+                            key: "suspend",
+                            label: "sleep",
+                            sub: "",
+                            icon: Theme.iconSuspend ?? "󰤄",
+                            span: 1,
+                            confirm: false,
+                            role: "primary"
+                        },
+                        {
+                            key: "logout",
+                            label: "log out",
+                            sub: "",
+                            icon: Theme.iconLogout ?? "󰍃",
+                            span: 1,
+                            // confirm logout too so one slip of the mouse doesn't vaporize unsaved work
+                            confirm: true,
+                            role: "warn"
+                        },
+                        {
+                            key: "reboot",
+                            label: "restart",
+                            sub: "",
+                            icon: Theme.iconReboot ?? "󰑐",
+                            span: 1,
+                            confirm: true,
+                            role: "warn"
+                        },
+                        {
+                            key: "poweroff",
+                            label: "shut down",
+                            sub: Theme.getVibe(Theme.kaoSleepy + " goodnight", "power off machine", "power off machine"),
+                            icon: Theme.iconPower ?? "󰐥",
+                            span: 2,
+                            confirm: true,
+                            role: "error"
+                        }
+                    ]
 
-                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                    delegate: Rectangle {
+                        id: actionCard
+                        required property var modelData
 
-                    ColumnLayout {
-                        anchors.centerIn: parent
-                        spacing: 4
+                        // keeps the 2:1 column ratio intact so countdown text doesnt reshape the grid
+                        Layout.fillWidth: true
+                        Layout.columnSpan: modelData.span
+                        Layout.preferredWidth: modelData.span
+                        implicitHeight: 68
+                        radius: Theme.radiusMd
 
-                        Text {
-                            text: Theme.iconLock ?? "󰌾"
-                            font.family: Theme.fontIcon
-                            font.pixelSize: 22
-                            color: Theme.primary
-                            Layout.alignment: Qt.AlignHCenter
+                        readonly property bool isConfirming: popup.pendingAction === modelData.key
+                        readonly property bool isError: modelData.role === "error"
+                        readonly property bool isWarn: modelData.role === "warn"
+
+                        readonly property color accentColor: isError ? Theme.error : (isWarn ? Theme.warn : Theme.primary)
+                        readonly property color confirmBg: isError ? Theme.error_container : Theme.warn_container
+                        readonly property color confirmFg: isError ? Theme.on_error_container : Theme.on_warn_container
+
+                        readonly property color baseBg: {
+                            if (isConfirming) return confirmBg;
+                            if (cardMouse.containsMouse) return isError ? Theme.error_overlay : Theme.pillHover;
+                            return Theme.cardBg;
                         }
 
-                        Text {
-                            text: "lock"
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
-                            color: Theme.on_surface
-                            Layout.alignment: Qt.AlignHCenter
-                        }
-                    }
+                        color: cardMouse.pressed ? Theme.statePress(baseBg, accentColor) : baseBg
+                        border.color: isConfirming || cardMouse.containsMouse ? accentColor : Theme.cardBorder
+                        border.width: isConfirming ? 1.5 : 1
 
-                    MouseArea {
-                        id: lockMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: popup.triggerAction("lock", false)
-                    }
-                }
+                        scale: cardMouse.pressed ? 0.97 : 1.0
 
-                // Suspend / Sleep Card
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.preferredWidth: 1
-                    Layout.preferredHeight: 1
-                    radius: Theme.radiusMd
-                    color: sleepMouse.containsMouse ? Theme.surface_container_highest : Theme.surface_container_high
-                    border.color: sleepMouse.containsMouse ? Theme.primary : "transparent"
-                    border.width: 1
+                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+                        Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+                        Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
 
-                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-
-                    ColumnLayout {
-                        anchors.centerIn: parent
-                        spacing: 4
-
-                        Text {
-                            text: Theme.iconSuspend ?? "󰤄"
-                            font.family: Theme.fontIcon
-                            font.pixelSize: 22
-                            color: Theme.primary
-                            Layout.alignment: Qt.AlignHCenter
-                        }
-
-                        Text {
-                            text: "sleep"
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
-                            color: Theme.on_surface
-                            Layout.alignment: Qt.AlignHCenter
-                        }
-                    }
-
-                    MouseArea {
-                        id: sleepMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: popup.triggerAction("suspend", false)
-                    }
-                }
-
-                // Log Out Card
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.preferredWidth: 1
-                    Layout.preferredHeight: 1
-                    radius: Theme.radiusMd
-                    color: logoutMouse.containsMouse ? Theme.surface_container_highest : Theme.surface_container_high
-                    border.color: logoutMouse.containsMouse ? Theme.warn : "transparent"
-                    border.width: 1
-
-                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-
-                    ColumnLayout {
-                        anchors.centerIn: parent
-                        spacing: 4
-
-                        Text {
-                            text: Theme.iconLogout ?? "󰍃"
-                            font.family: Theme.fontIcon
-                            font.pixelSize: 22
-                            color: Theme.warn
-                            Layout.alignment: Qt.AlignHCenter
-                        }
-
-                        Text {
-                            text: "log out"
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
-                            color: Theme.on_surface
-                            Layout.alignment: Qt.AlignHCenter
-                        }
-                    }
-
-                    MouseArea {
-                        id: logoutMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: popup.triggerAction("logout", false)
-                    }
-                }
-
-                // Reboot Card with Confirmation
-                Rectangle {
-                    id: rebootCard
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.preferredWidth: 1
-                    Layout.preferredHeight: 1
-                    radius: Theme.radiusMd
-                    readonly property bool isConfirming: popup.pendingAction === "reboot"
-                    color: isConfirming ? Theme.warn_container : (rebootMouse.containsMouse ? Theme.surface_container_highest : Theme.surface_container_high)
-                    border.color: isConfirming ? Theme.warn : (rebootMouse.containsMouse ? Theme.primary : "transparent")
-                    border.width: 1
-
-                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-
-                    ColumnLayout {
-                        anchors.centerIn: parent
-                        spacing: 4
-
-                        Text {
-                            text: Theme.iconReboot ?? "󰑐"
-                            font.family: Theme.fontIcon
-                            font.pixelSize: 22
-                            color: rebootCard.isConfirming ? Theme.on_warn_container : Theme.primary
-                            Layout.alignment: Qt.AlignHCenter
-                        }
-
-                        Text {
-                            text: rebootCard.isConfirming ? ("confirm (" + popup.confirmCountdown + "s)") : "restart"
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
-                            color: rebootCard.isConfirming ? Theme.on_warn_container : Theme.on_surface
-                            Layout.alignment: Qt.AlignHCenter
-                        }
-                    }
-
-                    MouseArea {
-                        id: rebootMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: popup.triggerAction("reboot", true)
-                    }
-                }
-
-                // Power Off Card with Confirmation
-                Rectangle {
-                    id: powerCard
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.columnSpan: 2
-                    // keeps the 2:1 column ratio intact so countdown text doesnt reshape the grid
-                    Layout.preferredWidth: 2
-                    Layout.preferredHeight: 1
-                    radius: Theme.radiusMd
-                    readonly property bool isConfirming: popup.pendingAction === "poweroff"
-                    color: isConfirming ? Theme.error_container : (powerMouse.containsMouse ? Theme.error_overlay : Theme.surface_container_high)
-                    border.color: isConfirming ? Theme.error : (powerMouse.containsMouse ? Theme.error : "transparent")
-                    border.width: 1
-
-                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 10
-
-                        Text {
-                            text: Theme.iconPower ?? "󰐥"
-                            font.family: Theme.fontIcon
-                            font.pixelSize: 24
-                            color: Theme.error
-                        }
-
+                        // single-column vertical card layout (lock, sleep, logout, restart)
                         ColumnLayout {
-                            spacing: 2
+                            visible: actionCard.modelData.span === 1
+                            anchors.centerIn: parent
+                            spacing: 4
+
                             Text {
-                                text: powerCard.isConfirming ? ("click to confirm (" + popup.confirmCountdown + "s)") : "shut down"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
-                                font.weight: Font.Bold
-                                color: powerCard.isConfirming ? Theme.on_error_container : Theme.on_surface
+                                text: actionCard.modelData.icon
+                                font.family: Theme.fontIcon
+                                font.pixelSize: Theme.fontSizeTitle
+                                color: actionCard.isConfirming ? actionCard.confirmFg : actionCard.accentColor
+                                Layout.alignment: Qt.AlignHCenter
                             }
+
                             Text {
-                                text: Theme.getVibe(Theme.kaoSleepy + " goodnight", "󰐥 power off", "power off device")
+                                text: actionCard.isConfirming
+                                    ? ("sure? (" + popup.confirmCountdown + "s)")
+                                    : actionCard.modelData.label
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 10
-                                color: powerCard.isConfirming ? Theme.on_error_container : Theme.on_surface_variant
+                                font.pixelSize: Theme.fontSizeXs
+                                font.weight: Theme.fontWeightBold
+                                color: actionCard.isConfirming ? actionCard.confirmFg : Theme.on_surface
+                                Layout.alignment: Qt.AlignHCenter
                             }
                         }
-                    }
 
-                    MouseArea {
-                        id: powerMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: popup.triggerAction("poweroff", true)
+                        // wide two-column layout for shut down
+                        RowLayout {
+                            visible: actionCard.modelData.span > 1
+                            anchors.centerIn: parent
+                            spacing: 10
+
+                            Text {
+                                text: actionCard.modelData.icon
+                                font.family: Theme.fontIcon
+                                font.pixelSize: Theme.fontSizeTitle + 2
+                                color: actionCard.isConfirming ? actionCard.confirmFg : actionCard.accentColor
+                            }
+
+                            ColumnLayout {
+                                spacing: 2
+
+                                Text {
+                                    text: actionCard.isConfirming
+                                        ? ("click to confirm (" + popup.confirmCountdown + "s)")
+                                        : actionCard.modelData.label
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSm
+                                    font.weight: Theme.fontWeightBold
+                                    color: actionCard.isConfirming ? actionCard.confirmFg : Theme.on_surface
+                                }
+
+                                Text {
+                                    text: actionCard.modelData.sub
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeXs
+                                    color: actionCard.isConfirming ? actionCard.confirmFg : Theme.on_surface_variant
+                                }
+                            }
+                        }
+
+                        MouseArea {
+                            id: cardMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: popup.triggerAction(actionCard.modelData.key, actionCard.modelData.confirm)
+                        }
                     }
                 }
             }

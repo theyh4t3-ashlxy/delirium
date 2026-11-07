@@ -1,30 +1,69 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 import ".."
+import "../controls"
 import Quickshell
+import Quickshell.Widgets
 import Quickshell.Services.Pipewire
 
 Rectangle {
     id: volRoot
-    implicitWidth: Theme.isVertical ? Theme.barHeight - 8 : (volIcon.implicitWidth + 24 + ((vMouse.containsMouse || popup.open) ? (volText.implicitWidth + 6) : 0))
+
+    property var barScreen: null
+    property var barMonitor: null
+
+    implicitWidth: Theme.isVertical
+        ? Theme.barHeight - 8
+        : (volIcon.implicitWidth + 24 + ((vMouse.containsMouse || popup.open) ? (volText.implicitWidth + 6) : 0))
     implicitHeight: Theme.barHeight - 8
     radius: Theme.radiusPill
-    color: popup.open ? Theme.primary_overlay : (volRoot.muted ? Theme.widgetBg : (vMouse.containsMouse ? Theme.pillHover : Theme.pillBg))
+    color: popup.open
+        ? Theme.primary_overlay
+        : (volRoot.muted ? Theme.widgetBg : (vMouse.containsMouse ? Theme.pillHover : Theme.pillBg))
     border.color: Theme.pillBorder
     border.width: Theme.pillBorder === "transparent" ? 0 : 1
 
-    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
+    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
 
-    property var sink: Pipewire.defaultAudioSink
-    property var source: Pipewire.defaultAudioSource
-    PwObjectTracker { objects: [volRoot.sink, volRoot.source].filter(Boolean) }
+    readonly property var sink: Pipewire.defaultAudioSink
+    readonly property var source: Pipewire.defaultAudioSource
 
-    property bool ready: sink?.ready ?? false
-    property real vol: (ready && sink?.audio) ? sink.audio.volume : 0
-    property bool muted: (ready && sink?.audio) ? sink.audio.muted : true
+    // separate real hardware sinks from apps like cava/discord pretending to be speakers
+    readonly property var outputDevices: {
+        if (!Pipewire.nodes?.values) return [];
+        return Pipewire.nodes.values.filter(n => n && !n.isStream && n.isSink && n.audio);
+    }
+
+    readonly property var inputDevices: {
+        if (!Pipewire.nodes?.values) return [];
+        return Pipewire.nodes.values.filter(n => n && !n.isStream && !n.isSink && n.audio);
+    }
+
+    // apps actually making noise right now
+    readonly property var appStreams: {
+        if (!Pipewire.nodes?.values) return [];
+        return Pipewire.nodes.values.filter(n => n && n.isStream && !n.isSink && n.audio);
+    }
+
+    /*
+    quickshell refuses to populate .audio or .properties unless the node is
+    Explicitly tracked here, so throw the whole party into PwObjectTracker
+    */
+    PwObjectTracker {
+        objects: [volRoot.sink, volRoot.source, ...volRoot.outputDevices, ...volRoot.inputDevices, ...volRoot.appStreams].filter(Boolean)
+    }
+
+    readonly property bool ready: sink?.ready ?? false
+    readonly property real vol: (ready && sink?.audio) ? sink.audio.volume : 0
+    readonly property bool muted: (ready && sink?.audio) ? sink.audio.muted : true
+    readonly property real maxVolRatio: Math.max(1.0, (Settings?.volumeMax ?? 150) / 100.0)
+    readonly property bool isOverdriven: !muted && vol > 1.005
     readonly property string mixerScript: Qt.resolvedUrl("../scripts/open-mixer.zsh").toString().replace(/^file:\/\//, "")
+
+    property bool showInputs: false
 
     Row {
         id: row
@@ -40,7 +79,9 @@ Rectangle {
             text: Theme.getVolumeIcon(volRoot.vol, volRoot.muted)
             font.family: Theme.fontIcon
             font.pixelSize: Theme.fontSizeMd
-            color: popup.open ? Theme.primary : (volRoot.muted ? Theme.on_surface_disabled : Theme.on_surface)
+            color: popup.open
+                ? Theme.primary
+                : (volRoot.muted ? Theme.on_surface_disabled : (volRoot.isOverdriven ? Theme.warn : Theme.on_surface))
         }
 
         Text {
@@ -57,17 +98,17 @@ Rectangle {
             }
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSizeXs
-            color: popup.open ? Theme.primary : (volRoot.muted ? Theme.on_surface_disabled : Theme.on_surface)
+            color: popup.open
+                ? Theme.primary
+                : (volRoot.muted ? Theme.on_surface_disabled : (volRoot.isOverdriven ? Theme.warn : Theme.on_surface))
         }
     }
 
     function syncAnchor() {
         const coords = volRoot.mapToItem(null, 0, 0);
-        if (Theme.isVertical) {
-            popup.targetRelativeY = coords.y + (volRoot.height / 2);
-        } else {
-            popup.targetRelativeX = coords.x + (volRoot.width / 2);
-        }
+        if (!coords) return;
+        popup.targetRelativeX = coords.x + (volRoot.width / 2);
+        popup.targetRelativeY = coords.y + (volRoot.height / 2);
     }
 
     HoverFlyoutHandler {
@@ -96,21 +137,22 @@ Rectangle {
                     popup.open = false;
                 }
             } else if (mouse.button === Qt.RightButton) {
-                Quickshell.execDetached([volRoot.mixerScript]);
-            } else if (mouse.button === Qt.MiddleButton) {
-                if (source && source.audio) {
-                    source.audio.muted = !source.audio.muted;
+                if (volRoot.ready && volRoot.sink?.audio) {
+                    volRoot.sink.audio.muted = !volRoot.sink.audio.muted;
                 }
+            } else if (mouse.button === Qt.MiddleButton) {
+                Quickshell.execDetached([volRoot.mixerScript]);
             }
         }
 
         onWheel: (wheel) => {
-            if (ready && sink.audio) {
+            if (volRoot.ready && volRoot.sink?.audio) {
                 let step = (Settings?.volumeStep ?? 5) / 100.0;
-                let maxLimit = (Settings?.volumeMax ?? 100) / 100.0;
-                sink.audio.volume = Math.max(0, Math.min(maxLimit,
-                    sink.audio.volume + (wheel.angleDelta.y > 0 ? step : -step)));
-                sink.audio.muted = false;
+                let next = volRoot.sink.audio.volume + (wheel.angleDelta.y > 0 ? step : -step);
+                volRoot.sink.audio.volume = Math.max(0.0, Math.min(volRoot.maxVolRatio, next));
+                if (wheel.angleDelta.y > 0 && volRoot.sink.audio.muted) {
+                    volRoot.sink.audio.muted = false;
+                }
             }
         }
     }
@@ -118,15 +160,11 @@ Rectangle {
     Connections {
         target: Settings
         function onRequestVolumeToggle() {
-            let pt = volRoot.mapToItem(null, 0, 0);
-            popup.targetRelativeX = pt ? (pt.x + (volRoot.width / 2)) : 0;
-            popup.targetRelativeY = pt ? (pt.y + (volRoot.height / 2)) : 0;
+            volRoot.syncAnchor();
             popup.open = !popup.open;
         }
         function onRequestVolumeOpen() {
-            let pt = volRoot.mapToItem(null, 0, 0);
-            popup.targetRelativeX = pt ? (pt.x + (volRoot.width / 2)) : 0;
-            popup.targetRelativeY = pt ? (pt.y + (volRoot.height / 2)) : 0;
+            volRoot.syncAnchor();
             popup.open = true;
         }
         function onRequestVolumeClose() {
@@ -136,102 +174,157 @@ Rectangle {
 
     PopupPanel {
         id: popup
-        cardWidth: 420
+        screen: volRoot.barScreen
+        cardWidth: 400
         cardHeight: Math.max(Theme.popupMinHeight, Math.min(Theme.popupMaxHeight, volContentLayout.implicitHeight + (Theme.popupPadding * 2)))
 
         content: ColumnLayout {
             id: volContentLayout
             anchors.fill: parent
-            spacing: Theme.widgetSpacing
+            spacing: Theme.popupSpacing
 
-            // Header
+            // top header with reactive pipewire commentary
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 8
 
-                Text {
-                    text: "audio & mixer"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeLg
-                    font.weight: Font.Bold
-                    color: Theme.on_surface
+                ColumnLayout {
                     Layout.fillWidth: true
+                    spacing: 2
+
+                    Text {
+                        text: "audio & mixer"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeMd
+                        font.weight: Theme.fontWeightBold
+                        color: Theme.on_surface
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: {
+                            if (volRoot.muted) return Theme.getFlavor("volume_muted", "output muted");
+                            if (volRoot.isOverdriven) return Theme.getFlavor("volume_high", "overdriving preamp past 100%");
+                            if (volRoot.appStreams.length > 0) return Theme.getFlavor("media_playing", volRoot.appStreams.length + " active audio stream(s)");
+                            return Theme.getFlavor("media_quiet", "pipewire graph idle");
+                        }
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeXs
+                        color: volRoot.isOverdriven ? Theme.warn : Theme.on_surface_variant
+                        elide: Text.ElideRight
+                    }
                 }
 
                 IconButton {
                     icon: Theme.iconSliders
                     iconSize: Theme.fontSizeMd
-                    tooltip: "open audio mixer"
+                    tooltip: "open external mixer"
                     onClicked: Quickshell.execDetached([volRoot.mixerScript])
                 }
             }
 
             Rectangle {
                 Layout.fillWidth: true
-                height: 1
-                color: Theme.widgetBorder
+                height: Theme.popupDividerHeight
+                color: Theme.cardBorder
             }
 
-            // Output Volume Slider Card
-            ColumnLayout {
+            // master output card
+            Rectangle {
                 Layout.fillWidth: true
-                spacing: 6
+                implicitHeight: outCol.implicitHeight + (Theme.popupCardPadding * 2) + 4
+                radius: Theme.radiusMd
+                color: Theme.cardBg
+                border.color: volRoot.isOverdriven ? Theme.warn : Theme.cardBorder
+                border.width: 1
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-
-                    Text {
-                        text: "output"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSm
-                        font.weight: Font.Bold
-                        color: Theme.primary
-                    }
-
-                    Text {
-                        text: ((volRoot.sink?.description || volRoot.sink?.name || "default playback")).toLowerCase()
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        color: Theme.on_surface_variant
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 54
-                    radius: Theme.widgetRadius
-                    color: Theme.surface_container_highest
+                ColumnLayout {
+                    id: outCol
+                    anchors.fill: parent
+                    anchors.margins: Theme.popupCardPadding + 2
+                    spacing: 8
 
                     RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: Theme.widgetPaddingH
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Text {
+                            text: "output"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: Theme.fontWeightBold
+                            color: Theme.primary
+                        }
+
+                        Text {
+                            text: ((volRoot.sink?.description || volRoot.sink?.nickname || volRoot.sink?.name || "default output")).toLowerCase()
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            color: Theme.on_surface_variant
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: Math.round(volRoot.vol * 100) + "%"
+                            font.family: Theme.fontMono
+                            font.pixelSize: Theme.fontSizeSm
+                            font.weight: Theme.fontWeightBold
+                            color: volRoot.muted
+                                ? Theme.on_surface_disabled
+                                : (volRoot.isOverdriven ? Theme.warn : Theme.primary)
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
                         spacing: 10
 
                         IconButton {
-                            icon: (volRoot.sink?.audio?.muted ?? false) ? Theme.iconVolMute : Theme.iconVolHigh
+                            icon: Theme.getVolumeIcon(volRoot.vol, volRoot.muted)
                             iconSize: Theme.fontSizeMd
                             tooltip: "toggle output mute"
                             onClicked: {
-                                if (volRoot.sink?.audio) volRoot.sink.audio.muted = !volRoot.sink.audio.muted
+                                if (volRoot.sink?.audio) volRoot.sink.audio.muted = !volRoot.sink.audio.muted;
                             }
                         }
 
-                        // Output Volume Slider Track (up to 150%)
-                        Rectangle {
+                        // track with a 100% tick mark if volumeMax allows overdriving past 100%
+                        Item {
                             id: volTrack
                             Layout.fillWidth: true
-                            height: 8
-                            radius: Theme.radiusPill
-                            color: Theme.surface_variant
+                            height: 20
 
                             Rectangle {
-                                width: parent.width * Math.min(1.0, Math.max(0.0, (volRoot.sink?.audio?.volume ?? 0) / 1.5))
-                                height: parent.height
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width
+                                height: 8
                                 radius: Theme.radiusPill
-                                color: (volRoot.sink?.audio?.muted ?? false) ? Theme.on_surface_disabled : Theme.primary
+                                color: Theme.pillBg
+                                border.color: Theme.pillBorder
+                                border.width: 1
+
+                                Rectangle {
+                                    width: parent.width * Math.min(1.0, Math.max(0.0, volRoot.vol / volRoot.maxVolRatio))
+                                    height: parent.height
+                                    radius: Theme.radiusPill
+                                    color: volRoot.muted
+                                        ? Theme.on_surface_disabled
+                                        : (volRoot.isOverdriven ? Theme.warn : Theme.primary)
+
+                                    Behavior on width { NumberAnimation { duration: 40 } }
+                                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                                }
+
+                                // subtle notch showing where 100% sits when max volume is > 100%
+                                Rectangle {
+                                    visible: volRoot.maxVolRatio > 1.01
+                                    x: parent.width * (1.0 / volRoot.maxVolRatio)
+                                    width: 2
+                                    height: parent.height
+                                    color: Theme.on_surface_variant
+                                    opacity: 0.45
+                                }
                             }
 
                             MouseArea {
@@ -241,75 +334,74 @@ Rectangle {
                                 preventStealing: true
 
                                 function applySinkVolume(posX) {
-                                    if (!volRoot.sink?.audio || width <= 0) return
-                                    const clamped = Math.max(0.0, Math.min(1.5, (posX / width) * 1.5))
-                                    volRoot.sink.audio.volume = clamped
-                                    if (volRoot.sink.audio.muted && clamped > 0) volRoot.sink.audio.muted = false
+                                    if (!volRoot.sink?.audio || width <= 0) return;
+                                    const clamped = Math.max(0.0, Math.min(volRoot.maxVolRatio, (posX / width) * volRoot.maxVolRatio));
+                                    volRoot.sink.audio.volume = clamped;
+                                    if (volRoot.sink.audio.muted && clamped > 0) volRoot.sink.audio.muted = false;
                                 }
 
                                 onPressed: (mouse) => applySinkVolume(mouse.x)
-                                onPositionChanged: (mouse) => { if (pressed) applySinkVolume(mouse.x) }
+                                onPositionChanged: (mouse) => { if (pressed) applySinkVolume(mouse.x); }
                             }
                         }
-
-                        Text {
-                            text: Math.round((volRoot.sink?.audio?.volume ?? 0) * 100) + "%"
-                            font.family: Theme.fontMono
-                            font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
-                            color: (volRoot.sink?.audio?.muted ?? false) ? Theme.on_surface_disabled : Theme.primary
-                            Layout.preferredWidth: 42
-                            horizontalAlignment: Text.AlignRight
-                        }
                     }
-                }
-            }
 
-            // Quick Volume Presets
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 6
-
-                Repeater {
-                    model: [
-                        { label: "mute", val: 0.0, mute: true },
-                        { label: "25%", val: 0.25, mute: false },
-                        { label: "50%", val: 0.5, mute: false },
-                        { label: "75%", val: 0.75, mute: false },
-                        { label: "100%", val: 1.0, mute: false },
-                        { label: "150%", val: 1.5, mute: false }
-                    ]
-
-                    delegate: Rectangle {
-                        required property var modelData
+                    // quick presets that actually light up when you're near that percentage
+                    RowLayout {
                         Layout.fillWidth: true
-                        height: 24
-                        radius: Theme.radiusPill
-                        color: presetMouse.containsMouse ? Theme.primary_overlay : Theme.surface_container_high
+                        spacing: Theme.popupCardGap
 
-                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                        Repeater {
+                            model: [
+                                { label: "mute", val: 0.0, mute: true },
+                                { label: "25%", val: 0.25, mute: false },
+                                { label: "50%", val: 0.5, mute: false },
+                                { label: "75%", val: 0.75, mute: false },
+                                { label: "100%", val: 1.0, mute: false },
+                                { label: "125%", val: 1.25, mute: false }
+                            ].filter(p => p.mute || p.val <= volRoot.maxVolRatio + 0.01)
 
-                        Text {
-                            text: modelData.label
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 10
-                            font.weight: Font.Medium
-                            color: Theme.on_surface
-                            anchors.centerIn: parent
-                        }
+                            delegate: Rectangle {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                height: 22
+                                radius: Theme.radiusPill
 
-                        MouseArea {
-                            id: presetMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (volRoot.sink?.audio) {
-                                    if (modelData.mute) {
-                                        volRoot.sink.audio.muted = true
-                                    } else {
-                                        volRoot.sink.audio.volume = modelData.val
-                                        volRoot.sink.audio.muted = false
+                                readonly property bool isActive: modelData.mute
+                                    ? volRoot.muted
+                                    : (!volRoot.muted && Math.abs(volRoot.vol - modelData.val) < 0.03)
+
+                                color: isActive
+                                    ? Theme.primary
+                                    : (presetMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                                border.color: isActive ? "transparent" : Theme.pillBorder
+                                border.width: isActive ? 0 : 1
+
+                                Behavior on color { ColorAnimation { duration: Theme.animFast } }
+
+                                Text {
+                                    text: modelData.label
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeXs
+                                    font.weight: isActive ? Theme.fontWeightBold : Theme.fontWeightMedium
+                                    color: isActive ? Theme.on_primary : Theme.on_surface
+                                    anchors.centerIn: parent
+                                }
+
+                                MouseArea {
+                                    id: presetMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (volRoot.sink?.audio) {
+                                            if (modelData.mute) {
+                                                volRoot.sink.audio.muted = !volRoot.sink.audio.muted;
+                                            } else {
+                                                volRoot.sink.audio.volume = modelData.val;
+                                                volRoot.sink.audio.muted = false;
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -318,48 +410,56 @@ Rectangle {
                 }
             }
 
+            // microphone input card
             Rectangle {
                 Layout.fillWidth: true
-                height: 1
-                color: Theme.widgetBorder
-            }
+                implicitHeight: micCol.implicitHeight + (Theme.popupCardPadding * 2) + 4
+                radius: Theme.radiusMd
+                color: Theme.cardBg
+                border.color: Theme.cardBorder
+                border.width: 1
 
-            // Microphone Input
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 6
+                readonly property bool micMuted: volRoot.source?.audio?.muted ?? true
+                readonly property real micVol: volRoot.source?.audio?.volume ?? 0
 
-                RowLayout {
-                    Layout.fillWidth: true
+                ColumnLayout {
+                    id: micCol
+                    anchors.fill: parent
+                    anchors.margins: Theme.popupCardPadding + 2
                     spacing: 6
 
-                    Text {
-                        text: "microphone"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSm
-                        font.weight: Font.Bold
-                        color: Theme.primary
-                    }
-
-                    Text {
-                        text: ((volRoot.source?.description || volRoot.source?.name || "default recording")).toLowerCase()
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        color: Theme.on_surface_variant
-                        elide: Text.ElideRight
+                    RowLayout {
                         Layout.fillWidth: true
-                    }
-                }
+                        spacing: 6
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 54
-                    radius: Theme.widgetRadius
-                    color: Theme.surface_container_highest
+                        Text {
+                            text: "microphone"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: Theme.fontWeightBold
+                            color: Theme.primary
+                        }
+
+                        Text {
+                            text: ((volRoot.source?.description || volRoot.source?.nickname || volRoot.source?.name || "default mic")).toLowerCase()
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            color: Theme.on_surface_variant
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: Math.round((volRoot.source?.audio?.volume ?? 0) * 100) + "%"
+                            font.family: Theme.fontMono
+                            font.pixelSize: Theme.fontSizeSm
+                            font.weight: Theme.fontWeightBold
+                            color: (volRoot.source?.audio?.muted ?? false) ? Theme.on_surface_disabled : Theme.primary
+                        }
+                    }
 
                     RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: Theme.widgetPaddingH
+                        Layout.fillWidth: true
                         spacing: 10
 
                         IconButton {
@@ -367,22 +467,31 @@ Rectangle {
                             iconSize: Theme.fontSizeMd
                             tooltip: "toggle microphone mute"
                             onClicked: {
-                                if (volRoot.source?.audio) volRoot.source.audio.muted = !volRoot.source.audio.muted
+                                if (volRoot.source?.audio) volRoot.source.audio.muted = !volRoot.source.audio.muted;
                             }
                         }
 
-                        Rectangle {
-                            id: micTrack
+                        Item {
                             Layout.fillWidth: true
-                            height: 8
-                            radius: Theme.radiusPill
-                            color: Theme.surface_variant
+                            height: 20
 
                             Rectangle {
-                                width: parent.width * Math.min(1.0, Math.max(0.0, volRoot.source?.audio?.volume ?? 0))
-                                height: parent.height
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width
+                                height: 8
                                 radius: Theme.radiusPill
-                                color: (volRoot.source?.audio?.muted ?? false) ? Theme.on_surface_disabled : Theme.primary
+                                color: Theme.pillBg
+                                border.color: Theme.pillBorder
+                                border.width: 1
+
+                                Rectangle {
+                                    width: parent.width * Math.min(1.0, Math.max(0.0, volRoot.source?.audio?.volume ?? 0))
+                                    height: parent.height
+                                    radius: Theme.radiusPill
+                                    color: (volRoot.source?.audio?.muted ?? false) ? Theme.on_surface_disabled : Theme.primary
+
+                                    Behavior on width { NumberAnimation { duration: 40 } }
+                                }
                             }
 
                             MouseArea {
@@ -392,25 +501,169 @@ Rectangle {
                                 preventStealing: true
 
                                 function applyMicVolume(posX) {
-                                    if (!volRoot.source?.audio || width <= 0) return
-                                    const clamped = Math.max(0.0, Math.min(1.0, posX / width))
-                                    volRoot.source.audio.volume = clamped
-                                    if (volRoot.source.audio.muted && clamped > 0) volRoot.source.audio.muted = false
+                                    if (!volRoot.source?.audio || width <= 0) return;
+                                    const clamped = Math.max(0.0, Math.min(1.0, posX / width));
+                                    volRoot.source.audio.volume = clamped;
+                                    if (volRoot.source.audio.muted && clamped > 0) volRoot.source.audio.muted = false;
                                 }
 
                                 onPressed: (mouse) => applyMicVolume(mouse.x)
-                                onPositionChanged: (mouse) => { if (pressed) applyMicVolume(mouse.x) }
+                                onPositionChanged: (mouse) => { if (pressed) applyMicVolume(mouse.x); }
                             }
                         }
+                    }
+                }
+            }
 
-                        Text {
-                            text: Math.round((volRoot.source?.audio?.volume ?? 0) * 100) + "%"
-                            font.family: Theme.fontMono
-                            font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
-                            color: (volRoot.source?.audio?.muted ?? false) ? Theme.on_surface_disabled : Theme.primary
-                            Layout.preferredWidth: 42
-                            horizontalAlignment: Text.AlignRight
+            // per-application volume mixer so it actually earns the word "mixer"
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: volRoot.appStreams.length > 0
+                spacing: 6
+
+                Text {
+                    text: "active applications (" + volRoot.appStreams.length + ")"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeXs
+                    font.weight: Theme.fontWeightBold
+                    color: Theme.primary
+                }
+
+                Flickable {
+                    Layout.fillWidth: true
+                    implicitHeight: Math.min(130, streamCol.implicitHeight)
+                    contentHeight: streamCol.implicitHeight
+                    clip: true
+
+                    ColumnLayout {
+                        id: streamCol
+                        width: parent.width
+                        spacing: Theme.popupCardGap
+
+                        Repeater {
+                            model: volRoot.appStreams
+
+                            delegate: Rectangle {
+                                id: streamCard
+                                required property var modelData
+
+                                Layout.fillWidth: true
+                                height: 38
+                                radius: Theme.radiusSm
+                                color: Theme.cardBg
+                                border.color: Theme.cardBorder
+                                border.width: 1
+
+                                readonly property string appName: {
+                                    let p = modelData?.properties;
+                                    let n = (p ? (p["application.name"] || p["media.name"]) : "") || modelData?.description || modelData?.name || "stream";
+                                    return n.toLowerCase();
+                                }
+                                readonly property string appIconSource: {
+                                    let p = modelData?.properties;
+                                    let candidate = (p ? (p["application.icon-name"] || p["application.process.binary"] || p["application.name"]) : "") || modelData?.name || "";
+                                    return Theme.resolveAppIcon ? Theme.resolveAppIcon(candidate) : "";
+                                }
+                                readonly property real streamVol: modelData?.audio?.volume ?? 1.0
+                                readonly property bool streamMuted: modelData?.audio?.muted ?? false
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 8
+                                    anchors.rightMargin: 8
+                                    spacing: 8
+
+                                    Rectangle {
+                                        width: 24
+                                        height: 24
+                                        radius: Theme.radiusXs
+                                        color: Theme.pillBg
+
+                                        IconImage {
+                                            id: sIcon
+                                            anchors.centerIn: parent
+                                            width: 16
+                                            height: 16
+                                            source: streamCard.appIconSource
+                                            visible: source !== "" && status !== Image.Error
+                                        }
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            visible: !sIcon.visible
+                                            text: streamCard.streamMuted ? Theme.iconVolMute : Theme.iconMusic
+                                            font.family: Theme.fontIcon
+                                            font.pixelSize: Theme.fontSizeSm
+                                            color: streamCard.streamMuted ? Theme.on_surface_disabled : Theme.primary
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (streamCard.modelData?.audio) {
+                                                    streamCard.modelData.audio.muted = !streamCard.modelData.audio.muted;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        text: streamCard.appName
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightMedium
+                                        color: streamCard.streamMuted ? Theme.on_surface_disabled : Theme.on_surface
+                                        elide: Text.ElideRight
+                                        Layout.preferredWidth: 105
+                                    }
+
+                                    Item {
+                                        Layout.fillWidth: true
+                                        height: 18
+
+                                        Rectangle {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: parent.width
+                                            height: 6
+                                            radius: Theme.radiusPill
+                                            color: Theme.pillBg
+
+                                            Rectangle {
+                                                width: parent.width * Math.min(1.0, Math.max(0.0, streamCard.streamVol))
+                                                height: parent.height
+                                                radius: Theme.radiusPill
+                                                color: streamCard.streamMuted ? Theme.on_surface_disabled : Theme.secondary
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            preventStealing: true
+
+                                            function setStreamVol(px) {
+                                                if (!streamCard.modelData?.audio || width <= 0) return;
+                                                let v = Math.max(0.0, Math.min(1.0, px / width));
+                                                streamCard.modelData.audio.volume = v;
+                                                if (streamCard.modelData.audio.muted && v > 0) streamCard.modelData.audio.muted = false;
+                                            }
+
+                                            onPressed: (mouse) => setStreamVol(mouse.x)
+                                            onPositionChanged: (mouse) => { if (pressed) setStreamVol(mouse.x); }
+                                        }
+                                    }
+
+                                    Text {
+                                        text: Math.round(streamCard.streamVol * 100) + "%"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontSizeXs
+                                        color: streamCard.streamMuted ? Theme.on_surface_disabled : Theme.on_surface_variant
+                                        Layout.preferredWidth: 34
+                                        horizontalAlignment: Text.AlignRight
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -418,26 +671,75 @@ Rectangle {
 
             Rectangle {
                 Layout.fillWidth: true
-                height: 1
-                color: Theme.widgetBorder
+                height: Theme.popupDividerHeight
+                color: Theme.cardBorder
             }
 
-            // Output Devices Quick List
+            // hardware device switcher with tabs for output vs input
             ColumnLayout {
                 Layout.fillWidth: true
-                spacing: 4
+                spacing: 6
 
-                Text {
-                    text: "output devices"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeXs
-                    font.weight: Font.Bold
-                    color: Theme.primary
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Rectangle {
+                        height: 22
+                        implicitWidth: outTabTxt.implicitWidth + 16
+                        radius: Theme.radiusPill
+                        color: !volRoot.showInputs ? Theme.primary_overlay : Theme.pillBg
+                        border.color: !volRoot.showInputs ? Theme.primary : Theme.pillBorder
+                        border.width: 1
+
+                        Text {
+                            id: outTabTxt
+                            anchors.centerIn: parent
+                            text: "outputs (" + volRoot.outputDevices.length + ")"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: !volRoot.showInputs ? Theme.fontWeightBold : Theme.fontWeightMedium
+                            color: !volRoot.showInputs ? Theme.primary : Theme.on_surface_variant
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: volRoot.showInputs = false
+                        }
+                    }
+
+                    Rectangle {
+                        height: 22
+                        implicitWidth: inTabTxt.implicitWidth + 16
+                        radius: Theme.radiusPill
+                        color: volRoot.showInputs ? Theme.primary_overlay : Theme.pillBg
+                        border.color: volRoot.showInputs ? Theme.primary : Theme.pillBorder
+                        border.width: 1
+
+                        Text {
+                            id: inTabTxt
+                            anchors.centerIn: parent
+                            text: "inputs (" + volRoot.inputDevices.length + ")"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: volRoot.showInputs ? Theme.fontWeightBold : Theme.fontWeightMedium
+                            color: volRoot.showInputs ? Theme.primary : Theme.on_surface_variant
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: volRoot.showInputs = true
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
                 }
 
                 Flickable {
                     Layout.fillWidth: true
-                    height: 80
+                    implicitHeight: Math.min(110, Math.max(36, devCol.implicitHeight))
                     contentHeight: devCol.implicitHeight
                     clip: true
 
@@ -447,38 +749,48 @@ Rectangle {
                         spacing: 4
 
                         Repeater {
-                            model: {
-                                if (!Pipewire.nodes || !Pipewire.nodes.values) return []
-                                return Pipewire.nodes.values.filter(n => n && n.isSink && n.audio)
-                            }
+                            model: volRoot.showInputs ? volRoot.inputDevices : volRoot.outputDevices
 
                             delegate: Rectangle {
+                                id: devDelegate
                                 required property var modelData
+
                                 Layout.fillWidth: true
                                 height: 32
                                 radius: Theme.radiusSm
-                                readonly property bool isCurrent: modelData?.id === volRoot.sink?.id
-                                color: isCurrent ? Theme.primary_overlay : (devMouse.containsMouse ? Theme.surface_container_highest : Theme.surface_container_high)
+                                readonly property bool isCurrent: volRoot.showInputs
+                                    ? (modelData?.id === volRoot.source?.id)
+                                    : (modelData?.id === volRoot.sink?.id)
+
+                                color: isCurrent
+                                    ? Theme.primary_overlay
+                                    : (devMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                                border.color: isCurrent ? Theme.primary : Theme.pillBorder
+                                border.width: 1
 
                                 Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                                 RowLayout {
                                     anchors.fill: parent
-                                    anchors.margins: 6
+                                    anchors.leftMargin: 8
+                                    anchors.rightMargin: 8
                                     spacing: 8
 
                                     Text {
-                                        text: isCurrent ? Theme.iconCheckCircle : Theme.iconHeadphones
+                                        text: devDelegate.isCurrent
+                                            ? Theme.iconCheckCircle
+                                            : (volRoot.showInputs ? Theme.iconMic : Theme.iconHeadphones)
                                         font.family: Theme.fontIcon
                                         font.pixelSize: Theme.fontSizeSm
-                                        color: isCurrent ? Theme.primary : Theme.on_surface_variant
+                                        color: devDelegate.isCurrent ? Theme.primary : Theme.on_surface_variant
                                     }
 
                                     Text {
-                                        text: ((modelData.description || modelData.name || "audio device")).toLowerCase()
+                                        text: ((devDelegate.modelData.description || devDelegate.modelData.nickname || devDelegate.modelData.name || "audio device")).toLowerCase()
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
-                                        color: isCurrent ? Theme.primary : Theme.on_surface
+                                        font.weight: devDelegate.isCurrent ? Theme.fontWeightBold : Theme.fontWeightRegular
+                                        color: devDelegate.isCurrent ? Theme.primary : Theme.on_surface
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
                                     }
@@ -490,8 +802,14 @@ Rectangle {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        if (modelData?.id) {
-                                            Quickshell.execDetached(["wpctl", "set-default", String(modelData.id)])
+                                        if (!devDelegate.modelData) return;
+                                        if (volRoot.showInputs) {
+                                            Pipewire.preferredDefaultAudioSource = devDelegate.modelData;
+                                        } else {
+                                            Pipewire.preferredDefaultAudioSink = devDelegate.modelData;
+                                        }
+                                        if (devDelegate.modelData.id) {
+                                            Quickshell.execDetached(["wpctl", "set-default", String(devDelegate.modelData.id)]);
                                         }
                                     }
                                 }
