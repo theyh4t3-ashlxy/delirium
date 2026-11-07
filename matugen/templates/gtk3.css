@@ -25,6 +25,30 @@
 @define-color popover_bg_color {{colors.surface_container_highest.default.hex}};
 @define-color headerbar_bg_color {{colors.surface_container_low.default.hex}};
 
+/* adw-gtk3 named tokens */
+@define-color accent_color {{colors.primary.default.hex}};
+@define-color accent_bg_color {{colors.primary.default.hex}};
+@define-color accent_fg_color {{colors.on_primary.default.hex}};
+
+@define-color window_bg_color {{colors.surface.default.hex}};
+@define-color window_fg_color {{colors.on_surface.default.hex}};
+@define-color window_backdrop_color {{colors.surface.default.hex}};
+
+@define-color view_bg_color {{colors.surface_container_lowest.default.hex}};
+@define-color view_fg_color {{colors.on_surface.default.hex}};
+@define-color view_backdrop_color {{colors.surface_container_lowest.default.hex}};
+
+@define-color headerbar_border_color {{colors.outline_variant.default.hex}};
+@define-color headerbar_backdrop_color @headerbar_bg_color;
+
+@define-color sidebar_bg_color {{colors.surface_container_low.default.hex}};
+@define-color sidebar_fg_color {{colors.on_surface.default.hex}};
+@define-color sidebar_border_color {{colors.outline_variant.default.hex}};
+@define-color sidebar_backdrop_color @sidebar_bg_color;
+
+@define-color dialog_bg_color {{colors.surface_container_high.default.hex}};
+@define-color dialog_fg_color {{colors.on_surface.default.hex}};
+
 /* so i dont get blinded or die by it */
 window,
 dialog,
@@ -81,7 +105,9 @@ selection {
 
 /* top bar drip */
 headerbar,
+.titlebar,
 .titlebar:not(headerbar) {
+  background-image: none;
   background-color: @headerbar_bg_color;
   color: @theme_fg_color;
   border-bottom: 1px solid @borders;
@@ -201,6 +227,7 @@ stackswitcher > button:checked {
 
 /* clicky crap and general controls */
 button {
+  background-image: none;
   min-height: 24px;
   min-width: 24px;
   padding: 5px 12px;
@@ -308,6 +335,9 @@ spinbutton button {
 }
 
 combobox button.combo {
+  background-image: none;
+  background-color: alpha(@theme_fg_color, 0.08);
+  color: @theme_fg_color;
   padding: 5px 10px;
 }
 
@@ -637,6 +667,9 @@ placessidebar row:selected {
 }
 
 pathbar button {
+  background-image: none;
+  background-color: alpha(@theme_fg_color, 0.08);
+  color: @theme_fg_color;
   border-radius: 6px;
   margin: 0 1px;
 }

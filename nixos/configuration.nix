@@ -258,6 +258,7 @@ in
     git
     quickshell
     matugen
+    adw-gtk3
     awww
     mpvpaper
     hyprpicker
