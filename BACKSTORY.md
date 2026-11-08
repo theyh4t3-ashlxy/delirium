@@ -17,13 +17,13 @@ because when you use a prebuilt rice, you are renting someone else's taste.
 the moment you crave:
 - **zero `.json` architecture**: evicting nested curly brackets and quotes from local state entirely in favor of flat key-value tokens.
 - **pure qml layer-shell composition**: abandoning bloated waybar setups for dynamic qtquick anchors with continuous bezier curves and fluid subsurfaces.
-- **hardware-level firmware hacking**: reverse-engineering thinkpad embedded controller registers to shock a false-positive bd-prochot throttle latch back to life.
+- **hardware-level firmware hacking**: reverse-engineering thinkpad embedded controller registers to bypass corporate thermal castration and force-feed the cooling assembly maximum fan wattage.
 - **deterministic nixos immutability**: ensuring an update can never brick your system because generation rollbacks are instant.
 - **embedded lua display scripting**: driving hyprland through runtime closures rather than brittle static config syntax.
 
 ...you realize prebuilt rices cannot give you that. you have to build it yourself, line by painful line, in the dark at 4 am.
 
-steal our code. rip out our continuous bezier scoop math, our matugen template pipelines, our native python desktop controller, or our anti-prochot watchdog loop. customize the living hell out of your system until every single byte reflects your own brain. but don't clone this expecting a frictionless appliance.
+steal our code. rip out our continuous bezier scoop math, our matugen template pipelines, our native python desktop controller, or our ec fan override loop. customize the living hell out of your system until every single byte reflects your own brain. but don't clone this expecting a frictionless appliance.
 
 ---
 
@@ -45,7 +45,7 @@ a laptop that never asked to be drafted into this digital war.
 - alder lake i7-1260p running at temperatures hot enough to fry an egg directly on the magnesium-aluminum chassis.
 - an nvidia geforce mx550 discrete gpu whose sole purpose in life is generating thermal panic and reminding us why wayland multi-gpu buffer synchronization is an unresolved crime against humanity.
 - lanzaboote secure boot with plymouth bgrt, where early kms modules (`i915`, `fastboot=1`) had to be violently forced into the initrd kernel modules list just to stop the lenovo oem splash screen from having a twelve-second epileptic strobe seizure during boot handoff.
-- **the bd-prochot death lock**: lenovo's embedded controller firmware has panic attacks at idle, falsely tripping the bi-directional processor hot flag and pinning the cpu cores at a comatose 400mhz. opening a single terminal took twelve seconds. rather than accepting defeat or returning the laptop to the manufacturer, we reverse-engineered the acpi fan registers, packaged a native nixos root systemd daemon (`fanctl`), and built an active ec shock watchdog into `pkgs/fan-control/` that force-resets the registers before the cpu can flatline.
+- **corporate acoustic castration (unshackling the fans)**: the thinkpad hardware itself is completely fine. the real enemy is lenovo's sanitized corporate firmware tuning. the factory embedded controller is engineered for terrified office workers in quiet open-plan cubicles who would get fired by hr if their cooling fan dared to spin above 2,200 rpm during a zoom call. lenovo's dytc firmware artificially throttled clock ceilings and thermal dissipation just to keep the laptop dead silent at the expense of actual silicon throughput. we don't work in a corporate cubicle farm, and we don't care about office etiquette. if the silicon wants to boost, it boosts. if the cooling assembly sounds like a boeing 737 ingesting gravel at 5,400 rpm, let it scream. we reverse-engineered the thinkpad acpi ec fan registers, packaged a native nixos root systemd daemon (`fan-control`), and built an active override loop in `pkgs/fan-control/` that forces the fans to maximum wattage whenever the cpu demands it. noise is the sound of work getting done.
 
 the cooling fan sounds like a miniature boeing 737 engine ingesting gravel. the bottom shell has permanently warped two millimeters to the left from sustained heat cycling. the battery capacity indicator is less of a gauge and more of a countdown timer to sudden death.
 
