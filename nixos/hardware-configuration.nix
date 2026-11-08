@@ -36,7 +36,7 @@
   fileSystems."/home" =
     { device = "/dev/disk/by-uuid/9d8d91d3-7fea-4df6-9dc7-0e7c269f142e";
       fsType = "btrfs";
-      options = [ "subvol=home" "compress=zstd:3" ];
+      options = [ "subvol=home" "compress=zstd:3" "noatime" ];
     };
 
   fileSystems."/var/lib/flatpak" =

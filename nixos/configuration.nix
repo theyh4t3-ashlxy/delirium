@@ -139,11 +139,6 @@ in
     priority = 100;
   };
 
-  # btrfs compression & atime muzzle: stopping the nix store from devouring the entire solid state drive
-  fileSystems."/".options = [ "compress=zstd" "noatime" ];
-  fileSystems."/home".options = [ "subvol=home" "compress=zstd" "noatime" ];
-  fileSystems."/nix".options = [ "subvol=nix" "compress=zstd" "noatime" ];
-
   # 2. networking: broadcasting our existential dread directly to the local subnet
   networking.hostName = "lost"; # accurate diagnostic status of the user and their root partition
   networking.networkmanager.enable = true;
