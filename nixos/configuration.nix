@@ -169,10 +169,38 @@ in
   services.desktopManager.gnome.enable = true; # emotional support desktop environment for wayland casualties
 
   environment.gnome.excludePackages = with pkgs; [
-    gnome-tour
+    baobab
+    decibels
     epiphany
     geary
+    gnome-calendar
+    gnome-characters
+    gnome-clocks
+    gnome-connections
+    gnome-console
+    gnome-contacts
+    gnome-font-viewer
+    gnome-initial-setup
+    gnome-logs
+    gnome-maps
+    gnome-music
+    gnome-software
+    gnome-system-monitor
+    gnome-text-editor
+    gnome-tour
+    gnome-user-docs
+    gnome-weather
+    loupe
+    papers
+    seahorse
+    showtime
+    simple-scan
+    snapshot
+    totem
+    yelp
   ];
+
+  services.xserver.excludePackages = [ pkgs.xterm ];
 
   services.xserver.xkb = {
     layout = "us";
