@@ -225,12 +225,15 @@ in
   hardware.bluetooth.enable = true;
 
   # 7. user definition: ashley, who typed 'yay -s' without reading the pkgbuild and invited an ebpf rootkit to live rent-free in memory
+  users.mutableUsers = false;
   users.users."ashley" = {
     isNormalUser = true;
     description = "ashley";
     extraGroups = [ "networkmanager" "wheel" "video" "audio" ];
     shell = pkgs.zsh;
+    hashedPasswordFile = "/persist/etc/shadow-ashley";
   };
+  users.users."root".hashedPasswordFile = "/persist/etc/shadow-root";
 
   # passwordless sudo so typing passwords during endless rebuilds stops draining the remaining will to live
   security.sudo.wheelNeedsPassword = false;
