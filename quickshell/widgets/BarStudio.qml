@@ -1,3 +1,4 @@
+// BarStudio.qml
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -15,7 +16,7 @@ PopupPanel {
     screen: modelData
 
     cardWidth: Math.min(1160, Math.max(780, (root.screen?.width ?? 1920) - 48))
-    cardHeight: Math.min(680, Math.max(520, (root.screen?.height ?? 1080) - (Theme?.barHeight ?? 48) - 32))
+    cardHeight: Math.min(680, Math.max(520, (root.screen?.height ?? 1080) - Theme.barHeight - 32))
     open: false
 
     property bool isDragging: false
@@ -31,25 +32,26 @@ PopupPanel {
     property int hoverIndex: -1
 
     readonly property var moduleCatalog: ({
-        "launcher":      { name: "app launcher",      icon: Theme?.iconDistro ?? Theme?.iconArch ?? "\uE88A",      desc: "application search & grid" },
-        "wallpaper":     { name: "wallpaper browser", icon: Theme?.iconWallpaper ?? "\uE1BC", desc: "awww & mpvpaper selector" },
-        "workspaces":    { name: "workspaces",        icon: Theme?.iconWorkspaces ?? "\uE871", desc: "hyprland workspace dots" },
-        "windowTitle":   { name: "active window",     icon: Theme?.iconSparkles ?? "\uE65F",   desc: "focused window title badge" },
-        "clock":         { name: "clock & date",      icon: Theme?.iconClock ?? "\uEFD6",     desc: "time, date & calendar" },
-        "media":         { name: "media player",      icon: Theme?.iconMusic ?? "\uE405",     desc: "mpris music controls" },
-        "quickNotes":    { name: "quick notes",       icon: Theme?.iconEdit ?? "\uF097",      desc: "floating scratchpad notes" },
-        "clipboard":     { name: "clipboard manager", icon: Theme?.iconClipboard ?? "\uE14D", desc: "cliphist history & sync" },
-        "idleInhibitor": { name: "idle inhibitor",    icon: Theme?.iconCoffee ?? "\uEFEF",    desc: "stay awake toggle" },
-        "notifications": { name: "notifications",     icon: Theme?.iconBell ?? "\uE7F5",      desc: "alert center & toast log" },
-        "systemTray":    { name: "system tray",       icon: Theme?.iconGrid ?? "\uE9B0",      desc: "statusnotifier tray icons" },
-        "bluetooth":     { name: "bluetooth",         icon: Theme?.iconBluetooth ?? "\uE1A7", desc: "bluetooth devices & scan" },
-        "network":       { name: "network status",    icon: Theme?.iconWifi ?? "\uE63E",       desc: "wifi & ethernet monitor" },
-        "volume":        { name: "volume & sink",     icon: Theme?.iconVolHigh ?? "\uE050",   desc: "pipewire audio controls" },
-        "battery":       { name: "battery & power",   icon: Theme?.iconBatFull ?? "\uE1A5",   desc: "upower level & charging" },
-        "quickSettings": { name: "quick settings",    icon: Theme?.iconSettings ?? "\uE8B8",  desc: "system & appearance toggles" },
-        "powerMenu":     { name: "power menu",        icon: Theme?.iconPower ?? "\uF8C7",     desc: "lock, logout & power off" },
-        "dynamicNotch":  { name: "dynamic notch",     icon: Theme?.iconSparkles ?? "\uE65F",  desc: "reactive island carousel (clock, calendar & timer)" },
-        "screenCapture": { name: "screen capture",    icon: Theme?.iconCamera ?? "\uE3B4",    desc: "screenshot & screen recording" }
+        "launcher":       { name: "app launcher",      icon: Theme.iconDistro,      desc: "application search & grid" },
+        "wallpaper":      { name: "wallpaper browser", icon: Theme.iconWallpaper,   desc: "awww & mpvpaper selector" },
+        "workspaces":     { name: "workspaces",        icon: Theme.iconWorkspaces,  desc: "hyprland workspace dots" },
+        "layout":         { name: "layout switcher",   icon: Theme.iconGrid,        desc: "tiling layout & orientation" },
+        "windowTitle":    { name: "active window",     icon: Theme.iconSparkles,    desc: "focused window title badge" },
+        "clock":          { name: "clock & date",      icon: Theme.iconClock,       desc: "time, date & calendar" },
+        "media":          { name: "media player",      icon: Theme.iconMusic,       desc: "mpris music controls" },
+        "quickNotes":     { name: "quick notes",       icon: Theme.iconEdit,        desc: "floating scratchpad notes" },
+        "clipboard":      { name: "clipboard manager", icon: Theme.iconClipboard,   desc: "cliphist history & sync" },
+        "idleInhibitor":  { name: "idle inhibitor",    icon: Theme.iconCoffee,      desc: "stay awake toggle" },
+        "notifications":  { name: "notifications",     icon: Theme.iconBell,        desc: "alert center & toast log" },
+        "systemTray":     { name: "system tray",       icon: Theme.iconTray,        desc: "statusnotifier tray icons" },
+        "bluetooth":      { name: "bluetooth",         icon: Theme.iconBluetooth,   desc: "bluetooth devices & scan" },
+        "network":        { name: "network status",    icon: Theme.iconWifi,        desc: "wifi & ethernet monitor" },
+        "volume":         { name: "volume & sink",     icon: Theme.iconVolHigh,     desc: "pipewire audio controls" },
+        "battery":        { name: "battery & power",   icon: Theme.iconBatFull,     desc: "upower level & charging" },
+        "quickSettings":  { name: "quick settings",    icon: Theme.iconSettings,    desc: "system & appearance toggles" },
+        "powerMenu":      { name: "power menu",        icon: Theme.iconPower,       desc: "lock, logout & power off" },
+        "dynamicNotch":   { name: "dynamic notch",     icon: Theme.iconSparkles,    desc: "reactive island carousel (clock, calendar & timer)" },
+        "screenCapture":  { name: "screen capture",    icon: Theme.iconCamera,      desc: "screenshot & screen recording" }
     })
 
     readonly property var unassignedModules: {
@@ -58,7 +60,7 @@ PopupPanel {
             ...(Settings?.barModulesCenter ?? []),
             ...(Settings?.barModulesRight ?? [])
         ]);
-        const keys = (PresetService && Object.keys(PresetService.blockMap).length > 0)
+        const keys = (typeof PresetService !== "undefined" && PresetService?.blockMap && Object.keys(PresetService.blockMap).length > 0)
             ? Object.keys(PresetService.blockMap)
             : Object.keys(root.moduleCatalog);
         return keys.filter(id => !assigned.has(id));
@@ -98,25 +100,35 @@ PopupPanel {
         }
     }
 
+    function saveSettings() {
+        if (Settings?.save) Settings.save();
+    }
+
     function getModuleInfo(modId) {
-        let b = PresetService?.getBlockInfo(modId);
+        let b = (typeof PresetService !== "undefined" && PresetService?.getBlockInfo) ? PresetService.getBlockInfo(modId) : null;
         if (b) return b;
+        if (modId === "layoutSwitcher") return root.moduleCatalog["layout"];
+        if (modId === "notch") return root.moduleCatalog["dynamicNotch"];
+        if (modId === "capture") return root.moduleCatalog["screenCapture"];
         return root.moduleCatalog[modId] ?? {
             name: modId,
-            icon: Theme?.iconGrid ?? "\uE9B0",
+            icon: Theme.iconGrid,
             desc: "custom widget",
-            color: "#4c97ff"
+            color: Theme.primary
         };
     }
 
+    // synced 1:1 with StatusBar.qml so modules don't pretend to be visible when they're not
     function isModuleVisible(modId) {
         if (!Settings) return true;
         switch (modId) {
             case "launcher": return Settings.showLauncher ?? true;
             case "wallpaper": return Settings.showWallpaper ?? true;
             case "workspaces": return Settings.showWorkspaces ?? true;
+            case "layout": case "layoutSwitcher": return Settings.showLayoutSwitcher ?? true;
             case "windowTitle": return Settings.showWindowTitle ?? true;
             case "clock": return Settings.showClock ?? true;
+            case "dynamicNotch": case "notch": return Settings.showDynamicNotch ?? true;
             case "media": return Settings.showMedia ?? true;
             case "quickNotes": return Settings.showQuickNotes ?? true;
             case "clipboard": return Settings.showClipboard ?? true;
@@ -129,33 +141,14 @@ PopupPanel {
             case "battery": return Settings.showBattery ?? true;
             case "quickSettings": return Settings.showQuickSettings ?? true;
             case "powerMenu": return Settings.showPowerMenu ?? true;
-            case "dynamicNotch": case "notch": return Settings.showDynamicNotch ?? true;
+            case "screenCapture": case "capture": return Settings.showScreenCapture ?? true;
             default: return true;
         }
     }
 
     function toggleModuleVisibility(modId) {
         if (!Settings) return;
-        switch (modId) {
-            case "launcher": Settings.showLauncher = !Settings.showLauncher; break;
-            case "wallpaper": Settings.showWallpaper = !Settings.showWallpaper; break;
-            case "workspaces": Settings.showWorkspaces = !Settings.showWorkspaces; break;
-            case "windowTitle": Settings.showWindowTitle = !Settings.showWindowTitle; break;
-            case "clock": Settings.showClock = !Settings.showClock; break;
-            case "dynamicNotch": case "notch": Settings.showDynamicNotch = !Settings.showDynamicNotch; break;
-            case "media": Settings.showMedia = !Settings.showMedia; break;
-            case "quickNotes": Settings.showQuickNotes = !Settings.showQuickNotes; break;
-            case "clipboard": Settings.showClipboard = !Settings.showClipboard; break;
-            case "idleInhibitor": Settings.showIdleInhibitor = !Settings.showIdleInhibitor; break;
-            case "notifications": Settings.showNotifications = !Settings.showNotifications; break;
-            case "systemTray": Settings.showSystemTray = !Settings.showSystemTray; break;
-            case "bluetooth": Settings.showBluetooth = !Settings.showBluetooth; break;
-            case "network": Settings.showNetwork = !Settings.showNetwork; break;
-            case "volume": Settings.showVolume = !Settings.showVolume; break;
-            case "quickSettings": Settings.showQuickSettings = !Settings.showQuickSettings; break;
-            case "powerMenu": Settings.showPowerMenu = !Settings.showPowerMenu; break;
-            case "screenCapture": case "capture": Settings.showScreenCapture = !Settings.showScreenCapture; break;
-        }
+        setModuleVisibility(modId, !isModuleVisible(modId));
     }
 
     function setModuleVisibility(modId, visible) {
@@ -164,6 +157,7 @@ PopupPanel {
             case "launcher": Settings.showLauncher = visible; break;
             case "wallpaper": Settings.showWallpaper = visible; break;
             case "workspaces": Settings.showWorkspaces = visible; break;
+            case "layout": case "layoutSwitcher": Settings.showLayoutSwitcher = visible; break;
             case "windowTitle": Settings.showWindowTitle = visible; break;
             case "clock": Settings.showClock = visible; break;
             case "dynamicNotch": case "notch": Settings.showDynamicNotch = visible; break;
@@ -181,6 +175,7 @@ PopupPanel {
             case "quickSettings": Settings.showQuickSettings = visible; break;
             case "powerMenu": Settings.showPowerMenu = visible; break;
         }
+        saveSettings();
     }
 
     function getZoneList(z) {
@@ -196,6 +191,14 @@ PopupPanel {
         if (z === "left") Settings.barModulesLeft = arr;
         else if (z === "center") Settings.barModulesCenter = arr;
         else if (z === "right") Settings.barModulesRight = arr;
+        saveSettings();
+    }
+
+    function syncGhostPos(globalX, globalY) {
+        const host = dragGhost.parent;
+        const localPt = host ? host.mapFromItem(null, globalX, globalY) : { x: globalX, y: globalY };
+        ghostX = localPt.x - dragOffsetX;
+        ghostY = localPt.y - dragOffsetY;
     }
 
     function startDrag(zoneId, index, modId, cardItem, mouseX, mouseY) {
@@ -207,16 +210,13 @@ PopupPanel {
         dragOffsetX = mouseX;
         dragOffsetY = mouseY;
 
-        // null maps directly to window scene coordinates without blowing up
         const p = cardItem.mapToItem(null, mouseX, mouseY);
-        ghostX = p.x - dragOffsetX;
-        ghostY = p.y - dragOffsetY;
+        syncGhostPos(p.x, p.y);
         updateHoverTarget(p.x, p.y);
     }
 
     function updateDrag(globalX, globalY) {
-        ghostX = globalX - dragOffsetX;
-        ghostY = globalY - dragOffsetY;
+        syncGhostPos(globalX, globalY);
         updateHoverTarget(globalX, globalY);
     }
 
@@ -325,7 +325,7 @@ PopupPanel {
     content: ColumnLayout {
         id: contentRoot
         anchors.fill: parent
-        spacing: 10
+        spacing: Theme.popupSpacing
         focus: true
 
         Keys.onEscapePressed: (event) => {
@@ -339,22 +339,25 @@ PopupPanel {
             }
         }
 
+        // header row
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
 
             Rectangle {
-                Layout.preferredWidth: 32
-                Layout.preferredHeight: 32
-                radius: Theme?.radiusPill ?? 16
-                color: Theme?.primary_overlay ?? "#20ffffff"
+                Layout.preferredWidth: 34
+                Layout.preferredHeight: 34
+                radius: Theme.radiusMd
+                color: Theme.primary_overlay
+                border.color: Theme.alpha(Theme.primary, 0.35)
+                border.width: 1
 
                 Text {
                     anchors.centerIn: parent
-                    text: Theme?.iconSparkles ?? "✦"
-                    font.family: Theme?.fontIcon
-                    font.pixelSize: Theme?.fontSizeMd ?? 14
-                    color: Theme?.primary ?? "#ffffff"
+                    text: Theme.iconSparkles
+                    font.family: Theme.fontIcon
+                    font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                    color: Theme.primary
                 }
             }
 
@@ -362,16 +365,16 @@ PopupPanel {
                 spacing: 1
                 Text {
                     text: "bar layout studio"
-                    font.family: Theme?.fontFamily
-                    font.pixelSize: Theme?.fontSizeMd ?? 14
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeMd
                     font.weight: Font.Bold
-                    color: Theme?.on_surface ?? "#ffffff"
+                    color: Theme.on_surface
                 }
                 Text {
-                    text: "drag cards or click arrows to hot-reorder panels on your status bar"
-                    font.family: Theme?.fontFamily
-                    font.pixelSize: Theme?.fontSizeXs ?? 11
-                    color: Theme?.on_surface_variant ?? "#aaaaaa"
+                    text: Theme.getFlavor("system", "drag cards or click arrows to hot-reorder panels on your status bar")
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeXs
+                    color: Theme.on_surface_variant
                 }
             }
 
@@ -381,32 +384,34 @@ PopupPanel {
 
                 Text {
                     text: "preset:"
-                    font.family: Theme?.fontFamily
-                    font.pixelSize: 10
-                    color: Theme?.on_surface_variant ?? "#888888"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeXs
+                    color: Theme.on_surface_variant
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
                 Repeater {
-                    model: PresetService?.availablePresets ?? []
+                    model: (typeof PresetService !== "undefined" ? PresetService?.availablePresets : null) ?? []
                     delegate: Rectangle {
                         required property var modelData
                         height: 24
                         implicitWidth: pText.implicitWidth + 14
-                        radius: Theme?.radiusPill ?? 12
+                        radius: Theme.radiusPill
                         readonly property bool isCurrent: PresetService?.activePresetName === modelData.id
-                        color: isCurrent ? (Theme?.primary ?? "#ffffff") : (pMouse.containsMouse ? (Theme?.surface_container_highest ?? "#383838") : (Theme?.surface_container_high ?? "#282828"))
-                        border.color: isCurrent ? (Theme?.primary ?? "#ffffff") : (Theme?.widgetBorder ?? "#444444")
-                        border.width: 1
+                        color: isCurrent ? Theme.primary : (pMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                        border.color: isCurrent ? Theme.primary : Theme.pillBorder
+                        border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+
+                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                         Text {
                             id: pText
                             anchors.centerIn: parent
                             text: modelData.name
-                            font.family: Theme?.fontFamily
-                            font.pixelSize: 9
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
                             font.weight: isCurrent ? Font.Bold : Font.Normal
-                            color: isCurrent ? (Theme?.on_primary ?? "#000000") : (Theme?.on_surface ?? "#ffffff")
+                            color: isCurrent ? Theme.on_primary : Theme.on_surface
                         }
 
                         MouseArea {
@@ -421,20 +426,36 @@ PopupPanel {
 
                 Rectangle {
                     height: 24
-                    implicitWidth: saveText.implicitWidth + 14
-                    radius: Theme?.radiusPill ?? 12
-                    color: saveMouse.containsMouse ? (Theme?.primary_overlay ?? "#25ffffff") : "transparent"
-                    border.color: Theme?.widgetBorder ?? "#444444"
+                    implicitWidth: saveRow.implicitWidth + 14
+                    radius: Theme.radiusPill
+                    color: saveMouse.containsMouse ? Theme.primary_overlay : "transparent"
+                    border.color: saveMouse.containsMouse ? Theme.primary : Theme.widgetBorder
                     border.width: 1
 
-                    Text {
-                        id: saveText
+                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                    Row {
+                        id: saveRow
                         anchors.centerIn: parent
-                        text: "💾 save preset"
-                        font.family: Theme?.fontFamily
-                        font.pixelSize: 9
-                        font.weight: Font.DemiBold
-                        color: Theme?.primary ?? "#ffffff"
+                        spacing: 4
+
+                        Text {
+                            visible: !Theme.isTextIconSet
+                            text: Theme.iconSave
+                            font.family: Theme.fontIcon
+                            font.pixelSize: Theme.fontSizeXs
+                            color: Theme.primary
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        Text {
+                            text: "save preset"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: Font.DemiBold
+                            color: Theme.primary
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
                     }
 
                     MouseArea {
@@ -455,26 +476,30 @@ PopupPanel {
             Rectangle {
                 Layout.preferredHeight: 28
                 Layout.preferredWidth: resetRow.implicitWidth + 18
-                radius: Theme?.radiusPill ?? 14
-                color: resetMouse.containsMouse ? (Theme?.surface_container_highest ?? "#383838") : (Theme?.surface_container_high ?? "#2b2b2b")
-                border.color: Theme?.widgetBorder ?? "#444444"
+                radius: Theme.radiusPill
+                color: resetMouse.pressed ? Theme.widgetActive : (resetMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                border.color: Theme.widgetBorder
                 border.width: 1
+
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                 Row {
                     id: resetRow
                     anchors.centerIn: parent
                     spacing: 5
                     Text {
-                        text: "↺"
-                        font.pixelSize: 11
-                        color: Theme?.on_surface ?? "#ffffff"
+                        visible: !Theme.isTextIconSet
+                        text: Theme.iconRefresh
+                        font.family: Theme.fontIcon
+                        font.pixelSize: Theme.fontSizeXs
+                        color: Theme.on_surface
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Text {
                         text: "reset layout"
-                        font.family: Theme?.fontFamily
-                        font.pixelSize: 10
-                        color: Theme?.on_surface ?? "#ffffff"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeXs
+                        color: Theme.on_surface
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
@@ -484,24 +509,29 @@ PopupPanel {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: Settings?.resetBarLayout ? Settings.resetBarLayout() : null
+                    onClicked: {
+                        if (Settings?.resetBarLayout) Settings.resetBarLayout();
+                        root.saveSettings();
+                    }
                 }
             }
 
             Rectangle {
                 Layout.preferredWidth: 28
                 Layout.preferredHeight: 28
-                radius: Theme?.radiusPill ?? 14
-                color: closeMouse.containsMouse ? (Theme?.error_overlay ?? "#33ff5555") : (Theme?.surface_container_high ?? "#2b2b2b")
-                border.color: Theme?.widgetBorder ?? "#444444"
+                radius: Theme.radiusPill
+                color: closeMouse.containsMouse ? Theme.error_overlay : Theme.pillBg
+                border.color: closeMouse.containsMouse ? Theme.error : Theme.widgetBorder
                 border.width: 1
+
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                 Text {
                     anchors.centerIn: parent
-                    text: "✕"
-                    font.family: Theme?.fontFamily
-                    font.pixelSize: 11
-                    color: closeMouse.containsMouse ? (Theme?.error ?? "#ff5555") : (Theme?.on_surface ?? "#ffffff")
+                    text: Theme.iconClose
+                    font.family: Theme.fontIcon
+                    font.pixelSize: Theme.fontSizeXs
+                    color: closeMouse.containsMouse ? Theme.error : Theme.on_surface
                 }
 
                 MouseArea {
@@ -517,14 +547,16 @@ PopupPanel {
             }
         }
 
+        // live mini screen preview (now actually using ConcaveCorner instead of leaving the import hanging)
         Rectangle {
             id: barPreviewMock
             Layout.fillWidth: true
-            Layout.preferredHeight: 84
-            color: Theme?.surface_container_lowest ?? "#141414"
-            radius: Theme?.radiusMd ?? 8
-            border.color: Theme?.widgetBorder ?? "#333333"
+            Layout.preferredHeight: 88
+            color: Theme.cardBg
+            radius: Theme.radiusMd
+            border.color: Theme.cardBorder
             border.width: 1
+            clip: true
 
             readonly property string barPos: Settings?.barPosition ?? "top"
             readonly property bool isTop: barPos === "up" || barPos === "top"
@@ -532,13 +564,25 @@ PopupPanel {
             readonly property bool isLeft: barPos === "left"
             readonly property bool isRight: barPos === "right"
             readonly property bool isVertical: isLeft || isRight
+            readonly property bool isFloating: (Settings?.barFloating ?? false) || Theme.isBento
+
+            Rectangle {
+                visible: Theme.isGlass
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 1
+                color: Theme.glassHighlight
+            }
 
             Rectangle {
                 id: screenMock
                 anchors.fill: parent
                 anchors.margins: 7
-                color: Theme?.background ?? "#1e1e1e"
-                radius: Theme?.radiusSm ?? 4
+                color: Theme.background
+                radius: Theme.radiusSm
+                border.color: Theme.widgetBorder
+                border.width: 1
                 clip: true
 
                 Rectangle {
@@ -547,9 +591,13 @@ PopupPanel {
                     anchors.right: !barPreviewMock.isLeft ? parent.right : undefined
                     anchors.top: !barPreviewMock.isBottom ? parent.top : undefined
                     anchors.bottom: !barPreviewMock.isTop ? parent.bottom : undefined
-                    width: barPreviewMock.isVertical ? 22 : parent.width
-                    height: barPreviewMock.isVertical ? parent.height : 22
-                    color: Theme?.surface_container_low ?? "#222222"
+                    anchors.margins: barPreviewMock.isFloating ? 4 : 0
+                    width: barPreviewMock.isVertical ? 24 : (parent.width - (barPreviewMock.isFloating ? 8 : 0))
+                    height: barPreviewMock.isVertical ? (parent.height - (barPreviewMock.isFloating ? 8 : 0)) : 22
+                    radius: barPreviewMock.isFloating ? Theme.radiusSm : 0
+                    color: Theme.cornerFill
+                    border.color: barPreviewMock.isFloating ? Theme.barBorderColor : "transparent"
+                    border.width: barPreviewMock.isFloating ? 1 : 0
                     z: 2
 
                     component MiniModulePill: Rectangle {
@@ -557,22 +605,22 @@ PopupPanel {
                         readonly property var info: root.getModuleInfo(modelData)
                         readonly property bool isVis: root.isModuleVisible(modelData)
                         readonly property bool isGhostTarget: root.isDragging && root.draggedModId === modelData
-                        readonly property color bColor: info?.color ?? Theme?.primary ?? "#4c97ff"
+                        readonly property color bColor: info?.color ?? Theme.primary
 
-                        height: barPreviewMock.isVertical ? 14 : 12
-                        width: barPreviewMock.isVertical ? 14 : Math.max(12, mText.implicitWidth + 6)
-                        radius: 3
-                        color: isGhostTarget ? "#ffffff" : (isVis ? bColor : (Theme?.surface_container_highest ?? "#383838"))
-                        border.color: isGhostTarget ? "#ffffff" : "transparent"
+                        height: barPreviewMock.isVertical ? 14 : 13
+                        width: barPreviewMock.isVertical ? 14 : Math.max(14, mText.implicitWidth + 6)
+                        radius: Theme.radiusXs
+                        color: isGhostTarget ? Theme.on_surface : (isVis ? bColor : Theme.widgetBg)
+                        border.color: isGhostTarget ? Theme.primary : "transparent"
                         border.width: 1
 
                         Text {
                             id: mText
                             anchors.centerIn: parent
                             text: parent.info.icon
-                            font.family: Theme?.fontIcon
+                            font.family: Theme.fontIcon
                             font.pixelSize: 8
-                            color: parent.isGhostTarget ? "#000000" : (parent.isVis ? "#ffffff" : (Theme?.on_surface_disabled ?? "#666666"))
+                            color: parent.isGhostTarget ? Theme.surface : (parent.isVis ? Theme.on_primary : Theme.on_surface_disabled)
                         }
                     }
 
@@ -629,15 +677,38 @@ PopupPanel {
                     }
                 }
 
+                // miniature concave scoops on the bar edges when docked
+                ConcaveCorner {
+                    visible: !barPreviewMock.isFloating && Theme.screenFrameDocked
+                    radius: 8
+                    fillColor: Theme.cornerFill
+                    x: barPreviewMock.isLeft ? mockBar.width : (barPreviewMock.isRight ? (screenMock.width - mockBar.width - width) : 0)
+                    y: barPreviewMock.isTop ? mockBar.height : (barPreviewMock.isBottom ? (screenMock.height - mockBar.height - height) : 0)
+                    flipX: barPreviewMock.isRight
+                    flipY: barPreviewMock.isBottom
+                    z: 2
+                }
+
+                ConcaveCorner {
+                    visible: !barPreviewMock.isFloating && Theme.screenFrameDocked
+                    radius: 8
+                    fillColor: Theme.cornerFill
+                    x: barPreviewMock.isLeft ? mockBar.width : (barPreviewMock.isRight ? (screenMock.width - mockBar.width - width) : (screenMock.width - width))
+                    y: barPreviewMock.isTop ? mockBar.height : (barPreviewMock.isBottom ? (screenMock.height - mockBar.height - height) : (screenMock.height - height))
+                    flipX: !barPreviewMock.isLeft
+                    flipY: !barPreviewMock.isTop
+                    z: 2
+                }
+
                 Rectangle {
                     anchors.left: barPreviewMock.isLeft ? mockBar.right : parent.left
                     anchors.right: barPreviewMock.isRight ? mockBar.left : parent.right
                     anchors.top: barPreviewMock.isTop ? mockBar.bottom : parent.top
                     anchors.bottom: barPreviewMock.isBottom ? mockBar.top : parent.bottom
-                    anchors.margins: 5
-                    color: Theme?.surface_container_high ?? "#2c2c2c"
-                    radius: Theme?.radiusSm ?? 4
-                    border.color: Theme?.primary_overlay ?? "#1affffff"
+                    anchors.margins: 6
+                    color: Theme.widgetBg
+                    radius: Theme.radiusSm
+                    border.color: Theme.widgetBorder
                     border.width: 1
 
                     RowLayout {
@@ -646,9 +717,9 @@ PopupPanel {
 
                         Text {
                             text: "dock position:"
-                            font.family: Theme?.fontFamily
-                            font.pixelSize: 9
-                            color: Theme?.on_surface_variant ?? "#999999"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            color: Theme.on_surface_variant
                         }
 
                         Repeater {
@@ -661,22 +732,26 @@ PopupPanel {
 
                             delegate: Rectangle {
                                 required property var modelData
-                                height: 20
-                                implicitWidth: dockText.implicitWidth + 10
-                                radius: Theme?.radiusPill ?? 10
+                                height: 22
+                                implicitWidth: dockText.implicitWidth + 12
+                                radius: Theme.radiusPill
                                 readonly property bool isCurrent: (Settings?.barPosition === modelData.pos)
                                     || (modelData.pos === "top" && Settings?.barPosition === "up")
                                     || (modelData.pos === "bottom" && Settings?.barPosition === "down")
-                                color: isCurrent ? (Theme?.primary ?? "#ffffff") : (dockMouse.containsMouse ? (Theme?.surface_container_highest ?? "#444444") : (Theme?.surface_container_low ?? "#202020"))
+                                color: isCurrent ? Theme.primary : (dockMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                                border.color: isCurrent ? Theme.primary : Theme.pillBorder
+                                border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+
+                                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                                 Text {
                                     id: dockText
                                     anchors.centerIn: parent
                                     text: modelData.label
-                                    font.family: Theme?.fontFamily
-                                    font.pixelSize: 8
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeXs
                                     font.weight: isCurrent ? Font.Bold : Font.Normal
-                                    color: isCurrent ? (Theme?.on_primary ?? "#000000") : (Theme?.on_surface ?? "#ffffff")
+                                    color: isCurrent ? Theme.on_primary : Theme.on_surface
                                 }
 
                                 MouseArea {
@@ -685,7 +760,10 @@ PopupPanel {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        if (Settings) Settings.barPosition = modelData.pos;
+                                        if (Settings) {
+                                            Settings.barPosition = modelData.pos;
+                                            root.saveSettings();
+                                        }
                                     }
                                 }
                             }
@@ -698,14 +776,14 @@ PopupPanel {
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 10
+            spacing: Theme.popupSpacing
 
             ZoneColumn {
                 id: leftColZone
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 zoneId: "left"
-                zoneTitle: "left modules"
+                zoneTitle: root.barPreviewMock?.isVertical ? "top modules" : "left modules"
                 modulesList: Settings?.barModulesLeft ?? []
             }
 
@@ -723,7 +801,7 @@ PopupPanel {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 zoneId: "right"
-                zoneTitle: "right modules"
+                zoneTitle: root.barPreviewMock?.isVertical ? "bottom modules" : "right modules"
                 modulesList: Settings?.barModulesRight ?? []
             }
         }
@@ -733,9 +811,9 @@ PopupPanel {
             visible: root.unassignedModules.length > 0
             Layout.fillWidth: true
             Layout.preferredHeight: 38
-            color: Theme?.surface_container_low ?? "#1c1c1c"
-            radius: Theme?.radiusSm ?? 4
-            border.color: Theme?.widgetBorder ?? "#333333"
+            color: Theme.cardBg
+            radius: Theme.radiusSm
+            border.color: Theme.cardBorder
             border.width: 1
 
             RowLayout {
@@ -746,10 +824,10 @@ PopupPanel {
 
                 Text {
                     text: "unassigned (" + root.unassignedModules.length + "):"
-                    font.family: Theme?.fontFamily
-                    font.pixelSize: 9
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeXs
                     font.weight: Font.DemiBold
-                    color: Theme?.on_surface_variant ?? "#888888"
+                    color: Theme.on_surface_variant
                 }
 
                 Flickable {
@@ -773,10 +851,10 @@ PopupPanel {
 
                                 height: 24
                                 implicitWidth: pillRow.implicitWidth + 12
-                                radius: Theme?.radiusPill ?? 12
-                                color: Theme?.surface_container_high ?? "#282828"
-                                border.color: Theme?.widgetBorder ?? "#3a3a3a"
-                                border.width: 1
+                                radius: Theme.radiusPill
+                                color: Theme.pillBg
+                                border.color: Theme.pillBorder
+                                border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
 
                                 Row {
                                     id: pillRow
@@ -784,27 +862,28 @@ PopupPanel {
                                     spacing: 5
 
                                     Text {
+                                        visible: !Theme.isTextIconSet
                                         text: parent.parent.info.icon
-                                        font.family: Theme?.fontIcon
-                                        font.pixelSize: 9
-                                        color: Theme?.primary ?? "#ffffff"
+                                        font.family: Theme.fontIcon
+                                        font.pixelSize: Theme.fontSizeXs
+                                        color: Theme.primary
                                         anchors.verticalCenter: parent.verticalCenter
                                     }
 
                                     Text {
                                         text: parent.parent.info.name
-                                        font.family: Theme?.fontFamily
-                                        font.pixelSize: 9
-                                        color: Theme?.on_surface ?? "#ffffff"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        color: Theme.on_surface
                                         anchors.verticalCenter: parent.verticalCenter
                                     }
 
                                     Text {
                                         text: "+left"
-                                        font.family: Theme?.fontFamily
-                                        font.pixelSize: 8
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
                                         font.weight: Font.Bold
-                                        color: leftAddMouse.containsMouse ? (Theme?.primary ?? "#ffffff") : (Theme?.on_surface_variant ?? "#777777")
+                                        color: leftAddMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
                                         anchors.verticalCenter: parent.verticalCenter
 
                                         MouseArea {
@@ -818,10 +897,10 @@ PopupPanel {
 
                                     Text {
                                         text: "+center"
-                                        font.family: Theme?.fontFamily
-                                        font.pixelSize: 8
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
                                         font.weight: Font.Bold
-                                        color: centerAddMouse.containsMouse ? (Theme?.primary ?? "#ffffff") : (Theme?.on_surface_variant ?? "#777777")
+                                        color: centerAddMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
                                         anchors.verticalCenter: parent.verticalCenter
 
                                         MouseArea {
@@ -835,10 +914,10 @@ PopupPanel {
 
                                     Text {
                                         text: "+right"
-                                        font.family: Theme?.fontFamily
-                                        font.pixelSize: 8
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
                                         font.weight: Font.Bold
-                                        color: rightAddMouse.containsMouse ? (Theme?.primary ?? "#ffffff") : (Theme?.on_surface_variant ?? "#777777")
+                                        color: rightAddMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
                                         anchors.verticalCenter: parent.verticalCenter
 
                                         MouseArea {
@@ -866,13 +945,23 @@ PopupPanel {
 
         readonly property bool isOverThisZone: root.isDragging && root.hoverZoneId === zoneRoot.zoneId
 
-        radius: Theme?.radiusMd ?? 8
-        color: isOverThisZone ? (Theme?.surface_container_high ?? "#333333") : (Theme?.surface_container_low ?? "#1f1f1f")
-        border.color: isOverThisZone ? (Theme?.primary ?? "#ffffff") : (Theme?.widgetBorder ?? "#333333")
+        radius: Theme.radiusMd
+        color: isOverThisZone ? Theme.widgetHover : Theme.cardBg
+        border.color: isOverThisZone ? Theme.primary : Theme.cardBorder
         border.width: isOverThisZone ? 2 : 1
+        clip: true
 
-        Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120 } }
-        Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 120 } }
+        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+        Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+        Rectangle {
+            visible: Theme.isGlass
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+            color: Theme.glassHighlight
+        }
 
         function getActiveCount() {
             const list = zoneRoot.modulesList ?? [];
@@ -900,17 +989,17 @@ PopupPanel {
                 Layout.fillWidth: true
                 Text {
                     text: zoneRoot.zoneTitle
-                    font.family: Theme?.fontFamily
-                    font.pixelSize: Theme?.fontSizeXs ?? 11
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
                     font.weight: Font.Bold
-                    color: zoneRoot.isOverThisZone ? (Theme?.primary ?? "#ffffff") : (Theme?.on_surface ?? "#ffffff")
+                    color: zoneRoot.isOverThisZone ? Theme.primary : Theme.on_surface
                 }
                 Item { Layout.fillWidth: true }
                 Text {
                     text: zoneRoot.getActiveCount() + "/" + zoneRoot.modulesList.length + " active"
-                    font.family: Theme?.fontFamily
-                    font.pixelSize: 9
-                    color: Theme?.on_surface_variant ?? "#888888"
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeXs
+                    color: Theme.on_surface_variant
                 }
             }
 
@@ -956,7 +1045,7 @@ PopupPanel {
                                     width: parent.width - 8
                                     height: 3
                                     radius: 1.5
-                                    color: Theme?.primary ?? "#ffffff"
+                                    color: Theme.primary
                                 }
                             }
 
@@ -1006,7 +1095,7 @@ PopupPanel {
                                     width: parent.width - 8
                                     height: 3
                                     radius: 1.5
-                                    color: Theme?.primary ?? "#ffffff"
+                                    color: Theme.primary
                                 }
                             }
 
@@ -1021,9 +1110,9 @@ PopupPanel {
                         visible: zoneRoot.modulesList.length === 0
                         width: parent.width
                         height: 64
-                        radius: Theme?.radiusSm ?? 4
-                        color: zoneRoot.isOverThisZone ? (Theme?.primary_overlay ?? "#20ffffff") : "transparent"
-                        border.color: zoneRoot.isOverThisZone ? (Theme?.primary ?? "#ffffff") : (Theme?.widgetBorder ?? "#333333")
+                        radius: Theme.radiusSm
+                        color: zoneRoot.isOverThisZone ? Theme.primary_overlay : "transparent"
+                        border.color: zoneRoot.isOverThisZone ? Theme.primary : Theme.widgetBorder
                         border.width: 1
 
                         Column {
@@ -1032,17 +1121,17 @@ PopupPanel {
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: zoneRoot.isOverThisZone ? "drop module here" : "empty zone"
-                                font.family: Theme?.fontFamily
-                                font.pixelSize: 10
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSm
                                 font.weight: Font.Bold
-                                color: zoneRoot.isOverThisZone ? (Theme?.primary ?? "#ffffff") : (Theme?.on_surface_variant ?? "#777777")
+                                color: zoneRoot.isOverThisZone ? Theme.primary : Theme.on_surface_variant
                             }
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: "drag cards across or use unassigned tray"
-                                font.family: Theme?.fontFamily
-                                font.pixelSize: 8
-                                color: Theme?.on_surface_disabled ?? "#555555"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeXs
+                                color: Theme.on_surface_disabled
                             }
                         }
                     }
@@ -1057,12 +1146,12 @@ PopupPanel {
         x: root.ghostX
         y: root.ghostY
         width: root.ghostW
-        height: 44
-        radius: Theme?.radiusSm ?? 6
+        height: Theme.popupCardHeight
+        radius: Theme.radiusSm
         readonly property var info: root.getModuleInfo(root.draggedModId)
-        readonly property color ghostColor: info?.color ?? (Theme?.primary ?? "#a8d292")
-        color: Theme?.surface_container_high ?? "#282b25"
-        border.color: Theme?.primary ?? "#a8d292"
+        readonly property color ghostColor: info?.color ?? Theme.primary
+        color: Theme.cardBg
+        border.color: Theme.primary
         border.width: 1.5
         z: 99999
         opacity: 0.95
@@ -1086,34 +1175,34 @@ PopupPanel {
 
             Text {
                 text: "⠿"
-                font.family: Theme?.fontFamily
-                font.pixelSize: 13
-                color: Theme?.on_surface_variant ?? "#888888"
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeMd
+                color: Theme.on_surface_variant
             }
 
             Rectangle {
-                Layout.preferredWidth: 26
-                Layout.preferredHeight: 26
-                radius: Theme?.radiusSm ?? 6
-                color: Qt.rgba(dragGhost.ghostColor.r, dragGhost.ghostColor.g, dragGhost.ghostColor.b, 0.15)
-                border.color: Qt.rgba(dragGhost.ghostColor.r, dragGhost.ghostColor.g, dragGhost.ghostColor.b, 0.35)
+                Layout.preferredWidth: Theme.popupCardIconSize
+                Layout.preferredHeight: Theme.popupCardIconSize
+                radius: Theme.radiusSm
+                color: Theme.alpha(dragGhost.ghostColor, 0.15)
+                border.color: Theme.alpha(dragGhost.ghostColor, 0.35)
                 border.width: 1
 
                 Text {
                     anchors.centerIn: parent
-                    text: dragGhost.info?.icon ?? "\uE9B0"
-                    font.family: Theme?.fontIcon
-                    font.pixelSize: 12
+                    text: dragGhost.info?.icon ?? Theme.iconGrid
+                    font.family: Theme.fontIcon
+                    font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                     color: dragGhost.ghostColor
                 }
             }
 
             Text {
                 text: dragGhost.info?.name ?? root.draggedModId
-                font.family: Theme?.fontFamily
-                font.pixelSize: 11
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSm
                 font.weight: Font.DemiBold
-                color: Theme?.on_surface ?? "#ffffff"
+                color: Theme.on_surface
                 Layout.fillWidth: true
                 elide: Text.ElideRight
             }
