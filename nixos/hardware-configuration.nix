@@ -14,20 +14,42 @@
   boot.extraModulePackages = [ ];
 
   fileSystems."/" =
-    { device = "/dev/disk/by-uuid/9d8d91d3-7fea-4df6-9dc7-0e7c269f142e";
-      fsType = "btrfs";
+    { device = "none";
+      fsType = "tmpfs";
+      options = [ "defaults" "size=4G" "mode=755" ];
     };
 
-  fileSystems."/home" =
+  fileSystems."/persist" =
     { device = "/dev/disk/by-uuid/9d8d91d3-7fea-4df6-9dc7-0e7c269f142e";
       fsType = "btrfs";
-      options = [ "subvol=home" ];
+      options = [ "subvol=persist" "compress=zstd:3" "noatime" ];
+      neededForBoot = true;
     };
 
   fileSystems."/nix" =
     { device = "/dev/disk/by-uuid/9d8d91d3-7fea-4df6-9dc7-0e7c269f142e";
       fsType = "btrfs";
-      options = [ "subvol=nix" ];
+      options = [ "subvol=nix" "compress=zstd:3" "noatime" ];
+      neededForBoot = true;
+    };
+
+  fileSystems."/home" =
+    { device = "/dev/disk/by-uuid/9d8d91d3-7fea-4df6-9dc7-0e7c269f142e";
+      fsType = "btrfs";
+      options = [ "subvol=home" "compress=zstd:3" ];
+    };
+
+  fileSystems."/var/lib/flatpak" =
+    { device = "/dev/disk/by-uuid/9d8d91d3-7fea-4df6-9dc7-0e7c269f142e";
+      fsType = "btrfs";
+      options = [ "subvol=flatpak" "compress=zstd:3" ];
+    };
+
+  fileSystems."/var/log" =
+    { device = "/dev/disk/by-uuid/9d8d91d3-7fea-4df6-9dc7-0e7c269f142e";
+      fsType = "btrfs";
+      options = [ "subvol=log" "compress=zstd:3" "noatime" ];
+      neededForBoot = true;
     };
 
   fileSystems."/boot" =

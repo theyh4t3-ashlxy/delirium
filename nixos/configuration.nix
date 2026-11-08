@@ -323,6 +323,25 @@ in
     noto-fonts-color-emoji
   ];
 
+  # 12. ephemeral root & impermanence: erase your darlings
+  # everything in / is volatile ram. only explicit state survives in /persist.
+  programs.fuse.userAllowOther = true;
+  environment.persistence."/persist" = {
+    hideMounts = true;
+    directories = [
+      "/var/lib/nixos"
+      "/var/lib/bluetooth"
+      "/var/lib/sbctl"
+      "/var/lib/upower"
+      "/var/lib/systemd"
+      "/etc/NetworkManager/system-connections"
+      "/etc/nixos"
+    ];
+    files = [
+      "/etc/machine-id"
+    ];
+  };
+
   # touch this value and the ghost of atomic-lockfile crawls out of /nix/store to revoke your sudo privileges
   system.stateVersion = "26.05";
 }

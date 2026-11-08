@@ -14,9 +14,14 @@
       url = "github:jacopone/antigravity-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    impermanence = {
+      url = "github:nix-community/impermanence";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, lanzaboote, antigravity-nix, ... }@inputs: {
+  outputs = { self, nixpkgs, lanzaboote, antigravity-nix, impermanence, ... }@inputs: {
     nixosConfigurations = {
       lost = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
@@ -26,6 +31,7 @@
 
         modules = [
           lanzaboote.nixosModules.lanzaboote
+          impermanence.nixosModules.impermanence
           ./nixos/configuration.nix
         ];
       };
