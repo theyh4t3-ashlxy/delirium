@@ -166,7 +166,13 @@ in
   # 4. display manager: bloatware emergency shelter for when hyprland commits suicide on a minor release
   services.xserver.enable = true;
   services.displayManager.sddm.enable = true;
-  services.desktopManager.plasma6.enable = true; # emotional support desktop environment for wayland casualties
+  services.desktopManager.gnome.enable = true; # emotional support desktop environment for wayland casualties
+
+  environment.gnome.excludePackages = with pkgs; [
+    gnome-tour
+    epiphany
+    geary
+  ];
 
   services.xserver.xkb = {
     layout = "us";
@@ -310,6 +316,12 @@ in
 
     # thinkpad fan curve and thermal control (gui + cli)
     fanControlPkg
+
+    # gnome tweaks and emotional support extensions for when hyprland breaks
+    gnome-tweaks
+    gnomeExtensions.blur-my-shell
+    gnomeExtensions.dash-to-dock
+    gnomeExtensions.appindicator
 
     # antigravity cli compiled directly into system closure from flake input
     inputs.antigravity-nix.packages.${pkgs.stdenv.hostPlatform.system}.google-antigravity-cli
