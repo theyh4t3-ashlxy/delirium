@@ -49,12 +49,17 @@ for app_gtk3 in $HOME/.var/app/*/config/gtk-3.0(N/); do
 done
 
 # 3. Update host GTK settings.ini files
-for ini in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
-    if [[ -f "$ini" ]]; then
-        sed -i "s/^gtk-theme-name=.*/gtk-theme-name=$target_theme/" "$ini" 2>/dev/null || true
-        sed -i "s/^gtk-application-prefer-dark-theme=.*/gtk-application-prefer-dark-theme=$dark_bool/" "$ini" 2>/dev/null || true
-    fi
-done
+# GTK3 uses adw-gtk3 and gtk-application-prefer-dark-theme
+if [[ -f "$HOME/.config/gtk-3.0/settings.ini" ]]; then
+    sed -i "s/^gtk-theme-name=.*/gtk-theme-name=$target_theme/" "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null || true
+    sed -i "s/^gtk-application-prefer-dark-theme=.*/gtk-application-prefer-dark-theme=$dark_bool/" "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null || true
+fi
+
+# GTK4 / Libadwaita relies on AdwStyleManager (dconf color-scheme) and hates gtk-application-prefer-dark-theme
+if [[ -f "$HOME/.config/gtk-4.0/settings.ini" ]]; then
+    sed -i '/^gtk-application-prefer-dark-theme=/d' "$HOME/.config/gtk-4.0/settings.ini" 2>/dev/null || true
+    sed -i '/^gtk-theme-name=/d' "$HOME/.config/gtk-4.0/settings.ini" 2>/dev/null || true
+fi
 
 # 4. Update xsettingsd configuration
 if [[ -f "$HOME/.config/xsettingsd/xsettingsd.conf" ]]; then
