@@ -2,7 +2,7 @@
 
 > [!WARNING]
 > this is an unholy biohazard containment zone masquerading as a wayland desktop.  
-> 98% of this codebase was hallucinated by neural networks running on melting cloud tpus at 4 am while the human maintainer stared blankly into the middle distance fueled by cold brew and spite. if you want polite anime dotfiles with rounded pastel corners and zero mental illness, close this tab immediately and go install `caelestia` or `end-4`.
+> all of the codebase was hallucinated by neural networks running on melting cloud tpus at 4 am while the human maintainer stared blankly into the middle distance fueled by cold brew and spite. if you want polite anime dotfiles with rounded pastel corners and zero mental illness, close this tab immediately and go install `caelestia` or `end-4`.
 
 here is five seconds of live footage captured moments before wayland choked on a malformed layer-shell surface and dropped straight into tty1.
 
