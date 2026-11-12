@@ -87,7 +87,6 @@ PanelWindow {
     readonly property bool isRight: pos === "right"
     readonly property bool isVertical: isLeft || isRight
 
-    // actually honoring Theme.paddingScaleMult so "compact" and "comfortable" aren't placebo buttons
     readonly property int effectivePaddingH: Math.max(4, Math.round(Theme.widgetPaddingH * Theme.paddingScaleMult))
     readonly property int effectiveSpacing: Math.max(2, Math.round(Theme.widgetSpacing * Theme.paddingScaleMult))
 
@@ -179,7 +178,6 @@ PanelWindow {
 
     readonly property real dpr: Math.max(1.0, (Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1.0))
 
-    // check if ScreenCapture is already on the bar so we don't spawn two REC pills at once
     readonly property bool hasCaptureModuleOnBar: {
         if (!root.isModuleVisible("screenCapture")) return false;
         let left = Settings?.barModulesLeft ?? [];
@@ -251,7 +249,6 @@ PanelWindow {
         screen: root.screen
     }
 
-    // cooldown timer so trackpad scrolling on the bar doesn't yeet you across 12 workspaces in 50ms
     Timer {
         id: wsScrollCooldown
         interval: 120
@@ -408,7 +405,6 @@ PanelWindow {
         id: barRootItem
         anchors.fill: parent
 
-        // ambient underglow for accent-glow style (now works on vertical bars too)
         Rectangle {
             visible: Theme.isAccentGlow && !root.isIslandMode
             anchors.fill: barBg
@@ -633,7 +629,6 @@ PanelWindow {
 
                     ctx.lineCap = "butt";
                     ctx.lineJoin = "round";
-                    // check hasNeon first when scoopBorderColor is auto so cyber-neon's pulse doesn't get eaten
                     if (hasNeon && (Settings?.scoopBorderColor ?? "auto") === "auto") {
                         ctx.lineWidth = Theme.scoopBorderWidth > 0 ? Theme.scoopBorderWidth : 2;
                         ctx.strokeStyle = Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, unifiedBarCanvas.glowOpacity);
@@ -670,7 +665,7 @@ PanelWindow {
             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
             Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-            // scroll on empty bar space to cycle workspaces without kidnapping clicks from widgets
+            // scroll on empty bar space to cycle workspaces via Settings' Lua-aware dispatcher
             WheelHandler {
                 enabled: (Settings?.barScrollWorkspaces ?? true) && !root.isIslandMode
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
@@ -679,7 +674,12 @@ PanelWindow {
                     let dy = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x;
                     if (Math.abs(dy) < 15) return;
                     wsScrollCooldown.restart();
-                    Hyprland.dispatch("workspace " + (dy > 0 ? "e-1" : "e+1"));
+                    let target = dy > 0 ? "e-1" : "e+1";
+                    if (typeof Settings !== "undefined" && Settings?.dispatchWorkspace) {
+                        Settings.dispatchWorkspace(target);
+                    } else {
+                        Hyprland.dispatch("workspace " + target);
+                    }
                 }
             }
         }
