@@ -1,15 +1,15 @@
 > [!WARNING]
-> this repository is three python daemons, a pile of qml, and a nixos config taped together at 4 am because i refused to learn how normal people use a computer.  
-> half the codebase was argued into existence with cloud models while my laptop fans sounded like a boeing 737 on the runway, and the other half was patched by a rival model after the first one broke my lockscreen.  
-> if you want a polite desktop with pastel corners and a discord server full of patient strangers, close this tab and install `caelestia` or `end-4`.
+> this repo is a pile of qml, python scripts, and a nixos config taped together at 4 am because i refused to use a computer like a normal person.  
+> half of this code was argued into existence with cloud models while my laptop fans screamed, and the other half was fixed by a second model after the first one broke my lockscreen.  
+> if you want a polite desktop with pastel corners and a discord server full of helpful people, close this tab and go install `caelestia` or `end-4`.
 
-exit doors are right here:  
-[caelestia](https://github.com/caelestia-dots/caelestia) · [end-4 (pc's fork)](https://github.com/pctrade/end4-pC)
+links so you don't even have to search:  
+[caelestia](https://github.com/caelestia-dots/caelestia) / [end4-pC](https://github.com/pctrade/end4-pC)
 
-below is fifteen seconds of live footage recorded moments before wayland choked on a malformed `zwlr_layer_shell_v1` surface and dumped me straight into `tty1`.
+here is fifteen seconds of live footage recorded right before wayland choked on a bad layer-shell surface and dropped me straight into `tty1`.
 
 > [!NOTE]
-> if the embed fails to render, either your browser's media decoder quietly segfaulted or github decided your user-agent doesn't deserve mp4 streams today. i am not filing a support ticket with microsoft on your behalf.
+> if the video doesn't load, either your browser's media player quietly segfaulted or github decided your user-agent doesn't get mp4 streams today. not my problem.
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/bbc2284c-7273-48a3-8108-871a036a0b3f" controls="controls" style="max-width: 100%; height: auto;">
@@ -19,117 +19,119 @@ below is fifteen seconds of live footage recorded moments before wayland choked 
 ---
 
 ### contents
-1. [ecosystem reality check](#ecosystem-reality-check-why-you-should-probably-leave)
-2. [stage 1: nixos ransom note](#stage-1-the-nixos-ransom-note)
-3. [stage 2: deployment vectors](#stage-2-deployment-vectors)
-4. [stage 3: python controller & cli flags](#stage-3-python-controller--cli-flags)
-5. [known hazards & unsolicited suggestions](#known-hazards--unsolicited-suggestions)
-6. [doctrine & autopsy logs (BACKSTORY.md)](#the-doctrine--lore)
+1. [other rices vs this mess](#other-rices-vs-this-mess)
+2. [step 1: nixos packages](#step-1-nixos-packages)
+3. [step 2: running the installer](#step-2-running-the-installer)
+4. [bugs & suggestions](#bugs--suggestions)
+5. [backstory (BACKSTORY.md)](#backstory)
 
 ---
 
-## ecosystem reality check: why you should probably leave
+## other rices vs this mess
 
-let's be realistic. you have actual options, and almost every single one of them is a healthier life decision than cloning this repo.
+let's be real here. you have actual options, and almost all of them are better life choices than cloning this repo.
 
-| rice | stack & engine | primary vibe | why people use it | why you should pick it over this | survival rate |
+| rice | actual stack | primary vibe | why people like it | why it beats this repo | survival rate |
 |---|---|---|---|---|---|
-| **[caelestia](https://github.com/caelestia-dots/caelestia)** | quickshell + hyprland, the current meta. | chromebook if google hired actual designers. | looks clean (`"it loosk cool"`) and works out of the box. | an actual community exists to rescue you when an update breaks it. | 94% |
-| **[end-4 (pc's fork)](https://github.com/pctrade/end4-pC)** | quickshell again. everything is quickshell now. | material you cranked past eleven. | widgets everywhere, massive customization ceiling. | battle-tested by thousands of arch insomniacs. | 80% |
-| **[HyDE](https://github.com/HyDE-Project/HyDE)** | classic waybar + standard hyprland script glue. | old-school arch stability ("i use arch btw"). | midwit bell curve meme: beginners overcomplicate, veterans just want a bar that renders text. | most mature shell in the ecosystem; won't randomly eat your ram. | 90% |
-| **[ml4w](https://github.com/mylinuxforwork/dotfiles)** | gtk/quickshell hybrid built for people with salaries. | employed adult in a cubicle. | GUI settings app so you never touch raw config files. | zero chance of bricking your audio five minutes before a zoom call. | 99% |
-| **delirium** *(you are here)* | quickshell, python, hyprland, nixos. | ouroboros of llm commits breaking and fixing each other in an infinite loop. | population: 1. tuned exclusively for my specific muscle memory and neuroses. | you shouldn't. only clone this if you read stack traces for sport. | 0% |
+| **[caelestia](https://github.com/caelestia-dots/caelestia)** | quickshell, typescript, lua (`hypr-vars.lua`), `caelestia-cli`. | chromebook if google hired real designers. | `"it loosk cool"` and installs straight from the AUR via `caelestia install`. | 4.7k stars and an actual community to save you when an update breaks your config. | 94% |
+| **[end4-pC](https://github.com/pctrade/end4-pC)** | 87% qml fork sitting on top of `@end-4`'s `illogical-impulse` (`ii`), plus lua vars. | material 3 expressive on steroids. | one-click community preset gallery (`gh` cli), lyrics, weather, and qr code screen snipping. | stable yet wild with customization, as long as you already have `illogical-impulse` installed. | 80% |
+| **[HyDE](https://github.com/HyDE-Project/HyDE)** | waybar, rofi, `wallbash`, shell + lua + python (formerly `hyprdots`). | classic arch rice ("i use arch btw"). | midwit bell curve: beginners want 50 widgets, veterans just want a bar that works and `themepatcher`. | 9.7k stars, most mature setup around, even has a nixos cousin (`hydenix`). | 90% |
+| **[ml4w](https://github.com/mylinuxforwork/dotfiles)** | qml (quickshell), shell, css, lua, plus its own live ISO ("ml4w os"). | employed adult with a day job. | GUI settings app and one-line installer supporting arch, fedora, ubuntu, and opensuse. | doesn't explode five minutes before a meeting. | 99% |
+| **delirium** *(this repo)* | quickshell, python, hyprland, nixos. | one ai model breaks it, a different ai model patches it, repeat forever. | population: me. built only for my specific muscle memory and ocd. | you want to try something weird that isn't mainstream, and you don't mind reading tracebacks. | 0% |
 
-### why delirium exists at all
-those other repos are real projects maintained for normal users. `delirium` is my personal sandbox built at 16 because i hated how everyone else handled window gaps and volume OSDs.
+### why delirium exists anyway
+the other rices are built for an audience. `delirium` was built by a 16-year-old who refused to use standard tools and wanted total keyboard control over every pixel.
 
-if you want a peaceful desktop where audio sliders work on the first try and your notification daemon doesn't judge you, go install **ml4w** or **caelestia**.
+if you want a painless desktop where volume sliders work on the first try and nothing yells at you in the terminal, go install **ml4w** or **caelestia**.
 
-if you stay anyway: strip-mine the repo. take the cubic bezier curves, steal the native python ipc controller, and rip out whatever qml components survive on your hardware.
+if you stick around anyway: steal the code, steal the bezier curves, steal `cli.py`, and take whatever qml parts work on your machine.
 
 ---
 
-## stage 1: the nixos ransom note
+## step 1: nixos packages
 
-before touching the installer, drop these packages into `/etc/nixos/configuration.nix`. skipping this step means `./install.zsh --doctor` will roast your missing `$PATH` binaries, `quickshell` will panic trying to bind layer surfaces, `matugen` will fail to sample a single hex code, and your bar will render nothing but hollow unicode tofu boxes (`[]`).
+before running `./install.zsh`, put this block into `/etc/nixos/configuration.nix` (or your flake). if you skip this, `./install.zsh --doctor` will call out every missing binary in red text, `quickshell` (`qs`) won't start, `matugen` will have nothing to sample, and your terminal will render hollow unicode tofu boxes (`[]`) instead of icons:
 
 ```nix
-  # 1. wayland session harness: uwsm keeping systemd and hyprland from leaking orphan processes
+  # 1. wayland session: uwsm keeps systemd and hyprland from leaving zombie processes behind
   programs.hyprland = {
     enable = true;
-    withUWSM = true; # wraps hyprland in a proper systemd unit so logging out actually kills child daemons
+    withUWSM = true; # lets install.zsh restart quickshell cleanly via 'uwsm app -- qs -d'
   };
-  programs.zsh.enable = true;   # registers zsh in /etc/shells before chsh locks you out of tty1
-  programs.dconf.enable = true; # required so gtk theme switches don't silently fail in the background
+  programs.zsh.enable = true;   # puts zsh in /etc/shells before you lock yourself out of tty1
+  programs.dconf.enable = true; # needed so gtk theme switches don't fail silently
 
-  # 2. required binaries: compositor glue, cli replacements, and python ipc dependencies
+  # 2. packages checked by './install.zsh --doctor' + script glue
   environment.systemPackages = with pkgs; [
-    # wayland plumbing & shell machinery
-    kitty                # gpu terminal for running git push --force at 3 am
-    quickshell           # qml desktop shell engine replacing waybar and eww
-    matugen              # extracts material color palettes straight from your wallpaper
-    awww                 # wallpaper daemon switching frames without dropping wayland surfaces
-    mpvpaper             # loops mp4 wallpapers when your battery life is too high
-    hyprpicker           # eyedropper utility for stealing hex codes off websites
-    wl-clipboard         # wl-copy / wl-paste so clipboard history persists across closes
-    brightnessctl        # hardware backlight control without needing root permissions
-    playerctl            # mpris media daemon pausing spotify from qml widgets
-    adw-gtk3             # forces stubborn gtk3 apps to match libadwaita dark mode
-    glib                 # provides gsettings binary for live theme reloads
-    dconf                # low-level gnome key-value store for gtk state
-    libnotify            # notify-send binary for background script alerts
-    ffmpeg               # extracts zero-second video frames for matugen color sampling
+    # wayland & rice daemons
+    kitty                # gpu terminal where we run git commands we barely understand
+    quickshell           # qml desktop shell ('qs') replacing waybar
+    matugen              # pulls material color palettes straight from wallpapers
+    awww                 # wallpaper daemon that doesn't crash when wayland blinks
+    mpvpaper             # video wallpaper player for when your gpu isn't warm enough
+    hyprpicker           # screen color picker for grabbing hex codes
+    wl-clipboard         # wl-copy and wl-paste so you can copy stackoverflow snippets
+    brightnessctl        # screen brightness control so you don't blind yourself at 3 am
+    playerctl            # media controller keeping spotify on a leash
+    adw-gtk3             # makes old gtk3 apps look like libadwaita
+    glib                 # gives you gsettings so gtk themes reload live
+    dconf                # gnome config backend for dark mode toggles
+    libnotify            # notify-send so background python scripts can ping you
+    ffmpeg               # grabs thumbnails from video wallpapers
+    rsync                # install.zsh uses this to copy gtk-3.0/4.0 folders for flatpak
+    curl                 # downloads missing icon fonts and random wallhaven wallpapers
+    fontconfig           # gives install.zsh fc-list and fc-cache to check installed fonts
 
-    # rust cli coreutils & terminal navigation
-    micro                # emergency editor for when you forget how to exit neovim
-    neovim               # modal editor with 40 plugins you spend more time configuring than using
-    fastfetch            # prints system specs fast enough to screenshot before the compositor crashes
-    eza                  # ls replacement with nerd font icons
-    zoxide               # tracks directory frecency so you stop typing cd ../../../../
-    fzf                  # fuzzy finder powering the interactive installer menu
-    bat                  # cat clone with syntax highlighting and git diff gutters
-    ripgrep              # rg because standard grep takes three geological eras on node_modules
-    fd                   # sane find replacement without the archaic -exec {} \; ritual
-    jq                   # parses hyprctl -j output without regex war crimes
-    yazi                 # terminal file manager with kitty image previews that actually render
-    git                  # version control for reverting whatever broke five minutes ago
-    zsh                  # interactive shell required by the installer scripts
+    # cli tools
+    micro                # normal text editor for when you forget how to quit neovim
+    neovim               # the editor you tell people on reddit you use every day
+    fastfetch            # prints your system info before the next crash
+    eza                  # ls with nerd font icons
+    zoxide               # smart cd that remembers where you go
+    fzf                  # fuzzy finder for the interactive installer menu
+    bat                  # cat with syntax highlighting
+    ripgrep              # rg because regular grep takes forty business days
+    fd                   # find replacement without the ugly -exec \; syntax
+    jq                   # parses json payloads (install.zsh falls back to python3 if missing)
+    yazi                 # fast terminal file manager with image previews
+    git                  # for committing straight to main without testing
+    zsh                  # runs install.zsh and loads ~/.config/zsh/sources.zsh
 
-    # python controller & archive utilities
-    python3                # runs the background desktop controller and socket listeners
-    python3Packages.pillow # handles gaussian blur passes for the lockscreen cache
-    unar                   # extracts tarballs and zip archives without memorizing tar flags
-    gh                     # github cli for yelling at autonomous ci runners from a terminal
+    # python glue & archives
+    python3                # runs ~/.local/bin/cli and wallpaper.py
+    python3Packages.pillow # blurs images for the lockscreen cache
+    unar                   # unpacks archives without memorizing tar flags
+    gh                     # github cli for yelling at bots in issue trackers
   ];
 
-  # 3. typography: prevents missing glyphs from turning your workspace bar into rectangles
+  # 3. fonts: keeps unicode tofu rectangles off your bar
   fonts.packages = with pkgs; [
-    nerd-fonts.jetbrains-mono # primary monospace font with patched ligatures
-    noto-fonts                # standard latin fallback
-    noto-fonts-cjk-sans       # stops japanese/chinese track titles on spotify from rendering as boxes
-    noto-fonts-color-emoji    # color emoji support so notifications look normal
+    nerd-fonts.jetbrains-mono # main monospace font with patched icons
+    noto-fonts                # standard text fallback
+    noto-fonts-cjk-sans       # stops asian characters on spotify from turning into boxes
+    noto-fonts-color-emoji    # normal color emojis
   ];
 ```
 
-rebuild your system generation prior to running the installer:
+switch your nixos generation before running the installer (or let `./install.zsh --rebuild` do it for you):
 
 ```zsh
 sudo nixos-rebuild switch
 ```
 
 > [!NOTE]
-> **the local font bypass:**  
-> `install.zsh` downloads google material symbols, font awesome 6 free, and microsoft fluent icons straight into `~/.local/share/fonts`. packaging proprietary icon webfonts inside a pure nix derivation is tedious bureaucratic pain, and `fontconfig` indexes `~/.local/share/fonts` automatically anyway. running `./install.zsh --doctor` prior to a full install flags these fonts as missing until the download step finishes. if impure downloads bother your nixos purity standards, add `material-symbols` and `font-awesome_6` directly to `fonts.packages` above.
+> **about the icon fonts:**  
+> `install.zsh` downloads google material symbols, font awesome 6 free, and `SegoeIcons.ttf` straight into `~/.local/share/fonts` and runs `fc-cache -f`. packaging microsoft fonts in nix is a headache, and `fontconfig` checks `~/.local/share/fonts` automatically anyway. if you run `./install.zsh --doctor` before running the installer once, it will complain that those icon fonts are missing.
 
 ---
 
-## stage 2: deployment vectors
+## step 2: running the installer
 
-do **not** run the installer as root. invoking `sudo ./install.zsh` trips a UID check that aborts execution immediately before you accidentally `chown root:root` your entire `~/.config` tree and brick your user login.
+do **not** run `./install.zsh` with `sudo`. the script checks `(( EUID == 0 ))` right at the start and quits immediately so you don't accidentally mess up permissions in `~/.config`.
 
-### vector a: local clone (recommended for people with a pulse)
+### option a: clone it normally
 
-clone into `~/.local/share/dotfiles` rather than dumping another loose folder into `~`:
+clone into `~/.local/share/dotfiles` so you don't clutter `~`:
 
 ```zsh
 mkdir -p ~/.local/share
@@ -139,46 +141,33 @@ chmod +x install.zsh
 ./install.zsh
 ```
 
-when `fzf` is present in `$PATH`, you get an interactive TUI menu. without `fzf`, the script drops down to a comma-separated number prompt like a 1994 BBS door game on a `vt100` terminal.
+just run `./install.zsh` and read the menu, or pass `--help` if you want to see the flags (`--doctor`, `--dry-run`, `--fetch-wp`, `--update`, etc.). if `fzf` is installed, you get a multi-select picker; if not, it drops down to typing comma-separated numbers like a 1994 `vt100` terminal.
 
-### vector b: curl pipe (`| zsh`)
+### option b: one-liner
 
-for people who refuse to audit shell scripts before executing them and trust random github commits with write access to their home directory:
+don't do `curl .../install.zsh | zsh` on its own. `install.zsh` sets `DOTS_DIR="${0:A:h}"` (the folder the script lives in) and doesn't run `git clone` itself, so piping `curl` straight into `zsh` in your home directory will make it try to symlink your `Downloads` and `Documents` folders into `~/.config`.
 
-```zsh
-curl -fsSL https://raw.githubusercontent.com/theyh4t3-ashlxy/delirium/main/install.zsh | zsh
-```
-
-the script binds interactive reads directly to `/dev/tty`, meaning `curl | zsh` won't choke on `EOF` when prompting for confirmation. you have *no excuses* (shoutout to that one charter school district motto etched into my brain against my will).
-
----
-
-## stage 3: python controller & cli flags
-
-since half the desktop logic lives in python sockets and custom zsh wrappers rather than standard bash spaghetti, here are the flags you will actually end up typing when something breaks:
+if you want a one-liner, clone and run it together:
 
 ```zsh
-./install.zsh --doctor    # audits $PATH binaries, nix packages, and local font cache without touching files
-./install.zsh --dry-run   # prints every symlink and backup operation before committing to disk
-./install.zsh --restore   # rolls back ~/.config from the last timestamped backup snapshot
+git clone https://github.com/theyh4t3-ashlxy/delirium.git ~/.local/share/dotfiles && ~/.local/share/dotfiles/install.zsh
 ```
 
-once inside the session, the native python controller syncs state between `hyprctl`, `matugen`, and `quickshell` over unix sockets so switching wallpapers doesn't freeze your bar for two seconds.
+the script reads interactive prompts straight from `/dev/tty`, so you have no excuses (as a certain charter school district motto once threatened. we do not speak its name).
 
 ---
 
-## known hazards & unsolicited suggestions
+## bugs & suggestions
 
-### current bug count
-zero open issues—either the python ipc loop achieved nirvana, or the crash reporter segfaulted before writing to disk. (if your monitor flashes black for 40ms when switching from an mp4 wallpaper to a static png, that's just `mpvpaper` and `awww` fighting over the layer surface. blink at the exact same moment and you won't notice.)
+### bugs
+zero reported fires so far. either the code is holding together or the crash logger segfaulted before it could snitch.
 
-### suggestions (not a roadmap)
-there is no roadmap. roadmaps imply project managers, quarterly deliverables, and promises i have no intention of keeping.
-- if you have a patch or suggestion that makes the shell faster, weirder, or cleaner, open an issue or drop a PR.
-- open an issue asking for "ubuntu 22.04 support" or "how do i install this on gnome" and i will close it as `wontfix` while my local scripts laugh at you.
-- if an autonomous cloud runner opens a PR at 3 am refactoring the entire python controller, do not make eye contact with it.
+### suggestions (no roadmap)
+i don't have a roadmap. roadmaps are for product managers.
+- if you have a suggestion or want to fix something weird, open an issue or send a PR.
+- if a cloud runner opens a PR at 3 am rewriting half the repo, just let it cook.
 
 ---
 
-## the doctrine & lore
-for the full post-mortem on why turn-key rices annoyed me enough to write this, the great arch linux partition incident, laptop thermal throttling workarounds, and rules for arguing with coding models, read [BACKSTORY.md](BACKSTORY.md).
+## backstory
+for why prebuilt rices annoyed me enough to make this, the arch incident, laptop thermal struggles, and rules for arguing with ai models, read [BACKSTORY.md](BACKSTORY.md).
