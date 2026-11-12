@@ -2,7 +2,7 @@
 > this is an unholy biohazard containment zone masquerading as a wayland desktop.  
 > all of the codebase was hallucinated by neural networks running on melting cloud tpus at 4 am while the human maintainer stared blankly into the middle distance fueled by cold brew and spite. if you want polite anime dotfiles with rounded pastel corners and zero mental illness, close this tab immediately and go install `caelestia` or `end-4`.
 
-here is sixteen seconds of live footage captured moments before wayland choked on a malformed layer-shell surface and dropped straight into tty1.
+here is fifteen seconds of live footage captured moments before wayland choked on a malformed layer-shell surface and dropped straight into tty1.
 
 > [!NOTE]
 > if the video fails to load, the media player probably suffered a silent segfault or github refused to serve raw video to your pathetic user-agent. either way, not my problem.
