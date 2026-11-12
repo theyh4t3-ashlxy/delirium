@@ -1,3 +1,4 @@
+// Theme.qml
 pragma Singleton
 import QtQuick
 import Quickshell
@@ -50,68 +51,73 @@ Singleton {
         return Math.max(0.1, Math.min(1.0, maxSat));
     }
 
-    readonly property real adaptiveSurfaceAlpha: {
-        if (!(cfg?.adaptiveTransparency ?? true)) return surfaceOpacity;
-        return Math.min(1.0, surfaceOpacity + (wallpaperVibrancy * 0.08));
-    }
+    readonly property real adaptiveAlphaBoost: (cfg?.adaptiveTransparency ?? true) ? (wallpaperVibrancy * 0.08) : 0.0
+    readonly property real adaptiveSurfaceAlpha: Math.min(1.0, surfaceOpacity + adaptiveAlphaBoost)
 
-    // raw hex slop scraped from the system matrix
-    readonly property color primary:               "{{colors.primary.default.hex}}"
-    readonly property color on_primary:            "{{colors.on_primary.default.hex}}"
-    readonly property color primary_container:     "{{colors.primary_container.default.hex}}"
-    readonly property color on_primary_container:  "{{colors.on_primary_container.default.hex}}"
+    // matugen hex tokens + live custom color overrides from QuickSettings
+    readonly property bool hasCustomColors: cfg?.customColorsEnabled ?? false
 
-    readonly property color secondary:             "{{colors.secondary.default.hex}}"
-    readonly property color on_secondary:          "{{colors.on_secondary.default.hex}}"
-    readonly property color secondary_container:   "{{colors.secondary_container.default.hex}}"
-    readonly property color on_secondary_container:"{{colors.on_secondary_container.default.hex}}"
+    readonly property color matugenPrimary:            "{{colors.primary.default.hex}}"
+    readonly property color primary:                   (hasCustomColors && (cfg?.customActive ?? "") !== "") ? cfg.customActive : matugenPrimary
+    readonly property color on_primary:                "{{colors.on_primary.default.hex}}"
+    readonly property color primary_container:         "{{colors.primary_container.default.hex}}"
+    readonly property color on_primary_container:      "{{colors.on_primary_container.default.hex}}"
 
-    readonly property color tertiary:              "{{colors.tertiary.default.hex}}"
-    readonly property color on_tertiary:           "{{colors.on_tertiary.default.hex}}"
-    readonly property color tertiary_container:    "{{colors.tertiary_container.default.hex}}"
-    readonly property color on_tertiary_container: "{{colors.on_tertiary_container.default.hex}}"
+    readonly property color secondary:                 "{{colors.secondary.default.hex}}"
+    readonly property color on_secondary:              "{{colors.on_secondary.default.hex}}"
+    readonly property color secondary_container:       "{{colors.secondary_container.default.hex}}"
+    readonly property color on_secondary_container:    "{{colors.on_secondary_container.default.hex}}"
 
-    readonly property color error:                 "{{colors.error.default.hex}}"
-    readonly property color on_error:              "{{colors.on_error.default.hex}}"
-    readonly property color error_container:       "{{colors.error_container.default.hex}}"
-    readonly property color on_error_container:    "{{colors.on_error_container.default.hex}}"
+    readonly property color tertiary:                  "{{colors.tertiary.default.hex}}"
+    readonly property color on_tertiary:               "{{colors.on_tertiary.default.hex}}"
+    readonly property color tertiary_container:        "{{colors.tertiary_container.default.hex}}"
+    readonly property color on_tertiary_container:     "{{colors.on_tertiary_container.default.hex}}"
 
-    readonly property color background:            "{{colors.background.default.hex}}"
-    readonly property color on_background:         "{{colors.on_background.default.hex}}"
+    readonly property color error:                     "{{colors.error.default.hex}}"
+    readonly property color on_error:                  "{{colors.on_error.default.hex}}"
+    readonly property color error_container:           "{{colors.error_container.default.hex}}"
+    readonly property color on_error_container:        "{{colors.on_error_container.default.hex}}"
 
-    readonly property color surface:               "{{colors.surface.default.hex}}"
-    readonly property color on_surface:            "{{colors.on_surface.default.hex}}"
-    readonly property color surface_variant:       "{{colors.surface_variant.default.hex}}"
-    readonly property color on_surface_variant:    "{{colors.on_surface_variant.default.hex}}"
-    readonly property color textPrimary:           on_surface
-    readonly property color textSecondary:         on_surface_variant
+    readonly property color matugenBg:                 "{{colors.background.default.hex}}"
+    readonly property color background:                (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : matugenBg
+    readonly property color on_background:             "{{colors.on_background.default.hex}}"
 
-    readonly property color surface_container_lowest:  "{{colors.surface_container_lowest.default.hex}}"
-    readonly property color surface_container_low:     "{{colors.surface_container_low.default.hex}}"
+    readonly property color matugenSurface:            "{{colors.surface.default.hex}}"
+    readonly property color surface:                   (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : matugenSurface
+    readonly property color matugenOnSurface:          "{{colors.on_surface.default.hex}}"
+    readonly property color on_surface:                (hasCustomColors && (cfg?.customText ?? "") !== "") ? cfg.customText : matugenOnSurface
+    readonly property color surface_variant:           "{{colors.surface_variant.default.hex}}"
+    readonly property color matugenOnSurfaceVariant:   "{{colors.on_surface_variant.default.hex}}"
+    readonly property color on_surface_variant:        (hasCustomColors && (cfg?.customSubtext ?? "") !== "") ? cfg.customSubtext : matugenOnSurfaceVariant
+    readonly property color textPrimary:               on_surface
+    readonly property color textSecondary:             on_surface_variant
+
+    readonly property color surface_container_lowest:  (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : "{{colors.surface_container_lowest.default.hex}}"
+    readonly property color surface_container_low:     (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : "{{colors.surface_container_low.default.hex}}"
     readonly property color surface_container:         "{{colors.surface_container.default.hex}}"
-    readonly property color surface_container_high:    "{{colors.surface_container_high.default.hex}}"
+    readonly property color surface_container_high:    (hasCustomColors && (cfg?.customWidgetBg ?? "") !== "") ? cfg.customWidgetBg : "{{colors.surface_container_high.default.hex}}"
     readonly property color surface_container_highest: "{{colors.surface_container_highest.default.hex}}"
 
-    readonly property color surface_dim:           "{{colors.surface_dim.default.hex}}"
-    readonly property color surface_bright:        "{{colors.surface_bright.default.hex}}"
+    readonly property color surface_dim:               "{{colors.surface_dim.default.hex}}"
+    readonly property color surface_bright:            "{{colors.surface_bright.default.hex}}"
 
-    readonly property color outline:                "{{colors.outline.default.hex}}"
-    readonly property color outline_variant:        "{{colors.outline_variant.default.hex}}"
+    readonly property color matugenOutline:            "{{colors.outline.default.hex}}"
+    readonly property color outline:                   (hasCustomColors && (cfg?.customBorder ?? "") !== "") ? cfg.customBorder : matugenOutline
+    readonly property color outline_variant:           (hasCustomColors && (cfg?.customBorder ?? "") !== "") ? cfg.customBorder : "{{colors.outline_variant.default.hex}}"
 
-    readonly property color shadow:                 "{{colors.shadow.default.hex}}"
-    readonly property color scrim:                  "{{colors.scrim.default.hex}}"
+    readonly property color shadow:                    "{{colors.shadow.default.hex}}"
+    readonly property color scrim:                     "{{colors.scrim.default.hex}}"
 
-    readonly property color inverse_surface:        "{{colors.inverse_surface.default.hex}}"
-    readonly property color inverse_on_surface:     "{{colors.inverse_on_surface.default.hex}}"
-    readonly property color inverse_primary:        "{{colors.inverse_primary.default.hex}}"
-    readonly property color source_color:           "{{colors.source_color.default.hex}}"
+    readonly property color inverse_surface:           "{{colors.inverse_surface.default.hex}}"
+    readonly property color inverse_on_surface:        "{{colors.inverse_on_surface.default.hex}}"
+    readonly property color inverse_primary:           "{{colors.inverse_primary.default.hex}}"
+    readonly property color source_color:              "{{colors.source_color.default.hex}}"
 
     /*
     math black magic so the engine doesn't combust,
     upgraded to approximate linear color space so gradients don't look like dishwater
     */
     function alpha(c: color, a: real): color {
-        // qml color coercion is weird, catch absolute garbage
         if (c === undefined || c.r === undefined) return Qt.rgba(0, 0, 0, 0);
         let val = (typeof a !== "number" || isNaN(a)) ? 1.0 : Math.max(0.0, Math.min(1.0, a));
         return Qt.rgba(c.r, c.g, c.b, val);
@@ -246,7 +252,7 @@ Singleton {
     readonly property string fontDisplay:           cfg?.fontDisplay ?? fontSans
 
     // font fallback pile so glyphs dont turn into tofu rectangles
-    readonly property var    fontFamiliesVibe:      [fontSans, "Noto Sans", "Noto Sans CJK JP", "Noto Color Emoji"]
+    readonly property var    fontFamiliesVibe:      [fontSans, "Noto Sans", "Noto Sans CJK JP"]
     readonly property string fontVibe:              fontSans
     readonly property string fontFamily:            fontSans
 
@@ -337,11 +343,11 @@ Singleton {
             case "barBg":
                 if (bs === "regular") return alpha(surface_container_low, 0.95);
                 if (bs === "pure-black") return "#000000";
-                if (bs === "glass") return alpha(surface_container_lowest, 0.40);
-                if (bs === "glass-frost") return alpha(surface_container_lowest, 0.55);
+                if (bs === "glass") return alpha(surface_container_lowest, Math.min(1.0, 0.40 + adaptiveAlphaBoost));
+                if (bs === "glass-frost") return alpha(surface_container_lowest, Math.min(1.0, 0.55 + adaptiveAlphaBoost));
                 if (bs === "cyber-neon") return alpha("#050508", 0.94);
-                if (bs === "bento-floating") return alpha(surface_container_low, 0.88);
-                if (bs === "translucent") return alpha(surface_container_low, 0.70);
+                if (bs === "bento-floating") return alpha(surface_container_low, Math.min(1.0, 0.88 + adaptiveAlphaBoost));
+                if (bs === "translucent") return alpha(surface_container_low, Math.min(1.0, 0.70 + adaptiveAlphaBoost));
                 if (bs === "accent-glow") return alpha(surface_container_lowest, 0.90);
                 if (bs === "monochrome") return surface_container_highest;
                 return surface_container_low;
@@ -402,11 +408,11 @@ Singleton {
             case "popupBg":
                 if (bs === "regular") return alpha(surface_container_low, 0.96);
                 if (bs === "pure-black") return "#000000";
-                if (bs === "glass") return alpha(surface_container_lowest, 0.60);
-                if (bs === "glass-frost") return alpha(surface_container_lowest, 0.75);
+                if (bs === "glass") return alpha(surface_container_lowest, Math.min(1.0, 0.60 + adaptiveAlphaBoost));
+                if (bs === "glass-frost") return alpha(surface_container_lowest, Math.min(1.0, 0.75 + adaptiveAlphaBoost));
                 if (bs === "cyber-neon") return alpha("#07070b", 0.96);
-                if (bs === "bento-floating") return alpha(surface_container_low, 0.92);
-                if (bs === "translucent") return alpha(surface_container_low, 0.80);
+                if (bs === "bento-floating") return alpha(surface_container_low, Math.min(1.0, 0.92 + adaptiveAlphaBoost));
+                if (bs === "translucent") return alpha(surface_container_low, Math.min(1.0, 0.80 + adaptiveAlphaBoost));
                 if (bs === "accent-glow") return alpha(surface_container_lowest, 0.95);
                 if (bs === "monochrome") return surface_container_low;
                 return surface_container_low;
@@ -444,6 +450,7 @@ Singleton {
                 if (bs === "monochrome") return alpha(outline, 0.35);
                 return alpha(outline_variant, 0.40);
             case "pillBg":
+                if (hasCustomColors && (cfg?.customWidgetBg ?? "") !== "") return cfg.customWidgetBg;
                 if (bs === "regular") return alpha(surface_container_high, 0.65);
                 if (bs === "pure-black") return "#0a0a0a";
                 if (bs === "glass") return alpha(surface_container_high, 0.25);
@@ -466,6 +473,7 @@ Singleton {
                 if (bs === "monochrome") return surface_container_highest;
                 return surface_container_highest;
             case "pillBorder":
+                if (hasCustomColors && (cfg?.customBorder ?? "") !== "") return cfg.customBorder;
                 if (bs === "regular") return alpha(outline_variant, 0.35);
                 if (bs === "pure-black") return "#222222";
                 if (bs === "glass") return Qt.rgba(1, 1, 1, 0.14);
@@ -605,7 +613,6 @@ Singleton {
         if (c === "emphasized-accel") return motionEmphasizedAccel;
         if (c === "linear") return [0.0, 0.0, 1.0, 1.0, 1.0, 1.0];
 
-        // regex praying the user typed four valid floats
         let m = c.match(/^(?:cubic-bezier\s*\(\s*)?([0-9.-]+)\s*,\s*([0-9.-]+)\s*,\s*([0-9.-]+)\s*,\s*([0-9.-]+)(?:\s*\))?$/);
         if (m) {
             let p1 = parseFloat(m[1]), p2 = parseFloat(m[2]), p3 = parseFloat(m[3]), p4 = parseFloat(m[4]);
@@ -719,7 +726,6 @@ Singleton {
     readonly property string fontMaterialOutlined:  (loaderMatOutlined.status === FontLoader.Ready && loaderMatOutlined.name) ? loaderMatOutlined.name : "Material Symbols Outlined"
     readonly property string fontMaterialSharp:     (loaderMatSharp.status === FontLoader.Ready && loaderMatSharp.name) ? loaderMatSharp.name : "Material Symbols Sharp"
     readonly property string fontSegoe:             (loaderSegoe.status === FontLoader.Ready && loaderSegoe.name) ? loaderSegoe.name : (cfg?.fontWindows ?? "Segoe Fluent Icons")
-    // font awesome 6 free gets mad if you put "solid" in the family name instead of the weight
     readonly property string fontAwesome:           (loaderFaSolid.status === FontLoader.Ready && loaderFaSolid.name)
         ? loaderFaSolid.name
         : (cfg?.fontAwesome ?? "Font Awesome 6 Free")
@@ -737,27 +743,29 @@ Singleton {
         return cfg?.fontMaterial ?? fontMaterialRounded;
     }
 
+    // actual expressive kaomoji instead of "[cpu]" and "(*_*)v"
     readonly property var kaomojiMap: Object.freeze({
-        "arch": "(*_*)v", "nix": "(*_*)v", "nixos": "(*_*)v", "distro": "(*_*)v", "appLauncher": "(^_^)v", "workspaces": "[::]", "search": "(⚆_⚆)", "close": "(x)",
-        "check": "(✓)", "checkCircle": "(✓)", "settings": "(*_*)", "gear": "(*_*)", "save": "(⤓)",
-        "refresh": "(↺)", "trash": "(⌫)", "clipboard": "(≡)", "tray": "[..]", "grid": "[#]",
-        "note": "(✎)", "edit": "(✎)", "coffee": "(旦)", "clock": "(◷)", "cpu": "[cpu]",
-        "mem": "[ram]", "thermo": "[°c]", "eye": "(•‿•)", "eyeOff": "(-_-)", "heart": "(♡)", "pin": "(⌖)",
-        "download": "(↓)", "folder": "[dir]", "globe": "(⊕)", "camera": "[o]", "crop": "[#]",
-        "screenshot": "[o]", "volMute": "(-_-)", "volLow": "(・ω・)", "volMid": "(ᵔᴥᵔ)", "volHigh": "(≧◡≦)",
-        "mic": "(¶)", "micMute": "(x_x)", "palette": "(※)", "headphones": "(d-_-b)", "equalizer": "|||",
-        "batFull": "(◕‿◕)", "batHalf": "(・_・)", "batQuarter": "(>_<)", "batEmpty": "(×_×)", "batCharge": "(↯^↯)",
-        "batCharging": "(↯^↯)", "sun": "(☼)", "moon": "(☾)", "brightness": "(☼)", "music": "(♫)",
-        "play": "(▶)", "pause": "(❚❚)", "next": "(>>)", "prev": "(<<)", "shuffle": "(~)",
-        "repeat": "(↻)", "repeatOne": "(1)", "wallhaven": "[img]", "wallpaper": "[img]", "bell": "(⍾)",
-        "bellOutline": "(⍾)", "bellOff": "(⍉)", "ethernet": "[eth]", "wifi": "(•̀ᴗ•́)و", "wifiHigh": "(•̀ᴗ•́)و",
-        "wifiMed": "(・_・)", "wifiLow": "( ;¬_¬)", "wifiOff": "(×_×)", "bluetooth": "(~)",
-        "bluetoothConnected": "(•̀ᴗ•́)و", "bluetoothOff": "(×_×)", "power": "(⏻)", "shutdown": "(⏻)",
-        "lock": "(⚿)", "logout": "(bye)", "reboot": "(↺)", "suspend": "(zzz)", "hibernate": "(zzz)",
-        "chevronRight": ">", "chevronLeft": "<", "chevronDown": "v", "chevronUp": "^", "flame": "(♨)",
-        "sparkles": "(✦)", "radio": "[rad]", "sliders": "[=]", "terminal": "[>_]", "calendar": "[cal]",
-        "history": "(↺)", "copy": "[cp]", "externalLink": "(->)", "signal": "(ıllι)", "filter": "[/]",
-        "user": "(•)", "shield": "[#]", "expand": "[+]", "collapse": "[-]"
+        "arch": "(⌐■_■)", "nix": "(⌐■_■)", "nixos": "(⌐■_■)", "distro": "(⌐■_■)",
+        "appLauncher": "(ﾉ◕ヮ◕)ﾉ", "workspaces": "( ० ० )", "search": "( ⚆_⚆)", "close": "(×_×)",
+        "check": "(•̀ᴗ•́)b", "checkCircle": "(•̀ᴗ•́)b", "settings": "( ˘_˘ )", "gear": "( ˘_˘ )", "save": "(っ˘ω˘ς)",
+        "refresh": "(ノ°▽°)ノ", "trash": "(╯°□°)╯", "clipboard": "(っ•̀ᴗ•́)っ", "tray": "( ˙꒳˙ )", "grid": "( ⊞_⊞ )",
+        "note": "φ(．．)", "edit": "φ(．．)", "coffee": "( -_-)旦~", "clock": "( ˘ω˘ )", "cpu": "(ง•̀_•́)ง",
+        "mem": "( °□° )", "thermo": "(;´Д`)", "eye": "( •_• )", "eyeOff": "( -_- )", "heart": "( ˘ ³˘)♥", "pin": "( ⌖_⌖ )",
+        "download": "(っ´▽`)っ", "folder": "( ˘▾˘ )", "globe": "( ◕‿◕ )", "camera": "( ◉_• )", "crop": "( ¬_¬ )",
+        "screenshot": "( ◉_• )", "volMute": "( ˙×˙ )", "volLow": "( ˙-˙ )", "volMid": "( ᵔ◡ᵔ )", "volHigh": "( ≧∇≦ )",
+        "mic": "( °O° )", "micMute": "( ˙×˙ )", "palette": "( ✧ω✧ )", "headphones": "d( -_- )b", "equalizer": "( ~‾▿‾)~",
+        "batFull": "( ◕‿◕ )", "batHalf": "( ・_・ )", "batQuarter": "( ;´-` )", "batEmpty": "( ×_× )", "batCharge": "( ✧∇✧ )",
+        "batCharging": "( ✧∇✧ )", "sun": "( ☼‿☼ )", "moon": "( ˘ω˘ )zzZ", "brightness": "( ☼‿☼ )", "music": "ヽ(•‿•)ノ♪",
+        "play": "( ▸‿▸ )", "pause": "( ˙-˙ )", "next": "( ⇀‿⇀ )", "prev": "( ↼‿↼ )", "shuffle": "( ~_~ )",
+        "repeat": "( ↻_↻ )", "repeatOne": "( ↻_1 )", "wallhaven": "( ✧_✧ )", "wallpaper": "( ✧_✧ )", "bell": "( °!° )",
+        "bellOutline": "( °!° )", "bellOff": "( -.- )", "ethernet": "( ⌐■_■ )", "wifi": "( •̀ᴗ•́ )و", "wifiHigh": "( •̀ᴗ•́ )و",
+        "wifiMed": "( ・_・ )", "wifiLow": "( ;¬_¬ )", "wifiOff": "( ×_× )", "bluetooth": "( ˘▾˘ )",
+        "bluetoothConnected": "d( •̀ᴗ•́ )b", "bluetoothOff": "( ×_× )", "power": "( ˘_˘ )", "shutdown": "( ˘_˘ )",
+        "lock": "( ⌐■-■ )", "logout": "( ´ ▽ ` )ﾉ", "reboot": "( ノ°▽°)ノ", "suspend": "( -.- )zzZ", "hibernate": "( -.- )zzZ",
+        "chevronRight": ">", "chevronLeft": "<", "chevronDown": "v", "chevronUp": "^", "flame": "(ง •̀_•́)ง",
+        "sparkles": "( ✧ω✧ )", "radio": "( ~˘▾˘)~", "sliders": "( ˘_˘ )", "terminal": "( ¬‿¬ )", "calendar": "( ˘▾˘ )",
+        "history": "( ◔_◔ )", "copy": "(っ•̀ᴗ•́)っ", "externalLink": "( ☞ﾟヮﾟ)☞", "signal": "( •̀ᴗ•́ )", "filter": "( ¬_¬ )",
+        "user": "( •‿• )", "shield": "(ง •̀_•́)ง", "expand": "( ⊙_⊙ )", "collapse": "( >_< )", "keyboard": "φ(•̀ᴗ•́ )"
     })
 
     readonly property var textMap: Object.freeze({
@@ -780,114 +788,36 @@ Singleton {
         "chevronRight": ">", "chevronLeft": "<", "chevronDown": "v", "chevronUp": "^", "flame": "chaos",
         "sparkles": "magic", "radio": "radio", "sliders": "opts", "terminal": "term", "calendar": "cal",
         "history": "hist", "copy": "copy", "externalLink": "open", "signal": "sig", "filter": "filter",
-        "user": "user", "shield": "safe", "expand": "max", "collapse": "min"
+        "user": "user", "shield": "safe", "expand": "max", "collapse": "min", "keyboard": "keys"
     })
 
     // giant lookup table of unicode hexes because font awesome can't agree with anyone else
     readonly property var fontAwesomeMap: Object.freeze({
-        "nixos": "\uF17C",
-        "nix": "\uF17C",
-        "arch": "\uF17C",
-        "appLauncher": "\uF009",
-        "workspaces": "\uF108",
-        "search": "\uF002",
-        "close": "\uF00D",
-        "check": "\uF00C",
-        "checkCircle": "\uF058",
-        "settings": "\uF013",
-        "save": "\uF0C7",
-        "refresh": "\uF021",
-        "trash": "\uF2ED",
-        "clipboard": "\uF328",
-        "tray": "\uF01C",
-        "grid": "\uF00A",
-        "note": "\uF249",
-        "edit": "\uF044",
-        "coffee": "\uF0F4",
-        "clock": "\uF017",
-        "cpu": "\uF2DB",
-        "mem": "\uF538",
-        "thermo": "\uF2C7",
-        "eye": "\uF06E",
-        "eyeOff": "\uF070",
-        "heart": "\uF004",
-        "pin": "\uF08D",
-        "download": "\uF019",
-        "folder": "\uF07B",
-        "globe": "\uF0AC",
-        "camera": "\uF030",
-        "crop": "\uF125",
-        "screenshot": "\uF03E",
-        "volMute": "\uF026",
-        "volLow": "\uF027",
-        "volMid": "\uF027",
-        "volHigh": "\uF028",
-        "mic": "\uF130",
-        "micMute": "\uF131",
-        "palette": "\uF53F",
-        "headphones": "\uF025",
-        "equalizer": "\uF1DE",
-        "batFull": "\uF240",
-        "batHalf": "\uF242",
-        "batQuarter": "\uF243",
-        "batEmpty": "\uF244",
-        "batCharge": "\uF0E7",
-        "batCharging": "\uF0E7",
-        "sun": "\uF185",
-        "moon": "\uF186",
-        "brightness": "\uF185",
-        "music": "\uF001",
-        "play": "\uF04B",
-        "pause": "\uF04C",
-        "next": "\uF051",
-        "prev": "\uF048",
-        "shuffle": "\uF074",
-        "repeat": "\uF363",
-        "repeatOne": "\uF365",
-        "wallhaven": "\uF03E",
-        "wallpaper": "\uF03E",
-        "bell": "\uF0F3",
-        "bellOutline": "\uF0F3",
-        "bellOff": "\uF1F6",
-        "ethernet": "\uF796",
-        "wifi": "\uF1EB",
-        "wifiHigh": "\uF1EB",
-        "wifiMed": "\uF6AB",
-        "wifiLow": "\uF6AA",
-        "wifiOff": "\uF6AC",
-        "bluetooth": "\uF293",
-        "bluetoothConnected": "\uF294",
-        "bluetoothOff": "\uF293",
-        "power": "\uF011",
-        "shutdown": "\uF011",
-        "lock": "\uF023",
-        "logout": "\uF2F5",
-        "reboot": "\uF021",
-        "suspend": "\uF186",
-        "hibernate": "\uF236",
-        "chevronRight": "\uF054",
-        "chevronLeft": "\uF053",
-        "chevronDown": "\uF078",
-        "chevronUp": "\uF077",
-        "flame": "\uF06D",
-        "sparkles": "\uE2CA",
-        "radio": "\uF8D7",
-        "sliders": "\uF1DE",
-        "terminal": "\uF120",
-        "calendar": "\uF133",
-        "history": "\uF1DA",
-        "copy": "\uF0C5",
-        "externalLink": "\uF35D",
-        "signal": "\uF012",
-        "filter": "\uF0B0",
-        "user": "\uF007",
-        "shield": "\uF132",
-        "expand": "\uF065",
-        "collapse": "\uF066",
+        "nixos": "\uF17C", "nix": "\uF17C", "arch": "\uF17C", "distro": "\uF17C",
+        "appLauncher": "\uF009", "workspaces": "\uF108", "search": "\uF002", "close": "\uF00D",
+        "check": "\uF00C", "checkCircle": "\uF058", "settings": "\uF013", "gear": "\uF013", "save": "\uF0C7",
+        "refresh": "\uF021", "trash": "\uF2ED", "clipboard": "\uF328", "tray": "\uF01C", "grid": "\uF00A",
+        "note": "\uF249", "edit": "\uF044", "coffee": "\uF0F4", "clock": "\uF017", "cpu": "\uF2DB",
+        "mem": "\uF538", "thermo": "\uF2C7", "eye": "\uF06E", "eyeOff": "\uF070", "heart": "\uF004", "pin": "\uF08D",
+        "download": "\uF019", "folder": "\uF07B", "globe": "\uF0AC", "camera": "\uF030", "crop": "\uF125",
+        "screenshot": "\uF03E", "volMute": "\uF026", "volLow": "\uF027", "volMid": "\uF027", "volHigh": "\uF028",
+        "mic": "\uF130", "micMute": "\uF131", "palette": "\uF53F", "headphones": "\uF025", "equalizer": "\uF1DE",
+        "batFull": "\uF240", "batHalf": "\uF242", "batQuarter": "\uF243", "batEmpty": "\uF244", "batCharge": "\uF0E7",
+        "batCharging": "\uF0E7", "sun": "\uF185", "moon": "\uF186", "brightness": "\uF185", "music": "\uF001",
+        "play": "\uF04B", "pause": "\uF04C", "next": "\uF051", "prev": "\uF048", "shuffle": "\uF074",
+        "repeat": "\uF363", "repeatOne": "\uF365", "wallhaven": "\uF03E", "wallpaper": "\uF03E", "bell": "\uF0F3",
+        "bellOutline": "\uF0F3", "bellOff": "\uF1F6", "ethernet": "\uF796", "wifi": "\uF1EB", "wifiHigh": "\uF1EB",
+        "wifiMed": "\uF6AB", "wifiLow": "\uF6AA", "wifiOff": "\uF6AC", "bluetooth": "\uF293",
+        "bluetoothConnected": "\uF294", "bluetoothOff": "\uF293", "power": "\uF011", "shutdown": "\uF011",
+        "lock": "\uF023", "logout": "\uF2F5", "reboot": "\uF021", "suspend": "\uF186", "hibernate": "\uF236",
+        "chevronRight": "\uF054", "chevronLeft": "\uF053", "chevronDown": "\uF078", "chevronUp": "\uF077",
+        "flame": "\uF06D", "sparkles": "\uE2CA", "radio": "\uF8D7", "sliders": "\uF1DE", "terminal": "\uF120",
+        "calendar": "\uF133", "history": "\uF1DA", "copy": "\uF0C5", "externalLink": "\uF35D", "signal": "\uF012",
+        "filter": "\uF0B0", "user": "\uF007", "shield": "\uF132", "expand": "\uF065", "collapse": "\uF066",
         "keyboard": "\uF11C"
     })
 
-    // nerd font glyphs that look like empty boxes in half the text editors
+    // nerd font glyphs
     readonly property var nerdMap: Object.freeze({
         "arch": "\uF303", "nix": "\uF313", "nixos": "\uF313", "distro": "\uF313", "appLauncher": "󰀻", "workspaces": "󱂬", "search": "", "close": "",
         "check": "", "checkCircle": "", "settings": "", "gear": "", "save": "",
@@ -908,7 +838,7 @@ Singleton {
         "chevronRight": "", "chevronLeft": "", "chevronDown": "", "chevronUp": "", "flame": "󰈸",
         "sparkles": "󰛓", "radio": "󰐹", "sliders": "󰒓", "terminal": "󰆍", "calendar": "󰃭",
         "history": "󰋚", "copy": "󰆏", "externalLink": "󰌹", "signal": "󰖩", "filter": "󰈲",
-        "user": "󰀉", "shield": "󰞌", "expand": "󰊓", "collapse": "󰊔"
+        "user": "󰀉", "shield": "󰞌", "expand": "󰊓", "collapse": "󰊔", "keyboard": "󰌌"
     })
 
     function getIcon(mat: string, win: string, fa: string, key: var, kao: var, txt: var): string {
@@ -940,12 +870,12 @@ Singleton {
         let lvl = p < 0 ? -1 : Math.min(10, Math.floor(p / 10));
 
         if (iconSet === "kaomoji") {
-            if (lvl < 0) return "(?)";
-            if (isCharging) return "(↯^↯)";
-            if (lvl >= 9) return "(◕‿◕)";
-            if (lvl >= 5) return "(・_・)";
-            if (lvl >= 2) return "(>_<)";
-            return "(×_×)";
+            if (lvl < 0) return kaomojiMap.batHalf;
+            if (isCharging) return kaomojiMap.batCharge;
+            if (lvl >= 9) return kaomojiMap.batFull;
+            if (lvl >= 5) return kaomojiMap.batHalf;
+            if (lvl >= 2) return kaomojiMap.batQuarter;
+            return kaomojiMap.batEmpty;
         }
 
         if (iconSet === "text") {
@@ -994,7 +924,7 @@ Singleton {
             if (lvl >= 7) return "\uF241";
             if (lvl >= 5) return fontAwesomeMap.batHalf;
             if (lvl >= 2) return fontAwesomeMap.batQuarter;
-            return "";
+            return "\uF244";
         }
 
         if (lvl < 0) return "\uE1A6";
@@ -1064,13 +994,13 @@ Singleton {
     }
 
     function getWifiIcon(signalPct: int, isConnected: bool, isEthernet: bool): string {
-        if (isEthernet) return (iconSet === "kaomoji") ? "[eth]" : (iconSet === "text") ? "eth" : (iconSet === "nerd") ? "󰈀" : iconEthernet;
-        if (!isConnected) return (iconSet === "kaomoji") ? "(×_×)" : (iconSet === "text") ? "off" : (iconSet === "nerd") ? "󰤮" : iconWifiOff;
+        if (isEthernet) return (iconSet === "kaomoji") ? kaomojiMap.ethernet : (iconSet === "text") ? "eth" : (iconSet === "nerd") ? "󰈀" : iconEthernet;
+        if (!isConnected) return (iconSet === "kaomoji") ? kaomojiMap.wifiOff : (iconSet === "text") ? "off" : (iconSet === "nerd") ? "󰤮" : iconWifiOff;
         let sig = (signalPct === undefined || signalPct === null || isNaN(signalPct)) ? 0 : signalPct;
         if (iconSet === "kaomoji") {
-            if (sig < 35) return "( ;¬_¬)";
-            if (sig < 70) return "(・_・)";
-            return "(•̀ᴗ•́)و";
+            if (sig < 35) return kaomojiMap.wifiLow;
+            if (sig < 70) return kaomojiMap.wifiMed;
+            return kaomojiMap.wifiHigh;
         }
         if (iconSet === "text") {
             if (sig < 35) return "low";
@@ -1098,148 +1028,148 @@ Singleton {
         return "\uE63E";
     }
 
-    // four different icon fonts taped together with hope
+    // four different icon fonts taped together with hope (and zero emojis)
     readonly property string iconDistro:            getIcon("\uE30A", "\uE71D", "\uF17C", "nixos")
     readonly property string iconNix:               getIcon("\uE30A", "\uE71D", "\uF17C", "nix")
     readonly property string iconArch:              getIcon("\uE30A", "\uE71D", "\uF17C", "arch")
-    readonly property string iconAppLauncher:       getIcon("\uE5C3", "\uE71D", "", "appLauncher")
-    readonly property string iconWorkspaces:        getIcon("\uE1A0", "\uE7C4", "", "workspaces")
-    readonly property string iconSearch:            getIcon("\uE8B6", "\uE721", "", "search")
-    readonly property string iconClose:             getIcon("\uE5CD", "\uE711", "", "close")
-    readonly property string iconCheck:             getIcon("\uE668", "\uE73E", "", "check")
-    readonly property string iconCheckCircle:       getIcon("\uF0BE", "\uF13E", "", "checkCircle")
-    readonly property string iconSettings:          getIcon("\uE8B8", "\uE713", "", "settings")
+    readonly property string iconAppLauncher:       getIcon("\uE5C3", "\uE71D", "\uF009", "appLauncher")
+    readonly property string iconWorkspaces:        getIcon("\uE1A0", "\uE7C4", "\uF108", "workspaces")
+    readonly property string iconSearch:            getIcon("\uE8B6", "\uE721", "\uF002", "search")
+    readonly property string iconClose:             getIcon("\uE5CD", "\uE711", "\uF00D", "close")
+    readonly property string iconCheck:             getIcon("\uE668", "\uE73E", "\uF00C", "check")
+    readonly property string iconCheckCircle:       getIcon("\uF0BE", "\uF13E", "\uF058", "checkCircle")
+    readonly property string iconSettings:          getIcon("\uE8B8", "\uE713", "\uF013", "settings")
     readonly property string iconGear:              iconSettings
-    readonly property string iconSave:              getIcon("\uE161", "\uE74E", "", "save")
-    readonly property string iconRefresh:           getIcon("\uE5D5", "\uE72C", "", "refresh")
-    readonly property string iconTrash:             getIcon("\uE92E", "\uE74D", "", "trash")
-    readonly property string iconClipboard:         getIcon("\uE14F", "\uF0E3", "", "clipboard")
+    readonly property string iconSave:              getIcon("\uE161", "\uE74E", "\uF0C7", "save")
+    readonly property string iconRefresh:           getIcon("\uE5D5", "\uE72C", "\uF021", "refresh")
+    readonly property string iconTrash:             getIcon("\uE92E", "\uE74D", "\uF2ED", "trash")
+    readonly property string iconClipboard:         getIcon("\uE14F", "\uF0E3", "\uF328", "clipboard")
     readonly property string iconTray:              getIcon("\uE156", "\uE971", "\uF01C", "tray")
-    readonly property string iconGrid:              getIcon("\uE9B0", "\uF0E2", "", "grid")
+    readonly property string iconGrid:              getIcon("\uE9B0", "\uF0E2", "\uF00A", "grid")
     readonly property string iconNote:              getIcon("\uE66D", "\uE70F", "\uF249", "note")
     readonly property string iconEdit:              iconNote
-    readonly property string iconCoffee:            getIcon("\uEFEF", "\uEC32", "", "coffee")
-    readonly property string iconClock:             getIcon("\uEFD6", "\uE823", "", "clock")
-    readonly property string iconCpu:               getIcon("\uE322", "\uEEA1", "", "cpu")
-    readonly property string iconMem:               getIcon("\uF7A3", "\uEEA0", "", "mem")
+    readonly property string iconCoffee:            getIcon("\uEFEF", "\uEC32", "\uF0F4", "coffee")
+    readonly property string iconClock:             getIcon("\uEFD6", "\uE823", "\uF017", "clock")
+    readonly property string iconCpu:               getIcon("\uE322", "\uEEA1", "\uF2DB", "cpu")
+    readonly property string iconMem:               getIcon("\uF7A3", "\uEEA0", "\uF538", "mem")
     readonly property string iconThermo:            getIcon("\uE846", "\uE9CA", "\uF2C7", "thermo")
-    readonly property string iconEye:               getIcon("\uE8F4", "\uE7B3", "", "eye")
-    readonly property string iconEyeOff:            getIcon("\uE8F5", "\uED1A", "", "eyeOff")
-    readonly property string iconHeart:             getIcon("\uE87E", "\uEB51", "", "heart")
+    readonly property string iconEye:               getIcon("\uE8F4", "\uE7B3", "\uF06E", "eye")
+    readonly property string iconEyeOff:            getIcon("\uE8F5", "\uED1A", "\uF070", "eyeOff")
+    readonly property string iconHeart:             getIcon("\uE87E", "\uEB51", "\uF004", "heart")
     readonly property string iconPin:               getIcon("\uE6AA", "\uE718", "\uF08D", "pin")
-    readonly property string iconDownload:          getIcon("\uF090", "\uE896", "", "download")
-    readonly property string iconFolder:            getIcon("\uE2C7", "\uE838", "", "folder")
+    readonly property string iconDownload:          getIcon("\uF090", "\uE896", "\uF019", "download")
+    readonly property string iconFolder:            getIcon("\uE2C7", "\uE838", "\uF07B", "folder")
     readonly property string iconGlobe:             getIcon("\uE64C", "\uE774", "\uF0AC", "globe")
-    readonly property string iconCamera:            getIcon("\uE3AF", "\uE722", "", "camera")
-    readonly property string iconCrop:              getIcon("\uE3BE", "\uE7A8", "", "crop")
+    readonly property string iconCamera:            getIcon("\uE3AF", "\uE722", "\uF030", "camera")
+    readonly property string iconCrop:              getIcon("\uE3BE", "\uE7A8", "\uF125", "crop")
     readonly property string iconScreenshot:        getIcon("\uF056", "\uE722", "\uF03E", "screenshot")
 
-    readonly property string iconVolMute:           getIcon("\uE04F", "\uE74F", "", "volMute")
-    readonly property string iconVolLow:            getIcon("\uE04E", "\uE993", "", "volLow")
-    readonly property string iconVolMid:            getIcon("\uE04D", "\uE994", "", "volMid")
-    readonly property string iconVolHigh:           getIcon("\uE050", "\uE995", "", "volHigh")
-    readonly property string iconMic:               getIcon("\uE31D", "\uE720", "", "mic")
-    readonly property string iconMicMute:           getIcon("\uE02B", "\uF781", "", "micMute")
-    readonly property string iconPalette:           getIcon("\uE40A", "\uE790", "", "palette")
-    readonly property string iconHeadphones:        getIcon("\uF01F", "\uE7F6", "", "headphones")
-    readonly property string iconEqualizer:         getIcon("\uE01D", "\uE9E9", "", "equalizer")
+    readonly property string iconVolMute:           getIcon("\uE04F", "\uE74F", "\uF026", "volMute")
+    readonly property string iconVolLow:            getIcon("\uE04E", "\uE993", "\uF027", "volLow")
+    readonly property string iconVolMid:            getIcon("\uE04D", "\uE994", "\uF027", "volMid")
+    readonly property string iconVolHigh:           getIcon("\uE050", "\uE995", "\uF028", "volHigh")
+    readonly property string iconMic:               getIcon("\uE31D", "\uE720", "\uF130", "mic")
+    readonly property string iconMicMute:           getIcon("\uE02B", "\uF781", "\uF131", "micMute")
+    readonly property string iconPalette:           getIcon("\uE40A", "\uE790", "\uF53F", "palette")
+    readonly property string iconHeadphones:        getIcon("\uF01F", "\uE7F6", "\uF025", "headphones")
+    readonly property string iconEqualizer:         getIcon("\uE01D", "\uE9E9", "\uF1DE", "equalizer")
 
-    readonly property string iconBatFull:           getIcon("\uE1A5", "\uE83F", "", "batFull")
-    readonly property string iconBatHalf:           getIcon("\uF09E", "\uE855", "", "batHalf")
-    readonly property string iconBatQuarter:        getIcon("\uF09D", "\uE852", "", "batQuarter")
-    readonly property string iconBatEmpty:          getIcon("\uEBDC", "\uE850", "", "batEmpty")
-    readonly property string iconBatCharge:         getIcon("\uE1A3", "\uE83E", "", "batCharge")
+    readonly property string iconBatFull:           getIcon("\uE1A5", "\uE83F", "\uF240", "batFull")
+    readonly property string iconBatHalf:           getIcon("\uF09E", "\uE855", "\uF242", "batHalf")
+    readonly property string iconBatQuarter:        getIcon("\uF09D", "\uE852", "\uF243", "batQuarter")
+    readonly property string iconBatEmpty:          getIcon("\uEBDC", "\uE850", "\uF244", "batEmpty")
+    readonly property string iconBatCharge:         getIcon("\uE1A3", "\uE83E", "\uF0E7", "batCharge")
     readonly property string iconBatCharging:       iconBatCharge
 
-    readonly property string iconSun:               getIcon("\uE518", "\uE706", "", "sun")
-    readonly property string iconMoon:              getIcon("\uE51C", "\uE708", "", "moon")
+    readonly property string iconSun:               getIcon("\uE518", "\uE706", "\uF185", "sun")
+    readonly property string iconMoon:              getIcon("\uE51C", "\uE708", "\uF186", "moon")
     readonly property string iconBrightness:        iconSun
 
-    readonly property string iconMusic:             getIcon("\uE405", "\uE8D6", "", "music")
-    readonly property string iconPlay:              getIcon("\uE037", "\uE768", "", "play")
-    readonly property string iconPause:             getIcon("\uE034", "\uE769", "", "pause")
-    readonly property string iconNext:              getIcon("\uE044", "\uE893", "", "next")
-    readonly property string iconPrev:              getIcon("\uE045", "\uE892", "", "prev")
-    readonly property string iconShuffle:           getIcon("\uE043", "\uE8B1", "", "shuffle")
-    readonly property string iconRepeat:            getIcon("\uE040", "\uE8EE", "", "repeat")
+    readonly property string iconMusic:             getIcon("\uE405", "\uE8D6", "\uF001", "music")
+    readonly property string iconPlay:              getIcon("\uE037", "\uE768", "\uF04B", "play")
+    readonly property string iconPause:             getIcon("\uE034", "\uE769", "\uF04C", "pause")
+    readonly property string iconNext:              getIcon("\uE044", "\uE893", "\uF051", "next")
+    readonly property string iconPrev:              getIcon("\uE045", "\uE892", "\uF048", "prev")
+    readonly property string iconShuffle:           getIcon("\uE043", "\uE8B1", "\uF074", "shuffle")
+    readonly property string iconRepeat:            getIcon("\uE040", "\uE8EE", "\uF363", "repeat")
     readonly property string iconRepeatOne:         getIcon("\uE041", "\uE8ED", "\uF365", "repeatOne")
 
-    readonly property string iconWallhaven:         getIcon("\uE1BC", "\uE91B", "", "wallhaven")
-    readonly property string iconWallpaper:         getIcon("\uE1BC", "\uE91B", "", "wallpaper")
-    readonly property string iconBell:              getIcon("\uE7F5", "\uEA8F", "", "bell")
-    readonly property string iconBellOutline:       getIcon("\uE7F5", "\uEA8F", "", "bellOutline")
-    readonly property string iconBellOff:           getIcon("\uE7F6", "\uEE79", "", "bellOff")
+    readonly property string iconWallhaven:         getIcon("\uE1BC", "\uE91B", "\uF03E", "wallhaven")
+    readonly property string iconWallpaper:         getIcon("\uE1BC", "\uE91B", "\uF03E", "wallpaper")
+    readonly property string iconBell:              getIcon("\uE7F5", "\uEA8F", "\uF0F3", "bell")
+    readonly property string iconBellOutline:       getIcon("\uE7F5", "\uEA8F", "\uF0F3", "bellOutline")
+    readonly property string iconBellOff:           getIcon("\uE7F6", "\uEE79", "\uF1F6", "bellOff")
 
-    readonly property string iconEthernet:          getIcon("\uEB2F", "\uE839", "", "ethernet")
-    readonly property string iconWifi:              getIcon("\uE63E", "\uE701", "", "wifi")
-    readonly property string iconWifiHigh:          getIcon("\uE63E", "\uE874", "", "wifiHigh")
-    readonly property string iconWifiMed:           getIcon("\uE4D9", "\uE873", "", "wifiMed")
-    readonly property string iconWifiLow:           getIcon("\uE4CA", "\uE872", "", "wifiLow")
-    readonly property string iconWifiOff:           getIcon("\uE648", "\uE998", "", "wifiOff")
-    readonly property string iconBluetooth:         getIcon("\uE1A7", "\uE702", "", "bluetooth")
-    readonly property string iconBluetoothConnected:getIcon("\uE1A8", "\uE702", "", "bluetoothConnected")
-    readonly property string iconBluetoothOff:      getIcon("\uE1A9", "\uE702", "", "bluetoothOff")
+    readonly property string iconEthernet:          getIcon("\uEB2F", "\uE839", "\uF796", "ethernet")
+    readonly property string iconWifi:              getIcon("\uE63E", "\uE701", "\uF1EB", "wifi")
+    readonly property string iconWifiHigh:          getIcon("\uE63E", "\uE874", "\uF1EB", "wifiHigh")
+    readonly property string iconWifiMed:           getIcon("\uE4D9", "\uE873", "\uF6AB", "wifiMed")
+    readonly property string iconWifiLow:           getIcon("\uE4CA", "\uE872", "\uF6AA", "wifiLow")
+    readonly property string iconWifiOff:           getIcon("\uE648", "\uE998", "\uF6AC", "wifiOff")
+    readonly property string iconBluetooth:         getIcon("\uE1A7", "\uE702", "\uF293", "bluetooth")
+    readonly property string iconBluetoothConnected:getIcon("\uE1A8", "\uE702", "\uF294", "bluetoothConnected")
+    readonly property string iconBluetoothOff:      getIcon("\uE1A9", "\uE702", "\uF293", "bluetoothOff")
 
-    readonly property string iconPower:             getIcon("\uF8C7", "\uE7E8", "", "power")
+    readonly property string iconPower:             getIcon("\uF8C7", "\uE7E8", "\uF011", "power")
     readonly property string iconShutdown:          iconPower
-    readonly property string iconLock:              getIcon("\uE899", "\uE72E", "", "lock")
-    readonly property string iconLogout:            getIcon("\uE9BA", "\uF3B1", "", "logout")
-    readonly property string iconReboot:            getIcon("\uF053", "\uE777", "", "reboot")
+    readonly property string iconLock:              getIcon("\uE899", "\uE72E", "\uF023", "lock")
+    readonly property string iconLogout:            getIcon("\uE9BA", "\uF3B1", "\uF2F5", "logout")
+    readonly property string iconReboot:            getIcon("\uF053", "\uE777", "\uF021", "reboot")
     readonly property string iconSuspend:           getIcon("\uF159", "\uE708", "\uF186", "suspend")
     readonly property string iconHibernate:         getIcon("\uF236", "\uE9CA", "\uF236", "hibernate")
 
-    readonly property string iconChevronRight:      getIcon("\uE5CC", "\uE974", "", "chevronRight")
-    readonly property string iconChevronLeft:       getIcon("\uE5CB", "\uE973", "", "chevronLeft")
-    readonly property string iconChevronDown:       getIcon("\uE5CF", "\uE972", "", "chevronDown")
+    readonly property string iconChevronRight:      getIcon("\uE5CC", "\uE974", "\uF054", "chevronRight")
+    readonly property string iconChevronLeft:       getIcon("\uE5CB", "\uE973", "\uF053", "chevronLeft")
+    readonly property string iconChevronDown:       getIcon("\uE5CF", "\uE972", "\uF078", "chevronDown")
     readonly property string iconChevronUp:         getIcon("\uE5CE", "\uE971", "\uF077", "chevronUp")
-    readonly property string iconFlame:             getIcon("\uEF55", "\uE945", "", "flame")
-    readonly property string iconSparkles:          getIcon("\uE65F", "\uE794", "", "sparkles")
-    readonly property string iconRadio:             getIcon("\uE03E", "\uE93E", "📻", "radio")
-    readonly property string iconSliders:           getIcon("\uE429", "\uE9E9", "", "sliders")
-    readonly property string iconTerminal:          getIcon("\uEB8E", "\uE756", "", "terminal")
-    readonly property string iconCalendar:          getIcon("\uE935", "\uE787", "", "calendar")
-    readonly property string iconHistory:           getIcon("\uE8B3", "\uE81C", "", "history")
-    readonly property string iconCopy:              getIcon("\uE14D", "\uE8C8", "", "copy")
-    readonly property string iconExternalLink:      getIcon("\uE89E", "\uE8A7", "", "externalLink")
-    readonly property string iconSignal:            getIcon("\uE202", "\uEC3A", "", "signal")
-    readonly property string iconFilter:            getIcon("\uE152", "\uE71C", "", "filter")
-    readonly property string iconUser:              getIcon("\uF0D3", "\uE77B", "", "user")
-    readonly property string iconShield:            getIcon("\uE9E0", "\uEA18", "", "shield")
-    readonly property string iconExpand:            getIcon("\uE5D0", "\uE740", "", "expand")
+    readonly property string iconFlame:             getIcon("\uEF55", "\uE945", "\uF06D", "flame")
+    readonly property string iconSparkles:          getIcon("\uE65F", "\uE794", "\uE2CA", "sparkles")
+    readonly property string iconRadio:             getIcon("\uE03E", "\uE93E", "\uF8D7", "radio")
+    readonly property string iconSliders:           getIcon("\uE429", "\uE9E9", "\uF1DE", "sliders")
+    readonly property string iconTerminal:          getIcon("\uEB8E", "\uE756", "\uF120", "terminal")
+    readonly property string iconCalendar:          getIcon("\uE935", "\uE787", "\uF133", "calendar")
+    readonly property string iconHistory:           getIcon("\uE8B3", "\uE81C", "\uF1DA", "history")
+    readonly property string iconCopy:              getIcon("\uE14D", "\uE8C8", "\uF0C5", "copy")
+    readonly property string iconExternalLink:      getIcon("\uE89E", "\uE8A7", "\uF35D", "externalLink")
+    readonly property string iconSignal:            getIcon("\uE202", "\uEC3A", "\uF012", "signal")
+    readonly property string iconFilter:            getIcon("\uE152", "\uE71C", "\uF0B0", "filter")
+    readonly property string iconUser:              getIcon("\uF0D3", "\uE77B", "\uF007", "user")
+    readonly property string iconShield:            getIcon("\uE9E0", "\uEA18", "\uF132", "shield")
+    readonly property string iconExpand:            getIcon("\uE5D0", "\uE740", "\uF065", "expand")
     readonly property string iconCollapse:          getIcon("\uE94D", "\uE73F", "\uF066", "collapse")
-    readonly property string iconKeyboard:          getIcon("\uE30C", "\uEA08", "", "keyboard")
+    readonly property string iconKeyboard:          getIcon("\uE30C", "\uEA08", "\uF11C", "keyboard")
 
-    // emotional support ascii faces for terminal burnout
-    readonly property string kaoHappy:              "(ﾉ◕ヮ◕)ﾉ*:･ﾟ*"
-    readonly property string kaoSad:                "(╥_╥)"
-    readonly property string kaoCoffee:             "( ᐛ )و"
+    // emotional support kaomoji faces for terminal burnout
+    readonly property string kaoHappy:              "(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧"
+    readonly property string kaoSad:                "( ╥ω╥ )"
+    readonly property string kaoCoffee:             "( -_-)旦~"
     readonly property string kaoShrug:              "¯\\_(ツ)_/¯"
-    readonly property string kaoEmpty:              "(´・ω・`)"
-    readonly property string kaoMusic:              "(´ε` )"
-    readonly property string kaoSearch:             "(╯°□°)╯"
-    readonly property string kaoError:              "(;´д`)"
-    readonly property string kaoLoading:            "(⊙_⊙;)"
+    readonly property string kaoEmpty:              "( ´・ω・` )"
+    readonly property string kaoMusic:              "ヽ(•‿•)ノ♪"
+    readonly property string kaoSearch:             "( ⚆_⚆)"
+    readonly property string kaoError:              "( ;´Д` )"
+    readonly property string kaoLoading:            "( ⊙_⊙;)"
     readonly property string kaoPeace:              "ヽ(・∀・)ノ"
-    readonly property string kaoSleepy:             "(-.-)zzz"
-    readonly property string kaoCool:               "(⌐■_■)"
-    readonly property string kaoLove:               "(^ω^*)"
-    readonly property string kaoAnger:              "(╬ Ò﹏Ó)"
+    readonly property string kaoSleepy:             "( -.- )zzZ"
+    readonly property string kaoCool:               "( ⌐■_■ )"
+    readonly property string kaoLove:               "( ´▽`ʃ♡ƪ)"
+    readonly property string kaoAnger:              "( ╬ Ò﹏Ó)"
     readonly property string kaoChaos:              "(╯°□°)╯︵ ┻━┻"
-    readonly property string kaoWink:               "(¬‿¬)"
+    readonly property string kaoWink:               "( ¬‿¬ )"
     readonly property string kaoFlex:               "ᕦ(ò_óˇ)ᕤ"
-    readonly property string kaoBolt:               "(>ᐛ )>"
-    readonly property string kaoDead:               "(x_x)"
+    readonly property string kaoBolt:               "( ✧∇✧ )و"
+    readonly property string kaoDead:               "( ×_× )"
     readonly property string kaoCat:                "(=^･ω･^=)"
-    readonly property string kaoPanic:              "(°Д°；)"
-    readonly property string kaoVibe:               "( ˘ ³˘)♡"
-    readonly property string kaoJam:                "(~‾‾)~"
-    readonly property string kaoDJ:                 "(ノ^_^)ノ"
-    readonly property string kaoSilent:             "( ˙-˙ )"
+    readonly property string kaoPanic:              "( °Д°；)"
+    readonly property string kaoVibe:               "( ˘ ³˘)♥"
+    readonly property string kaoJam:                "( ~‾▿‾)~"
+    readonly property string kaoDJ:                 "d( -_- )b"
+    readonly property string kaoSilent:             "( ˙×˙ )"
     readonly property string kaoCozy:               "(っ˘ω˘ς)"
     readonly property string kaoCheer:              "(ﾉ>ω<)ﾉ :｡･:*:･ﾟ"
     readonly property string kaoSmug:               "( ˘⌣˘ )"
-    readonly property string kaoFire:               "(ง♨Д♨)ง"
-    readonly property string kaoSparkle:            "(★ω★)"
+    readonly property string kaoFire:               "(ง •̀_•́)ง"
+    readonly property string kaoSparkle:            "( ✧ω✧ )"
     readonly property string kaoTableFlip:          "(╯°□°)╯︵ ┻━┻"
     readonly property string kaoPutBack:            "┬─┬ノ( º _ ºノ)"
 
@@ -1356,7 +1286,7 @@ Singleton {
         "volume_muted": [
             "muted just in case auto-playing video tries something funny",
             "sending all pcm streams straight into the void",
-            "muted on discord—Wait let me double check the mic icon too",
+            "muted on discord—wait let me double check the mic icon too",
             "silence dialed to eleven",
             "wireplumber ordered to execute total radio silence"
         ],

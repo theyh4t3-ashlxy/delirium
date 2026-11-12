@@ -1,3 +1,4 @@
+// Settings.qml
 pragma Singleton
 import QtQuick
 import ".."
@@ -35,6 +36,7 @@ QtObject {
     property bool hoverToOpen: false
     property int hoverDelay: 220
     property bool hoverAutoClose: true
+    property bool barScrollWorkspaces: true
     property string workspaceMode: "slide"
     property string fontNerd: "JetBrainsMono Nerd Font"
 
@@ -233,7 +235,6 @@ QtObject {
 
     property bool hyprlandLua: true
 
-    // Granular Customization Engine (Gen 5)
     property string paddingScale: "cozy"
     property int widgetPaddingV: 4
     property string animCurve: "cubic"
@@ -324,6 +325,7 @@ QtObject {
     onShowQuickSettingsChanged: queueSave()
     onShowWallpaperChanged: queueSave()
     onShowQuickNotesChanged: queueSave()
+    onShowScreenCaptureChanged: queueSave()
     onShowMotionSandboxChanged: queueSave()
     onShowBarStudioChanged: queueSave()
     onLockscreenWallpaperSyncChanged: queueSave()
@@ -392,6 +394,8 @@ QtObject {
         queueSave();
     }
     onNotificationTimeoutChanged: queueSave()
+    onNotificationCornerStyleChanged: queueSave()
+    onNotificationEdgeChanged: queueSave()
     onScoopBorderEnabledChanged: queueSave()
     onScoopBorderWidthChanged: queueSave()
     onScoopBorderColorChanged: queueSave()
@@ -406,6 +410,7 @@ QtObject {
     onHoverToOpenChanged: queueSave()
     onHoverDelayChanged: queueSave()
     onHoverAutoCloseChanged: queueSave()
+    onBarScrollWorkspacesChanged: queueSave()
     onWorkspaceModeChanged: queueSave()
     onFontNerdChanged: queueSave()
     onWindowTitleModeChanged: queueSave()
@@ -436,6 +441,19 @@ QtObject {
     onSurfaceOpacityChanged: queueSave()
     onCornerFilletsChanged: queueSave()
     onCornerSmoothingChanged: queueSave()
+    onCustomColorsEnabledChanged: queueSave()
+    onCustomBgChanged: queueSave()
+    onCustomActiveChanged: queueSave()
+    onCustomTextChanged: queueSave()
+    onCustomSubtextChanged: queueSave()
+    onCustomBorderChanged: queueSave()
+    onCustomWidgetBgChanged: queueSave()
+    onShowDynamicNotchChanged: queueSave()
+    onDynamicNotchEnabledChanged: queueSave()
+    onDynamicNotchModeChanged: queueSave()
+    onBentoGapChanged: queueSave()
+    onBentoHoverLiftChanged: queueSave()
+    onBarIslandModeChanged: queueSave()
     onGlobalRoundingChanged: {
         if (!root._loading) {
             if (popupRadius !== globalRounding) popupRadius = globalRounding;
@@ -453,7 +471,6 @@ QtObject {
     onRequestWelcomeToggle: showWelcomeWizard = !showWelcomeWizard
     onRequestWelcomeOpen: showWelcomeWizard = true
     onRequestWelcomeClose: showWelcomeWizard = false
-
 
     readonly property var _schema: [
         { key: "barPosition", type: "string", def: "top" },
@@ -504,12 +521,13 @@ QtObject {
         { key: "showQuickSettings", type: "bool", def: true },
         { key: "showWallpaper", type: "bool", def: true },
         { key: "showQuickNotes", type: "bool", def: true },
+        { key: "showScreenCapture", type: "bool", def: true },
         { key: "showMotionSandbox", type: "bool", def: false },
         { key: "showBarStudio", type: "bool", def: false },
         { key: "lockscreenWallpaperSync", type: "bool", def: true },
         { key: "lockscreenWallpaper", type: "string", def: "" },
         { key: "lockscreenShowMedia", type: "bool", def: true },
-        { key: "barModulesLeft", type: "json", def: ["launcher", "wallpaper", "workspaces", "windowTitle"] },
+        { key: "barModulesLeft", type: "json", def: ["launcher", "wallpaper", "workspaces", "layout", "windowTitle"] },
         { key: "barModulesCenter", type: "json", def: ["clock"] },
         { key: "barModulesRight", type: "json", def: ["media", "quickNotes", "screenCapture", "clipboard", "idleInhibitor", "notifications", "systemTray", "bluetooth", "network", "volume", "battery", "quickSettings", "powerMenu"] },
         { key: "iconSet", type: "string", def: "material" },
@@ -564,6 +582,7 @@ QtObject {
         { key: "hoverToOpen", type: "bool", def: false },
         { key: "hoverDelay", type: "int", def: 220 },
         { key: "hoverAutoClose", type: "bool", def: true },
+        { key: "barScrollWorkspaces", type: "bool", def: true },
         { key: "workspaceMode", type: "string", def: "slide" },
         { key: "fontNerd", type: "string", def: "JetBrainsMono Nerd Font" },
         { key: "windowTitleMode", type: "string", def: "auto" },
@@ -611,6 +630,10 @@ QtObject {
             if (item.key === "awwwTransitionType") {
                 let valid = ["wipe", "wave", "grow", "fade", "center", "outer", "simple", "left", "right", "top", "bottom", "random", "none"];
                 if (valid.indexOf(v) === -1) v = "wipe";
+            }
+            if (item.key === "barPosition") {
+                if (v === "up") v = "top";
+                else if (v === "down") v = "bottom";
             }
 
             if (item.type === "string") {
@@ -789,7 +812,11 @@ QtObject {
             root.save();
         }
         onSaved: resetSavingTimer.restart()
-        onSaveFailed: (error) => resetSavingTimer.restart()
+        onSaveFailed: (error) => {
+            // fallback to writeScript if stateDir wasn't created yet when FileView tried to write
+            Quickshell.execDetached([root.writeScript, root.confPath, root.toConf()]);
+            resetSavingTimer.restart();
+        }
         onFileChanged: {
             if (!root._isSaving) {
                 confFile.reload();
@@ -896,7 +923,7 @@ QtObject {
     }
 
     function resetBarLayout() {
-        barModulesLeft = ["launcher", "wallpaper", "workspaces", "windowTitle"];
+        barModulesLeft = ["launcher", "wallpaper", "workspaces", "layout", "windowTitle"];
         barModulesCenter = ["clock"];
         barModulesRight = ["media", "quickNotes", "screenCapture", "clipboard", "idleInhibitor", "notifications", "systemTray", "bluetooth", "network", "volume", "battery", "quickSettings", "powerMenu"];
     }
@@ -955,4 +982,3 @@ QtObject {
         }
     }
 }
-

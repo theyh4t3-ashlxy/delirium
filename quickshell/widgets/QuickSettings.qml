@@ -1,3 +1,4 @@
+// QuickSettings.qml
 import QtQuick
 import QtQuick.Layouts
 import ".."
@@ -9,21 +10,34 @@ import Quickshell.Hyprland
 
 Rectangle {
     id: root
-    readonly property int pillSize: Theme.barHeight - 8
-    implicitWidth: Theme.isVertical ? pillSize : qsRow.implicitWidth + 24
-    implicitHeight: pillSize
-    radius: Theme.radiusPill
-    color: popup.open
-        ? Theme.widgetActive
-        : (qsMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-    border.color: popup.open ? Theme.alpha(Theme.primary, 0.55) : Theme.pillBorder
-    border.width: (popup.open || Theme.pillBorder.a > 0) ? 1 : 0
-
-    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
     property var barScreen: null
     property var barMonitor: null
+
+    readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
+    readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
+
+    readonly property int pillSize: Theme.barHeight - 8
+    implicitWidth: {
+        if (Theme.isVertical) return pillSize;
+        return (qsMouse.containsMouse || popup.open) ? (qsRow.implicitWidth + 20) : pillSize;
+    }
+    implicitHeight: pillSize
+    radius: Theme.radiusPill
+    color: {
+        if (qsMouse.pressed) return Theme.widgetActive;
+        if (popup.open) return Theme.primary_overlay;
+        if (qsMouse.containsMouse) return Theme.pillHover;
+        return Theme.pillBg;
+    }
+    border.color: popup.open ? Theme.primary : Theme.pillBorder
+    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+    clip: true
+
+    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+    Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+
     property string activeTab: "layout"
     property string fontTarget: "sans"
     property string fontSearchQuery: ""
@@ -31,13 +45,14 @@ Rectangle {
     property string activeShell: "quickshell"
     property bool fontsLoaded: false
     property var allFonts: []
+    property string pendingShotMode: ""
 
     readonly property string userHome: Quickshell.env("HOME") || ""
     readonly property string cacheDir: Quickshell.env("XDG_CACHE_HOME") || (userHome + "/.cache")
     readonly property string configDir: Quickshell.env("XDG_CONFIG_HOME") || (userHome + "/.config")
     readonly property string lockStatePath: configDir + "/quickshell/lockscreen/state"
 
-    // synced with ~/.config/quickshell/lockscreen/state so we don't nuke the new lockscreen keys
+    // synced with ~/.config/quickshell/lockscreen/state so we don't nuke the lockscreen keys
     property var lockCfg: ({
         syncClockGlobal: false,
         clock24h: false,
@@ -79,6 +94,26 @@ Rectangle {
         interval: 120
         repeat: false
         onTriggered: root.flushLockState()
+    }
+
+    // waits for quick settings to close before firing a test screenshot
+    Timer {
+        id: quickShotTimer
+        interval: 140
+        repeat: false
+        onTriggered: {
+            if (typeof ScreenshotService === "undefined" || !ScreenshotService) return;
+            if (root.pendingShotMode === "full") {
+                const scr = root.barScreen || (Quickshell.screens?.length > 0 ? Quickshell.screens[0] : null);
+                ScreenshotService.captureFullscreen(scr, Settings?.screenshotDefaultAction || "both");
+            } else if (ScreenshotService.open) {
+                ScreenshotService.open(root.pendingShotMode);
+            }
+        }
+    }
+
+    function saveSettings() {
+        if (Settings?.save) Settings.save();
     }
 
     function parseBool(val, fallback) {
@@ -171,10 +206,10 @@ Rectangle {
         Settings.clock24h = is24h;
         Settings.clockMilitary = is24h;
         Settings.clockShowSeconds = withSec;
-        if (Settings.save) Settings.save();
+        root.saveSettings();
     }
 
-    // only query system fonts when the user actually looks at the appearance tab
+    // only query system fonts when the user actually opens the appearance tab
     function ensureFontsLoaded() {
         if (root.fontsLoaded) return;
         root.fontsLoaded = true;
@@ -193,7 +228,7 @@ Rectangle {
         || Settings.iconSet === "material-sharp"
 
     readonly property string activeTabTitle: ({
-        layout: "layout",
+        layout: "bar & geometry",
         style: "appearance",
         behavior: "behavior",
         capture: "capture",
@@ -202,8 +237,8 @@ Rectangle {
     })[root.activeTab] || "settings"
 
     readonly property string activeTabSubtitle: ({
-        layout: "bar geometry, floating mode, and active modules",
-        style: "materials, colors, screen corners, and typography",
+        layout: "bar dimensions, floating islands, and studio launcher",
+        style: "materials, colors, concave scoops, and typography",
         behavior: "lock screen studio, clock formats, and motion physics",
         capture: "screenshots, audio sources, and overlay guides",
         keybinds: "view and manage your shell shortcuts",
@@ -264,15 +299,19 @@ Rectangle {
 
     function updatePopupPos() {
         const p = root.mapToItem(null, 0, 0);
-        if (p) {
-            popup.targetRelativeX = p.x + (root.width / 2);
-            popup.targetRelativeY = p.y + (root.height / 2);
+        if (p && root.visible) {
+            if (Theme.isVertical) {
+                popup.targetRelativeX = 0;
+                popup.targetRelativeY = p.y + (root.implicitHeight / 2) + root.effectiveBarMargin;
+            } else {
+                popup.targetRelativeX = p.x + (root.implicitWidth / 2) + root.effectiveBarMargin;
+                popup.targetRelativeY = 0;
+            }
+        } else {
+            popup.targetRelativeX = 0;
+            popup.targetRelativeY = 0;
         }
     }
-
-    /*
-    Reusable setting components wired to Theme.qml tokens
-    */
 
     component CategoryHeader: ColumnLayout {
         id: catHdr
@@ -281,7 +320,7 @@ Rectangle {
         property string subtitle: ""
 
         Layout.fillWidth: true
-        Layout.topMargin: 10
+        Layout.topMargin: 8
         Layout.bottomMargin: 2
         spacing: 3
 
@@ -341,11 +380,20 @@ Rectangle {
         Layout.fillWidth: true
         width: parent ? parent.width : undefined
         implicitHeight: cardCol.implicitHeight + (Theme.widgetPaddingV * 2) + 12
-        radius: Theme.radiusLg
+        radius: Theme.radiusMd
         color: Theme.cardBg
         border.color: Theme.cardBorder
         border.width: Theme.popupBorderWidth
         clip: true
+
+        Rectangle {
+            visible: Theme.isGlass
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+            color: Theme.glassHighlight
+        }
 
         Column {
             id: cardCol
@@ -366,7 +414,6 @@ Rectangle {
         color: Theme.widgetBorder
     }
 
-    // single-click toggle row that doesn't fight ToggleSwitch's internal state
     component ToggleRow: Rectangle {
         id: trRoot
         property string icon: ""
@@ -597,14 +644,16 @@ Rectangle {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: crRoot.selected(itemVal)
+                        onClicked: {
+                            crRoot.selected(itemVal);
+                            root.saveSettings();
+                        }
                     }
                 }
             }
         }
     }
 
-    // squishy M3 expressive slider with wheel + drag support
     component SliderRow: ColumnLayout {
         id: slRoot
         property string title: ""
@@ -634,7 +683,10 @@ Rectangle {
             let raw = slRoot.from + t * (slRoot.to - slRoot.from);
             if (slRoot.stepSize > 0) raw = Math.round(raw / slRoot.stepSize) * slRoot.stepSize;
             raw = Math.max(slRoot.from, Math.min(slRoot.to, raw));
-            if (Math.abs(raw - slRoot.value) > 1e-6) slRoot.moved(raw);
+            if (Math.abs(raw - slRoot.value) > 1e-6) {
+                slRoot.moved(raw);
+                root.saveSettings();
+            }
         }
 
         RowLayout {
@@ -730,7 +782,10 @@ Rectangle {
                     let dir = wheel.angleDelta.y > 0 ? 1 : -1;
                     let step = slRoot.stepSize > 0 ? slRoot.stepSize : ((slRoot.to - slRoot.from) * 0.05);
                     let next = Math.max(slRoot.from, Math.min(slRoot.to, slRoot.value + dir * step));
-                    if (Math.abs(next - slRoot.value) > 1e-6) slRoot.moved(next);
+                    if (Math.abs(next - slRoot.value) > 1e-6) {
+                        slRoot.moved(next);
+                        root.saveSettings();
+                    }
                 }
             }
         }
@@ -816,7 +871,10 @@ Rectangle {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: cgRoot.selected(itemVal)
+                        onClicked: {
+                            cgRoot.selected(itemVal);
+                            root.saveSettings();
+                        }
                     }
                 }
             }
@@ -847,17 +905,30 @@ Rectangle {
         }
     }
 
+    // bar pill content (expands on hover like ScreenCapture, Bluetooth, and NetworkStatus)
     Row {
         id: qsRow
         anchors.centerIn: parent
-        spacing: 4
+        spacing: 6
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: Theme.iconSettings
             font.family: Theme.fontIcon
-            font.pixelSize: Theme.fontSizeMd
-            color: popup.open ? Theme.primary : Theme.textPrimary
+            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+            color: popup.open || qsMouse.containsMouse ? Theme.primary : Theme.textPrimary
+
+            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+        }
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !Theme.isVertical && (qsMouse.containsMouse || popup.open)
+            text: "settings"
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSm
+            font.weight: Font.Medium
+            color: Theme.textPrimary
         }
     }
 
@@ -867,12 +938,19 @@ Rectangle {
         updatePos: () => root.updatePopupPos()
     }
 
+    // left click opens settings, right click jumps straight into Bar Layout Studio
     MouseArea {
         id: qsMouse
         anchors.fill: parent
         hoverEnabled: true
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
-        onClicked: {
+        onClicked: (mouse) => {
+            if (mouse.button === Qt.RightButton) {
+                popup.open = false;
+                if (Settings) Settings.showBarStudio = !Settings.showBarStudio;
+                return;
+            }
             root.updatePopupPos();
             if (!popup.open) {
                 popup.pinned = true;
@@ -953,18 +1031,18 @@ Rectangle {
                 spacing: 10
 
                 Rectangle {
-                    width: 38
-                    height: 38
+                    width: 36
+                    height: 36
                     radius: Theme.radiusMd
                     color: Theme.primary_overlay
-                    border.color: Theme.alpha(Theme.primary, 0.45)
+                    border.color: Theme.alpha(Theme.primary, 0.35)
                     border.width: 1
 
                     Text {
                         anchors.centerIn: parent
                         text: Theme.iconSettings
                         font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeLg
+                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                         color: Theme.primary
                     }
                 }
@@ -976,7 +1054,7 @@ Rectangle {
                     Text {
                         text: "settings & studio"
                         font.family: Theme.fontDisplay
-                        font.pixelSize: Theme.fontSizeLg
+                        font.pixelSize: Theme.fontSizeMd
                         font.weight: Theme.fontWeightBold
                         color: Theme.textPrimary
                     }
@@ -992,11 +1070,11 @@ Rectangle {
                 }
 
                 Rectangle {
-                    height: 24
+                    height: 22
                     implicitWidth: saveBadgeRow.implicitWidth + 14
                     radius: Theme.radiusPill
                     color: Theme.primary_overlay
-                    border.color: Theme.alpha(Theme.primary, 0.45)
+                    border.color: Theme.primary
                     border.width: 1
 
                     RowLayout {
@@ -1005,6 +1083,7 @@ Rectangle {
                         spacing: 4
 
                         Text {
+                            visible: !Theme.isTextIconSet
                             text: Theme.iconCheck
                             font.family: Theme.fontIcon
                             font.pixelSize: Theme.fontSizeXs
@@ -1057,7 +1136,7 @@ Rectangle {
 
                     Repeater {
                         model: [
-                            { id: "layout", label: "layout", icon: Theme.iconGrid },
+                            { id: "layout", label: "bar", icon: Theme.iconGrid },
                             { id: "style", label: "appearance", icon: Theme.iconSparkles },
                             { id: "behavior", label: "behavior", icon: Theme.iconFlame },
                             { id: "capture", label: "capture", icon: Theme.iconCamera },
@@ -1069,12 +1148,12 @@ Rectangle {
                             required property var modelData
                             readonly property bool isSelected: root.activeTab === modelData.id
                             height: 30
-                            width: tabItemRow.implicitWidth + 22
+                            width: tabItemRow.implicitWidth + 20
                             radius: isSelected ? Theme.radiusMd : Theme.radiusPill
                             color: isSelected
                                 ? Theme.primary_overlay
                                 : (tabMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-                            border.color: isSelected ? Theme.alpha(Theme.primary, 0.65) : Theme.pillBorder
+                            border.color: isSelected ? Theme.primary : Theme.pillBorder
                             border.width: (isSelected || Theme.pillBorder.a > 0) ? 1 : 0
 
                             Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
@@ -1087,6 +1166,7 @@ Rectangle {
                                 spacing: 6
 
                                 Text {
+                                    visible: !Theme.isTextIconSet
                                     text: modelData.icon
                                     font.family: Theme.fontIcon
                                     font.pixelSize: Theme.fontSizeSm
@@ -1124,7 +1204,7 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
-                // 1. layout & modules tab
+                // 1. bar & geometry tab (module lists nuked since BarStudio owns module placement now)
                 Flickable {
                     id: flickLayout
                     anchors.fill: parent
@@ -1139,31 +1219,12 @@ Rectangle {
                         target: parent
                     }
 
-                    function isModAssigned(modId) {
-                        return (Settings?.barModulesLeft || []).includes(modId)
-                            || (Settings?.barModulesCenter || []).includes(modId)
-                            || (Settings?.barModulesRight || []).includes(modId);
-                    }
-
-                    function toggleBarModule(modId, propName) {
-                        if (!Settings) return;
-                        let currentlyActive = Boolean(Settings[propName]) && isModAssigned(modId);
-                        let nextVal = !currentlyActive;
-                        Settings[propName] = nextVal;
-                        if (nextVal && !isModAssigned(modId)) {
-                            let right = (Settings.barModulesRight || []).slice();
-                            right.push(modId);
-                            Settings.barModulesRight = right;
-                        }
-                        if (Settings.save) Settings.save();
-                    }
-
                     ColumnLayout {
                         id: layoutCol
                         width: parent.width
                         spacing: Theme.popupSpacing
 
-                        // bar layout studio hero card
+                        // bar layout studio launcher card (closes quick settings so they don't stack on top of each other)
                         SettingCard {
                             RowLayout {
                                 width: parent.width
@@ -1174,12 +1235,14 @@ Rectangle {
                                     height: 38
                                     radius: Theme.radiusMd
                                     color: Settings.showBarStudio ? Theme.primary : Theme.primary_overlay
+                                    border.color: Theme.alpha(Theme.primary, 0.4)
+                                    border.width: 1
 
                                     Text {
                                         anchors.centerIn: parent
-                                        text: Theme.iconSliders
+                                        text: Theme.iconSparkles
                                         font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeMd
+                                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                         color: Settings.showBarStudio ? Theme.on_primary : Theme.primary
                                     }
                                 }
@@ -1189,7 +1252,7 @@ Rectangle {
                                     spacing: 2
 
                                     Text {
-                                        text: (Settings.barPosition === "up" ? "top" : (Settings.barPosition === "down" ? "bottom" : Settings.barPosition)) + " bar • layout studio"
+                                        text: "bar layout studio"
                                         font.family: Theme.fontDisplay
                                         font.pixelSize: Theme.fontSizeSm
                                         font.weight: Theme.fontWeightBold
@@ -1197,36 +1260,33 @@ Rectangle {
                                     }
 
                                     Text {
-                                        text: Settings.showBarStudio
-                                            ? "studio active on screen edge"
-                                            : (Settings.barHeight + "px  •  " + Settings.widgetSpacing + "px gap  •  drag & reorder modules")
-                                        font.family: Theme.fontMono
+                                        text: "drag & drop modules, switch zones, toggle visibility, or load presets"
+                                        font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
-                                        color: Settings.showBarStudio ? Theme.primary : Theme.textSecondary
+                                        color: Theme.textSecondary
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
                                     }
                                 }
 
                                 Rectangle {
                                     height: 30
                                     implicitWidth: studioQuickTxt.implicitWidth + 20
-                                    radius: Settings.showBarStudio ? Theme.radiusMd : Theme.radiusPill
-                                    color: Settings.showBarStudio
-                                        ? Theme.primary_overlay
-                                        : (studioBtnMouse.containsMouse ? Theme.stateHover(Theme.primary, Theme.on_primary) : Theme.primary)
-                                    border.color: Settings.showBarStudio ? Theme.primary : "transparent"
-                                    border.width: 1
+                                    radius: Theme.radiusPill
+                                    color: studioBtnMouse.containsMouse
+                                        ? Theme.stateHover(Theme.primary, Theme.on_primary)
+                                        : Theme.primary
 
-                                    Behavior on radius { NumberAnimation { duration: Theme.animFast } }
-                                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                                     Text {
                                         id: studioQuickTxt
                                         anchors.centerIn: parent
-                                        text: Settings.showBarStudio ? "close studio" : "open studio"
+                                        text: "open studio"
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightBold
-                                        color: Settings.showBarStudio ? Theme.primary : Theme.on_primary
+                                        color: Theme.on_primary
                                     }
 
                                     MouseArea {
@@ -1234,7 +1294,10 @@ Rectangle {
                                         anchors.fill: parent
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: Settings.showBarStudio = !Settings.showBarStudio
+                                        onClicked: {
+                                            popup.open = false;
+                                            Settings.showBarStudio = true;
+                                        }
                                     }
                                 }
                             }
@@ -1242,7 +1305,7 @@ Rectangle {
 
                         CategoryHeader {
                             title: "bar geometry & spacing"
-                            subtitle: "screen placement, thickness, rounding, and pill spacing"
+                            subtitle: "screen edge, thickness, padding density, and corner rounding"
                             icon: Theme.iconGrid
                         }
 
@@ -1257,6 +1320,17 @@ Rectangle {
                                 ]
                                 currentValue: Settings.barPosition === "up" ? "top" : (Settings.barPosition === "down" ? "bottom" : Settings.barPosition)
                                 onSelected: (val) => Settings.barPosition = val
+                            }
+
+                            ChoiceRow {
+                                title: "padding density scale (Theme.paddingScale)"
+                                model: [
+                                    { label: "compact (0.8x)", value: "compact" },
+                                    { label: "cozy (1.0x)", value: "cozy" },
+                                    { label: "comfortable (1.25x)", value: "comfortable" }
+                                ]
+                                currentValue: Settings.paddingScale || "cozy"
+                                onSelected: (val) => Settings.paddingScale = val
                             }
 
                             RowDivider {}
@@ -1319,7 +1393,7 @@ Rectangle {
 
                         CategoryHeader {
                             title: "floating bar & island physics"
-                            subtitle: "detach the bar from the screen edge"
+                            subtitle: "detach the bar from the screen edge or split into bento islands"
                             icon: Theme.iconExpand
                         }
 
@@ -1329,13 +1403,40 @@ Rectangle {
                                 title: "floating bar"
                                 subtitle: "detach status bar from screen edge"
                                 checked: Settings.barFloating
-                                onToggled: Settings.barFloating = !Settings.barFloating
+                                onToggled: {
+                                    Settings.barFloating = !Settings.barFloating;
+                                    root.saveSettings();
+                                }
                             }
 
-                            RowDivider { visible: Settings.barFloating }
+                            RowDivider { visible: Settings.barFloating || Theme.isBento }
+
+                            ToggleRow {
+                                visible: Settings.barFloating || Theme.isBento
+                                icon: Theme.iconGrid
+                                title: "bento island split"
+                                subtitle: "split left, center, and right zones into floating capsules"
+                                checked: Settings.barIslandMode ?? true
+                                onToggled: {
+                                    Settings.barIslandMode = !(Settings.barIslandMode ?? true);
+                                    root.saveSettings();
+                                }
+                            }
+
+                            ToggleRow {
+                                visible: Settings.barFloating || Theme.isBento
+                                icon: Theme.iconSparkles
+                                title: "bento island hover lift"
+                                subtitle: "elevate capsules slightly when hovered"
+                                checked: Settings.bentoHoverLift ?? true
+                                onToggled: {
+                                    Settings.bentoHoverLift = !(Settings.bentoHoverLift ?? true);
+                                    root.saveSettings();
+                                }
+                            }
 
                             SliderRow {
-                                visible: Settings.barFloating
+                                visible: Settings.barFloating || Theme.isBento
                                 title: "floating bar corner radius"
                                 from: 0
                                 to: 24
@@ -1346,7 +1447,7 @@ Rectangle {
                             }
 
                             SliderRow {
-                                visible: Settings.barFloating
+                                visible: Settings.barFloating || Theme.isBento
                                 title: "floating screen margin"
                                 from: 0
                                 to: 32
@@ -1355,177 +1456,71 @@ Rectangle {
                                 value: Settings.barMargin
                                 onMoved: (v) => Settings.barMargin = v
                             }
-
-                            RowDivider { visible: Settings.barFloating }
-
-                            ToggleRow {
-                                visible: Settings.barFloating
-                                icon: Theme.iconSparkles
-                                title: "bento island hover lift"
-                                subtitle: "elevate capsules slightly on hover"
-                                checked: Settings.bentoHoverLift
-                                onToggled: Settings.bentoHoverLift = !Settings.bentoHoverLift
-                            }
                         }
 
                         CategoryHeader {
-                            title: "navigation & window modules"
-                            subtitle: "launcher, workspaces, layouts, and active window title"
-                            icon: Theme.iconWorkspaces
+                            title: "window title & dynamic notch"
+                            subtitle: "configure active window badge and center island behavior"
+                            icon: Theme.iconSparkles
                         }
 
                         SettingCard {
-                            ToggleRow {
-                                icon: Theme.iconAppLauncher
-                                title: "application launcher"
-                                checked: Settings.showLauncher && flickLayout.isModAssigned("launcher")
-                                onToggled: flickLayout.toggleBarModule("launcher", "showLauncher")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconWorkspaces
-                                title: "workspaces switcher"
-                                checked: Settings.showWorkspaces && flickLayout.isModAssigned("workspaces")
-                                onToggled: flickLayout.toggleBarModule("workspaces", "showWorkspaces")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconGrid
-                                title: "tiling layout switcher"
-                                checked: Settings.showLayoutSwitcher && flickLayout.isModAssigned("layout")
-                                onToggled: flickLayout.toggleBarModule("layout", "showLayoutSwitcher")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconTerminal
-                                title: "window title"
-                                checked: Settings.showWindowTitle && flickLayout.isModAssigned("windowTitle")
-                                onToggled: flickLayout.toggleBarModule("windowTitle", "showWindowTitle")
-                            }
-                            RowDivider { visible: Settings.showWindowTitle }
                             ChoiceRow {
-                                visible: Settings.showWindowTitle
-                                title: "window title stretch"
+                                title: "window title width mode"
                                 model: [
-                                    { label: "auto", value: "auto" },
-                                    { label: "fill bar", value: "fill" },
+                                    { label: "auto fit", value: "auto" },
+                                    { label: "fill space", value: "fill" },
                                     { label: "compact", value: "compact" }
                                 ]
-                                currentValue: Settings.windowTitleMode
+                                currentValue: Settings.windowTitleMode || "auto"
                                 onSelected: (val) => Settings.windowTitleMode = val
                             }
+
                             ToggleRow {
-                                visible: Settings.showWindowTitle
                                 icon: Theme.iconEye
                                 title: "app icon in window title"
-                                checked: Settings.windowTitleShowIcon
-                                onToggled: Settings.windowTitleShowIcon = !Settings.windowTitleShowIcon
+                                subtitle: "resolve desktop entry icon next to active window title"
+                                checked: Settings.windowTitleShowIcon ?? true
+                                onToggled: {
+                                    Settings.windowTitleShowIcon = !(Settings.windowTitleShowIcon ?? true);
+                                    root.saveSettings();
+                                }
                             }
-                        }
 
-                        CategoryHeader {
-                            title: "status, media & utility pills"
-                            subtitle: "toggle which system pills appear on the bar"
-                            icon: Theme.iconWifi
-                        }
+                            RowDivider {}
 
-                        SettingCard {
-                            ToggleRow {
-                                icon: Theme.iconClock
-                                title: "clock & date"
-                                checked: Settings.showClock && flickLayout.isModAssigned("clock")
-                                onToggled: flickLayout.toggleBarModule("clock", "showClock")
+                            ChoiceGrid {
+                                title: "dynamic notch mode"
+                                columns: 3
+                                model: [
+                                    { label: "adaptive auto", value: "auto" },
+                                    { label: "clock only", value: "clock" },
+                                    { label: "timer only", value: "timer" }
+                                ]
+                                currentValue: Settings.dynamicNotchMode || "auto"
+                                onSelected: (val) => Settings.dynamicNotchMode = val
                             }
-                            RowDivider {}
+
                             ToggleRow {
-                                icon: Theme.iconMusic
-                                title: "now playing / mpris"
-                                checked: Settings.showMedia && flickLayout.isModAssigned("media")
-                                onToggled: flickLayout.toggleBarModule("media", "showMedia")
+                                icon: Theme.iconSparkles
+                                title: "dynamic notch concave flares"
+                                subtitle: "melt center notch into screen bezel"
+                                checked: Settings.dynamicNotchFlared
+                                onToggled: {
+                                    Settings.dynamicNotchFlared = !Settings.dynamicNotchFlared;
+                                    root.saveSettings();
+                                }
                             }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconWallpaper
-                                title: "wallpaper & theme browser"
-                                checked: Settings.showWallpaper && flickLayout.isModAssigned("wallpaper")
-                                onToggled: flickLayout.toggleBarModule("wallpaper", "showWallpaper")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconVolHigh
-                                title: "volume & audio mixer"
-                                checked: Settings.showVolume && flickLayout.isModAssigned("volume")
-                                onToggled: flickLayout.toggleBarModule("volume", "showVolume")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconWifi
-                                title: "network / wi-fi"
-                                checked: Settings.showNetwork && flickLayout.isModAssigned("network")
-                                onToggled: flickLayout.toggleBarModule("network", "showNetwork")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconBluetooth
-                                title: "bluetooth devices"
-                                checked: Settings.showBluetooth && flickLayout.isModAssigned("bluetooth")
-                                onToggled: flickLayout.toggleBarModule("bluetooth", "showBluetooth")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconBatFull
-                                title: "battery & power status"
-                                checked: Settings.showBattery && flickLayout.isModAssigned("battery")
-                                onToggled: flickLayout.toggleBarModule("battery", "showBattery")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconTray
-                                title: "system tray icons"
-                                checked: Settings.showSystemTray && flickLayout.isModAssigned("systemTray")
-                                onToggled: flickLayout.toggleBarModule("systemTray", "showSystemTray")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconCoffee
-                                title: "caffeine / idle inhibitor"
-                                checked: Settings.showIdleInhibitor && flickLayout.isModAssigned("idleInhibitor")
-                                onToggled: flickLayout.toggleBarModule("idleInhibitor", "showIdleInhibitor")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconClipboard
-                                title: "clipboard history"
-                                checked: Settings.showClipboard && flickLayout.isModAssigned("clipboard")
-                                onToggled: flickLayout.toggleBarModule("clipboard", "showClipboard")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconNote
-                                title: "quick notes & scratchpad"
-                                checked: Settings.showQuickNotes && flickLayout.isModAssigned("quickNotes")
-                                onToggled: flickLayout.toggleBarModule("quickNotes", "showQuickNotes")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconCamera
-                                title: "screen capture & recorder"
-                                checked: Settings.showScreenCapture && flickLayout.isModAssigned("screenCapture")
-                                onToggled: flickLayout.toggleBarModule("screenCapture", "showScreenCapture")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconBell
-                                title: "notification center"
-                                checked: Settings.showNotifications && flickLayout.isModAssigned("notifications")
-                                onToggled: flickLayout.toggleBarModule("notifications", "showNotifications")
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconPower
-                                title: "power session menu"
-                                checked: Settings.showPowerMenu && flickLayout.isModAssigned("powerMenu")
-                                onToggled: flickLayout.toggleBarModule("powerMenu", "showPowerMenu")
+
+                            SliderRow {
+                                visible: Settings.dynamicNotchFlared
+                                title: "notch flare radius"
+                                from: 8
+                                to: 32
+                                stepSize: 2
+                                suffix: "px"
+                                value: Settings.notchFlareRadius
+                                onMoved: (val) => Settings.notchFlareRadius = val
                             }
                         }
                     }
@@ -1554,7 +1549,7 @@ Rectangle {
 
                         CategoryHeader {
                             title: "surface & material"
-                            subtitle: "bar shader preset, opacity, and custom color overrides"
+                            subtitle: "bar shader preset, adaptive opacity, and color overrides"
                             icon: Theme.iconSparkles
                         }
 
@@ -1579,6 +1574,17 @@ Rectangle {
                             }
 
                             RowDivider {}
+
+                            ToggleRow {
+                                icon: Theme.iconWallpaper
+                                title: "adaptive wallpaper transparency"
+                                subtitle: "boost surface alpha automatically when wallpaper vibrancy is high"
+                                checked: Settings.adaptiveTransparency ?? true
+                                onToggled: {
+                                    Settings.adaptiveTransparency = !(Settings.adaptiveTransparency ?? true);
+                                    root.saveSettings();
+                                }
+                            }
 
                             SliderRow {
                                 title: "bar background opacity"
@@ -1609,7 +1615,7 @@ Rectangle {
                                 checked: Settings.customColorsEnabled
                                 onToggled: {
                                     Settings.customColorsEnabled = !Settings.customColorsEnabled;
-                                    if (Settings.save) Settings.save();
+                                    root.saveSettings();
                                 }
                             }
 
@@ -1664,57 +1670,6 @@ Rectangle {
                             }
                         }
 
-                        CategoryHeader {
-                            title: "dynamic notch & screen corners"
-                            subtitle: "center island, concave screen fillets, and frame borders"
-                            icon: Theme.iconGrid
-                        }
-
-                        SettingCard {
-                            ToggleRow {
-                                icon: Theme.iconSparkles
-                                title: "reactive dynamic notch"
-                                subtitle: "interactive center island (clock, calendar & timer)"
-                                checked: Settings.dynamicNotchEnabled
-                                onToggled: Settings.dynamicNotchEnabled = !Settings.dynamicNotchEnabled
-                            }
-
-                            RowDivider { visible: Settings.dynamicNotchEnabled }
-
-                            ChoiceGrid {
-                                visible: Settings.dynamicNotchEnabled
-                                title: "dynamic notch mode"
-                                columns: 3
-                                model: [
-                                    { label: "adaptive auto", value: "auto" },
-                                    { label: "clock only", value: "clock" },
-                                    { label: "timer only", value: "timer" }
-                                ]
-                                currentValue: Settings.dynamicNotchMode
-                                onSelected: (val) => Settings.dynamicNotchMode = val
-                            }
-
-                            ToggleRow {
-                                visible: Settings.dynamicNotchEnabled
-                                icon: Theme.iconSparkles
-                                title: "dynamic notch concave flares"
-                                subtitle: "melt center notch into screen bezel"
-                                checked: Settings.dynamicNotchFlared
-                                onToggled: Settings.dynamicNotchFlared = !Settings.dynamicNotchFlared
-                            }
-
-                            SliderRow {
-                                visible: Settings.dynamicNotchEnabled && Settings.dynamicNotchFlared
-                                title: "notch flare radius"
-                                from: 8
-                                to: 32
-                                stepSize: 2
-                                suffix: "px"
-                                value: Settings.notchFlareRadius
-                                onMoved: (val) => Settings.notchFlareRadius = val
-                            }
-                        }
-
                         CollapsibleSection {
                             Layout.fillWidth: true
                             title: "screen corners, scoops & frame"
@@ -1737,7 +1692,10 @@ Rectangle {
                                     { label: "right only", value: "right" }
                                 ]
                                 currentValue: Settings.screenCornerMode
-                                onSelected: (val) => Settings.screenCornerMode = val
+                                onSelected: (val) => {
+                                    Settings.screenCornerMode = val;
+                                    root.saveSettings();
+                                }
                             }
 
                             Dropdown {
@@ -1746,14 +1704,18 @@ Rectangle {
                                 icon: Theme.iconSparkles
                                 model: [
                                     { label: "g2 continuous", value: "continuous-bezier" },
-                                    { label: "cubic", value: "cubic" },
+                                    { label: "cubic circle", value: "cubic" },
                                     { label: "squircle", value: "squircle" },
                                     { label: "hyperbolic", value: "hyperbolic" },
+                                    { label: "stepped pixel", value: "stepped" },
                                     { label: "chamfer 45°", value: "chamfer" },
                                     { label: "flared", value: "flared" }
                                 ]
                                 currentValue: Settings.cornerStyle
-                                onSelected: (val) => Settings.cornerStyle = val
+                                onSelected: (val) => {
+                                    Settings.cornerStyle = val;
+                                    root.saveSettings();
+                                }
                             }
 
                             ChoiceRow {
@@ -1815,7 +1777,10 @@ Rectangle {
                                     title: "scoop border outlines"
                                     subtitle: "draw continuous stroke along concave curves"
                                     checked: Settings.scoopBorderEnabled
-                                    onToggled: Settings.scoopBorderEnabled = !Settings.scoopBorderEnabled
+                                    onToggled: {
+                                        Settings.scoopBorderEnabled = !Settings.scoopBorderEnabled;
+                                        root.saveSettings();
+                                    }
                                 }
                                 RowDivider {}
                                 ToggleRow {
@@ -1823,7 +1788,10 @@ Rectangle {
                                     title: "docked frame & scoops"
                                     subtitle: "anchor shell fillets directly to screen bounds"
                                     checked: Settings.screenFrameDocked
-                                    onToggled: Settings.screenFrameDocked = !Settings.screenFrameDocked
+                                    onToggled: {
+                                        Settings.screenFrameDocked = !Settings.screenFrameDocked;
+                                        root.saveSettings();
+                                    }
                                 }
                             }
                         }
@@ -2070,7 +2038,7 @@ Rectangle {
                                         RowLayout {
                                             anchors.fill: parent
                                             anchors.margins: 8
-                                            spacing: 8
+                                            spacing: 6
 
                                             Text {
                                                 text: modelData.toLowerCase()
@@ -2082,8 +2050,17 @@ Rectangle {
                                                 elide: Text.ElideRight
                                             }
 
+                                            // keep iconCheck in Theme.fontIcon so random system fonts don't render it as a box
                                             Text {
-                                                text: isCurrent ? (Theme.iconCheck + " active") : "123 abc"
+                                                visible: isCurrent && !Theme.isTextIconSet
+                                                text: Theme.iconCheck
+                                                font.family: Theme.fontIcon
+                                                font.pixelSize: Theme.fontSizeXs
+                                                color: Theme.primary
+                                            }
+
+                                            Text {
+                                                text: isCurrent ? "active" : "123 abc"
                                                 font.family: modelData
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: isCurrent ? Theme.primary : Theme.textSecondary
@@ -2098,6 +2075,7 @@ Rectangle {
                                             onClicked: {
                                                 if (root.fontTarget === "sans") Settings.fontFamily = modelData;
                                                 else Settings.fontMono = modelData;
+                                                root.saveSettings();
                                             }
                                         }
                                     }
@@ -2364,23 +2342,38 @@ Rectangle {
 
                         CategoryHeader {
                             title: "motion & interaction"
-                            subtitle: "animation speed presets, workspace trail, and flyouts"
+                            subtitle: "animation speed, easing curves, workspace trail, and flyouts"
                             icon: Theme.iconFlame
                         }
 
                         SettingCard {
                             ChoiceGrid {
-                                columns: 2
-                                buttonHeight: 32
+                                columns: 3
+                                buttonHeight: 30
                                 title: "animation speed preset"
                                 model: [
-                                    { label: "hyprland (default)", value: "hyprland" },
-                                    { label: "snappy (110ms)", value: "snappy" },
-                                    { label: "chill (300ms)", value: "chill" },
+                                    { label: "hyprland", value: "hyprland" },
+                                    { label: "snappy", value: "snappy" },
+                                    { label: "hyper", value: "hyper" },
+                                    { label: "normal", value: "normal" },
+                                    { label: "chill", value: "chill" },
                                     { label: "instant", value: "instant" }
                                 ]
                                 currentValue: Settings.animSpeed
                                 onSelected: (val) => Settings.animSpeed = val
+                            }
+
+                            ChoiceRow {
+                                title: "easing curve profile (Theme.animCurve)"
+                                model: [
+                                    { label: "cubic", value: "cubic" },
+                                    { label: "hyprland", value: "hyprland" },
+                                    { label: "snappy", value: "snappy" },
+                                    { label: "expressive", value: "expressive" },
+                                    { label: "linear", value: "linear" }
+                                ]
+                                currentValue: Settings.animCurve || "cubic"
+                                onSelected: (val) => Settings.animCurve = val
                             }
 
                             RowDivider {}
@@ -2414,7 +2407,10 @@ Rectangle {
                                 title: "hover to open flyouts"
                                 subtitle: "hover over bar pills to open popups"
                                 checked: Settings.hoverToOpen
-                                onToggled: Settings.hoverToOpen = !Settings.hoverToOpen
+                                onToggled: {
+                                    Settings.hoverToOpen = !Settings.hoverToOpen;
+                                    root.saveSettings();
+                                }
                             }
 
                             ToggleRow {
@@ -2422,7 +2418,10 @@ Rectangle {
                                 title: "hover auto-close"
                                 subtitle: "dismiss popup when cursor leaves"
                                 checked: Settings.hoverAutoClose
-                                onToggled: Settings.hoverAutoClose = !Settings.hoverAutoClose
+                                onToggled: {
+                                    Settings.hoverAutoClose = !Settings.hoverAutoClose;
+                                    root.saveSettings();
+                                }
                             }
 
                             SliderRow {
@@ -2483,7 +2482,10 @@ Rectangle {
                                 title: "do not disturb"
                                 subtitle: "suppress on-screen notification popups"
                                 checked: Settings.dnd
-                                onToggled: Settings.dnd = !Settings.dnd
+                                onToggled: {
+                                    Settings.dnd = !Settings.dnd;
+                                    root.saveSettings();
+                                }
                             }
                             RowDivider {}
                             ToggleRow {
@@ -2491,7 +2493,10 @@ Rectangle {
                                 title: "unhinged flavor text"
                                 subtitle: "chaotic system status quips & personality"
                                 checked: Settings.unhingedFlavor
-                                onToggled: Settings.unhingedFlavor = !Settings.unhingedFlavor
+                                onToggled: {
+                                    Settings.unhingedFlavor = !Settings.unhingedFlavor;
+                                    root.saveSettings();
+                                }
                             }
                             RowDivider {}
                             ToggleRow {
@@ -2499,7 +2504,10 @@ Rectangle {
                                 title: "motion sandbox playground"
                                 subtitle: "open interactive physics playground on screen edge"
                                 checked: Settings.showMotionSandbox
-                                onToggled: Settings.showMotionSandbox = !Settings.showMotionSandbox
+                                onToggled: {
+                                    Settings.showMotionSandbox = !Settings.showMotionSandbox;
+                                    root.saveSettings();
+                                }
                             }
                         }
                     }
@@ -2562,6 +2570,7 @@ Rectangle {
                                             anchors.centerIn: parent
                                             spacing: 6
                                             Text {
+                                                visible: !Theme.isTextIconSet
                                                 text: modelData.icon
                                                 font.family: Theme.fontIcon
                                                 font.pixelSize: Theme.fontSizeSm
@@ -2582,13 +2591,9 @@ Rectangle {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
+                                                root.pendingShotMode = modelData.id;
                                                 popup.open = false;
-                                                if (modelData.id === "full") {
-                                                    const scr = root.barScreen || (Quickshell.screens?.length > 0 ? Quickshell.screens[0] : null);
-                                                    ScreenshotService.captureFullscreen(scr, Settings.screenshotDefaultAction || "both");
-                                                } else {
-                                                    ScreenshotService.open(modelData.id);
-                                                }
+                                                quickShotTimer.restart();
                                             }
                                         }
                                     }
@@ -2633,7 +2638,10 @@ Rectangle {
                                 title: "window snapping"
                                 subtitle: "hover over any hyprland client to snap to its geometry"
                                 checked: Settings.screenshotWindowSnapping
-                                onToggled: Settings.screenshotWindowSnapping = !Settings.screenshotWindowSnapping
+                                onToggled: {
+                                    Settings.screenshotWindowSnapping = !Settings.screenshotWindowSnapping;
+                                    root.saveSettings();
+                                }
                             }
                             RowDivider {}
                             ToggleRow {
@@ -2641,7 +2649,10 @@ Rectangle {
                                 title: "freeze frame on open"
                                 subtitle: "freeze display during selection so windows don't move"
                                 checked: Settings.screenshotFreeze
-                                onToggled: Settings.screenshotFreeze = !Settings.screenshotFreeze
+                                onToggled: {
+                                    Settings.screenshotFreeze = !Settings.screenshotFreeze;
+                                    root.saveSettings();
+                                }
                             }
                             RowDivider {}
                             ToggleRow {
@@ -2649,7 +2660,10 @@ Rectangle {
                                 title: "shutter flash"
                                 subtitle: "visual flash animation when capture finishes"
                                 checked: Settings.screenshotFlash
-                                onToggled: Settings.screenshotFlash = !Settings.screenshotFlash
+                                onToggled: {
+                                    Settings.screenshotFlash = !Settings.screenshotFlash;
+                                    root.saveSettings();
+                                }
                             }
                             RowDivider {}
                             ToggleRow {
@@ -2657,7 +2671,10 @@ Rectangle {
                                 title: "desktop notification"
                                 subtitle: "send notification with image preview on capture"
                                 checked: Settings.screenshotNotify
-                                onToggled: Settings.screenshotNotify = !Settings.screenshotNotify
+                                onToggled: {
+                                    Settings.screenshotNotify = !Settings.screenshotNotify;
+                                    root.saveSettings();
+                                }
                             }
                             RowDivider {}
                             ToggleRow {
@@ -2665,7 +2682,10 @@ Rectangle {
                                 title: "hairline crosshairs"
                                 subtitle: "show alignment crosshairs tracking cursor"
                                 checked: Settings.screenshotShowCrosshair
-                                onToggled: Settings.screenshotShowCrosshair = !Settings.screenshotShowCrosshair
+                                onToggled: {
+                                    Settings.screenshotShowCrosshair = !Settings.screenshotShowCrosshair;
+                                    root.saveSettings();
+                                }
                             }
                             RowDivider {}
                             ToggleRow {
@@ -2673,7 +2693,10 @@ Rectangle {
                                 title: "live dimension badge"
                                 subtitle: "show [w × h] and window class above selection"
                                 checked: Settings.screenshotShowBadge
-                                onToggled: Settings.screenshotShowBadge = !Settings.screenshotShowBadge
+                                onToggled: {
+                                    Settings.screenshotShowBadge = !Settings.screenshotShowBadge;
+                                    root.saveSettings();
+                                }
                             }
                             RowDivider {}
                             ToggleRow {
@@ -2681,7 +2704,10 @@ Rectangle {
                                 title: "corner accent handles"
                                 subtitle: "render accent markers on selection corners"
                                 checked: Settings.screenshotShowHandles
-                                onToggled: Settings.screenshotShowHandles = !Settings.screenshotShowHandles
+                                onToggled: {
+                                    Settings.screenshotShowHandles = !Settings.screenshotShowHandles;
+                                    root.saveSettings();
+                                }
                             }
 
                             RowDivider {}
