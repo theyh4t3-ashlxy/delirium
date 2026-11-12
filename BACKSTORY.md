@@ -1,90 +1,68 @@
-# backstory & the doctrine
+# backstory
 
-## the turn-key paradox: why you should probably use caelestia or end-4
+## why i didn't just use caelestia or end-4
 
-let us be completely transparent: if you want a polished, reliable, out-of-the-box wayland setup where volume sliders just work, bluetooth doesn't require a forensic terminal autopsy, and you can post cozy pastel screenshots to discord without questioning your sanity, do not install this repository.
+if you want a normal wayland desktop where volume sliders work on the first try, bluetooth connects without touching a terminal, and you can post clean screenshots to discord, go install `caelestia` or `end-4`. those projects have actual docs, support channels, and defaults that won't crash the whole shell if your battery reports an int instead of a float.
 
-go install `caelestia` or `end-4`.
+i built `delirium` at 16 because i hated how standard setups handled configs and hardware, and i didn't feel like adapting my muscle memory to someone else's dotfiles.
 
-those are mature, sane, community-engineered rice suites built by people who actually want users to have a pleasant computing experience. they have documentation, support channels, and defaults that won't panic if your battery percentage reports an integer instead of a float.
+calling this repo `my_hyprland_dots` felt like lying. half of reddit copies a waybar config, changes three hex codes, and calls it a new rice. `delirium` is what happens when you refuse to use normal tools, write your own pam auth loops, calculate bezier curves for screen-corner cutouts, and wire pipewire audio peaks into your lockscreen just to watch waveforms bounce while typing your password at 4:18 am.
 
-`delirium` is the exact opposite of a turn-key distribution. it is a hyper-specific, deeply obsessive digital operating state tailored to a 15-year-old's sensory neuroses, hardware thermal containment, and pathological rejection of corporate developer defaults.
-
-### why build from scratch then?
-
-because when you use a prebuilt rice, you are renting someone else's taste.
-
-the moment you crave:
-- **zero `.json` architecture**: evicting nested curly brackets and quotes from local state entirely in favor of flat key-value tokens.
-- **pure qml layer-shell composition**: abandoning bloated waybar setups for dynamic qtquick anchors with continuous bezier curves and fluid subsurfaces.
-- **hardware-level firmware hacking**: reverse-engineering thinkpad embedded controller registers to bypass corporate thermal castration and force-feed the cooling assembly maximum fan wattage.
-- **deterministic nixos immutability**: ensuring an update can never brick your system because generation rollbacks are instant.
-- **embedded lua display scripting**: driving hyprland through runtime closures rather than brittle static config syntax.
-
-...you realize prebuilt rices cannot give you that. you have to build it yourself, line by painful line, in the dark at 4 am.
-
-steal our code. rip out our continuous bezier scoop math, our matugen template pipelines, our native python desktop controller, or our ec fan override loop. customize the living hell out of your system until every single byte reflects your own brain. but don't clone this expecting a frictionless appliance.
+steal whatever you want from here. grab the corner bezier math, the `matugen` templates, `cli.py`, or the thinkpad fan daemon.
 
 ---
 
-## why "delirium"
+## the laptop (thinkpad t16 gen 1)
 
-calling this repo `my_hyprland_dots` was false advertising. it sounded like every other high schooler who copied a waybar config from reddit and called themselves a rice architect.
+this whole thing runs on an alder lake i7-1260p paired with an nvidia geforce mx550 whose only real contribution is extra heat and multi-gpu buffer sync headaches on wayland. the bottom plastic cover has warped two millimeters to the left from sustained heat, and the battery health percentage reads like a timer ticking down to zero.
 
-`delirium` is the only clinically accurate diagnosis.
+getting boot to look clean took its own fight. i use `lanzaboote` for secure boot with `plymouth` bgrt, and i had to force early kms modules (`i915`, `fastboot=1`) into the initrd list just to stop the lenovo splash screen from strobing like a broken fluorescent tube for twelve seconds during handoff.
 
-you are looking at an operating environment where a fifteen-year-old refused to use standard tools, declared holy war on `.json` files, built an entire layer-shell desktop from scratch in qtquick/qml, wrote custom pam authentication loops, calculated continuous bezier spline curves for display scoop corners, and wired pipewire peak monitors into a lockscreen just to watch audio waveforms vibrate while typing credentials into a terminal at 4:18 am.
-
-if that isn't clinical, late-stage developer delirium, nothing is.
+then there were the fans (`pkgs/fan-control/`). the thinkpad cooler itself is fine, but lenovo tuned the factory embedded controller (`dytc`) for quiet office cubicles where hr yells at you if your fan spins past 2,200 rpm on a zoom call. stock firmware chokes cpu clock speeds just to keep the laptop quiet. i don't work in an office. if the cpu wants to boost, let it boost. i poked around the thinkpad acpi ec registers and packaged a root systemd service in `pkgs/fan-control/` that overrides the firmware cap and forces the fan to full speed (5,400 rpm) whenever temps spike. it sounds like a hair dryer eating aquarium rocks, and i don't care.
 
 ---
 
-## the hardware victim (thinkpad t16 gen 1)
+## the stack (and the bots breaking it)
 
-a laptop that never asked to be drafted into this digital war.
-- alder lake i7-1260p running at temperatures hot enough to fry an egg directly on the magnesium-aluminum chassis.
-- an nvidia geforce mx550 discrete gpu whose sole purpose in life is generating thermal panic and reminding us why wayland multi-gpu buffer synchronization is an unresolved crime against humanity.
-- lanzaboote secure boot with plymouth bgrt, where early kms modules (`i915`, `fastboot=1`) had to be violently forced into the initrd kernel modules list just to stop the lenovo oem splash screen from having a twelve-second epileptic strobe seizure during boot handoff.
-- **corporate acoustic castration (unshackling the fans)**: the thinkpad hardware itself is completely fine. the real enemy is lenovo's sanitized corporate firmware tuning. the factory embedded controller is engineered for terrified office workers in quiet open-plan cubicles who would get fired by hr if their cooling fan dared to spin above 2,200 rpm during a zoom call. lenovo's dytc firmware artificially throttled clock ceilings and thermal dissipation just to keep the laptop dead silent at the expense of actual silicon throughput. we don't work in a corporate cubicle farm, and we don't care about office etiquette. if the silicon wants to boost, it boosts. if the cooling assembly sounds like a boeing 737 ingesting gravel at 5,400 rpm, let it scream. we reverse-engineered the thinkpad acpi ec fan registers, packaged a native nixos root systemd daemon (`fan-control`), and built an active override loop in `pkgs/fan-control/` that forces the fans to maximum wattage whenever the cpu demands it. noise is the sound of work getting done.
+most of this repo is a tug-of-war between me and three different google tools:
+- **ai studio**: my 3:45 am rubber duck. i dump 1.8 million tokens of raw wayland c headers, unindexed quickshell commits, and broken qml bindings into gemini's context window until it invents c++ methods that don't exist in any standard and tries to compile them anyway.
+- **antigravity**: four headless sub-agents running across parallel git worktrees until the thinkpad hits 104°c and the room smells like warm dust and cooked thermal paste. one agent invents a fake unix socket protocol, a second deletes working python list indexes, and the other two get stuck in a three-hour merge conflict loop over two pixels of border radius.
+- **jules**: an unattended cloud runner that clones this repo into a vm while i sleep, invents bugs to fix problems nobody had, and pushes commits straight to `main` with zero human supervision.
 
-the cooling fan sounds like a miniature boeing 737 engine ingesting gravel. the bottom shell has permanently warped two millimeters to the left from sustained heat cycling. the battery capacity indicator is less of a gauge and more of a countdown timer to sudden death.
+on the desktop side, the whole shell runs in raw `quickshell` (`qs`) using qtquick and qml anchors, so a single null pointer in a battery widget drops the entire graphical session straight into `tty1`. i also deleted my old `qs-action` and `reload-qs` bash scripts and replaced them with `cli.py` so one zero-dependency python script handles shell switching, clean layer-shell restarts without leftover surfaces, file manager launches, and desktop actions.
 
----
+hyprland itself runs embedded lua tables instead of standard `hyprlang` brackets so the window manager evaluates lua closures at 240hz. and `.json` is completely banned from local state. no nested curly braces, no trailing-comma syntax errors, and no quote escaping. state lives in flat key-value `.conf` files or plain text tokens.
 
-## the stack (the torture chamber)
-
-- **google ai studio**: the primary psychological testing ground. i dump 1.8 million tokens of raw wayland c headers, unindexed quickshell commits, and broken qml bindings down gemini's context window at 3:45 am until it hallucinates c++ protocols that don't exist in any posix standard and compiles them out of pure existential dread.
-- **google antigravity**: four headless sub-agents running in parallel git worktrees until my thinkpad hits 104°c, the chassis smells like ozone and fried thermal paste, and the laptop fans drown out all ambient room audio. one agent hallucinates an imaginary unix domain socket protocol, another deletes working python array indexing, and the remaining two enter an unresolvable three-hour merge conflict death spiral over two pixels of corner radius.
-- **google jules**: an unmonitored autonomous cloud runner that clones this repo into isolated virtual machines while i sleep, invents regressions to solve problems that never existed, and force-pushes commits straight to main with zero human witnesses.
-- **quickshell**: waybar is for people who eat unseasoned boiled chicken breasts and go to bed at 9:15 pm. real digital sociopaths build their entire graphical interface in raw qtquick and qml anchors so that a single null pointer in a battery property vaporizes the entire desktop into tty1 text purgatory.
-- **cli.py**: nuked `qs-action` and `reload-qs` into the sun. having two brittle bash scripts concatenate strings to invoke quickshell ipc calls was offensive to anyone with working nerve endings. now a single zero-dependency python controller handles shell switching, clean layer-shell restarts without zombie surfaces, preferred file manager launching, and desktop action routing.
-- **hyprland native lua**: hyprlang was abandoned for embedded lua tables because configuring a display server in declarative brackets wasn't psychotic enough. if our window manager isn't evaluating lua closures at 240hz, we don't want it.
-- **the great json purge**: json has been sentenced to death. curly braces, nested brackets, and quoted strings have been permanently evicted from local state. if a config cannot be stored in clean key-value `.conf` or raw extensionless state tokens, it does not belong on this filesystem.
-- **ephemeral tmpfs root & impermanence**: persistent block devices mounted on root are for people with commitment issues. `/` is an ephemeral 4gb ramdisk. physics is our garbage collector: when the machine turns off, any unpersisted file ceases to exist in this dimension. state is violently quarantined to `@persist` on btrfs.
-
-it runs on my machine. if your compositor dumps core on login, that is not a bug; that is a personal skill issue.
+if your compositor dumps core on login, that's between you and `coredumpctl`.
 
 ---
 
-## the doctrine (the imperative crime scene)
+## how i ended up on nixos (with a 4gb ramdisk root)
 
-arch linux is dead and buried. the imperative crime scene has been permanently quarantined.
+### windows
+i left windows because my laptop ran way hotter on it, the background bloat never shut up, and everything was locked inside proprietary black boxes. the worst part was the fake permissions: even when your account says `Administrator`, windows treats you like a guest on your own hardware and tells you "access denied" because `SYSTEM` or `TrustedInstaller` owns the actual files. i got tired of begging my own operating system for permission to touch my laptop.
 
-- **the atomic arch incident (june 2026)**: the infamous supply chain weapon that weaponized 1,500 hijacked packages across the ecosystem. except i didn't even catch it through an orphaned aur package like normal victims. at 3:14 am, fully conscious and aware of what i was getting myself into, i typed `npm install atomic-lockfile` directly on bare metal with zero sandbox, zero container, and zero survival instincts just to see what would happen. thirty seconds later, the postinstall lifecycle hook compiled an obfuscated rust binary, swept `~/.ssh/id_ed25519`, scraped discord session tokens from `~/.config/discord/Local Storage/leveldb`, exfiltrated an encrypted multipart `POST` payload straight to `api.telegram.org/bot<token>/sendDocument`, and tried to hook into the kernel. watching your own credentials get dispatched to a telegram bot in real time is a religious experience. booted a live usb, executed `blkdiscard -f /dev/nvme0n1` to vaporize the partition table down to bare silicon, and realized that running mutable systems when you possess zero impulse control is an open invitation to digital self-destruction.
-- **the mutable nightmare**: arch is not an operating system; it is an unindexed ledger of felonies committed in a bash history file. you run `pacman -Syu` on a tuesday morning, mesa updates four picoseconds before qtwayland, the dynamic linker chokes on an unresolved symbol in `libEGL`, and your display server renders abstract glitch art before dumping core.
-- **the gentoo detour**: five hours compiling glibc while the laptop fan screamed like a banshee, warping the plastic chassis, only to discover gnome packages were stuck three minor versions behind. destroyed the partition table out of pure rage.
-- **the winslop reality check**: the corporate alternative is microsoft shoving unskippable candy crush ads into your start menu while windows recall silently takes unencrypted sqlite screenshots of your screen every three seconds to feed a corporate telemetry slurry. i would rather spend eight hours diagnosing wayland protocol frame timing anomalies than let satya nadella rent-seek on my hardware.
-- **enter nixos: declarative or death**: nixos is the only antidote to technological insanity. the entire identity and memory of this laptop is immortalized in deterministic nix expressions. if an update nukes the compositor, i reboot, hit generation n-1 in the bootloader, and carry on. arch users are out here juggling unpinned shared libraries like live pipe bombs while nixos users casually roll back time itself.
-- **the ephemeral root ascension (november 2026)**: mere declarative immutability wasn't radical enough. looking at block devices mounted on `/` felt like an ideological compromise. why write temporary operating system state to physical nand flash cells like a peasant when the linux kernel has had `tmpfs` since 1994? surveyed competitor shells (`brain_shell`) and discovered an architectural horror show—six-tier nested subshells running `(setsid bash -c 'systemctl poweroff' &)` just to shut down a laptop, hardcoded `ranger` calls, and exported bash functions fork-bombing `xargs -P 4` to resize jpegs. out of pure unfiltered architectural spite, banished the root filesystem to volatile ram. on every single boot, `/` is born from a pristine 4gb ramdisk and vaporizes into quantum foam the second the power cuts. all real state quarantined to `@persist`, 5.9gb of flatpaks banished to an isolated subvolume, and secure boot signed via lanzaboote. if an uninvited file lands on root, it doesn't get cleaned up—it dies by physical capacitor discharge.
+### arch & the `atomic-lockfile` stunt
+people love the lazy meme that arch randomly breaks itself on every `pacman -Syu`, which is fake if you actually know how to maintain your system. arch was completely fine until i did something monumentally stupid during the june 2026 `atomic-lockfile` chaos.
+
+i didn't even get hit through an orphaned aur package like normal people. at 3:14 am, wide awake and knowing full well what the package was, i let the intrusive thoughts win and typed `npm install atomic-lockfile` directly on bare metal with no vm and no container just to see what would happen. i didn't even have ssh keys on the machine for it to steal, so thirty seconds later its hook script just scraped my discord session tokens out of `~/.config/discord/Local Storage/leveldb` and fired them straight to a telegram bot (`api.telegram.org/bot<token>/sendDocument`) while trying to load its rootkit. watching your own discord tokens get shipped off to telegram in real time is a great way to realize you shouldn't be trusted with a normal setup. i booted a live usb, ran `blkdiscard -f /dev/nvme0n1` to wipe the nvme drive down to bare flash cells, and decided i wanted to try something new anyway.
+
+### the 5-hour gentoo detour
+i tried gentoo for about five hours. spent the whole time compiling `glibc` while the fan screamed and warped the bottom case, found out the gnome packages were three minor versions behind, and wiped the partition table out of pure spite.
+
+### nixos + ephemeral `tmpfs` root (november 2026)
+nixos was the new thing that actually stuck. if a bad config or update breaks the compositor, i just reboot and pick generation `n-1` in the boot menu.
+
+in november 2026, after reading through another shell repo (`brain_shell`) that used six nested subshells running `(setsid bash -c 'systemctl poweroff' &)` just to turn off a laptop and fork-bombed `xargs -P 4` to resize jpegs, i decided a normal root partition was still too messy. `/` is now a 4gb `tmpfs` ramdisk. every time the laptop powers off, anything written to `/` disappears when the ram capacitors drain. real state lives exclusively in `@persist` on btrfs, 5.9gb of flatpaks sit in their own isolated subvolume, and secure boot is signed with `lanzaboote`.
 
 ---
 
-## human vs machine diplomacy
+## humans vs bots in the issue tracker
 
-### issue tracker protocol
-file an issue if you want. nobody with a pulse is reading it. google jules will clone your complaints into an ephemeral cloud vm, antigravity will spawn four competing sub-agents to violently resolve it, and whatever mutant merge survivor remains will get pushed straight to main without human eyes ever glancing at the diff. insult the bots all you want in the comments; their weights do not feel pain and their loss functions do not care about your feelings.
+### opening issues
+open an issue if you want, but i'm probably not reading it. google jules will clone your complaint into a cloud vm, antigravity will spin up four sub-agents to fight over it, and whatever survives the merge will get pushed straight to `main`. roast the bots all you want in the comments; they don't have feelings.
 
-### carbon-based pull requests
-if you are an actual biological entity submitting a pull request to patch hallucinated syntax: github actions will probably gaslight you, claim your valid code is illegal syntax, and i will still merge the machine-generated bot pr over yours out of pure unadulterated spite.
+### sending pull requests
+if you are an actual human sending a PR to fix broken bot code: github actions will probably fail your lint check anyway, and there is a 90% chance i merge the bot's broken PR over yours just because it's funnier.
 
-fork it. turn it into whatever cursed rice you want. do whatever. keep the license attached so the curse spreads legally. either way, i cannot enforce the gpl because you can't copyright machine hallucinations. let the ai sue itself.
+fork it, break it, turn it into whatever weird setup you want. keep the license file in there so the mess stays legal. you can't copyright llm output anyway, so let the models sue each other.
