@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import Quickshell.Services.Pipewire
 import ".."
 import "../services"
@@ -14,18 +15,20 @@ PanelWindow {
     color: "transparent"
 
     readonly property var root: osdRoot
-    readonly property bool showing: revealed || osdCard.opacity > 0
+    readonly property bool showing: revealed || osdCard.opacity > 0.001
     visible: root.showing
+
+    // avoid popping up underneath a bottom docked bar
+    readonly property bool barAtBottom: (Settings?.barPosition === "bottom" || Settings?.barPosition === "down")
 
     anchors {
         bottom: true
     }
     margins {
-        bottom: 72
+        bottom: barAtBottom ? (Theme.barHeight + 48) : 72
     }
 
-    // Extra room around the card so OutBack scaling and glow dont get clipped
-    implicitWidth: Math.max(340, osdCard.width + 40)
+    implicitWidth: Math.max(360, osdCard.width + 40)
     implicitHeight: 96
 
     WlrLayershell.namespace: "quickshell:osd"
@@ -34,7 +37,7 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
 
     mask: Region {
-        item: (revealed || osdCard.opacity > 0) ? osdCard : null
+        item: osdRoot.showing ? osdCard : null
     }
 
     property bool _ready: false
@@ -52,10 +55,14 @@ PanelWindow {
     readonly property bool isMuted: (isMic && (source?.audio?.muted ?? false)) ||
                                     (isVolume && (sink?.audio?.muted ?? false))
 
-    readonly property bool isKaomoji: (Theme.iconSet === "kaomoji" || Theme.iconSet === "text" || osdIcon.length > 2)
+    readonly property real maxVolPct: Math.max(100, Settings?.volumeMax ?? 100)
+    readonly property real effectiveMaxScale: isVolume ? Math.max(maxVolPct, osdValue > 100 ? 150 : 100) : 100.0
+    readonly property int stepPct: Math.max(1, Settings?.volumeStep ?? 5)
+
+    readonly property bool isKaomoji: Theme.isTextIconSet || osdIcon.length > 2
     readonly property color activeColor: isMuted
-        ? (Theme.error ?? "#ff5449")
-        : (isOverAmp ? (Theme.warn ?? "#ffb4ab") : Theme.primary)
+        ? Theme.error
+        : (isOverAmp ? Theme.warn : Theme.primary)
     readonly property color activeOverlay: isMuted
         ? Theme.error_overlay
         : (isOverAmp ? Theme.warn_overlay : Theme.primary_overlay)
@@ -79,8 +86,27 @@ PanelWindow {
         onTriggered: osdRoot.revealed = false
     }
 
+    function isTargetMonitor() {
+        if (!osdRoot.screen || Quickshell.screens.length <= 1) return true;
+        const focused = Hyprland?.focusedMonitor?.name;
+        return !focused || osdRoot.screen.name === focused;
+    }
+
+    function getVolumeSubtitle(vol, muted, devName) {
+        let fallback = (devName || "audio output").toLowerCase();
+        if (muted) return Theme.getFlavor("volume_muted", fallback);
+        if (vol >= 85) return Theme.getFlavor("volume_high", fallback);
+        return fallback;
+    }
+
+    function getBrightnessSubtitle(pct) {
+        if (pct >= 85) return Theme.getFlavor("brightness_high", "display backlight");
+        if (pct <= 25) return Theme.getFlavor("brightness_low", "display backlight");
+        return "display backlight";
+    }
+
     function show(type, icon, value, label, subtitle) {
-        if (!_ready) return;
+        if (!_ready || !isTargetMonitor()) return;
         osdType = type;
         osdIcon = icon;
         osdValue = Math.max(0, value);
@@ -96,12 +122,12 @@ PanelWindow {
         let clamped = Math.min(1.0, Math.max(0.0, ratio));
         if (osdRoot.isVolume && osdRoot.sink?.audio) {
             if (osdRoot.sink.audio.muted) osdRoot.sink.audio.muted = false;
-            osdRoot.sink.audio.volume = clamped * 1.5;
+            osdRoot.sink.audio.volume = clamped * (osdRoot.effectiveMaxScale / 100.0);
         } else if (osdRoot.isMic && osdRoot.source?.audio) {
             if (osdRoot.source.audio.muted) osdRoot.source.audio.muted = false;
             osdRoot.source.audio.volume = clamped;
         } else if (osdRoot.isBrightness && typeof BrightnessService !== "undefined") {
-            let pct = Math.round(clamped * 100);
+            let pct = Math.max(1, Math.round(clamped * 100));
             if (BrightnessService.setBrightness) {
                 BrightnessService.setBrightness(pct);
             }
@@ -109,13 +135,14 @@ PanelWindow {
     }
 
     function stepLevel(direction) {
-        let delta = direction > 0 ? 0.02 : -0.02;
+        let stepRatio = (direction > 0 ? osdRoot.stepPct : -osdRoot.stepPct) / 100.0;
         if (osdRoot.isVolume && osdRoot.sink?.audio) {
-            osdRoot.sink.audio.volume = Math.min(1.5, Math.max(0, osdRoot.sink.audio.volume + delta));
+            let maxRatio = osdRoot.effectiveMaxScale / 100.0;
+            osdRoot.sink.audio.volume = Math.min(maxRatio, Math.max(0, osdRoot.sink.audio.volume + stepRatio));
         } else if (osdRoot.isMic && osdRoot.source?.audio) {
-            osdRoot.source.audio.volume = Math.min(1.0, Math.max(0, osdRoot.source.audio.volume + delta));
+            osdRoot.source.audio.volume = Math.min(1.0, Math.max(0, osdRoot.source.audio.volume + stepRatio));
         } else if (osdRoot.isBrightness && typeof BrightnessService !== "undefined") {
-            let step = direction > 0 ? 2 : -2;
+            let step = direction > 0 ? osdRoot.stepPct : -osdRoot.stepPct;
             let nextPct = Math.min(100, Math.max(1, osdRoot.osdValue + step));
             if (BrightnessService.setBrightness) {
                 BrightnessService.setBrightness(nextPct);
@@ -123,12 +150,8 @@ PanelWindow {
         }
     }
 
-    // Pop the icon slightly when it changes
-    onOsdIconChanged: {
-        iconPopAnim.restart();
-    }
+    onOsdIconChanged: iconPopAnim.restart()
 
-    // Show OSD when switching headphones/speakers
     onSinkChanged: {
         if (!osdRoot._ready || !osdRoot.sink?.audio) return;
         let vRatio = osdRoot.sink.audio.volume;
@@ -136,7 +159,7 @@ PanelWindow {
         let m = osdRoot.sink.audio.muted;
         let icon = Theme.getVolumeIcon(vRatio, m);
         let devName = osdRoot.sink.description || osdRoot.sink.name || "";
-        osdRoot.show(vol > 100 ? "volume boost" : "volume", icon, m ? 0 : vol, m ? "muted" : (vol + "%"), devName);
+        osdRoot.show(vol > 100 ? "volume boost" : "volume", icon, m ? 0 : vol, m ? "muted" : (vol + "%"), osdRoot.getVolumeSubtitle(vol, m, devName));
     }
 
     Connections {
@@ -149,7 +172,7 @@ PanelWindow {
             let icon = Theme.getVolumeIcon(vRatio, m);
             let type = vol > 100 ? "volume boost" : "volume";
             let devName = osdRoot.sink?.description || osdRoot.sink?.name || "";
-            osdRoot.show(type, icon, vol, m ? "muted" : (vol + "%"), devName);
+            osdRoot.show(type, icon, vol, m ? "muted" : (vol + "%"), osdRoot.getVolumeSubtitle(vol, m, devName));
         }
         function onMutedChanged() {
             if (!osdRoot._ready || !osdRoot.sink?.audio) return;
@@ -158,7 +181,7 @@ PanelWindow {
             let vol = Math.round(vRatio * 100);
             let icon = Theme.getVolumeIcon(vRatio, m);
             let devName = osdRoot.sink?.description || osdRoot.sink?.name || "";
-            osdRoot.show("volume", icon, m ? 0 : vol, m ? "speaker muted" : (vol + "%"), devName);
+            osdRoot.show("volume", icon, m ? 0 : vol, m ? "muted" : (vol + "%"), osdRoot.getVolumeSubtitle(vol, m, devName));
         }
     }
 
@@ -170,24 +193,24 @@ PanelWindow {
             let vol = Math.round(vRatio * 100);
             let m = osdRoot.source.audio.muted;
             let icon = m ? Theme.iconMicMute : Theme.iconMic;
-            let devName = osdRoot.source?.description || osdRoot.source?.name || "";
-            osdRoot.show("mic", icon, vol, m ? "mic muted" : (vol + "%"), devName);
+            let devName = (osdRoot.source?.description || osdRoot.source?.name || "microphone").toLowerCase();
+            osdRoot.show("mic", icon, vol, m ? "muted" : (vol + "%"), devName);
         }
         function onMutedChanged() {
             if (!osdRoot._ready || !osdRoot.source?.audio) return;
             let m = osdRoot.source.audio.muted;
             let vRatio = osdRoot.source.audio.volume ?? 1.0;
             let vol = Math.round(vRatio * 100);
-            let devName = osdRoot.source?.description || osdRoot.source?.name || "";
-            osdRoot.show("mic", m ? Theme.iconMicMute : Theme.iconMic, m ? 0 : vol, m ? "mic muted" : "mic active", devName);
+            let devName = (osdRoot.source?.description || osdRoot.source?.name || "microphone").toLowerCase();
+            osdRoot.show("mic", m ? Theme.iconMicMute : Theme.iconMic, m ? 0 : vol, m ? "muted" : (vol + "%"), devName);
         }
     }
 
     Connections {
-        target: BrightnessService
+        target: typeof BrightnessService !== "undefined" ? BrightnessService : null
         function onBrightnessChanged(pct) {
             if (!osdRoot._ready) return;
-            osdRoot.show("brightness", Theme.iconBrightness, pct, pct + "%", "display");
+            osdRoot.show("brightness", Theme.getBrightnessIcon(pct), pct, pct + "%", osdRoot.getBrightnessSubtitle(pct));
         }
     }
 
@@ -195,63 +218,60 @@ PanelWindow {
         id: osdCard
         anchors.centerIn: parent
         anchors.verticalCenterOffset: osdRoot.revealed ? 0 : 16
-        width: Math.max(268, Math.min(340, 220 + iconBadge.width))
+        width: Math.max(280, Math.min(350, 232 + iconBadge.width))
         height: 58
         radius: Theme.radiusPill
-        color: Theme.barBg
+        color: Theme.popupBg
         border.color: osdRoot.isMuted
-            ? (Theme.error ?? "#ff5449")
-            : (osdRoot.isOverAmp
-                ? (Theme.warn ?? "#ffb4ab")
-                : ((Theme?.isCyberNeon ?? false)
-                    ? Theme.alpha(Theme.primary, 0.65)
-                    : ((Theme?.isPureBlack ?? false) ? "#222222" : Theme.widgetBorder)))
-        border.width: 1
+            ? Theme.error
+            : (osdRoot.isOverAmp ? Theme.warn : Theme.popupBorderColor)
+        border.width: Theme.popupBorderWidth
 
         opacity: osdRoot.revealed ? 1.0 : 0.0
         scale: osdRoot.revealed ? (cardMouseArea.containsMouse ? 1.02 : 1.0) : 0.90
 
         Behavior on width { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
+        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+        Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         Behavior on opacity {
             NumberAnimation {
                 duration: Theme.animNormal
-                easing.type: osdRoot.revealed ? Theme.animEasing : Easing.InQuad
+                easing.type: osdRoot.revealed ? Theme.animEasing : Theme.animEasingExit
             }
         }
         Behavior on scale {
             NumberAnimation {
                 duration: Theme.animNormal
-                easing.type: osdRoot.revealed ? Easing.OutBack : Easing.InCubic
+                easing.type: osdRoot.revealed ? Theme.animEasingEntrance : Theme.animEasingExit
             }
         }
         Behavior on anchors.verticalCenterOffset {
             NumberAnimation {
                 duration: Theme.animNormal
-                easing.type: osdRoot.revealed ? Easing.OutCubic : Easing.InCubic
+                easing.type: osdRoot.revealed ? Theme.animEasing : Theme.animEasingExit
             }
         }
 
-        // Ambient underglow to match StatusBar
+        // ambient underglow matching StatusBar & WelcomeWizard
         Rectangle {
-            visible: (Theme?.isAccentGlow ?? false) || (Theme?.isCyberNeon ?? false) || osdRoot.isOverAmp
+            visible: Theme.isAccentGlow || Theme.isCyberNeon || osdRoot.isOverAmp || osdRoot.isMuted
             anchors.fill: parent
             anchors.margins: -4
-            radius: parent.radius + 4
+            radius: parent.radius
             color: Theme.alpha(osdRoot.activeColor, 0.22)
             z: -2
-            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         }
 
-        // Top specular highlight for glass theme
+        // clamp radius to height/2 so Theme.radiusPill (9999) doesn't turn width into -13698px
         Rectangle {
-            visible: Theme?.isGlass ?? false
+            visible: Theme.isGlass
             anchors.top: parent.top
             anchors.topMargin: 1
             anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width - (parent.radius * 1.4)
+            width: Math.max(0, parent.width - (Math.min(parent.radius, parent.height / 2) * 1.4))
             height: 1
-            color: Theme.glassHighlight ?? Qt.rgba(1, 1, 1, 0.22)
+            color: Theme.glassHighlight
         }
 
         MouseArea {
@@ -275,22 +295,22 @@ PanelWindow {
             anchors.bottomMargin: 9
             spacing: 12
 
-            // Dynamic icon / kaomoji badge (click to toggle mute)
+            // dynamic icon / kaomoji badge (click to toggle mute)
             Rectangle {
                 id: iconBadge
                 Layout.preferredWidth: osdRoot.isKaomoji ? Math.max(38, iconText.implicitWidth + 18) : 38
                 Layout.preferredHeight: 38
                 width: Layout.preferredWidth
                 height: 38
-                radius: 19
+                radius: Theme.radiusPill
                 color: iconMouse.pressed
                     ? Theme.alpha(osdRoot.activeColor, 0.35)
                     : (iconMouse.containsMouse ? Theme.alpha(osdRoot.activeColor, 0.25) : osdRoot.activeOverlay)
-                border.color: Theme.alpha(osdRoot.activeColor, iconMouse.containsMouse ? 0.5 : 0.2)
+                border.color: Theme.alpha(osdRoot.activeColor, iconMouse.containsMouse ? 0.55 : 0.28)
                 border.width: 1
 
                 Behavior on Layout.preferredWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                 SequentialAnimation {
                     id: iconPopAnim
@@ -303,10 +323,10 @@ PanelWindow {
                     anchors.centerIn: parent
                     text: osdRoot.osdIcon
                     font.family: osdRoot.isKaomoji ? Theme.fontFamily : Theme.fontIcon
-                    font.pixelSize: osdRoot.isKaomoji ? Theme.fontSizeSm : Theme.fontSizeLg
+                    font.pixelSize: osdRoot.isKaomoji ? Theme.fontSizeXs : Theme.fontSizeLg
                     font.weight: osdRoot.isKaomoji ? Font.Bold : Font.Normal
                     color: osdRoot.activeColor
-                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                 }
 
                 MouseArea {
@@ -336,17 +356,17 @@ PanelWindow {
                     Text {
                         text: osdRoot.osdType
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.fontSizeSm
                         font.weight: Font.Bold
-                        color: osdRoot.isOverAmp ? (Theme.warn ?? "#ffb4ab") : Theme.on_surface
+                        color: osdRoot.isOverAmp ? Theme.warn : Theme.on_surface
                     }
 
                     Text {
                         visible: osdRoot.osdSubtitle !== ""
                         Layout.fillWidth: true
-                        text: "· " + osdRoot.osdSubtitle
+                        text: "• " + osdRoot.osdSubtitle
                         font.family: Theme.fontFamily
-                        font.pixelSize: 10
+                        font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface_variant
                         elide: Text.ElideRight
                     }
@@ -362,11 +382,11 @@ PanelWindow {
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Font.Bold
                         color: osdRoot.activeColor
-                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                     }
                 }
 
-                // Interactive progress track (click or drag to adjust)
+                // interactive progress track
                 Item {
                     id: trackContainer
                     Layout.fillWidth: true
@@ -377,19 +397,19 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         width: parent.width
                         height: sliderDragArea.containsMouse || sliderDragArea.pressed ? 8 : 6
-                        radius: height / 2
-                        color: Theme.surface_container_highest
+                        radius: Theme.radiusPill
+                        color: Theme.widgetBg
+                        border.color: Theme.widgetBorder
+                        border.width: 1
                         clip: true
 
-                        Behavior on height { NumberAnimation { duration: Theme.animFast } }
+                        Behavior on height { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
 
-                        // Fill bar
                         Rectangle {
                             id: fillRect
                             height: parent.height
-                            readonly property real maxScale: osdRoot.isVolume ? 150.0 : 100.0
-                            width: Math.round(parent.width * Math.min(1.0, Math.max(0.0, osdRoot.osdValue / maxScale)))
-                            radius: parent.radius
+                            width: Math.round(parent.width * Math.min(1.0, Math.max(0.0, osdRoot.osdValue / osdRoot.effectiveMaxScale)))
+                            radius: Theme.radiusPill
                             color: osdRoot.activeColor
 
                             Behavior on width {
@@ -399,17 +419,17 @@ PanelWindow {
                                     easing.type: Theme.animEasing
                                 }
                             }
-                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                         }
 
-                        // 100% notch marker so the 150% volume scale makes visual sense
+                        // only show the 100% notch marker when volume ceiling is above 100%
                         Rectangle {
-                            visible: osdRoot.isVolume
-                            x: Math.round(parent.width * (100.0 / 150.0)) - 1
+                            visible: osdRoot.isVolume && osdRoot.effectiveMaxScale > 100.0
+                            x: Math.round(parent.width * (100.0 / osdRoot.effectiveMaxScale)) - 1
                             width: 2
                             height: parent.height
                             color: osdRoot.osdValue >= 100
-                                ? Qt.rgba(0, 0, 0, 0.45)
+                                ? Theme.alpha(Theme.surface, 0.65)
                                 : Theme.alpha(Theme.on_surface_variant, 0.45)
                         }
                     }

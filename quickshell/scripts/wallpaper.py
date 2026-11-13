@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
-import json
 import os
+from pathlib import Path
 import random
+import re
 import shutil
 import subprocess
 import sys
 import time
+from typing import List, Optional
 import urllib.parse
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from typing import List, Optional
 
-# --- ANSI Colors & Glyphs ---
+# ansi paint so terminal output doesn't look like a 1998 bios screen
 C_RESET = "\033[0m"
 C_BOLD = "\033[1m"
+C_DIM = "\033[2m"
 C_MAGENTA = "\033[38;5;141m"
 C_GREEN = "\033[38;5;120m"
 C_CYAN = "\033[38;5;81m"
@@ -23,23 +24,24 @@ C_YELLOW = "\033[38;5;221m"
 C_RED = "\033[38;5;203m"
 
 
-def log_info(msg: str):
-  print(f"{C_MAGENTA}󰄛 {msg}{C_RESET}")
+def log_info(msg: str, detail: str = ""):
+  suffix = f" {C_CYAN}{detail.lower()}{C_RESET}" if detail else ""
+  print(f"{C_MAGENTA}( ✧_✧ ){C_RESET} {msg.lower()}{suffix}")
 
 
-def log_success(msg: str, val: str = ""):
-  print(f"{C_GREEN}󰄲 {msg}{C_RESET} {C_CYAN}{val}{C_RESET}")
+def log_ok(msg: str, val: str = ""):
+  suffix = f" {C_CYAN}{val.lower()}{C_RESET}" if val else ""
+  print(f"{C_GREEN}(•̀ᴗ•́)b{C_RESET} {msg.lower()}{suffix}")
 
 
 def log_warn(msg: str):
-  print(f"{C_YELLOW}󰅚 {msg}{C_RESET}")
+  print(f"{C_YELLOW}( ;¬_¬ ) {msg.lower()}{C_RESET}")
 
 
 def log_err(msg: str):
-  sys.stderr.write(f"{C_RED}󰅚 {msg}{C_RESET}\n")
+  sys.stderr.write(f"{C_RED}( ;´Д` ) {msg.lower()}{C_RESET}\n")
 
 
-# --- XDG Paths ---
 XDG_CACHE_HOME = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
 XDG_RUNTIME_DIR = Path(
     os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
@@ -55,18 +57,25 @@ APP_CACHE_DIR = XDG_CACHE_HOME / "quickshell"
 APP_STATE_DIR = XDG_STATE_HOME / "quickshell"
 THUMB_DIR = APP_CACHE_DIR / "thumbnails"
 WALLPAPERS_DIR = Path.home() / ".wallpapers"
+EXTRA_WALLPAPER_DIRS = [
+    Path.home() / "Pictures" / "Wallpapers",
+    Path.home() / "Pictures" / "wallpapers",
+    Path.home() / "wallpapers",
+]
+
 SETTINGS_CONF = APP_STATE_DIR / "settings.conf"
 FALLBACK_SETTINGS_CONF = XDG_CONFIG_HOME / "quickshell" / "settings.conf"
+SAVED_WP_FILE = APP_STATE_DIR / "saved_wp"
 
-APP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-APP_STATE_DIR.mkdir(parents=True, exist_ok=True)
-THUMB_DIR.mkdir(parents=True, exist_ok=True)
-WALLPAPERS_DIR.mkdir(parents=True, exist_ok=True)
+for _d in (APP_CACHE_DIR, APP_STATE_DIR, THUMB_DIR, WALLPAPERS_DIR):
+  _d.mkdir(parents=True, exist_ok=True)
 
-CUR_WP_FILE = Path("/tmp/qs_current_wallpaper.txt")
-VIDEO_THUMB = Path("/tmp/qs_video_thumb.jpg")
-WALLPAPERS_JSON = Path("/tmp/qs_wallpapers.json")
-LIVE_JSON = Path("/tmp/qs_live_wallpapers.json")
+# make sure saved_wp exists on disk right away so quickshell's FileView always has an inode to watch
+if not SAVED_WP_FILE.exists():
+  try:
+    SAVED_WP_FILE.write_text("", encoding="utf-8")
+  except Exception:
+    pass
 
 CURR_WALL_SYMLINK = Path.home() / ".curr_wall"
 CURR_WALL_STATIC = Path.home() / ".curr_wall_static.jpg"
@@ -75,7 +84,7 @@ GLOBAL_CACHE_WALLPAPER = XDG_CACHE_HOME / "current_wallpaper"
 FALLBACK_WALLPAPER = WALLPAPERS_DIR / "hyprland" / "hypr.png"
 
 DEFAULT_SETTINGS = {
-    "currentWallpaper": str(WALLPAPERS_DIR / "hyprland" / "hypr.png"),
+    "currentWallpaper": str(FALLBACK_WALLPAPER),
     "matugenMode": "dark",
     "matugenScheme": "scheme-tonal-spot",
     "awwwTransitionType": "wipe",
@@ -109,8 +118,20 @@ ANIM_EXTS = {".gif"}
 VIDEO_EXTS = {".mp4", ".webm", ".mkv", ".mov"}
 ALL_EXTS = IMAGE_EXTS | ANIM_EXTS | VIDEO_EXTS
 
+SCHEMES = [
+    "scheme-tonal-spot",
+    "scheme-smart",
+    "scheme-vibrant",
+    "scheme-expressive",
+    "scheme-content",
+    "scheme-fruit-salad",
+    "scheme-rainbow",
+    "scheme-fidelity",
+    "scheme-monochrome",
+    "scheme-neutral",
+]
 
-# --- Settings Engine ---
+
 def load_settings() -> dict:
   settings = dict(DEFAULT_SETTINGS)
   conf_path = (
@@ -120,8 +141,7 @@ def load_settings() -> dict:
     return settings
 
   try:
-    content = conf_path.read_text(encoding="utf-8")
-    for line in content.splitlines():
+    for line in conf_path.read_text(encoding="utf-8").splitlines():
       line = line.strip()
       if not line or line.startswith("#") or "=" not in line:
         continue
@@ -142,19 +162,27 @@ def load_settings() -> dict:
           settings[key] = int(val)
         except ValueError:
           pass
-      elif key in {"mpvPanscan"}:
+      elif key == "mpvPanscan":
         try:
           settings[key] = float(val)
         except ValueError:
           pass
-      elif key in {"mpvAudio"}:
+      elif key == "mpvAudio":
         settings[key] = val.lower() in ("true", "1", "yes")
       else:
         settings[key] = val
   except Exception as e:
-    sys.stderr.write(f"Warning: Failed to parse {conf_path}: {e}\n")
+    log_warn(f"could not read {conf_path.name}: {e}")
 
   return settings
+
+
+def format_kv_value(v) -> str:
+  if isinstance(v, bool):
+    return "true" if v else "false"
+  if isinstance(v, (int, float)):
+    return str(v)
+  return f'"{v}"'
 
 
 def update_settings(updates: dict):
@@ -168,12 +196,7 @@ def update_settings(updates: dict):
       lines = FALLBACK_SETTINGS_CONF.read_text(encoding="utf-8").splitlines()
     else:
       real_conf = SETTINGS_CONF
-      lines = [
-          f'{k}="{v}"'
-          if isinstance(v, str)
-          else f"{k}={str(v).lower() if isinstance(v, bool) else v}"
-          for k, v in DEFAULT_SETTINGS.items()
-      ]
+      lines = [f"{k}={format_kv_value(v)}" for k, v in DEFAULT_SETTINGS.items()]
 
     keys_to_update = dict(updates)
     updated_lines = []
@@ -185,111 +208,190 @@ def update_settings(updates: dict):
         k = k.strip()
         if k in keys_to_update:
           v = keys_to_update.pop(k)
-          if isinstance(v, bool):
-            updated_lines.append(f"{k}={'true' if v else 'false'}")
-          elif isinstance(v, (int, float)):
-            updated_lines.append(f"{k}={v}")
-          elif isinstance(v, str):
-            updated_lines.append(f'{k}="{v}"')
-          else:
-            updated_lines.append(f"{k}='{json.dumps(v)}'")
+          updated_lines.append(f"{k}={format_kv_value(v)}")
           continue
       updated_lines.append(line)
 
     for k, v in keys_to_update.items():
-      if isinstance(v, bool):
-        updated_lines.append(f"{k}={'true' if v else 'false'}")
-      elif isinstance(v, (int, float)):
-        updated_lines.append(f"{k}={v}")
-      elif isinstance(v, str):
-        updated_lines.append(f'{k}="{v}"')
-      else:
-        updated_lines.append(f"{k}='{json.dumps(v)}'")
+      updated_lines.append(f"{k}={format_kv_value(v)}")
 
-    tmp_conf = real_conf.with_suffix(f".tmp_{os.getpid()}")
-    tmp_conf.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
-    tmp_conf.replace(real_conf)
+    # write in-place so Settings.qml's FileView doesn't lose its inotify watch
+    real_conf.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
   except Exception as e:
-    sys.stderr.write(f"Warning: Failed to update {SETTINGS_CONF}: {e}\n")
+    log_warn(f"failed to update settings.conf: {e}")
 
 
-def atomic_write_json(file_path: Path, data):
-  def _write(target: Path):
+def clean_field(val: str) -> str:
+  return str(val).replace("|", "_").replace("\n", "").replace("\r", "")
+
+
+def write_saved_wp(
+    wallpapers: Optional[list] = None,
+    current_wp: Optional[str] = None,
+    mode: Optional[str] = None,
+    scheme: Optional[str] = None,
+):
+  cfg = load_settings()
+  existing_wps = []
+
+  if wallpapers is None and SAVED_WP_FILE.exists():
     try:
-      target.parent.mkdir(parents=True, exist_ok=True)
-      tmp = target.with_suffix(f".tmp_{os.getpid()}")
-      tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-      tmp.replace(target)
-    except Exception as e:
-      sys.stderr.write(f"Warning: Failed to write JSON to {target}: {e}\n")
+      for line in SAVED_WP_FILE.read_text(encoding="utf-8").splitlines():
+        if line.startswith("wp="):
+          existing_wps.append(line)
+        elif line.startswith("current=") and current_wp is None:
+          current_wp = line.split("=", 1)[1].strip()
+        elif line.startswith("mode=") and mode is None:
+          mode = line.split("=", 1)[1].strip()
+        elif line.startswith("scheme=") and scheme is None:
+          scheme = line.split("=", 1)[1].strip()
+    except Exception:
+      pass
 
-  _write(file_path)
-  if file_path == WALLPAPERS_JSON:
-    _write(APP_CACHE_DIR / "wallpapers.json")
-  elif file_path == LIVE_JSON:
-    _write(APP_CACHE_DIR / "live_wallpapers.json")
+  cur = (
+      current_wp
+      if current_wp is not None
+      else str(cfg.get("currentWallpaper", ""))
+  )
+  m = mode if mode is not None else str(cfg.get("matugenMode", "dark"))
+  s = (
+      scheme
+      if scheme is not None
+      else str(cfg.get("matugenScheme", "scheme-tonal-spot"))
+  )
+
+  out_lines = [
+      f"current={clean_field(cur)}",
+      f"static={clean_field(str(CURR_WALL_STATIC))}",
+      f"mode={clean_field(m)}",
+      f"scheme={clean_field(s)}",
+  ]
+
+  if wallpapers is not None:
+    for w in wallpapers:
+      p = clean_field(w.get("path", ""))
+      thumb = clean_field(w.get("thumb", p))
+      name = clean_field(w.get("name", ""))
+      ext = clean_field(w.get("ext", ""))
+      live = "1" if w.get("isLive") else "0"
+      video = "1" if w.get("isVideo") else "0"
+      gif = "1" if w.get("isGif") else "0"
+      cat = clean_field(w.get("category", "root"))
+      parent = clean_field(w.get("parentCategory", "root"))
+      sub = clean_field(w.get("subCategory", ""))
+      out_lines.append(
+          f"wp={p}|thumb={thumb}|name={name}|ext={ext}|live={live}|video={video}|gif={gif}|cat={cat}|parent={parent}|sub={sub}"
+      )
+  else:
+    out_lines.extend(existing_wps)
+
+  try:
+    SAVED_WP_FILE.parent.mkdir(parents=True, exist_ok=True)
+    # write in-place so FileView's inotify watcher stays glued to the inode
+    SAVED_WP_FILE.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+  except Exception as e:
+    log_warn(f"failed to write saved_wp: {e}")
 
 
-# --- Helper Process Executions ---
+def read_saved_wp_list() -> list:
+  if not SAVED_WP_FILE.exists():
+    return []
+  wps = []
+  try:
+    for line in SAVED_WP_FILE.read_text(encoding="utf-8").splitlines():
+      line = line.strip()
+      if not line.startswith("wp="):
+        continue
+      parts = line[3:].split("|")
+      if not parts or not parts[0]:
+        continue
+      item = {
+          "path": parts[0],
+          "thumb": parts[0],
+          "name": "",
+          "ext": "",
+          "isLive": False,
+          "isVideo": False,
+          "isGif": False,
+          "category": "root",
+          "parentCategory": "root",
+          "subCategory": "",
+      }
+      for kv in parts[1:]:
+        if "=" not in kv:
+          continue
+        k, v = kv.split("=", 1)
+        if k == "thumb":
+          item["thumb"] = v or parts[0]
+        elif k == "name":
+          item["name"] = v
+        elif k == "ext":
+          item["ext"] = v
+        elif k == "live":
+          item["isLive"] = v == "1"
+        elif k == "video":
+          item["isVideo"] = v == "1"
+        elif k == "gif":
+          item["isGif"] = v == "1"
+        elif k == "cat":
+          item["category"] = v
+        elif k == "parent":
+          item["parentCategory"] = v
+        elif k == "sub":
+          item["subCategory"] = v
+      wps.append(item)
+  except Exception:
+    return []
+  return wps
+
+
 def make_video_thumb(video_path: str, target_thumb: Path) -> bool:
   if target_thumb.exists() and target_thumb.stat().st_size > 0:
     return True
   target_thumb.parent.mkdir(parents=True, exist_ok=True)
-  try:
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-ss",
-        "00:00:00.5",
-        "-i",
-        video_path,
-        "-vframes",
-        "1",
-        "-q:v",
-        "2",
-        str(target_thumb),
-    ]
-    subprocess.run(
-        cmd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        timeout=8,
-        check=True,
-    )
-    if target_thumb.exists() and target_thumb.stat().st_size > 0:
-      return True
-  except Exception:
-    pass
-
-  try:
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        video_path,
-        "-vframes",
-        "1",
-        "-q:v",
-        "2",
-        str(target_thumb),
-    ]
-    subprocess.run(
-        cmd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        timeout=8,
-        check=True,
-    )
-    if target_thumb.exists() and target_thumb.stat().st_size > 0:
-      return True
-  except Exception:
-    pass
+  for args in (
+      [
+          "ffmpeg",
+          "-y",
+          "-ss",
+          "00:00:00.5",
+          "-i",
+          video_path,
+          "-vframes",
+          "1",
+          "-q:v",
+          "2",
+          str(target_thumb),
+      ],
+      [
+          "ffmpeg",
+          "-y",
+          "-i",
+          video_path,
+          "-vframes",
+          "1",
+          "-q:v",
+          "2",
+          str(target_thumb),
+      ],
+  ):
+    try:
+      subprocess.run(
+          args,
+          stdout=subprocess.DEVNULL,
+          stderr=subprocess.DEVNULL,
+          timeout=8,
+          check=True,
+      )
+      if target_thumb.exists() and target_thumb.stat().st_size > 0:
+        return True
+    except Exception:
+      pass
 
   try:
     if shutil.which("magick"):
-      cmd = ["magick", f"{video_path}[0]", str(target_thumb)]
       subprocess.run(
-          cmd,
+          ["magick", f"{video_path}[0]", str(target_thumb)],
           stdout=subprocess.DEVNULL,
           stderr=subprocess.DEVNULL,
           timeout=8,
@@ -360,7 +462,7 @@ def stream_download(url: str, dest_path: Path, timeout: int = 30) -> bool:
   except Exception as e:
     if temp_dest.exists():
       temp_dest.unlink()
-    log_err(f"Download failed for {url}: {e}")
+    log_err(f"download failed for {url}: {e}")
     return False
 
 
@@ -401,69 +503,85 @@ def ensure_awww_daemon() -> bool:
 
 def kill_mpvpaper() -> bool:
   try:
-    subprocess.run(["pkill", "-9", "-x", "mpvpaper"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(
+        ["pkill", "-9", "-x", "mpvpaper"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
     return True
   except Exception:
     return False
 
 
+# follow symlinked folders too so nix-store / dotfile wallpaper links don't vanish
 def scan() -> list:
   wallpapers = []
   seen_paths = set()
   videos_to_thumb = []
 
-  for p in WALLPAPERS_DIR.rglob("*"):
-    if not p.is_file():
+  search_roots = [WALLPAPERS_DIR] + [
+      d for d in EXTRA_WALLPAPER_DIRS if d.is_dir()
+  ]
+
+  for base_dir in search_roots:
+    if not base_dir.is_dir():
       continue
-    ext = p.suffix.lower()
-    if ext not in ALL_EXTS:
-      continue
+    for root_dir, _, files in os.walk(base_dir, followlinks=True):
+      for fname in files:
+        if fname.startswith("."):
+          continue
+        p = Path(root_dir) / fname
+        ext = p.suffix.lower()
+        if ext not in ALL_EXTS:
+          continue
 
-    try:
-      resolved = str(p.resolve())
-    except Exception:
-      continue
+        try:
+          resolved = str(p.resolve())
+        except Exception:
+          resolved = str(p.absolute())
 
-    if resolved in seen_paths:
-      continue
-    seen_paths.add(resolved)
+        if resolved in seen_paths:
+          continue
+        seen_paths.add(resolved)
 
-    try:
-      rel_dir = p.parent.relative_to(WALLPAPERS_DIR)
-      rel_parts = rel_dir.parts
-      category = str(rel_dir) if str(rel_dir) != "." else "root"
-      parent_category = (
-          rel_parts[0] if len(rel_parts) > 0 and rel_parts[0] != "." else "root"
-      )
-      sub_category = rel_parts[1] if len(rel_parts) > 1 else ""
-    except ValueError:
-      category = "general"
-      parent_category = "general"
-      sub_category = ""
+        try:
+          rel_dir = Path(root_dir).relative_to(base_dir)
+          rel_parts = rel_dir.parts
+          category = str(rel_dir) if str(rel_dir) != "." else "root"
+          parent_category = (
+              rel_parts[0]
+              if len(rel_parts) > 0 and rel_parts[0] != "."
+              else "root"
+          )
+          sub_category = rel_parts[1] if len(rel_parts) > 1 else ""
+        except ValueError:
+          category = "general"
+          parent_category = "general"
+          sub_category = ""
 
-    is_video = ext in VIDEO_EXTS
-    is_gif = ext in ANIM_EXTS
-    thumb_path = resolved
+        is_video = ext in VIDEO_EXTS
+        is_gif = ext in ANIM_EXTS
+        thumb_path = resolved
 
-    if is_video:
-      h = hashlib.md5(resolved.encode()).hexdigest()
-      t_file = THUMB_DIR / f"{h}.jpg"
-      thumb_path = str(t_file.resolve())
-      if not t_file.exists():
-        videos_to_thumb.append((resolved, t_file))
+        if is_video:
+          h = hashlib.md5(resolved.encode()).hexdigest()
+          t_file = THUMB_DIR / f"{h}.jpg"
+          thumb_path = str(t_file.resolve())
+          if not t_file.exists():
+            videos_to_thumb.append((resolved, t_file))
 
-    wallpapers.append({
-        "path": resolved,
-        "thumb": thumb_path,
-        "name": p.stem,
-        "ext": ext.replace(".", ""),
-        "isVideo": is_video,
-        "isGif": is_gif,
-        "isLive": is_video or is_gif,
-        "category": category,
-        "parentCategory": parent_category,
-        "subCategory": sub_category,
-    })
+        wallpapers.append({
+            "path": resolved,
+            "thumb": thumb_path,
+            "name": p.stem,
+            "ext": ext.lstrip("."),
+            "isVideo": is_video,
+            "isGif": is_gif,
+            "isLive": is_video or is_gif,
+            "category": category,
+            "parentCategory": parent_category,
+            "subCategory": sub_category,
+        })
 
   if videos_to_thumb:
     with ThreadPoolExecutor(
@@ -478,7 +596,7 @@ def scan() -> list:
   wallpapers.sort(
       key=lambda w: (w["parentCategory"], w["subCategory"], w["name"].lower())
   )
-  atomic_write_json(WALLPAPERS_JSON, wallpapers)
+  write_saved_wp(wallpapers=wallpapers)
   return wallpapers
 
 
@@ -535,19 +653,19 @@ def resolve_wallpaper_path(path_str: Optional[str] = None) -> Optional[str]:
       FALLBACK_WALLPAPER,
       WALLPAPERS_DIR / "endermanch" / "img0.jpg",
       WALLPAPERS_DIR / "endermanch" / "Bliss.png",
-      WALLPAPERS_DIR / "Windows" / "Wallpaper" / "Windows" / "img0.jpg",
   ]
   for c in candidates:
     if c.is_file():
       return str(c.resolve())
 
-  if WALLPAPERS_DIR.is_dir():
-    for root, _, files in os.walk(WALLPAPERS_DIR):
-      for f in files:
-        if Path(f).suffix.lower() in IMAGE_EXTS:
-          cand = Path(root) / f
-          if cand.is_file():
-            return str(cand.resolve())
+  for base_dir in [WALLPAPERS_DIR] + EXTRA_WALLPAPER_DIRS:
+    if base_dir.is_dir():
+      for root_dir, _, files in os.walk(base_dir, followlinks=True):
+        for f in files:
+          if Path(f).suffix.lower() in IMAGE_EXTS:
+            cand = Path(root_dir) / f
+            if cand.is_file():
+              return str(cand.resolve())
 
   return None
 
@@ -589,23 +707,17 @@ def update_wallpaper_symlinks(img_path: str) -> bool:
 
 def ensure_symlinks_valid():
   needs_repair = False
-  if not CURR_WALL_SYMLINK.is_symlink():
-    needs_repair = True
-  else:
+  for link in (CURR_WALL_SYMLINK, CURR_WALL_STATIC):
+    if not link.is_symlink():
+      needs_repair = True
+      break
     try:
-      if not CURR_WALL_SYMLINK.resolve().is_file():
+      if not link.resolve().is_file():
         needs_repair = True
+        break
     except Exception:
       needs_repair = True
-
-  if not CURR_WALL_STATIC.is_symlink():
-    needs_repair = True
-  else:
-    try:
-      if not CURR_WALL_STATIC.resolve().is_file():
-        needs_repair = True
-    except Exception:
-      needs_repair = True
+      break
 
   if needs_repair:
     resolved = resolve_wallpaper_path(None)
@@ -613,7 +725,6 @@ def ensure_symlinks_valid():
       update_wallpaper_symlinks(resolved)
 
 
-# --- Core Command Logic ---
 def parse_wallpaper_args(raw_args: list) -> dict:
   cfg = load_settings()
   opts = {
@@ -739,7 +850,7 @@ def set_wallpaper(raw_args) -> bool:
 
   resolved = resolve_wallpaper_path(opts["img_path"])
   if not resolved:
-    log_err(f"Wallpaper file does not exist: {opts['img_path']}")
+    log_err(f"wallpaper file does not exist: {opts['img_path']}")
     return False
 
   img_path = resolved
@@ -769,7 +880,6 @@ def set_wallpaper(raw_args) -> bool:
   valid_resizes = {"crop", "fit", "stretch", "no"}
   resize = opts["resize"] if opts["resize"] in valid_resizes else "crop"
 
-  # Coordinates: (0,0) is TOP-LEFT, (1,1) is BOTTOM-RIGHT
   pos_map = {
       "center": "center",
       "top": "0.5,0.0",
@@ -787,19 +897,12 @@ def set_wallpaper(raw_args) -> bool:
       raw_pos if ("," in raw_pos or raw_pos == "center") else "center",
   )
 
-  try:
-    CUR_WP_FILE.write_text(img_path + "\n", encoding="utf-8")
-    (XDG_RUNTIME_DIR / "qs_current_wallpaper.txt").write_text(
-        img_path + "\n", encoding="utf-8"
-    )
-  except Exception:
-    pass
-
   update_settings({
       "currentWallpaper": img_path,
       "matugenMode": opts["mode"],
       "matugenScheme": opts["scheme"],
   })
+  write_saved_wp(current_wp=img_path, mode=opts["mode"], scheme=opts["scheme"])
 
   ext_lower = Path(img_path).suffix.lower()
 
@@ -814,10 +917,6 @@ def set_wallpaper(raw_args) -> bool:
     v_hash = hashlib.md5(img_path.encode()).hexdigest()
     v_thumb = THUMB_DIR / f"{v_hash}.jpg"
     if make_video_thumb(img_path, v_thumb):
-      try:
-        shutil.copyfile(v_thumb, VIDEO_THUMB)
-      except Exception:
-        pass
       try:
         subprocess.run(
             [
@@ -856,10 +955,10 @@ def set_wallpaper(raw_args) -> bool:
           stdout=subprocess.DEVNULL,
           stderr=subprocess.DEVNULL,
       )
-      log_success("Live video wallpaper applied:", Path(img_path).name)
+      log_ok("live video wallpaper applied:", Path(img_path).name)
       return True
     except Exception as e:
-      log_err(f"Failed to spawn mpvpaper: {e}")
+      log_err(f"failed to spawn mpvpaper: {e}")
       return False
   else:
     kill_mpvpaper()
@@ -893,37 +992,52 @@ def set_wallpaper(raw_args) -> bool:
     if transition in {"grow", "outer"}:
       awww_cmd.extend(["--transition-pos", pos])
 
-    success = True
+    matugen_target = (
+        str(CURR_WALL_STATIC.resolve())
+        if CURR_WALL_STATIC.is_symlink()
+        else img_path
+    )
+    matugen_cmd = [
+        "matugen",
+        "image",
+        matugen_target,
+        "-m",
+        opts["mode"],
+        "-t",
+        opts["scheme"],
+        "--source-color-index",
+        "0",
+    ]
+
+    # fire awww and matugen in parallel so colors morph during the wipe instead of after
+    awww_proc = None
+    matugen_proc = None
     try:
-      subprocess.run(awww_cmd, check=True, stderr=subprocess.DEVNULL)
+      awww_proc = subprocess.Popen(
+          awww_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+      )
     except Exception as e:
-      log_err(f"Failed to execute awww: {e}")
-      success = False
+      log_err(f"failed to execute awww: {e}")
 
     try:
-      matugen_target = (
-          str(CURR_WALL_STATIC.resolve())
-          if CURR_WALL_STATIC.is_symlink()
-          else img_path
-      )
-      subprocess.run(
-          [
-              "matugen",
-              "image",
-              matugen_target,
-              "-m",
-              opts["mode"],
-              "-t",
-              opts["scheme"],
-              "--source-color-index",
-              "0",
-          ],
-          stderr=subprocess.DEVNULL,
+      matugen_proc = subprocess.Popen(
+          matugen_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
       )
     except Exception:
       pass
 
-    log_success("Wallpaper applied:", Path(img_path).name)
+    success = True
+    if awww_proc is not None:
+      awww_proc.wait()
+      if awww_proc.returncode != 0:
+        success = False
+    if matugen_proc is not None:
+      matugen_proc.wait()
+
+    log_ok(
+        "wallpaper & palette synced:",
+        f"{Path(img_path).name} ({opts['mode']} • {opts['scheme'].replace('scheme-', '')})",
+    )
     return success
 
 
@@ -935,17 +1049,11 @@ def random_wallpaper(args) -> bool:
   if filter_cat in ("online", "wallhaven", "wh"):
     return random_wallhaven(args[1:])
 
-  wps = []
-  if WALLPAPERS_JSON.exists():
-    try:
-      wps = json.loads(WALLPAPERS_JSON.read_text(encoding="utf-8"))
-    except Exception:
-      wps = []
-
+  wps = read_saved_wp_list()
   if not wps:
     wps = scan()
   if not wps:
-    log_err("No wallpapers found in library. Run scan first.")
+    log_err("no wallpapers found in library. drop some in ~/.wallpapers first.")
     return False
 
   cur_wp = ""
@@ -978,11 +1086,10 @@ def random_wallpaper(args) -> bool:
 
   chosen = random.choice(candidates)
   rest = args[1:] if (args and not args[0].startswith("-")) else args
-  log_info(f"Rolled random wallpaper ({C_CYAN}{filter_cat}{C_RESET})")
+  log_info("rolled random wallpaper", filter_cat)
   return set_wallpaper([chosen] + rest)
 
 
-# --- Wallhaven Online Roll ---
 def fetch_wallhaven_wallpaper(
     query: str = "", category: str = "all", sorting: str = "random"
 ) -> Optional[str]:
@@ -1019,13 +1126,16 @@ def fetch_wallhaven_wallpaper(
 
   try:
     with urllib.request.urlopen(req, timeout=12) as resp:
-      data = json.loads(resp.read().decode("utf-8"))
-      wps = data.get("data", [])
-      if not wps:
+      body = resp.read().decode("utf-8", errors="ignore")
+      paths = [
+          p.replace("\\/", "/")
+          for p in re.findall(r'"path"\s*:\s*"(https?:[^"]+)"', body)
+      ]
+      if not paths:
         return None
-      return random.choice(wps).get("path")
+      return random.choice(paths)
   except Exception as e:
-    log_err(f"Wallhaven API error: {e}")
+    log_err(f"wallhaven api error: {e}")
     return None
 
 
@@ -1038,13 +1148,10 @@ def random_wallhaven(args) -> bool:
   else:
     rest = args
 
-  log_info(
-      f"Fetching random wallpaper from Wallhaven"
-      + (f" ({C_CYAN}{query}{C_RESET})" if query else "...")
-  )
+  log_info("fetching random wallpaper from wallhaven", query or "random")
   img_url = fetch_wallhaven_wallpaper(query=query)
   if not img_url:
-    log_err(f"No wallpaper found on Wallhaven for: '{query}'")
+    log_err(f"nothing found on wallhaven for '{query}'")
     return False
 
   save_dir = WALLPAPERS_DIR / "wallhaven"
@@ -1086,12 +1193,13 @@ def set_color(args) -> bool:
     pass
 
   update_settings({"matugenMode": mode, "matugenScheme": scheme})
-  log_success("Applied color theme:", hex_color)
+  write_saved_wp(mode=mode, scheme=scheme)
+  log_ok("applied solid color palette:", hex_color)
   return True
 
 
 def reapply(args) -> bool:
-  log_info("Re-applying current wallpaper & matugen theme...")
+  log_info("re-applying current wallpaper & matugen palette...")
   cfg = load_settings()
   mode = (
       args[0] if len(args) > 0 and args[0] else cfg.get("matugenMode", "dark")
@@ -1120,22 +1228,8 @@ def reapply(args) -> bool:
         + (args[2:] if len(args) > 2 else [])
     )
   else:
-    log_warn("No active wallpaper to reapply. Falling back to theme color.")
+    log_warn("no active wallpaper found, falling back to solid color")
     return set_color(["#787756", mode, scheme])
-
-
-SCHEMES = [
-    "scheme-tonal-spot",
-    "scheme-smart",
-    "scheme-vibrant",
-    "scheme-expressive",
-    "scheme-content",
-    "scheme-fruit-salad",
-    "scheme-rainbow",
-    "scheme-fidelity",
-    "scheme-monochrome",
-    "scheme-neutral",
-]
 
 
 def set_mode(args) -> bool:
@@ -1146,11 +1240,11 @@ def set_mode(args) -> bool:
   if target_mode in ("toggle", "t"):
     target_mode = "light" if cur_mode == "dark" else "dark"
   elif target_mode not in ("dark", "light"):
-    log_err(f"Invalid mode '{target_mode}'. Use 'dark', 'light', or 'toggle'.")
+    log_err(f"invalid mode '{target_mode}'. use 'dark', 'light', or 'toggle'.")
     return False
 
   update_settings({"matugenMode": target_mode})
-  log_info(f"Switched theme mode to: {C_CYAN}{target_mode}{C_RESET}")
+  log_info("switched theme mode to", target_mode)
   return reapply([target_mode, cfg.get("matugenScheme", "scheme-tonal-spot")])
 
 
@@ -1159,42 +1253,38 @@ def set_scheme(args) -> bool:
   if not args:
     if shutil.which("fzf"):
       chosen = fzf_prompt(
-          SCHEMES,
+          [s.replace("scheme-", "") for s in SCHEMES],
           [
-              "--header=[󰏘 select matugen color scheme]",
+              "--header=( ✧ω✧ ) select matugen color scheme",
               "--reverse",
-              "--height=40%",
+              "--height=45%",
           ],
       )
       if not chosen:
         return False
-      scheme = chosen
+      scheme = f"scheme-{chosen}"
     else:
       log_err(
-          f"Usage: wp scheme <{' | '.join([s.replace('scheme-', '') for s in SCHEMES])}>"
+          f"usage: wp scheme <{' | '.join([s.replace('scheme-', '') for s in SCHEMES])}>"
       )
       return False
   else:
     raw = args[0].strip().lower()
-    if not raw.startswith("scheme-"):
-      scheme = f"scheme-{raw}"
-    else:
-      scheme = raw
-
+    scheme = raw if raw.startswith("scheme-") else f"scheme-{raw}"
     if scheme not in SCHEMES:
       log_err(
-          f"Unknown scheme '{args[0]}'. Available: {', '.join([s.replace('scheme-', '') for s in SCHEMES])}"
+          f"unknown scheme '{args[0]}'. options: {', '.join([s.replace('scheme-', '') for s in SCHEMES])}"
       )
       return False
 
   update_settings({"matugenScheme": scheme})
-  log_info(f"Switched color scheme to: {C_CYAN}{scheme}{C_RESET}")
+  log_info("switched color scheme to", scheme)
   return reapply([cfg.get("matugenMode", "dark"), scheme])
 
 
 def download(args) -> bool:
   if not args:
-    log_err("Usage: wp download <url>")
+    log_err("usage: wp download <url>")
     return False
   raw_url = args[0].strip()
   rest = args[1:]
@@ -1213,17 +1303,57 @@ def download(args) -> bool:
   if dest.exists() and dest.stat().st_size > 0:
     return set_wallpaper([str(dest)] + rest)
 
-  log_info("Downloading wallpaper...")
+  log_info("downloading wallpaper...", raw_url)
   if stream_download(raw_url, dest):
     scan()
     return set_wallpaper([str(dest)] + rest)
   return False
 
 
-# --- Native FZF Interactive Engine ---
+def batch_download(args) -> bool:
+  urls = [u.strip() for u in args if u and u.strip().startswith("http")]
+  if not urls:
+    return False
+
+  def _dl(url: str) -> bool:
+    live = is_live_url(url)
+    save_dir = WALLPAPERS_DIR / ("live" if live else "wallhaven")
+    dest = save_dir / extract_filename(url, live)
+    if dest.exists() and dest.stat().st_size > 0:
+      return True
+    return stream_download(url, dest)
+
+  log_info("batch downloading wallpapers", f"{len(urls)} queued")
+  with ThreadPoolExecutor(max_workers=min(4, len(urls))) as pool:
+    results = list(pool.map(_dl, urls))
+  scan()
+  return any(results)
+
+
+def print_status() -> bool:
+  cfg = load_settings()
+  wps = read_saved_wp_list()
+  cur = resolve_wallpaper_path(cfg.get("currentWallpaper", "")) or "none"
+  mode = str(cfg.get("matugenMode", "dark")).lower()
+  scheme = (
+      str(cfg.get("matugenScheme", "scheme-tonal-spot"))
+      .replace("scheme-", "")
+      .lower()
+  )
+  trans = str(cfg.get("awwwTransitionType", "wipe")).lower()
+
+  print(f"{C_MAGENTA}( ⌐■_■ ) wallpaper & matugen status{C_RESET}")
+  print(f"  {C_DIM}current:{C_RESET}    {C_CYAN}{cur}{C_RESET}")
+  print(f"  {C_DIM}mode:{C_RESET}       {C_GREEN}{mode}{C_RESET}")
+  print(f"  {C_DIM}scheme:{C_RESET}     {C_GREEN}{scheme}{C_RESET}")
+  print(f"  {C_DIM}transition:{C_RESET} {trans}")
+  print(f"  {C_DIM}indexed:{C_RESET}    {len(wps)} wallpapers in saved_wp")
+  return True
+
+
 def fzf_prompt(lines: List[str], fzf_args: List[str]) -> Optional[str]:
   if not shutil.which("fzf"):
-    log_warn("fzf not found. Install fzf for interactive pickers.")
+    log_warn("fzf not installed. install fzf for interactive pickers.")
     return None
   try:
     proc = subprocess.run(
@@ -1245,27 +1375,30 @@ def interactive_picker():
     return
 
   cur_cfg = load_settings()
-  cur_m = cur_cfg.get("matugenMode", "dark")
-  cur_s = cur_cfg.get("matugenScheme", "scheme-tonal-spot").replace(
-      "scheme-", ""
+  cur_m = str(cur_cfg.get("matugenMode", "dark")).lower()
+  cur_s = (
+      str(cur_cfg.get("matugenScheme", "scheme-tonal-spot"))
+      .replace("scheme-", "")
+      .lower()
   )
+  wps = read_saved_wp_list() or scan()
 
   options = [
-      "󰑐 roll random local wallpaper",
-      "󰖟 roll random online wallpaper (wallhaven)",
-      "󰋩 select wallpaper from library",
-      "󰍹 select live video / gif wallpaper",
-      f"󰔎 toggle dark / light mode (currently: {cur_m})",
-      f"󰏘 switch color scheme (currently: {cur_s})",
-      "󰁕 reload current wallpaper & theme",
-      "󰚰 rescan library & thumbnails",
-      "󰏤 download wallpaper by url",
+      f"roll      • random local wallpaper ({len(wps)} indexed)",
+      "wallhaven • roll random online wallpaper",
+      "library   • browse & filter local wallpapers",
+      "live      • browse video & gif wallpapers",
+      f"mode      • toggle dark / light (active: {cur_m})",
+      f"scheme    • switch matugen algorithm (active: {cur_s})",
+      "reload    • re-apply current wallpaper & palette",
+      "scan      • rescan folders & rebuild saved_wp",
+      "status    • inspect current state & paths",
   ]
 
   choice = fzf_prompt(
       options,
       [
-          "--header=[󰄛 wallpaper hub - what do you want to do?]",
+          "--header=( ✧_✧ ) wp hub • pick an action",
           "--reverse",
           "--height=45%",
       ],
@@ -1273,89 +1406,87 @@ def interactive_picker():
   if not choice:
     return
 
-  if "roll random local" in choice:
+  action = choice.split("•")[0].strip()
+
+  if action == "roll":
     random_wallpaper(["all"])
-  elif "roll random online" in choice:
+  elif action == "wallhaven":
     try:
-      q = (
-          input(f"{C_CYAN}enter search query (leave blank for random): {C_RESET}")
-          .strip()
-      )
+      q = input(
+          f"{C_CYAN}search query (enter for random): {C_RESET}"
+      ).strip()
     except (EOFError, KeyboardInterrupt):
       return
     random_wallhaven([q] if q else [])
-  elif "select wallpaper from library" in choice:
-    if not WALLPAPERS_JSON.exists():
-      scan()
-    wps = json.loads(WALLPAPERS_JSON.read_text(encoding="utf-8"))
-    lines = [f"{w['path']}\t{w['category']}\t{w['name']}" for w in wps]
-    res = fzf_prompt(
-        lines,
-        [
-            "--with-nth=2,3",
-            "--delimiter=\t",
-            "--header=[󰋩 select wallpaper]",
-            "--reverse",
-            "--height=50%",
-        ],
-    )
-    if res:
-      set_wallpaper([res.split("\t")[0]])
-  elif "select live video" in choice:
-    if not WALLPAPERS_JSON.exists():
-      scan()
-    wps = json.loads(WALLPAPERS_JSON.read_text(encoding="utf-8"))
-    live = [w for w in wps if w.get("isLive")]
+  elif action == "library":
     lines = [
-        f"{w['path']}\t[live {w.get('ext')}]\t{w.get('name')}" for w in live
+        f"{w['path']}\t[{w['category'].lower()}]\t{w['name'].lower()}"
+        for w in wps
     ]
     res = fzf_prompt(
         lines,
         [
             "--with-nth=2,3",
             "--delimiter=\t",
-            "--header=[󰍹 select live wallpaper]",
+            "--header=( ✧_✧ ) select wallpaper",
+            "--reverse",
+            "--height=60%",
+        ],
+    )
+    if res:
+      set_wallpaper([res.split("\t")[0]])
+  elif action == "live":
+    live = [w for w in wps if w.get("isLive")]
+    if not live:
+      log_warn("no live video or gif wallpapers found in ~/.wallpapers")
+      return
+    lines = [
+        f"{w['path']}\t[live {w.get('ext', '').lower()}]\t{w.get('name', '').lower()}"
+        for w in live
+    ]
+    res = fzf_prompt(
+        lines,
+        [
+            "--with-nth=2,3",
+            "--delimiter=\t",
+            "--header=( ▸‿▸ ) select live wallpaper",
             "--reverse",
             "--height=50%",
         ],
     )
     if res:
       set_wallpaper([res.split("\t")[0]])
-  elif "toggle dark / light mode" in choice:
+  elif action == "mode":
     set_mode(["toggle"])
-  elif "switch color scheme" in choice:
+  elif action == "scheme":
     set_scheme([])
-  elif "reload current" in choice:
+  elif action == "reload":
     reapply([])
-  elif "rescan library" in choice:
-    scan()
-    log_success("Library rescanned & thumbnails updated.")
-  elif "download wallpaper" in choice:
-    try:
-      url = input(f"{C_CYAN}enter wallpaper / video url: {C_RESET}").strip()
-    except (EOFError, KeyboardInterrupt):
-      return
-    if url:
-      download([url])
+  elif action == "scan":
+    found = scan()
+    log_ok("rescanned library & updated saved_wp:", f"{len(found)} wallpapers")
+  elif action == "status":
+    print_status()
 
 
 def print_help():
-  print(f"""{C_MAGENTA}󰄛 wp - interactive wallpaper control hub{C_RESET}
+  print(f"""{C_MAGENTA}( ✧_✧ ) wp • wallpaper & matugen control hub{C_RESET}
 
-{C_BOLD}Usage:{C_RESET}
-  wp                           Open interactive fzf picker
-  wp mode [dark|light|toggle]  Switch or toggle theme mode (dark / light)
-  wp scheme [name]             Switch Matugen palette algorithm (or fzf pick)
-  wp toggle                    Quick toggle between dark and light mode
-  wp random [category|online]  Roll random wallpaper (e.g. wp random anime)
-  wp wh [query]                Roll random online wallpaper from Wallhaven
-  wp reload                    Re-apply current wallpaper & theme
-  wp set <file> [options...]   Apply specific image or video file
-  wp color <#hex>              Set custom solid color theme
-  wp scan                      Rescan local library & generate thumbnails
-  wp download <url>            Download image/video and apply
-  wp stop                      Kill running live video wallpapers (mpvpaper)
-  wp get                       Print current wallpaper path
+{C_BOLD}usage:{C_RESET}
+  wp                           open interactive fzf picker
+  wp status                    show active wallpaper, mode, scheme & count
+  wp mode [dark|light|toggle]  switch or toggle dark / light mode
+  wp scheme [name]             switch matugen palette algorithm
+  wp toggle                    quick toggle between dark and light mode
+  wp random [category|online]  roll random wallpaper (e.g. wp random anime)
+  wp wh [query]                roll random online wallpaper from wallhaven
+  wp reload                    re-apply current wallpaper & matugen palette
+  wp set <file> [options...]   apply specific image or video file
+  wp color <#hex>              apply solid color theme
+  wp scan                      rescan folders & rebuild saved_wp
+  wp download <url>            download image/video and apply
+  wp stop                      stop running live video wallpapers (mpvpaper)
+  wp get                       print current wallpaper path
 """)
 
 
@@ -1373,7 +1504,14 @@ def main():
   args = sys.argv[2:]
 
   dispatch = {
-      "scan": lambda: (scan(), log_success("Wallpaper library rescanned."), True)[2],
+      "scan": lambda: (
+          lambda res: (
+              log_ok("wallpaper library indexed:", f"{len(res)} items"),
+              True,
+          )[1]
+      )(scan()),
+      "status": lambda: print_status(),
+      "info": lambda: print_status(),
       "set": lambda: set_wallpaper(args),
       "mode": lambda: set_mode(args),
       "scheme": lambda: set_scheme(args),
@@ -1390,8 +1528,17 @@ def main():
       "reapply": lambda: reapply(args),
       "color": lambda: set_color(args),
       "download": lambda: download(args),
-      "stop": lambda: (kill_mpvpaper(), log_success("Stopped live wallpapers."), True)[2],
-      "kill": lambda: (kill_mpvpaper(), log_success("Stopped live wallpapers."), True)[2],
+      "batch-download": lambda: batch_download(args),
+      "stop": lambda: (
+          kill_mpvpaper(),
+          log_ok("stopped live wallpapers"),
+          True,
+      )[2],
+      "kill": lambda: (
+          kill_mpvpaper(),
+          log_ok("stopped live wallpapers"),
+          True,
+      )[2],
       "get": lambda: (print(resolve_wallpaper_path(None) or "none"), True)[1],
       "current": lambda: (print(resolve_wallpaper_path(None) or "none"), True)[1],
   }
@@ -1403,7 +1550,7 @@ def main():
     success = set_wallpaper(sys.argv[1:])
     sys.exit(0 if success else 1)
   else:
-    log_err(f"Unknown command '{arg}'. Run 'wp --help' for usage.")
+    log_err(f"unknown command '{arg}'. run 'wp --help' for usage.")
     sys.exit(1)
 
 

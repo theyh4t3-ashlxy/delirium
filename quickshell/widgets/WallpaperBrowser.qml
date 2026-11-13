@@ -1,7 +1,9 @@
+// WallpaperBrowser.qml
 import QtQuick
 import QtQuick.Layouts
 import ".."
 import "../controls"
+import "../services"
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -9,21 +11,37 @@ import Quickshell.Hyprland
 
 Rectangle {
     id: root
-    implicitWidth: (Theme?.isVertical ?? false) ? ((Theme?.barHeight ?? 48) - 8) : (wpRow.implicitWidth + 24)
-    implicitHeight: (Theme?.barHeight ?? 48) - 8
-    radius: Theme?.radiusPill ?? 999
-    color: popup.open ? Theme.primary_overlay : (wpMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-    border.color: Theme?.pillBorder ?? "transparent"
-    border.width: (Theme?.pillBorder ?? "transparent") === "transparent" ? 0 : 1
-    visible: Settings?.showWallpaper ?? true
-
-    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 150 } }
-    Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 150 } }
 
     property var barScreen: null
     property var barMonitor: null
+
+    readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
+    readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
+
+    implicitWidth: {
+        if (Theme.isVertical) return Theme.barHeight - 8;
+        if (wpMouse.containsMouse || popup.open) return wpRow.implicitWidth + 20;
+        return Theme.barHeight - 8;
+    }
+    implicitHeight: Theme.barHeight - 8
+    radius: Theme.radiusPill
+    visible: Settings?.showWallpaper ?? true
+
+    color: {
+        if (wpMouse.pressed) return Theme.widgetActive;
+        if (popup.open) return Theme.primary_overlay;
+        if (wpMouse.containsMouse) return Theme.pillHover;
+        return Theme.pillBg;
+    }
+    border.color: popup.open ? Theme.primary : Theme.pillBorder
+    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+    clip: true
+
+    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+    Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+
     property string activeTab: "local"
-    property string liveSubTab: "local"
     property string localCategoryFilter: "all"
     property string localSubCategoryFilter: "all"
     property string localSearchQuery: ""
@@ -31,7 +49,6 @@ Rectangle {
     property string onlineSorting: "date_added"
     property int onlinePage: 1
 
-    // resolve resolution from the current bar's monitor first before falling back to primary screen
     readonly property string nativeRes: {
         if (root.barScreen?.width && root.barScreen?.height) {
             return root.barScreen.width + "x" + root.barScreen.height;
@@ -49,110 +66,27 @@ Rectangle {
     property bool isOnlineLoading: false
     property bool isBatchDownloading: false
     property string batchStatusText: ""
-    property string liveSearchQuery: ""
 
-    property var allLocalWallpapers: []
+    // bound directly to WallpaperService.wallpaperList (parsed from saved_wp, zero JSON)
+    readonly property var allLocalWallpapers: WallpaperService?.wallpaperList ?? []
     property var onlineWallpapers: []
-    property var onlineLiveWallpapers: []
-
-    readonly property string wpScriptPath: decodeURIComponent(
-        Qt.resolvedUrl("../scripts/wallpaper.py").toString().replace(/^file:\/\//, "")
-    )
 
     readonly property var localLiveWallpapers: {
         let res = [];
         let items = root.allLocalWallpapers || [];
         for (let i = 0; i < items.length; i++) {
             let item = items[i];
-            if (item && (item.isVideo || item.isGif || item.isLive || ["gif", "mp4", "webm"].indexOf(item.ext) !== -1)) {
+            if (item && (item.isVideo || item.isGif || item.isLive || ["gif", "mp4", "webm", "mkv", "mov"].indexOf(item.ext) !== -1)) {
                 res.push(item);
             }
         }
         return res;
     }
 
-    readonly property var activeLiveList: root.liveSubTab === "local" ? root.localLiveWallpapers : root.onlineLiveWallpapers
-
-    FileView {
-        id: liveWpFile
-        path: "/tmp/qs_live_wallpapers.json"
-        watchChanges: true
-        printErrors: false
-        onFileChanged: {
-            reload();
-            root.loadLiveFromJson(text());
-        }
-    }
-
-    Timer {
-        id: liveParseTimer
-        interval: 300
-        repeat: false
-        onTriggered: {
-            liveWpFile.reload();
-            root.loadLiveFromJson(liveWpFile.text());
-        }
-    }
-
     Timer {
         id: batchStatusResetTimer
         interval: 4000
         onTriggered: root.batchStatusText = ""
-    }
-
-    Process {
-        id: batchDownloadProc
-        command: []
-        running: false
-        onExited: (code) => {
-            root.isBatchDownloading = false;
-            root.batchStatusText = (code === 0) ? "saved to ~/.wallpapers/" : "download failed";
-            batchStatusResetTimer.restart();
-            reloadLocalWallpapers();
-        }
-    }
-
-    Connections {
-        target: WallpaperService ?? null
-        ignoreUnknownSignals: true
-        function onWallpapersUpdated() {
-            root.parseLocalWallpapers();
-        }
-    }
-
-    HyprlandFocusGrab {
-        id: hyprFocusGrab
-        active: popup.open
-        windows: {
-            let targets = [];
-            if (popup) targets.push(popup);
-            if (popup?.window) targets.push(popup.window);
-            let barWin = root.QsWindow?.window;
-            if (barWin && targets.indexOf(barWin) === -1) targets.push(barWin);
-            return targets;
-        }
-        onCleared: popup.open = false
-    }
-
-    function syncKeyboardFocus(openState) {
-        if (popup) {
-            try {
-                if (popup.focusable !== undefined) popup.focusable = openState;
-                if (popup.grabFocus !== undefined) popup.grabFocus = openState;
-                if (popup.WlrLayershell) {
-                    popup.WlrLayershell.keyboardFocus = openState ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None;
-                }
-            } catch (e) {}
-        }
-        try {
-            let win = root.QsWindow?.window;
-            if (win) {
-                if (win.focusable !== undefined) win.focusable = openState;
-                if (win.WlrLayershell) {
-                    win.WlrLayershell.keyboardFocus = openState ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None;
-                }
-            }
-        } catch (e) {}
     }
 
     function focusActiveInput() {
@@ -167,23 +101,25 @@ Rectangle {
     Connections {
         target: popup
         function onOpenChanged() {
-            root.syncKeyboardFocus(popup.open);
             if (popup.open) root.focusActiveInput();
         }
     }
 
     onActiveTabChanged: root.focusActiveInput()
 
-    Component.onCompleted: {
-        parseLocalWallpapers();
-        reloadLocalWallpapers();
-    }
-
     function syncAnchor() {
         const p = root.mapToItem(null, 0, 0);
-        if (p) {
-            popup.targetRelativeX = p.x + (root.width / 2);
-            popup.targetRelativeY = p.y + (root.height / 2);
+        if (p && root.visible) {
+            if (Theme.isVertical) {
+                popup.targetRelativeX = 0;
+                popup.targetRelativeY = p.y + (root.implicitHeight / 2) + root.effectiveBarMargin;
+            } else {
+                popup.targetRelativeX = p.x + (root.implicitWidth / 2) + root.effectiveBarMargin;
+                popup.targetRelativeY = 0;
+            }
+        } else {
+            popup.targetRelativeX = 0;
+            popup.targetRelativeY = 0;
         }
     }
 
@@ -206,37 +142,38 @@ Rectangle {
         }
     }
 
-    function fetchLiveWallpapers(q) {
-        Quickshell.execDetached(["python3", wpScriptPath, "fetch-live", q || ""]);
-        liveParseTimer.restart();
-    }
-
-    function loadLiveFromJson(raw) {
-        try {
-            if (!raw || raw.trim() === "") {
-                root.onlineLiveWallpapers = [];
-                return;
-            }
-            root.onlineLiveWallpapers = JSON.parse(raw) || [];
-        } catch (e) {
-            root.onlineLiveWallpapers = [];
-        }
-    }
-
-    function parseLocalWallpapers() {
-        if (!WallpaperService?.localWpListFile) return;
-        WallpaperService.localWpListFile.reload();
-        let str = WallpaperService.localWpListFile.text();
-        if (!str || str.trim() === "") return;
-        try {
-            root.allLocalWallpapers = JSON.parse(str) || [];
-        } catch (e) {}
-    }
-
     function reloadLocalWallpapers() {
+        if (WallpaperService?.updateWallpaperList) {
+            WallpaperService.updateWallpaperList();
+        }
         if (WallpaperService?.scanLocalWallpapers) {
             WallpaperService.scanLocalWallpapers();
         }
+    }
+
+    // lightweight regex scraper for wallhaven API responses so we don't even touch JSON.parse
+    function parseWallhavenResponse(raw) {
+        if (!raw) return [];
+        let results = [];
+        let blocks = raw.split('"id":');
+        for (let i = 1; i < blocks.length; i++) {
+            let b = blocks[i];
+            let idMatch = b.match(/^\s*"([^"]+)"/);
+            let pathMatch = b.match(/"path"\s*:\s*"([^"]+)"/);
+            let thumbMatch = b.match(/"small"\s*:\s*"([^"]+)"/);
+            let resMatch = b.match(/"resolution"\s*:\s*"([^"]+)"/);
+            let typeMatch = b.match(/"file_type"\s*:\s*"image\/([^"]+)"/);
+            if (pathMatch) {
+                results.push({
+                    id: idMatch ? idMatch[1].toLowerCase() : "",
+                    fullUrl: pathMatch[1].replace(/\\\//g, "/"),
+                    thumbUrl: thumbMatch ? thumbMatch[1].replace(/\\\//g, "/") : pathMatch[1].replace(/\\\//g, "/"),
+                    resolution: resMatch ? resMatch[1] : "",
+                    fileType: typeMatch ? typeMatch[1].toLowerCase() : "img"
+                });
+            }
+        }
+        return results;
     }
 
     function fetchWallhaven(query, sort, page, resolution) {
@@ -273,21 +210,7 @@ Rectangle {
             if (req.readyState === XMLHttpRequest.DONE) {
                 root.isOnlineLoading = false;
                 if (req.status === 200) {
-                    try {
-                        let data = JSON.parse(req.responseText)?.data ?? [];
-                        let parsed = [];
-                        for (let i = 0; i < data.length; i++) {
-                            parsed.push({
-                                thumbUrl: data[i].thumbs?.small ?? "",
-                                fullUrl: data[i].path ?? "",
-                                id: String(data[i].id ?? ""),
-                                resolution: data[i].resolution || "",
-                                fileType: (data[i].file_type || "").replace("image/", "").toUpperCase(),
-                                favorites: data[i].favorites || 0
-                            });
-                        }
-                        root.onlineWallpapers = parsed;
-                    } catch (e) {}
+                    root.onlineWallpapers = root.parseWallhavenResponse(req.responseText);
                 }
             }
         };
@@ -303,12 +226,9 @@ Rectangle {
 
         if (WallpaperService?.batchDownload) {
             WallpaperService.batchDownload(urls);
-            root.isBatchDownloading = false;
-            batchStatusResetTimer.restart();
-        } else {
-            batchDownloadProc.command = ["python3", wpScriptPath, "batch-download", JSON.stringify(urls)];
-            batchDownloadProc.running = true;
         }
+        root.isBatchDownloading = false;
+        batchStatusResetTimer.restart();
     }
 
     function downloadCurrentSection() {
@@ -318,21 +238,13 @@ Rectangle {
                 let u = root.onlineWallpapers[i]?.fullUrl;
                 if (u) urls.push(u);
             }
-        } else if (root.activeTab === "live") {
-            let list = root.activeLiveList;
-            for (let i = 0; i < list.length; i++) {
-                let u = list[i]?.url || list[i]?.path;
-                if (u && (u.startsWith("http://") || u.startsWith("https://"))) urls.push(u);
-            }
         }
         downloadUrls(urls);
     }
 
-    // reusable UI components to keep tab layouts readable
-
     component GroupLabel: Text {
-        font.family: Theme?.fontFamily ?? "sans-serif"
-        font.pixelSize: Theme?.fontSizeXs ?? 10
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.fontSizeXs
         font.weight: Font.DemiBold
         color: Theme.on_surface_variant
     }
@@ -346,10 +258,20 @@ Rectangle {
 
         Layout.fillWidth: true
         implicitHeight: cardCol.implicitHeight + 24
-        radius: Theme?.radiusMd ?? 10
+        radius: Theme.radiusMd
         color: Theme.cardBg
         border.color: Theme.cardBorder
         border.width: 1
+        clip: true
+
+        Rectangle {
+            visible: Theme.isGlass
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+            color: Theme.glassHighlight
+        }
 
         ColumnLayout {
             id: cardCol
@@ -363,17 +285,17 @@ Rectangle {
                 visible: sCard.title !== ""
 
                 Text {
-                    visible: sCard.icon !== ""
+                    visible: sCard.icon !== "" && !Theme.isTextIconSet
                     text: sCard.icon
-                    font.family: Theme?.fontIcon ?? "sans-serif"
-                    font.pixelSize: Theme?.fontSizeSm ?? 12
+                    font.family: Theme.fontIcon
+                    font.pixelSize: Theme.fontSizeSm
                     color: Theme.primary
                 }
 
                 Text {
                     text: sCard.title
-                    font.family: Theme?.fontFamily ?? "sans-serif"
-                    font.pixelSize: Theme?.fontSizeSm ?? 12
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
                     font.weight: Font.Bold
                     color: Theme.on_surface
                 }
@@ -384,7 +306,7 @@ Rectangle {
                     visible: sCard.badge !== ""
                     height: 20
                     implicitWidth: cardBadgeText.implicitWidth + 14
-                    radius: Theme?.radiusPill ?? 999
+                    radius: Theme.radiusPill
                     color: Theme.primary_overlay
                     border.color: Theme.alpha(Theme.primary, 0.35)
                     border.width: 1
@@ -393,8 +315,8 @@ Rectangle {
                         id: cardBadgeText
                         anchors.centerIn: parent
                         text: sCard.badge
-                        font.family: Theme?.fontMono ?? "monospace"
-                        font.pixelSize: (Theme?.fontSizeXs ?? 10) - 1
+                        font.family: Theme.fontMono
+                        font.pixelSize: Theme.fontSizeXs
                         font.weight: Font.Bold
                         color: Theme.primary
                     }
@@ -414,7 +336,7 @@ Rectangle {
         id: fieldRoot
         property alias text: inputItem.text
         property string placeholder: ""
-        property string icon: Theme?.iconSearch ?? "󰍉"
+        property string icon: Theme.iconSearch
         property string badgeText: ""
         property bool monoFont: false
         signal submitted(string value)
@@ -427,11 +349,11 @@ Rectangle {
         Layout.fillWidth: true
         Layout.preferredHeight: 36
         color: Theme.cardBg
-        radius: Theme?.radiusMd ?? 10
+        radius: Theme.radiusMd
         border.color: inputItem.activeFocus ? Theme.primary : Theme.cardBorder
         border.width: 1
 
-        Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 150 } }
+        Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
         RowLayout {
             anchors.fill: parent
@@ -441,8 +363,8 @@ Rectangle {
 
             Text {
                 text: fieldRoot.icon
-                font.family: Theme?.fontIcon ?? "sans-serif"
-                font.pixelSize: Theme?.fontSizeSm ?? 12
+                font.family: Theme.fontIcon
+                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                 color: inputItem.activeFocus ? Theme.primary : Theme.on_surface_variant
             }
 
@@ -451,8 +373,8 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 verticalAlignment: TextInput.AlignVCenter
-                font.family: fieldRoot.monoFont ? (Theme?.fontMono ?? "monospace") : (Theme?.fontFamily ?? "sans-serif")
-                font.pixelSize: Theme?.fontSizeSm ?? 12
+                font.family: fieldRoot.monoFont ? Theme.fontMono : Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSm
                 color: Theme.on_surface
                 selectByMouse: true
                 activeFocusOnTab: true
@@ -460,8 +382,8 @@ Rectangle {
 
                 Text {
                     text: fieldRoot.placeholder
-                    font.family: Theme?.fontFamily ?? "sans-serif"
-                    font.pixelSize: Theme?.fontSizeSm ?? 12
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
                     color: Theme.on_surface_disabled
                     visible: inputItem.text.length === 0 && !inputItem.activeFocus
                     anchors.verticalCenter: parent.verticalCenter
@@ -479,22 +401,24 @@ Rectangle {
                 visible: fieldRoot.badgeText !== ""
                 height: 20
                 implicitWidth: badgeLbl.implicitWidth + 12
-                radius: Theme?.radiusPill ?? 999
-                color: Theme.surface_container_high
+                radius: Theme.radiusPill
+                color: Theme.widgetBg
+                border.color: Theme.widgetBorder
+                border.width: 1
 
                 Text {
                     id: badgeLbl
                     anchors.centerIn: parent
                     text: fieldRoot.badgeText
-                    font.family: Theme?.fontMono ?? "monospace"
-                    font.pixelSize: (Theme?.fontSizeXs ?? 10) - 1
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeXs
                     color: Theme.on_surface_variant
                 }
             }
 
             IconButton {
-                icon: Theme?.iconClose ?? "✕"
-                iconSize: 10
+                icon: Theme.iconClose
+                iconSize: Theme.fontSizeXs
                 tooltip: "clear"
                 visible: inputItem.text.length > 0
                 onClicked: {
@@ -521,11 +445,11 @@ Rectangle {
         property string label: ""
         property string icon: ""
         property real chipHeight: 26
-        property real chipRadius: Theme?.radiusPill ?? 999
-        property int fontSize: Theme?.fontSizeXs ?? 10
+        property real chipRadius: Theme.radiusPill
+        property int fontSize: Theme.fontSizeXs
         property bool fillWidth: false
         property color activeBg: Theme.primary_overlay
-        property color inactiveBg: "transparent"
+        property color inactiveBg: Theme.widgetBg
         property color activeFg: Theme.primary
         property color inactiveFg: Theme.on_surface_variant
         signal clicked()
@@ -534,12 +458,12 @@ Rectangle {
         Layout.preferredHeight: chipHeight
         Layout.preferredWidth: fillWidth ? -1 : (chipRow.implicitWidth + 20)
         radius: chipRadius
-        color: selected ? activeBg : (chipMouse.containsMouse ? Theme.surface_container_high : inactiveBg)
-        border.color: selected ? Theme.primary : (chipMouse.containsMouse ? Theme.outline : (Theme.outline_variant ?? Theme.widgetBorder))
+        color: selected ? activeBg : (chipMouse.containsMouse ? Theme.widgetHover : inactiveBg)
+        border.color: selected ? Theme.primary : (chipMouse.containsMouse ? Theme.alpha(Theme.primary, 0.45) : Theme.widgetBorder)
         border.width: 1
 
-        Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 150 } }
-        Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 150 } }
+        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+        Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
         RowLayout {
             id: chipRow
@@ -547,18 +471,19 @@ Rectangle {
             spacing: 5
 
             Text {
-                visible: chipRoot.icon !== ""
+                visible: chipRoot.icon !== "" && (!Theme.isTextIconSet || chipRoot.label === "")
                 text: chipRoot.icon
-                font.family: Theme?.fontIcon ?? "sans-serif"
+                font.family: Theme.fontIcon
                 font.pixelSize: chipRoot.fontSize
                 color: chipRoot.selected ? chipRoot.activeFg : chipRoot.inactiveFg
             }
 
             Text {
+                visible: chipRoot.label !== ""
                 text: chipRoot.label
-                font.family: Theme?.fontFamily ?? "sans-serif"
+                font.family: Theme.fontFamily
                 font.pixelSize: chipRoot.fontSize
-                font.weight: chipRoot.selected ? Font.DemiBold : Font.Normal
+                font.weight: chipRoot.selected ? Font.Bold : Font.Normal
                 color: chipRoot.selected ? chipRoot.activeFg : chipRoot.inactiveFg
             }
         }
@@ -573,47 +498,57 @@ Rectangle {
     }
 
     component EmptyState: Item {
-                    id: emptyRoot
-                    property string icon: Theme?.iconFolder ?? "󰉋"
-                    property string message: "no wallpapers found"
-                    property bool loading: false
-            
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-            
-                    ColumnLayout {
-                        anchors.centerIn: parent
-                        spacing: 8
-            
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: emptyRoot.loading ? (Theme?.iconRefresh ?? "↺") : emptyRoot.icon
-                            font.family: Theme?.fontIcon ?? "sans-serif"
-                            font.pixelSize: 32
-                            color: emptyRoot.loading ? Theme.primary : Theme.on_surface_disabled
-            
-                            RotationAnimator on rotation {
-                                running: emptyRoot.loading
-                                loops: Animation.Infinite
-                                from: 0
-                                to: 360
-                                duration: 1000
-                            }
-                        }
-            
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: emptyRoot.message
-                            font.family: Theme?.fontFamily ?? "sans-serif"
-                            font.pixelSize: Theme?.fontSizeSm ?? 12
-                            color: Theme.on_surface_variant
-                            horizontalAlignment: Text.AlignHCenter
-                            lineHeight: 1.4
-                        }
+        id: emptyRoot
+        property string icon: Theme.iconFolder
+        property string message: "no wallpapers found"
+        property bool loading: false
+
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+
+        ColumnLayout {
+            anchors.centerIn: parent
+            spacing: 8
+
+            Rectangle {
+                Layout.alignment: Qt.AlignHCenter
+                width: 48
+                height: 48
+                radius: Theme.radiusPill
+                color: Theme.widgetBg
+                border.color: Theme.widgetBorder
+                border.width: 1
+
+                Text {
+                    anchors.centerIn: parent
+                    text: emptyRoot.loading ? Theme.iconRefresh : emptyRoot.icon
+                    font.family: Theme.fontIcon
+                    font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
+                    color: emptyRoot.loading ? Theme.primary : Theme.on_surface_variant
+
+                    RotationAnimator on rotation {
+                        running: emptyRoot.loading && !Theme.isTextIconSet
+                        loops: Animation.Infinite
+                        from: 0
+                        to: 360
+                        duration: 1000
                     }
                 }
+            }
 
-        component WallpaperCard: Rectangle {
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                text: emptyRoot.message
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSm
+                color: Theme.on_surface_variant
+                horizontalAlignment: Text.AlignHCenter
+                lineHeight: 1.4
+            }
+        }
+    }
+
+    component WallpaperCard: Rectangle {
         id: cardRoot
         property string thumbUrl: ""
         property string titleText: ""
@@ -632,12 +567,12 @@ Rectangle {
             anchors.fill: parent
             anchors.margins: 4
             color: Theme.cardBg
-            radius: Theme?.radiusMd ?? 10
+            radius: Theme.radiusMd
             clip: true
             border.color: cardRoot.isSelected ? Theme.primary : (cardMouse.containsMouse ? Theme.primary : Theme.cardBorder)
             border.width: cardRoot.isSelected ? 2 : 1
 
-            Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 150 } }
+            Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
             Image {
                 anchors.fill: parent
@@ -667,9 +602,9 @@ Rectangle {
                 anchors.margins: 8
                 height: 20
                 width: bText.implicitWidth + 12
-                radius: Theme?.radiusPill ?? 999
+                radius: Theme.radiusPill
                 color: Theme.alpha(Theme.surface, 0.82)
-                border.color: Theme.alpha(Theme.outline, 0.25)
+                border.color: Theme.widgetBorder
                 border.width: 1
                 visible: cardRoot.badgeText !== ""
                 z: 2
@@ -677,9 +612,9 @@ Rectangle {
                 Text {
                     id: bText
                     anchors.centerIn: parent
-                    text: cardRoot.badgeText
-                    font.family: Theme?.fontFamily ?? "sans-serif"
-                    font.pixelSize: (Theme?.fontSizeXs ?? 10) - 1
+                    text: cardRoot.badgeText.toLowerCase()
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeXs
                     font.weight: Font.Medium
                     color: Theme.on_surface
                 }
@@ -695,36 +630,36 @@ Rectangle {
                 Rectangle {
                     height: 20
                     width: tText.implicitWidth + 12
-                    radius: Theme?.radiusPill ?? 999
+                    radius: Theme.radiusPill
                     color: cardRoot.tagAccent ? Theme.primary : Theme.alpha(Theme.surface, 0.82)
-                    border.color: cardRoot.tagAccent ? "transparent" : Theme.alpha(Theme.outline, 0.25)
+                    border.color: cardRoot.tagAccent ? "transparent" : Theme.widgetBorder
                     border.width: 1
                     visible: cardRoot.tagText !== ""
 
                     Text {
                         id: tText
                         anchors.centerIn: parent
-                        text: cardRoot.tagText
-                        font.family: Theme?.fontMono ?? "monospace"
-                        font.pixelSize: (Theme?.fontSizeXs ?? 10) - 1
+                        text: cardRoot.tagText.toLowerCase()
+                        font.family: Theme.fontMono
+                        font.pixelSize: Theme.fontSizeXs
                         font.weight: Font.Bold
-                        color: cardRoot.tagAccent ? (Theme.on_primary ?? "#ffffff") : Theme.on_surface_variant
+                        color: cardRoot.tagAccent ? Theme.on_primary : Theme.on_surface_variant
                     }
                 }
 
                 Rectangle {
                     height: 20
                     width: 20
-                    radius: 10
+                    radius: Theme.radiusPill
                     color: Theme.primary
                     visible: cardRoot.isSelected
 
                     Text {
                         anchors.centerIn: parent
-                        text: Theme?.iconCheck ?? "✓"
-                        font.family: Theme?.fontIcon ?? "sans-serif"
-                        font.pixelSize: 10
-                        color: Theme.on_primary ?? "#ffffff"
+                        text: Theme.iconCheck
+                        font.family: Theme.fontIcon
+                        font.pixelSize: Theme.fontSizeXs
+                        color: Theme.on_primary
                     }
                 }
             }
@@ -747,9 +682,9 @@ Rectangle {
 
                 Text {
                     Layout.fillWidth: true
-                    text: cardRoot.titleText !== "" ? cardRoot.titleText : "click to set"
-                    font.family: Theme?.fontFamily ?? "sans-serif"
-                    font.pixelSize: Theme?.fontSizeXs ?? 10
+                    text: (cardRoot.titleText !== "" ? cardRoot.titleText : "click to set").toLowerCase()
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeXs
                     font.weight: Font.Medium
                     color: Theme.on_surface
                     elide: Text.ElideRight
@@ -758,18 +693,18 @@ Rectangle {
                 Rectangle {
                     width: 22
                     height: 22
-                    radius: Theme?.radiusPill ?? 999
+                    radius: Theme.radiusPill
                     color: dlMouse.containsMouse ? Theme.primary : Theme.alpha(Theme.surface, 0.82)
-                    border.color: Theme.alpha(Theme.outline, 0.25)
+                    border.color: Theme.widgetBorder
                     border.width: 1
                     visible: cardRoot.allowDownload
 
                     Text {
                         anchors.centerIn: parent
-                        text: Theme?.iconDownload ?? "󰇚"
-                        font.family: Theme?.fontIcon ?? "sans-serif"
-                        font.pixelSize: 10
-                        color: dlMouse.containsMouse ? (Theme.on_primary ?? "#ffffff") : Theme.on_surface
+                        text: Theme.iconDownload
+                        font.family: Theme.fontIcon
+                        font.pixelSize: Theme.fontSizeXs
+                        color: dlMouse.containsMouse ? Theme.on_primary : Theme.on_surface
                     }
 
                     MouseArea {
@@ -784,30 +719,49 @@ Rectangle {
         }
     }
 
-    // bar pill icon
+    // bar pill content
     Row {
         id: wpRow
         anchors.centerIn: parent
-        spacing: 4
+        spacing: 6
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: Theme?.iconWallpaper ?? "󰸉"
-            font.family: Theme?.fontIcon ?? "sans-serif"
-            font.pixelSize: Theme?.fontSizeMd ?? 14
-            color: popup.open ? Theme.primary : Theme.on_surface
+            text: Theme.iconWallpaper
+            font.family: Theme.fontIcon
+            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+            color: popup.open || wpMouse.containsMouse ? Theme.primary : Theme.on_surface
+
+            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+        }
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !Theme.isVertical && (wpMouse.containsMouse || popup.open)
+            text: "wallpapers"
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSm
+            font.weight: Font.Medium
+            color: Theme.on_surface
         }
     }
 
+    // left click opens browser, right click rolls random wallpaper, middle click toggles dark/light mode
     MouseArea {
         id: wpMouse
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
         cursorShape: Qt.PointingHandCursor
         onClicked: (mouse) => {
             if (mouse.button === Qt.RightButton) {
                 root.rollRandomWallpaper();
+                return;
+            }
+            if (mouse.button === Qt.MiddleButton) {
+                if (WallpaperService?.setMode) {
+                    WallpaperService.setMode(WallpaperService.currentMode === "dark" ? "light" : "dark");
+                }
                 return;
             }
             root.syncAnchor();
@@ -841,33 +795,34 @@ Rectangle {
         id: popup
         screen: root.barScreen
         wantsFocus: true
+        keyboardFocusMode: WlrKeyboardFocus.OnDemand
         cardWidth: 760
         cardHeight: Math.min(600, (popup.screen?.height ?? 800) - 80)
-        targetRelativeX: (root.mapToItem(null, 0, 0)?.x ?? 0) + (root.width / 2)
-        targetRelativeY: (root.mapToItem(null, 0, 0)?.y ?? 0) + (root.height / 2)
+        targetRelativeX: 0
+        targetRelativeY: 0
 
         content: ColumnLayout {
             anchors.fill: parent
-            spacing: 8
+            spacing: Theme.popupSpacing
 
-            // top header: title + status on left, target monitor pills + actions on right
+            // top header
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 8
+                spacing: 10
 
                 Rectangle {
                     width: 34
                     height: 34
-                    radius: Theme?.radiusMd ?? 8
+                    radius: Theme.radiusMd
                     color: Theme.primary_overlay
                     border.color: Theme.alpha(Theme.primary, 0.35)
                     border.width: 1
 
                     Text {
                         anchors.centerIn: parent
-                        text: Theme?.iconWallpaper ?? "󰸉"
-                        font.family: Theme?.fontIcon ?? "sans-serif"
-                        font.pixelSize: Theme?.fontSizeLg ?? 16
+                        text: Theme.iconWallpaper
+                        font.family: Theme.fontIcon
+                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                         color: Theme.primary
                     }
                 }
@@ -877,8 +832,8 @@ Rectangle {
 
                     Text {
                         text: "wallpapers & aesthetics"
-                        font.family: Theme?.fontFamily ?? "sans-serif"
-                        font.pixelSize: Theme?.fontSizeMd ?? 14
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeMd
                         font.weight: Font.Bold
                         color: Theme.on_surface
                     }
@@ -888,24 +843,23 @@ Rectangle {
                             if (root.batchStatusText !== "") return root.batchStatusText;
                             if (root.activeTab === "local") return localView.filteredLocalWps.length + " wallpapers in local gallery";
                             if (root.activeTab === "online") return root.onlineWallpapers.length > 0 ? (root.onlineWallpapers.length + " wallhaven results (page " + root.onlinePage + ")") : "explore wallhaven community gallery";
-                            if (root.activeTab === "live") return root.activeLiveList.length + " animated & video streams";
+                            if (root.activeTab === "live") return root.localLiveWallpapers.length + " local animated & video wallpapers";
                             return "matugen palette, awww transitions & mpvpaper";
                         }
-                        font.family: Theme?.fontFamily ?? "sans-serif"
-                        font.pixelSize: Theme?.fontSizeXs ?? 10
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeXs
                         color: root.batchStatusText !== "" ? Theme.primary : Theme.on_surface_variant
                     }
                 }
 
                 Item { Layout.fillWidth: true }
 
-                // target monitor pills tucked cleanly into the header
                 RowLayout {
                     spacing: 4
                     visible: root.activeTab !== "theme" && (Quickshell?.screens?.length ?? 0) > 1
 
                     Chip {
-                        icon: Theme?.iconWorkspaces ?? "󰍹"
+                        icon: Theme.iconWorkspaces
                         label: "all"
                         selected: (WallpaperService?.targetMonitor ?? "all") === "all"
                         chipHeight: 26
@@ -916,7 +870,7 @@ Rectangle {
                         model: Quickshell?.screens ?? []
                         delegate: Chip {
                             required property var modelData
-                            label: modelData?.name ?? "screen"
+                            label: (modelData?.name ?? "screen").toLowerCase()
                             selected: WallpaperService?.targetMonitor === modelData.name
                             chipHeight: 26
                             onClicked: if (WallpaperService) WallpaperService.targetMonitor = modelData.name
@@ -924,38 +878,36 @@ Rectangle {
                     }
                 }
 
-                // batch download button for online & live tabs
                 Chip {
-                    visible: (root.activeTab === "online" && root.onlineWallpapers.length > 0)
-                        || (root.activeTab === "live" && root.activeLiveList.length > 0)
-                    icon: root.isBatchDownloading ? (Theme?.iconRefresh ?? "↺") : (Theme?.iconDownload ?? "󰇚")
-                    label: root.isBatchDownloading
-                        ? "saving..."
-                        : ("save page (" + (root.activeTab === "online" ? root.onlineWallpapers.length : root.activeLiveList.length) + ")")
+                    visible: root.activeTab === "online" && root.onlineWallpapers.length > 0
+                    icon: root.isBatchDownloading ? Theme.iconRefresh : Theme.iconDownload
+                    label: root.isBatchDownloading ? "saving..." : ("save page (" + root.onlineWallpapers.length + ")")
                     chipHeight: 28
                     selected: root.isBatchDownloading
                     onClicked: root.downloadCurrentSection()
                 }
 
                 IconButton {
-                    icon: Theme?.iconShuffle ?? "󰒝"
+                    icon: Theme.iconShuffle
+                    iconSize: Theme.fontSizeSm
                     tooltip: "roll random wallpaper"
                     onClicked: root.rollRandomWallpaper()
                 }
 
                 IconButton {
-                    icon: Theme?.iconRefresh ?? "↺"
-                    tooltip: "refresh current tab"
+                    icon: Theme.iconRefresh
+                    iconSize: Theme.fontSizeSm
+                    tooltip: "rescan / refresh current tab"
                     onClicked: {
-                        if (root.activeTab === "local") reloadLocalWallpapers();
+                        if (root.activeTab === "local" || root.activeTab === "live") reloadLocalWallpapers();
                         else if (root.activeTab === "online") fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
-                        else if (root.activeTab === "live") fetchLiveWallpapers(root.liveSearchQuery);
                         else if (WallpaperService?.reapplyTheme) WallpaperService.reapplyTheme();
                     }
                 }
 
                 IconButton {
-                    icon: Theme?.iconClose ?? "✕"
+                    icon: Theme.iconClose
+                    iconSize: Theme.fontSizeSm
                     tooltip: "close panel"
                     onClicked: popup.open = false
                 }
@@ -964,58 +916,59 @@ Rectangle {
             // segmented tab bar
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 36
-                radius: Theme?.radiusPill ?? 999
-                color: Theme.surface_container_lowest
-                border.color: Theme.outline_variant ?? Theme.widgetBorder
+                Layout.preferredHeight: 38
+                radius: Theme.radiusMd
+                color: Theme.cardBg
+                border.color: Theme.cardBorder
                 border.width: 1
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.margins: 3
-                    spacing: 3
+                    anchors.margins: 4
+                    spacing: 4
 
                     Repeater {
                         model: [
-                            { id: "local", label: "local gallery", icon: Theme?.iconFolder ?? "󰉋" },
-                            { id: "online", label: "wallhaven", icon: Theme?.iconGlobe ?? "󰖟" },
-                            { id: "live", label: "live / video", icon: Theme?.iconFlame ?? "󰈸" },
-                            { id: "theme", label: "effects & theme", icon: Theme?.iconPalette ?? "󰏘" }
+                            { id: "local", label: "local gallery", icon: Theme.iconFolder },
+                            { id: "online", label: "wallhaven", icon: Theme.iconGlobe },
+                            { id: "live", label: "live / video", icon: Theme.iconFlame },
+                            { id: "theme", label: "effects & theme", icon: Theme.iconPalette }
                         ]
 
                         delegate: Rectangle {
                             required property var modelData
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            radius: Theme?.radiusPill ?? 999
+                            radius: Theme.radiusPill
 
                             readonly property bool isSelected: root.activeTab === modelData.id
 
                             color: isSelected
-                                ? (Theme.surface_container_high ?? Theme.primary_container)
-                                : (tabMouse.containsMouse ? Theme.surface_container_low : "transparent")
-                            border.color: isSelected ? (Theme.outline_variant ?? Theme.primary) : "transparent"
+                                ? Theme.primary_overlay
+                                : (tabMouse.containsMouse ? Theme.widgetHover : "transparent")
+                            border.color: isSelected ? Theme.primary : "transparent"
                             border.width: isSelected ? 1 : 0
 
-                            Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 150 } }
+                            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                             RowLayout {
                                 anchors.centerIn: parent
                                 spacing: 6
 
                                 Text {
+                                    visible: !Theme.isTextIconSet
                                     text: modelData.icon
-                                    font.family: Theme?.fontIcon ?? "sans-serif"
-                                    font.pixelSize: Theme?.fontSizeSm ?? 12
+                                    font.family: Theme.fontIcon
+                                    font.pixelSize: Theme.fontSizeSm
                                     color: isSelected ? Theme.primary : Theme.on_surface_variant
                                 }
 
                                 Text {
                                     text: modelData.label
-                                    font.family: Theme?.fontFamily ?? "sans-serif"
-                                    font.pixelSize: Theme?.fontSizeSm ?? 11
-                                    font.weight: isSelected ? Font.DemiBold : Font.Medium
-                                    color: isSelected ? Theme.on_surface : Theme.on_surface_variant
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSm
+                                    font.weight: isSelected ? Font.Bold : Font.Medium
+                                    color: isSelected ? Theme.primary : Theme.on_surface_variant
                                 }
                             }
 
@@ -1028,7 +981,6 @@ Rectangle {
                                     root.activeTab = modelData.id;
                                     if (modelData.id === "local") reloadLocalWallpapers();
                                     else if (modelData.id === "online" && root.onlineWallpapers.length === 0) fetchWallhaven(root.onlineQuery, root.onlineSorting, root.onlinePage, root.onlineResolution);
-                                    else if (modelData.id === "live" && root.onlineLiveWallpapers.length === 0) fetchLiveWallpapers(root.liveSearchQuery);
                                 }
                             }
                         }
@@ -1089,7 +1041,6 @@ Rectangle {
                     return result;
                 }
 
-                // row 1: search input with inline match badge + random from filter button
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -1103,7 +1054,7 @@ Rectangle {
                     }
 
                     Chip {
-                        icon: Theme?.iconShuffle ?? "󰒝"
+                        icon: Theme.iconShuffle
                         label: "random here"
                         chipHeight: 36
                         inactiveBg: Theme.cardBg
@@ -1111,7 +1062,6 @@ Rectangle {
                     }
                 }
 
-                // row 2: unified category + subfolder strip in one horizontal flickable
                 Flickable {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 28
@@ -1128,7 +1078,7 @@ Rectangle {
                             model: localView.uniqueParentCategories
                             delegate: Chip {
                                 required property string modelData
-                                label: modelData
+                                label: modelData.toLowerCase()
                                 selected: root.localCategoryFilter === modelData
                                 chipHeight: 26
                                 onClicked: {
@@ -1144,14 +1094,14 @@ Rectangle {
                             Layout.preferredHeight: 16
                             Layout.leftMargin: 4
                             Layout.rightMargin: 4
-                            color: Theme.outline_variant ?? Theme.widgetBorder
+                            color: Theme.widgetBorder
                         }
 
                         Text {
-                            visible: localView.uniqueSubCategories.length > 0
-                            text: Theme?.iconFolder ?? "󰉋"
-                            font.family: Theme?.fontIcon ?? "sans-serif"
-                            font.pixelSize: Theme?.fontSizeXs ?? 10
+                            visible: localView.uniqueSubCategories.length > 0 && !Theme.isTextIconSet
+                            text: Theme.iconFolder
+                            font.family: Theme.fontIcon
+                            font.pixelSize: Theme.fontSizeXs
                             color: Theme.primary
                         }
 
@@ -1159,7 +1109,7 @@ Rectangle {
                             model: localView.uniqueSubCategories
                             delegate: Chip {
                                 required property string modelData
-                                label: modelData
+                                label: modelData.toLowerCase()
                                 selected: root.localSubCategoryFilter === modelData
                                 chipHeight: 26
                                 onClicked: root.localSubCategoryFilter = modelData
@@ -1191,7 +1141,7 @@ Rectangle {
                         thumbUrl: modelData?.thumb || modelData?.path || ""
                         titleText: modelData?.name ?? ""
                         badgeText: modelData?.category === "root" ? "" : (modelData?.category ?? "")
-                        tagText: modelData?.isVideo ? "LIVE" : (modelData?.isGif ? "GIF" : (modelData?.ext ?? "").toUpperCase())
+                        tagText: modelData?.isVideo ? "live" : (modelData?.isGif ? "gif" : (modelData?.ext ?? ""))
                         tagAccent: Boolean(modelData?.isLive || modelData?.isVideo)
                         isSelected: modelData?.path === WallpaperService?.currentWallpaperPath
                         onApplyRequested: if (WallpaperService?.applyLocalWallpaper) WallpaperService.applyLocalWallpaper(modelData?.path)
@@ -1200,7 +1150,7 @@ Rectangle {
 
                 EmptyState {
                     visible: localView.filteredLocalWps.length === 0
-                    icon: Theme?.iconFolder ?? "󰉋"
+                    icon: Theme.iconFolder
                     message: "no wallpapers found\ntry adjusting your category or search filter"
                 }
             }
@@ -1229,7 +1179,7 @@ Rectangle {
                         Layout.fillWidth: false
                         Layout.preferredWidth: 165
                         text: root.onlineResolution
-                        icon: Theme?.iconWorkspaces ?? "󰍹"
+                        icon: Theme.iconWorkspaces
                         placeholder: "any (" + root.nativeRes + ")"
                         monoFont: true
                         onSubmitted: (val) => fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, val)
@@ -1272,9 +1222,8 @@ Rectangle {
 
                     Item { Layout.fillWidth: true }
 
-                    // compact pagination controls using Theme chevron icons
                     Chip {
-                        icon: Theme?.iconChevronLeft ?? "<"
+                        icon: Theme.iconChevronLeft
                         chipHeight: 26
                         opacity: root.onlinePage > 1 ? 1.0 : 0.4
                         onClicked: {
@@ -1287,8 +1236,8 @@ Rectangle {
                     Rectangle {
                         Layout.preferredHeight: 26
                         Layout.preferredWidth: pageText.implicitWidth + 18
-                        radius: Theme?.radiusPill ?? 999
-                        color: Theme.surface_container_high
+                        radius: Theme.radiusPill
+                        color: Theme.widgetBg
                         border.color: Theme.widgetBorder
                         border.width: 1
 
@@ -1296,15 +1245,15 @@ Rectangle {
                             id: pageText
                             anchors.centerIn: parent
                             text: "page " + root.onlinePage
-                            font.family: Theme?.fontMono ?? "monospace"
-                            font.pixelSize: Theme?.fontSizeXs ?? 10
+                            font.family: Theme.fontMono
+                            font.pixelSize: Theme.fontSizeXs
                             font.weight: Font.Bold
                             color: Theme.primary
                         }
                     }
 
                     Chip {
-                        icon: Theme?.iconChevronRight ?? ">"
+                        icon: Theme.iconChevronRight
                         chipHeight: 26
                         onClicked: {
                             if (!root.isOnlineLoading) {
@@ -1338,7 +1287,7 @@ Rectangle {
                         titleText: modelData?.id ?? ""
                         badgeText: modelData?.resolution ?? ""
                         tagText: modelData?.fileType ?? ""
-                        tagAccent: modelData?.fileType === "PNG"
+                        tagAccent: modelData?.fileType === "png"
                         allowDownload: true
                         onApplyRequested: if (WallpaperService?.setWallpaper) WallpaperService.setWallpaper(modelData.fullUrl)
                         onDownloadRequested: root.downloadUrls([modelData.fullUrl])
@@ -1348,7 +1297,7 @@ Rectangle {
                 EmptyState {
                     visible: root.isOnlineLoading || root.onlineWallpapers.length === 0
                     loading: root.isOnlineLoading
-                    icon: Theme?.iconGlobe ?? "󰖟"
+                    icon: Theme.iconGlobe
                     message: root.isOnlineLoading
                         ? ("fetching " + (root.onlineSorting === "date_added" ? "latest" : root.onlineSorting) + (root.onlineResolution ? (" " + root.onlineResolution) : "") + " wallpapers...")
                         : "no wallpapers found\ntry adjusting your search query or resolution"
@@ -1367,28 +1316,10 @@ Rectangle {
                     Layout.fillWidth: true
                     spacing: 8
 
-                    Chip {
-                        label: "local (" + root.localLiveWallpapers.length + ")"
-                        icon: Theme?.iconFolder ?? "󰉋"
-                        selected: root.liveSubTab === "local"
-                        chipHeight: 36
-                        onClicked: root.liveSubTab = "local"
-                    }
-
-                    Chip {
-                        label: "streams (" + root.onlineLiveWallpapers.length + ")"
-                        icon: Theme?.iconGlobe ?? "󰖟"
-                        selected: root.liveSubTab === "online"
-                        chipHeight: 36
-                        onClicked: {
-                            root.liveSubTab = "online";
-                            if (root.onlineLiveWallpapers.length === 0) fetchLiveWallpapers(root.liveSearchQuery);
-                        }
-                    }
-
                     SearchField {
                         id: liveUrlField
-                        icon: Theme?.iconFlame ?? "󰈸"
+                        icon: Theme.iconFlame
+                        badgeText: root.localLiveWallpapers.length + " local"
                         placeholder: "paste video url or local path (.mp4, .webm, .gif)..."
                         onSubmitted: (val) => {
                             if (val.trim() !== "" && WallpaperService?.setWallpaper) {
@@ -1398,7 +1329,8 @@ Rectangle {
                     }
 
                     IconButton {
-                        icon: Theme?.iconClipboard ?? "󰅌"
+                        icon: Theme.iconClipboard
+                        iconSize: Theme.fontSizeSm
                         tooltip: "paste from clipboard"
                         onClicked: {
                             let clip = Quickshell?.clipboardText ? Quickshell.clipboardText.trim() : "";
@@ -1407,7 +1339,7 @@ Rectangle {
                     }
 
                     Chip {
-                        icon: Theme?.iconCheck ?? "✓"
+                        icon: Theme.iconCheck
                         label: "apply"
                         chipHeight: 36
                         selected: liveUrlField.text.trim() !== ""
@@ -1427,8 +1359,8 @@ Rectangle {
                     boundsBehavior: Flickable.StopAtBounds
                     cellWidth: width / 3
                     cellHeight: cellWidth * 0.65
-                    model: root.activeLiveList
-                    visible: root.activeLiveList.length > 0
+                    model: root.localLiveWallpapers
+                    visible: root.localLiveWallpapers.length > 0
 
                     WheelHandler {
                         orientation: Qt.Vertical
@@ -1441,33 +1373,27 @@ Rectangle {
                         width: liveGrid.cellWidth
                         height: liveGrid.cellHeight
                         thumbUrl: modelData?.thumb || targetPath
-                        titleText: modelData?.name || modelData?.title || "live wallpaper"
-                        badgeText: modelData?.isVideo ? "VIDEO" : (modelData?.isGif ? "GIF" : "STREAM")
-                        tagText: (modelData?.ext ?? "LIVE").toUpperCase()
+                        titleText: modelData?.name || "live wallpaper"
+                        badgeText: modelData?.isVideo ? "video" : "gif"
+                        tagText: modelData?.ext || "live"
                         tagAccent: true
-                        allowDownload: root.liveSubTab === "online" && (targetPath.startsWith("http://") || targetPath.startsWith("https://"))
                         isSelected: targetPath !== "" && targetPath === WallpaperService?.currentWallpaperPath
                         onApplyRequested: {
-                            if (root.liveSubTab === "local" && WallpaperService?.applyLocalWallpaper) {
+                            if (WallpaperService?.applyLocalWallpaper) {
                                 WallpaperService.applyLocalWallpaper(targetPath);
-                            } else if (WallpaperService?.setWallpaper) {
-                                WallpaperService.setWallpaper(targetPath);
                             }
                         }
-                        onDownloadRequested: root.downloadUrls([targetPath])
                     }
                 }
 
                 EmptyState {
-                    visible: root.activeLiveList.length === 0
-                    icon: Theme?.iconFlame ?? "󰈸"
-                    message: root.liveSubTab === "local"
-                        ? "no local animated wallpapers found\ndrop .mp4, .webm, or .gif files into ~/.wallpapers"
-                        : "no online live streams loaded"
+                    visible: root.localLiveWallpapers.length === 0
+                    icon: Theme.iconFlame
+                    message: "no local animated wallpapers found\ndrop .mp4, .webm, or .gif files into ~/.wallpapers"
                 }
             }
 
-            // effects & theme tab organized into clean bento cards
+            // effects & theme tab
             Flickable {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -1485,12 +1411,11 @@ Rectangle {
                 ColumnLayout {
                     id: themeCol
                     width: parent.width - 4
-                    spacing: 10
+                    spacing: Theme.popupSpacing
 
-                    // 1. Matugen color extraction & scheme card
                     SettingCard {
                         title: "matugen color palette"
-                        icon: Theme?.iconPalette ?? "󰏘"
+                        icon: Theme.iconPalette
                         badge: (WallpaperService?.currentMode ?? "dark") + " • " + (WallpaperService?.currentSchemeType ?? "scheme-tonal-spot").replace("scheme-", "")
 
                         RowLayout {
@@ -1498,7 +1423,7 @@ Rectangle {
                             spacing: 8
 
                             Chip {
-                                icon: Theme?.iconMoon ?? "󰖔"
+                                icon: Theme.iconMoon
                                 label: "dark mode"
                                 selected: WallpaperService?.currentMode === "dark"
                                 fillWidth: true
@@ -1507,7 +1432,7 @@ Rectangle {
                             }
 
                             Chip {
-                                icon: Theme?.iconSun ?? "󰖙"
+                                icon: Theme.iconSun
                                 label: "light mode"
                                 selected: WallpaperService?.currentMode === "light"
                                 fillWidth: true
@@ -1558,7 +1483,7 @@ Rectangle {
                             Rectangle {
                                 Layout.preferredWidth: 32
                                 Layout.preferredHeight: 32
-                                radius: 16
+                                radius: Theme.radiusPill
                                 color: {
                                     let h = hexField.text.trim();
                                     return (h.startsWith("#") && (h.length === 7 || h.length === 9)) ? h : Theme.primary;
@@ -1572,8 +1497,8 @@ Rectangle {
                                 Layout.preferredWidth: 150
                                 Layout.fillWidth: false
                                 Layout.preferredHeight: 32
-                                icon: Theme?.iconSparkles ?? "✦"
-                                text: Theme?.source_color || "#a8c8ff"
+                                icon: Theme.iconSparkles
+                                text: String(Theme.source_color || "#a8c8ff")
                                 placeholder: "#rrggbb"
                                 monoFont: true
                                 onSubmitted: (val) => {
@@ -1611,9 +1536,9 @@ Rectangle {
                                         required property string modelData
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 24
-                                        radius: Theme?.radiusPill ?? 999
+                                        radius: Theme.radiusPill
                                         color: modelData
-                                        border.color: hexField.text === modelData ? Theme.on_surface : Theme.alpha(Theme.outline, 0.3)
+                                        border.color: hexField.text === modelData ? Theme.on_surface : Theme.widgetBorder
                                         border.width: hexField.text === modelData ? 2 : 1
 
                                         MouseArea {
@@ -1630,10 +1555,9 @@ Rectangle {
                         }
                     }
 
-                    // 2. Awww transition & scaling engine card
                     SettingCard {
                         title: "awww transition engine"
-                        icon: Theme?.iconFlame ?? "󰈸"
+                        icon: Theme.iconFlame
                         badge: (Settings?.awwwTransitionType ?? "fade") + " • " + (Settings?.awwwTransitionFps ?? 60) + " fps"
 
                         RowLayout {
@@ -1734,7 +1658,6 @@ Rectangle {
                             }
                         }
 
-                        // contextual row for wipe/wave angle
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
@@ -1774,7 +1697,6 @@ Rectangle {
                             }
                         }
 
-                        // contextual row for grow/outer circle origin
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
@@ -1841,10 +1763,9 @@ Rectangle {
                         }
                     }
 
-                    // 3. Mpvpaper live video engine card (side-by-side compact layout)
                     SettingCard {
                         title: "mpvpaper live video engine"
-                        icon: Theme?.iconPlay ?? "▶"
+                        icon: Theme.iconPlay
                         badge: (Settings?.mpvAudio ?? false) ? "audio on" : "muted"
 
                         RowLayout {
@@ -1897,7 +1818,7 @@ Rectangle {
                                     spacing: 6
 
                                     Chip {
-                                        icon: Theme?.iconVolMute ?? "󰝟"
+                                        icon: Theme.iconVolMute
                                         label: "mute"
                                         selected: !(Settings?.mpvAudio ?? false)
                                         fillWidth: true
@@ -1912,7 +1833,7 @@ Rectangle {
                                     }
 
                                     Chip {
-                                        icon: Theme?.iconVolHigh ?? "󰕾"
+                                        icon: Theme.iconVolHigh
                                         label: "ambient sound"
                                         selected: Settings?.mpvAudio ?? false
                                         fillWidth: true
