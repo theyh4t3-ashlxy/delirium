@@ -59,4 +59,5 @@ KeybindsPreview          widgets/KeybindsPreview.qml
 WelcomeWizard            widgets/WelcomeWizard.qml
 ScreenCapture            widgets/ScreenCapture.qml
 DynamicNotch             widgets/DynamicNotch.qml
+PolkitDialog             widgets/PolkitDialog.qml
 

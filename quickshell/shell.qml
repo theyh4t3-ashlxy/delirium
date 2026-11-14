@@ -55,6 +55,11 @@ ShellRoot {
         id: globalLockScreen
     }
 
+    // native polkit authentication agent dialog
+    PolkitDialog {
+        id: globalPolkitDialog
+    }
+
     // notifications IPC: route alerts to dbus or nuke them into the void
     IpcHandler {
         target: "notifs"
