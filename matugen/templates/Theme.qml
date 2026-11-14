@@ -13,6 +13,7 @@ Singleton {
         path: (Quickshell.env("XDG_CONFIG_HOME") || ((Quickshell.env("HOME") || "") + "/.config")) + "/quickshell/palette.css"
         watchChanges: true
         printErrors: false
+        onFileChanged: reload()
     }
 
     // ticking time bomb so the widgets know when to panic
@@ -21,26 +22,34 @@ Singleton {
         precision: SystemClock.Minutes
     }
 
-    // squinting at the wallpaper to guess how obnoxious the colors are
-    ColorQuantizer {
-        id: wpQuantizer
-        depth: 2
-        source: {
-            let wp = cfg?.currentWallpaper ?? "";
-            if (!wp) return "";
-            if (wp.startsWith("/") || wp.startsWith("~")) {
-                let p = wp.startsWith("~") ? ((Quickshell.env("HOME") || "") + wp.slice(1)) : wp;
-                return "file://" + p;
-            }
-            return wp;
+    readonly property string resolvedWpFileUrl: {
+        let wp = (cfg?.currentWallpaper ?? "").trim();
+        if (!wp || wp.startsWith("http://") || wp.startsWith("https://")) return "";
+        if (wp.startsWith("file://")) return wp;
+        if (wp.startsWith("/") || wp.startsWith("~")) {
+            let p = wp.startsWith("~") ? ((Quickshell.env("HOME") || "") + wp.slice(1)) : wp;
+            return "file://" + p;
+        }
+        return "";
+    }
+
+    // guarded inside a Loader so empty paths don't spam QFSFileEngine warnings
+    Loader {
+        id: wpQuantizerLoader
+        active: root.resolvedWpFileUrl !== ""
+        sourceComponent: ColorQuantizer {
+            depth: 2
+            rescaleSize: 64
+            source: root.resolvedWpFileUrl
         }
     }
 
     readonly property real wallpaperVibrancy: {
-        if (!wpQuantizer.colors || wpQuantizer.colors.length === 0) return 0.5;
+        let qColors = wpQuantizerLoader.item?.colors;
+        if (!qColors || qColors.length === 0) return 0.5;
         let maxSat = 0.0;
-        for (let i = 0; i < wpQuantizer.colors.length; i++) {
-            let c = wpQuantizer.colors[i];
+        for (let i = 0; i < qColors.length; i++) {
+            let c = qColors[i];
             if (!c) continue;
             let r = c.r, g = c.g, b = c.b;
             let mx = Math.max(r, g, b);
@@ -113,6 +122,10 @@ Singleton {
     readonly property color inverse_primary:           "{{colors.inverse_primary.default.hex}}"
     readonly property color source_color:              "{{colors.source_color.default.hex}}"
 
+    // automatic light mode detection via surface luminance or explicit Settings flag
+    readonly property real surfaceLuminance: (0.2126 * surface.r) + (0.7152 * surface.g) + (0.0722 * surface.b)
+    readonly property bool isLightMode: Boolean(cfg?.lightMode || cfg?.isLight || cfg?.themeMode === "light" || surfaceLuminance > 0.5)
+
     /*
     math black magic so the engine doesn't combust,
     upgraded to approximate linear color space so gradients don't look like dishwater
@@ -130,7 +143,6 @@ Singleton {
         let f = (typeof t !== "number" || isNaN(t)) ? 0.0 : Math.max(0.0, Math.min(1.0, t));
         let inv = 1.0 - f;
 
-        // squaring the channels so the middle of the gradient doesn't turn into wet concrete
         return Qt.rgba(
             Math.sqrt((c1.r * c1.r * inv) + (c2.r * c2.r * f)),
             Math.sqrt((c1.g * c1.g * inv) + (c2.g * c2.g * f)),
@@ -165,10 +177,6 @@ Singleton {
         return on_surface;
     }
 
-    /*
-    centralized icon detective so we stop copy-pasting the same 45-line
-    for-loop into every single widget like cavemen
-    */
     function resolveAppIcon(winClass: string): string {
         if (!winClass) return "";
         let base = winClass.trim().toLowerCase();
@@ -216,7 +224,6 @@ Singleton {
         return "";
     }
 
-    // radioactive state tints and depression overlays
     readonly property color primary_overlay:        alpha(primary, 0.18)
     readonly property color secondary_overlay:      alpha(secondary, 0.18)
     readonly property color tertiary_overlay:       alpha(tertiary, 0.18)
@@ -226,7 +233,6 @@ Singleton {
     readonly property color on_warn_container:      on_tertiary_container
     readonly property color warn_overlay:           tertiary_overlay
 
-    // google's sacred opacity percentages for button pokes
     function stateHover(baseColor: color, contentColor: color): color {
         return blend(baseColor, (contentColor !== undefined && contentColor !== "" ? contentColor : on_surface), 0.08);
     }
@@ -242,16 +248,14 @@ Singleton {
 
     readonly property color on_surface_disabled:    alpha(on_surface, 0.38)
     readonly property color outline_disabled:       alpha(outline, 0.12)
-    readonly property color fontStrokeColor:        "#000000"
-    readonly property color textStroke:             "#000000"
-    readonly property color textShadow:             "#000000"
+    readonly property color fontStrokeColor:        isLightMode ? "#ffffff" : "#000000"
+    readonly property color textStroke:             isLightMode ? "#ffffff" : "#000000"
+    readonly property color textShadow:             isLightMode ? alpha(shadow, 0.25) : "#000000"
 
-    // font witchcraft and pixel size guesswork
     readonly property string fontSans:              cfg?.fontSans ?? cfg?.fontFamily ?? "Noto Sans"
     readonly property string fontMono:              cfg?.fontMono ?? "JetBrainsMono Nerd Font"
     readonly property string fontDisplay:           cfg?.fontDisplay ?? fontSans
 
-    // font fallback pile so glyphs dont turn into tofu rectangles
     readonly property var    fontFamiliesVibe:      [fontSans, "Noto Sans", "Noto Sans CJK JP"]
     readonly property string fontVibe:              fontSans
     readonly property string fontFamily:            fontSans
@@ -270,7 +274,6 @@ Singleton {
     readonly property int    fontSizeXl:            Math.round(18 * fontScale)
     readonly property int    fontSizeTitle:         Math.round(22 * fontScale)
 
-    // translation layer between random strings and qt font weight deities
     function getFontWeight(weight: string): int {
         if (!weight || typeof weight !== "string") return Font.Normal;
         let w = weight.toLowerCase().trim();
@@ -284,7 +287,6 @@ Singleton {
         return map[w] ?? Font.Normal;
     }
 
-    // rounding corners until my screen turns into an oval pebble
     readonly property int    widgetRadius:          cfg?.widgetRadius ?? 6
     readonly property int    popupRadius:           cfg?.popupRadius ?? 8
     readonly property int    radiusXs:              4
@@ -337,46 +339,49 @@ Singleton {
     readonly property bool   isMonochrome:          barStyle === "monochrome"
     readonly property bool   isTextIconSet:         iconSet === "kaomoji" || iconSet === "text"
 
-    // color casino determining which glass shader liquefies your gpu today
+    // light- and dark-mode aware style resolver so glass & borders look crisp in both modes
     function getStyleColor(role: string, bs: string): color {
+        let lightGlassBorder = alpha(outline_variant, 0.52);
+        let lightFrostBorder = alpha(outline_variant, 0.65);
+
         switch (role) {
             case "barBg":
                 if (bs === "regular") return alpha(surface_container_low, 0.95);
-                if (bs === "pure-black") return "#000000";
-                if (bs === "glass") return alpha(surface_container_lowest, Math.min(1.0, 0.40 + adaptiveAlphaBoost));
-                if (bs === "glass-frost") return alpha(surface_container_lowest, Math.min(1.0, 0.55 + adaptiveAlphaBoost));
-                if (bs === "cyber-neon") return alpha("#050508", 0.94);
+                if (bs === "pure-black") return isLightMode ? "#ffffff" : "#000000";
+                if (bs === "glass") return alpha(surface_container_lowest, Math.min(1.0, (isLightMode ? 0.68 : 0.40) + adaptiveAlphaBoost));
+                if (bs === "glass-frost") return alpha(surface_container_lowest, Math.min(1.0, (isLightMode ? 0.78 : 0.55) + adaptiveAlphaBoost));
+                if (bs === "cyber-neon") return isLightMode ? alpha(surface_container_lowest, 0.94) : alpha("#050508", 0.94);
                 if (bs === "bento-floating") return alpha(surface_container_low, Math.min(1.0, 0.88 + adaptiveAlphaBoost));
-                if (bs === "translucent") return alpha(surface_container_low, Math.min(1.0, 0.70 + adaptiveAlphaBoost));
+                if (bs === "translucent") return alpha(surface_container_low, Math.min(1.0, (isLightMode ? 0.80 : 0.70) + adaptiveAlphaBoost));
                 if (bs === "accent-glow") return alpha(surface_container_lowest, 0.90);
                 if (bs === "monochrome") return surface_container_highest;
                 return surface_container_low;
             case "barBorderColor":
                 if (bs === "regular") return alpha(outline_variant, 0.40);
-                if (bs === "pure-black") return "#1f1f1f";
-                if (bs === "glass") return Qt.rgba(1, 1, 1, 0.16);
-                if (bs === "glass-frost") return Qt.rgba(1, 1, 1, 0.24);
+                if (bs === "pure-black") return isLightMode ? "#e0e0e0" : "#1f1f1f";
+                if (bs === "glass") return isLightMode ? lightGlassBorder : Qt.rgba(1, 1, 1, 0.16);
+                if (bs === "glass-frost") return isLightMode ? lightFrostBorder : Qt.rgba(1, 1, 1, 0.24);
                 if (bs === "cyber-neon") return primary;
                 if (bs === "bento-floating") return alpha(outline_variant, 0.45);
                 if (bs === "accent-glow") return primary;
                 if (bs === "translucent") return alpha(outline_variant, 0.35);
                 return alpha(outline_variant, 0.50);
             case "widgetBg":
-                if (bs === "regular") return alpha(surface_container_high, 0.60);
-                if (bs === "pure-black") return "#0a0a0a";
-                if (bs === "glass") return alpha(surface_container_high, 0.28);
-                if (bs === "glass-frost") return alpha(surface_container_high, 0.38);
+                if (bs === "regular") return alpha(surface_container_high, isLightMode ? 0.75 : 0.60);
+                if (bs === "pure-black") return isLightMode ? "#f2f2f2" : "#0a0a0a";
+                if (bs === "glass") return alpha(surface_container_high, isLightMode ? 0.55 : 0.28);
+                if (bs === "glass-frost") return alpha(surface_container_high, isLightMode ? 0.68 : 0.38);
                 if (bs === "cyber-neon") return alpha(surface_container_lowest, 0.85);
-                if (bs === "bento-floating") return alpha(surface_container_high, 0.50);
-                if (bs === "translucent") return alpha(surface_container_high, 0.40);
+                if (bs === "bento-floating") return alpha(surface_container_high, isLightMode ? 0.65 : 0.50);
+                if (bs === "translucent") return alpha(surface_container_high, isLightMode ? 0.58 : 0.40);
                 if (bs === "accent-glow") return alpha(primary_container, 0.65);
                 if (bs === "monochrome") return surface_container_high;
                 return surface_container_low;
             case "widgetHover":
                 if (bs === "regular") return alpha(surface_container_highest, 0.85);
-                if (bs === "pure-black") return "#181818";
-                if (bs === "glass") return alpha(surface_container_highest, 0.48);
-                if (bs === "glass-frost") return alpha(surface_container_highest, 0.60);
+                if (bs === "pure-black") return isLightMode ? "#e6e6e6" : "#181818";
+                if (bs === "glass") return alpha(surface_container_highest, isLightMode ? 0.72 : 0.48);
+                if (bs === "glass-frost") return alpha(surface_container_highest, isLightMode ? 0.82 : 0.60);
                 if (bs === "cyber-neon") return alpha(primary_container, 0.50);
                 if (bs === "bento-floating") return alpha(surface_container_highest, 0.70);
                 if (bs === "translucent") return alpha(surface_container_highest, 0.65);
@@ -385,9 +390,9 @@ Singleton {
                 return surface_container_highest;
             case "widgetActive":
                 if (bs === "regular") return alpha(primary_container, 0.90);
-                if (bs === "pure-black") return "#242424";
-                if (bs === "glass") return alpha(surface_container_highest, 0.65);
-                if (bs === "glass-frost") return alpha(surface_container_highest, 0.80);
+                if (bs === "pure-black") return isLightMode ? "#d9d9d9" : "#242424";
+                if (bs === "glass") return alpha(surface_container_highest, isLightMode ? 0.85 : 0.65);
+                if (bs === "glass-frost") return alpha(surface_container_highest, isLightMode ? 0.90 : 0.80);
                 if (bs === "cyber-neon") return alpha(primary, 0.45);
                 if (bs === "bento-floating") return alpha(surface_container_highest, 0.90);
                 if (bs === "translucent") return alpha(surface_container_highest, 0.85);
@@ -396,9 +401,9 @@ Singleton {
                 return surface_container_highest;
             case "widgetBorder":
                 if (bs === "regular") return alpha(outline_variant, 0.40);
-                if (bs === "pure-black") return "#1f1f1f";
-                if (bs === "glass") return Qt.rgba(1, 1, 1, 0.12);
-                if (bs === "glass-frost") return Qt.rgba(1, 1, 1, 0.20);
+                if (bs === "pure-black") return isLightMode ? "#dcdcdc" : "#1f1f1f";
+                if (bs === "glass") return isLightMode ? lightGlassBorder : Qt.rgba(1, 1, 1, 0.12);
+                if (bs === "glass-frost") return isLightMode ? lightFrostBorder : Qt.rgba(1, 1, 1, 0.20);
                 if (bs === "cyber-neon") return alpha(primary, 0.60);
                 if (bs === "bento-floating") return alpha(outline_variant, 0.40);
                 if (bs === "translucent") return alpha(outline_variant, 0.35);
@@ -407,20 +412,20 @@ Singleton {
                 return alpha(outline_variant, 0.50);
             case "popupBg":
                 if (bs === "regular") return alpha(surface_container_low, 0.96);
-                if (bs === "pure-black") return "#000000";
-                if (bs === "glass") return alpha(surface_container_lowest, Math.min(1.0, 0.60 + adaptiveAlphaBoost));
-                if (bs === "glass-frost") return alpha(surface_container_lowest, Math.min(1.0, 0.75 + adaptiveAlphaBoost));
-                if (bs === "cyber-neon") return alpha("#07070b", 0.96);
+                if (bs === "pure-black") return isLightMode ? "#ffffff" : "#000000";
+                if (bs === "glass") return alpha(surface_container_lowest, Math.min(1.0, (isLightMode ? 0.86 : 0.60) + adaptiveAlphaBoost));
+                if (bs === "glass-frost") return alpha(surface_container_lowest, Math.min(1.0, (isLightMode ? 0.92 : 0.75) + adaptiveAlphaBoost));
+                if (bs === "cyber-neon") return isLightMode ? alpha(surface_container_lowest, 0.96) : alpha("#07070b", 0.96);
                 if (bs === "bento-floating") return alpha(surface_container_low, Math.min(1.0, 0.92 + adaptiveAlphaBoost));
-                if (bs === "translucent") return alpha(surface_container_low, Math.min(1.0, 0.80 + adaptiveAlphaBoost));
+                if (bs === "translucent") return alpha(surface_container_low, Math.min(1.0, (isLightMode ? 0.88 : 0.80) + adaptiveAlphaBoost));
                 if (bs === "accent-glow") return alpha(surface_container_lowest, 0.95);
                 if (bs === "monochrome") return surface_container_low;
                 return surface_container_low;
             case "popupBorderColor":
                 if (bs === "regular") return alpha(outline_variant, 0.45);
-                if (bs === "pure-black") return "#1f1f1f";
-                if (bs === "glass") return Qt.rgba(1, 1, 1, 0.18);
-                if (bs === "glass-frost") return Qt.rgba(1, 1, 1, 0.26);
+                if (bs === "pure-black") return isLightMode ? "#dcdcdc" : "#1f1f1f";
+                if (bs === "glass") return isLightMode ? lightFrostBorder : Qt.rgba(1, 1, 1, 0.18);
+                if (bs === "glass-frost") return isLightMode ? lightFrostBorder : Qt.rgba(1, 1, 1, 0.26);
                 if (bs === "cyber-neon") return primary;
                 if (bs === "bento-floating") return alpha(outline_variant, 0.50);
                 if (bs === "accent-glow") return alpha(primary, 0.85);
@@ -428,21 +433,21 @@ Singleton {
                 if (bs === "monochrome") return alpha(outline, 0.45);
                 return alpha(outline_variant, 0.50);
             case "cardBg":
-                if (bs === "regular") return alpha(surface_container_high, 0.75);
-                if (bs === "pure-black") return "#080808";
-                if (bs === "glass") return alpha(surface_container_high, 0.30);
-                if (bs === "glass-frost") return alpha(surface_container_high, 0.45);
+                if (bs === "regular") return alpha(surface_container_high, isLightMode ? 0.85 : 0.75);
+                if (bs === "pure-black") return isLightMode ? "#f7f7f7" : "#080808";
+                if (bs === "glass") return alpha(surface_container_high, isLightMode ? 0.65 : 0.30);
+                if (bs === "glass-frost") return alpha(surface_container_high, isLightMode ? 0.76 : 0.45);
                 if (bs === "cyber-neon") return alpha(surface_container_low, 0.75);
-                if (bs === "bento-floating") return alpha(surface_container_high, 0.60);
-                if (bs === "translucent") return alpha(surface_container_high, 0.50);
+                if (bs === "bento-floating") return alpha(surface_container_high, isLightMode ? 0.75 : 0.60);
+                if (bs === "translucent") return alpha(surface_container_high, isLightMode ? 0.68 : 0.50);
                 if (bs === "accent-glow") return alpha(primary_container, 0.45);
                 if (bs === "monochrome") return surface_container_high;
                 return surface_container_high;
             case "cardBorder":
                 if (bs === "regular") return alpha(outline_variant, 0.35);
-                if (bs === "pure-black") return "#1c1c1c";
-                if (bs === "glass") return Qt.rgba(1, 1, 1, 0.12);
-                if (bs === "glass-frost") return Qt.rgba(1, 1, 1, 0.20);
+                if (bs === "pure-black") return isLightMode ? "#e2e2e2" : "#1c1c1c";
+                if (bs === "glass") return isLightMode ? lightGlassBorder : Qt.rgba(1, 1, 1, 0.12);
+                if (bs === "glass-frost") return isLightMode ? lightFrostBorder : Qt.rgba(1, 1, 1, 0.20);
                 if (bs === "cyber-neon") return alpha(primary, 0.50);
                 if (bs === "bento-floating") return alpha(outline_variant, 0.35);
                 if (bs === "translucent") return alpha(outline_variant, 0.30);
@@ -451,21 +456,21 @@ Singleton {
                 return alpha(outline_variant, 0.40);
             case "pillBg":
                 if (hasCustomColors && (cfg?.customWidgetBg ?? "") !== "") return cfg.customWidgetBg;
-                if (bs === "regular") return alpha(surface_container_high, 0.65);
-                if (bs === "pure-black") return "#0a0a0a";
-                if (bs === "glass") return alpha(surface_container_high, 0.25);
-                if (bs === "glass-frost") return alpha(surface_container_high, 0.35);
+                if (bs === "regular") return alpha(surface_container_high, isLightMode ? 0.78 : 0.65);
+                if (bs === "pure-black") return isLightMode ? "#f2f2f2" : "#0a0a0a";
+                if (bs === "glass") return alpha(surface_container_high, isLightMode ? 0.62 : 0.25);
+                if (bs === "glass-frost") return alpha(surface_container_high, isLightMode ? 0.74 : 0.35);
                 if (bs === "cyber-neon") return alpha(surface_container_low, 0.60);
-                if (bs === "bento-floating") return alpha(surface_container_high, 0.50);
-                if (bs === "translucent") return alpha(surface_container_high, 0.45);
+                if (bs === "bento-floating") return alpha(surface_container_high, isLightMode ? 0.68 : 0.50);
+                if (bs === "translucent") return alpha(surface_container_high, isLightMode ? 0.62 : 0.45);
                 if (bs === "accent-glow") return alpha(primary, 0.22);
                 if (bs === "monochrome") return surface_container;
                 return surface_container_high;
             case "pillHover":
                 if (bs === "regular") return alpha(surface_container_highest, 0.85);
-                if (bs === "pure-black") return "#181818";
-                if (bs === "glass") return alpha(surface_container_highest, 0.45);
-                if (bs === "glass-frost") return alpha(surface_container_highest, 0.55);
+                if (bs === "pure-black") return isLightMode ? "#e6e6e6" : "#181818";
+                if (bs === "glass") return alpha(surface_container_highest, isLightMode ? 0.78 : 0.45);
+                if (bs === "glass-frost") return alpha(surface_container_highest, isLightMode ? 0.85 : 0.55);
                 if (bs === "cyber-neon") return alpha(primary_container, 0.40);
                 if (bs === "bento-floating") return alpha(surface_container_highest, 0.65);
                 if (bs === "translucent") return alpha(surface_container_highest, 0.70);
@@ -475,9 +480,9 @@ Singleton {
             case "pillBorder":
                 if (hasCustomColors && (cfg?.customBorder ?? "") !== "") return cfg.customBorder;
                 if (bs === "regular") return alpha(outline_variant, 0.35);
-                if (bs === "pure-black") return "#222222";
-                if (bs === "glass") return Qt.rgba(1, 1, 1, 0.14);
-                if (bs === "glass-frost") return Qt.rgba(1, 1, 1, 0.22);
+                if (bs === "pure-black") return isLightMode ? "#dddddd" : "#222222";
+                if (bs === "glass") return isLightMode ? lightGlassBorder : Qt.rgba(1, 1, 1, 0.14);
+                if (bs === "glass-frost") return isLightMode ? lightFrostBorder : Qt.rgba(1, 1, 1, 0.22);
                 if (bs === "cyber-neon") return alpha(primary, 0.75);
                 if (bs === "bento-floating") return alpha(outline_variant, 0.30);
                 if (bs === "translucent") return alpha(outline_variant, 0.25);
@@ -492,9 +497,9 @@ Singleton {
     readonly property color barBg:            alpha(getStyleColor("barBg", barStyle), barOpacity)
     readonly property color barBorderColor:   getStyleColor("barBorderColor", barStyle)
     readonly property color cornerFill: {
-        let cm = Settings?.cornerColorMode ?? "bar";
+        let cm = cfg?.cornerColorMode ?? "bar";
         if (cm === "accent") return primary;
-        if (cm === "pure-black") return "#000000";
+        if (cm === "pure-black") return isLightMode ? "#ffffff" : "#000000";
         if (cm === "theme") return surface_container_high;
         return barBg;
     }
@@ -510,9 +515,8 @@ Singleton {
     readonly property color pillHover:        getStyleColor("pillHover", barStyle)
     readonly property color pillBorder:       getStyleColor("pillBorder", barStyle)
 
-    // easing curves and physics to make buttons feel dangerously squishy
-    readonly property color  glassHighlight:        Qt.rgba(1, 1, 1, 0.16)
-    readonly property color  glassBorder:           Qt.rgba(1, 1, 1, 0.12)
+    readonly property color  glassHighlight:        isLightMode ? alpha(outline_variant, 0.45) : Qt.rgba(1, 1, 1, 0.16)
+    readonly property color  glassBorder:           isLightMode ? alpha(outline_variant, 0.40) : Qt.rgba(1, 1, 1, 0.12)
     readonly property color  glassGlow:             alpha(primary, 0.25)
     readonly property color  cardGlow:              alpha(primary, 0.15)
     readonly property int    popupBorderWidth:      cfg?.popupBorderWidth ?? 1
@@ -525,7 +529,6 @@ Singleton {
         return barBorderColor;
     }
 
-    // fallback guardrails so popups don't shrink into a single pixel or eat the monitor
     readonly property int    popupWidth:             460
     readonly property int    popupHeight:            580
     readonly property int    popupMinWidth:          320
@@ -544,7 +547,6 @@ Singleton {
     readonly property int    popupActionHeight:      32
     readonly property int    popupColumns:           2
 
-    // workspace dot math that took way too many reloads to center
     readonly property int    workspaceDotSize:       8
     readonly property int    workspaceIndicatorSize: 8
     readonly property int    workspaceIndicatorMin:  8
@@ -579,7 +581,6 @@ Singleton {
     readonly property int    workspaceTrailDuration:Math.round(260 * animSpeedMult)
     readonly property bool   workspaceActiveTrail:  cfg?.workspaceActiveTrail ?? true
 
-    // magic numbers pretending to be physics for qt's bezier spline
     readonly property var    hyprlandBezier:            [0.05, 0.9, 0.1, 1.05, 1.0, 1.0]
     readonly property var    hyprlandExitBezier:        [0.3, 0.0, 0.8, 0.15, 1.0, 1.0]
     readonly property var    smoothBezier:              [0.16, 1.0, 0.3, 1.0, 1.0, 1.0]
@@ -697,7 +698,6 @@ Singleton {
     readonly property int    animEasingExit:        (animCurve === "snappy") ? Easing.InQuad : Easing.InCubic
     readonly property int    animColorEasing:       Easing.OutQuad
 
-    // icon summoner circle: pulling glyphs out of ~/.local/share by their ankles
     readonly property string userFontDir:           (Quickshell.env("XDG_DATA_HOME") || ((Quickshell.env("HOME") || "") + "/.local/share")) + "/fonts/"
 
     FontLoader {
@@ -730,7 +730,6 @@ Singleton {
         ? loaderFaSolid.name
         : (cfg?.fontAwesome ?? "Font Awesome 6 Free")
 
-    // dodging qt.fontfamilies() so the main thread doesnt flatline
     readonly property string fontIcon: {
         if (iconSet === "kaomoji" || iconSet === "text") return fontFamily;
         if (iconSet === "nerd") return cfg?.fontNerd ?? "JetBrainsMono Nerd Font";
@@ -743,7 +742,6 @@ Singleton {
         return cfg?.fontMaterial ?? fontMaterialRounded;
     }
 
-    // actual expressive kaomoji instead of "[cpu]" and "(*_*)v"
     readonly property var kaomojiMap: Object.freeze({
         "arch": "(⌐■_■)", "nix": "(⌐■_■)", "nixos": "(⌐■_■)", "distro": "(⌐■_■)",
         "appLauncher": "(ﾉ◕ヮ◕)ﾉ", "workspaces": "( ० ० )", "search": "( ⚆_⚆)", "close": "(×_×)",
@@ -791,7 +789,6 @@ Singleton {
         "user": "user", "shield": "safe", "expand": "max", "collapse": "min", "keyboard": "keys"
     })
 
-    // giant lookup table of unicode hexes because font awesome can't agree with anyone else
     readonly property var fontAwesomeMap: Object.freeze({
         "nixos": "\uF17C", "nix": "\uF17C", "arch": "\uF17C", "distro": "\uF17C",
         "appLauncher": "\uF009", "workspaces": "\uF108", "search": "\uF002", "close": "\uF00D",
@@ -817,7 +814,6 @@ Singleton {
         "keyboard": "\uF11C"
     })
 
-    // nerd font glyphs
     readonly property var nerdMap: Object.freeze({
         "arch": "\uF303", "nix": "\uF313", "nixos": "\uF313", "distro": "\uF313", "appLauncher": "󰀻", "workspaces": "󱂬", "search": "", "close": "",
         "check": "", "checkCircle": "", "settings": "", "gear": "", "save": "",
@@ -1028,7 +1024,6 @@ Singleton {
         return "\uE63E";
     }
 
-    // four different icon fonts taped together with hope (and zero emojis)
     readonly property string iconDistro:            getIcon("\uE30A", "\uE71D", "\uF17C", "nixos")
     readonly property string iconNix:               getIcon("\uE30A", "\uE71D", "\uF17C", "nix")
     readonly property string iconArch:              getIcon("\uE30A", "\uE71D", "\uF17C", "arch")
@@ -1139,7 +1134,6 @@ Singleton {
     readonly property string iconCollapse:          getIcon("\uE94D", "\uE73F", "\uF066", "collapse")
     readonly property string iconKeyboard:          getIcon("\uE30C", "\uEA08", "\uF11C", "keyboard")
 
-    // emotional support kaomoji faces for terminal burnout
     readonly property string kaoHappy:              "(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧"
     readonly property string kaoSad:                "( ╥ω╥ )"
     readonly property string kaoCoffee:             "( -_-)旦~"
@@ -1180,10 +1174,6 @@ Singleton {
         return (text ?? "").toLowerCase();
     }
 
-    /*
-    quote roulette: part relatable linux habits, part cozy check-ins,
-    part classic tech quotes, and part unhinged sleep deprivation
-    */
     readonly property var flavorQuotes: Object.freeze({
         "network_on": [
             "pinging 1.1.1.1 just to check if the router is mad at me",
@@ -1329,6 +1319,8 @@ Singleton {
             "spent 3 hours ricing quickshell to avoid a 10-minute task",
             "opened a terminal, typed ls, immediately closed it",
             "hyprland.lua indexing workspaces from 1 like a sociopath",
+            "migrating hyprland.conf to hl.config({}) at 3am",
+            "hyprctl repl is my new favorite calculator",
             "\"talk is cheap. show me the code.\" — linus torvalds",
             "\"an idiot admires complexity, a genius admires simplicity.\" — terry davis",
             "\"do one thing and do it well.\" — douglas mcilroy",
@@ -1339,7 +1331,7 @@ Singleton {
             "discord screenshare showing a black window on wayland again",
             "git commit -m 'fix' followed by git commit -m 'actually fix'",
             "oom killer quietly sizing up the electron apps",
-            "rewrote my config in lua and it actually worked on reload",
+            "rewrote my config in hyprland.lua and it actually worked on reload",
             "\"beware of bugs in the above code; i have only proved it correct.\" — knuth",
             "hydrated? posture okay? alright, carry on",
             "running 30 days of uptime out of pure refusal to close my tabs"
@@ -1355,7 +1347,6 @@ Singleton {
         ]
     })
 
-    // hooked straight into the clock pulse so thoughts rotate every 60s
     function getFlavor(category: string, fallback: string): string {
         if (!cfg?.unhingedFlavor) return (fallback ?? "").toLowerCase();
         let list = flavorQuotes[category];

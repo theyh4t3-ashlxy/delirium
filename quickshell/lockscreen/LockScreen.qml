@@ -19,82 +19,367 @@ Scope {
     property bool locked: false
     property bool authFailed: false
     property bool isChecking: false
-    property date currentTime: new Date()
+    property bool pamRespondedThisTurn: false
+    property string pamFeedback: ""
+    property bool pamFeedbackIsError: false
+    property int failedAttempts: 0
+
+    property var activeSurface: null
+
     property date lockedAtTime: new Date()
     property string pendingPassword: ""
     property string sharedPassword: ""
     property bool revealPassword: false
     property int manualPlayerIndex: -1
+    property bool zenMode: false
 
-    // Extensionless Quickshell-controlled state file (~/.config/quickshell/lockscreen/state)
-    readonly property string configDir: Quickshell.env("XDG_CONFIG_HOME") || ((Quickshell.env("HOME") || "") + "/.config")
-    readonly property string lockStatePath: configDir + "/quickshell/lockscreen/state"
+    property bool capsLockActive: false
+    property string kbLayoutShort: ""
+
+    readonly property string homeDir: Quickshell.env("HOME") || ""
+    readonly property string configDir: Quickshell.env("XDG_CONFIG_HOME") || (homeDir + "/.config")
+    readonly property string lockStateDir: configDir + "/quickshell/lockscreen"
+    readonly property string lockStatePath: lockStateDir + "/state"
+
+    readonly property string runtimeDir: {
+        let xdg = (Quickshell.env("XDG_RUNTIME_DIR") || "").trim();
+        return xdg !== "" ? xdg : "/tmp";
+    }
+    readonly property string currentUser: (Quickshell.env("USER") || Quickshell.env("LOGNAME") || "user")
+    readonly property string lockTokenPath: runtimeDir + "/qs_session_locked_" + currentUser + ".token"
+    readonly property string remoteArtCachePath: runtimeDir + "/qs_lock_art_" + currentUser + ".img"
+
+    PersistentProperties {
+        id: sessionPersist
+        reloadableId: "qsLockScreenSessionState"
+        property bool wasLocked: false
+        property double lockedAtEpochMs: 0
+        property int failedCount: 0
+    }
 
     property bool stateLoaded: false
-    property bool syncClockGlobal: false
-    property bool sandboxClock24h: false
-    property bool showSeconds: true
-    property string clockStyle: "inline"       // "inline" | "stacked" | "minimal"
-    property string secondsStyle: "badge"      // "badge" | "supersub" | "tower" | "inline"
+    property bool studioLocked: false
+    property string studioTab: "layout"        // "layout" | "clock" | "vibe" | "widgets"
+
+    // user-controlled layout & geometry
     property string layoutPosition: "center"   // "center" | "top" | "bottom" | "left" | "right" | "custom"
     property string stackOrder: "clock,media,password"
-    property bool dateAboveClock: false
     property bool freeDragMode: false
     property real customNormX: 0.5
     property real customNormY: 0.5
+    property int stageWidth: 448               // 340 .. 620
+    property string shapePreset: "theme"       // "theme" | "pill" | "squircle" | "sharp"
+    property real cardOpacityBoost: 0.0        // -0.35 .. +0.35
 
+    // user-controlled clock & typography
+    property bool syncClockGlobal: false
+    property bool showClock: true
+    property bool showDate: true
+    property bool sandboxClock24h: false
+    property bool showSeconds: true
+    property string clockStyle: "inline"       // "inline" | "stacked" | "split" | "typo" | "digital" | "editorial" | "minimal"
+    property string secondsStyle: "badge"      // "badge" | "supersub" | "tower" | "inline"
+    property string dateFormat: "dddd, MMMM d" // customizable date format string
+    property bool dateAboveClock: false
     property real clockScale: 1.0
-    property string quoteMode: "hyprland"
+    property string textCase: "lower"          // "lower" | "normal" | "upper"
+    property string pwMaskChar: "•"            // "•" | "*" | "✦" | "▪" | "none"
+    property bool autoSubmitLength: false
+    property int autoSubmitTargetLen: 0
+
+    // user-controlled vibe & quotes
+    property string quoteMode: "smart"         // "smart" | "hyprland" | "unhinged" | "custom" | "off"
+    property string customQuoteText: "welcome back"
+    property string backdropMode: "auto"       // "auto" | "dark" | "light"
+    property string pamService: "login"
     property real scrimDim: 0.58
+    property real vignetteStrength: 0.35
     property real focusZoom: 1.05
+
+    // user-controlled widgets & dock (nothing forced, everything optional)
     property bool showMediaCard: true
     property bool showMediaVisualizer: true
     property bool showUserPill: true
+    property bool showStatusBar: true
+    property bool showSystemVol: true
+    property bool showPowerDock: true
+    property bool confirmPowerActions: true
+    property bool allowLogoutOnLock: true
+    property bool showScreenCorners: true
+    property bool ambientOrbs: true
+    property bool albumArtBackdrop: false
+    property bool autoZenIdle: false
     property bool wallpaperSync: true
     property string localWallpaperOverride: ""
 
     property string hyprSplash: ""
-    property string unhingedQuote: ""
+    property string rolledQuote: ""
     property real wavePhase: 0.0
 
-    readonly property string currentUser: (Quickshell.env("USER") || "user").toLowerCase()
-    readonly property string lockTokenPath: (Quickshell.env("XDG_RUNTIME_DIR") ?? "/tmp") + "/qs_session_locked.token"
+    // respects the user's text casing preference instead of forcing .toLowerCase() everywhere
+    function fmtText(s: string): string {
+        if (!s) return "";
+        if (lockRoot.textCase === "lower") return s.toLowerCase();
+        if (lockRoot.textCase === "upper") return s.toUpperCase();
+        return s;
+    }
 
-    // Reactive clock state
+    // shape preset overrides so the user can go full sharp brutalist, squircle, or pill
+    readonly property int uiRadiusSm: {
+        if (shapePreset === "sharp") return 0;
+        if (shapePreset === "pill") return 9999;
+        if (shapePreset === "squircle") return 10;
+        return Theme.radiusSm;
+    }
+    readonly property int uiRadiusMd: {
+        if (shapePreset === "sharp") return 2;
+        if (shapePreset === "pill") return 9999;
+        if (shapePreset === "squircle") return 14;
+        return Theme.radiusMd;
+    }
+    readonly property int uiRadiusLg: {
+        if (shapePreset === "sharp") return 2;
+        if (shapePreset === "pill") return 32;
+        if (shapePreset === "squircle") return 22;
+        return Theme.radiusLg;
+    }
+    readonly property int uiRadiusXl: {
+        if (shapePreset === "sharp") return 4;
+        if (shapePreset === "pill") return 42;
+        if (shapePreset === "squircle") return 28;
+        return Theme.radiusXl;
+    }
+    readonly property int uiRadiusPill: shapePreset === "sharp" ? 2 : Theme.radiusPill
+
+    /*
+    full light & dark mode palette engine:
+    works whether matugen generated light tokens OR dark tokens
+    */
+    readonly property real surfaceLuminance: (0.2126 * Theme.surface.r) + (0.7152 * Theme.surface.g) + (0.0722 * Theme.surface.b)
+    readonly property bool matugenIsLight: surfaceLuminance > 0.5
+    readonly property bool globalCfgLight: (typeof Settings !== "undefined" && Settings)
+        ? Boolean(Settings.lightMode || Settings.isLight || Settings.themeMode === "light" || Settings.colorScheme === "light")
+        : false
+    readonly property bool isLight: backdropMode === "light" || (backdropMode === "auto" && (matugenIsLight || globalCfgLight))
+
+    readonly property color uiAccent: {
+        if (!isLight) return Theme.primary;
+        if (matugenIsLight) return Theme.primary;
+        let darkened = Qt.rgba(Theme.primary.r * 0.62, Theme.primary.g * 0.62, Theme.primary.b * 0.62, 1.0);
+        return Theme.blend(darkened, Theme.on_primary_container, 0.35);
+    }
+    readonly property color uiOnAccent: isLight ? "#ffffff" : Theme.on_primary
+    readonly property color uiAccentOverlay: Theme.alpha(uiAccent, isLight ? 0.16 : 0.18)
+
+    readonly property color uiSurfaceBase: {
+        if (!isLight) return Theme.surface;
+        if (matugenIsLight) return Theme.surface;
+        return Theme.blend(Qt.rgba(0.97, 0.96, 0.99, 1.0), Theme.primary, 0.05);
+    }
+    readonly property color uiTextPrimary: {
+        if (!isLight) return matugenIsLight ? Theme.inverse_on_surface : Theme.textPrimary;
+        return matugenIsLight ? Theme.textPrimary : Theme.blend(Qt.rgba(0.11, 0.10, 0.14, 1.0), Theme.primary, 0.08);
+    }
+    readonly property color uiTextSecondary: {
+        if (!isLight) return matugenIsLight ? Theme.alpha(Theme.inverse_on_surface, 0.72) : Theme.textSecondary;
+        return matugenIsLight ? Theme.textSecondary : Theme.alpha(uiTextPrimary, 0.68);
+    }
+    readonly property color uiTextDisabled: Theme.alpha(uiTextPrimary, 0.40)
+
+    function applyAlphaBoost(c: color, boost: real): color {
+        let targetA = Math.max(0.12, Math.min(1.0, c.a + boost));
+        return Qt.rgba(c.r, c.g, c.b, targetA);
+    }
+
+    readonly property color uiPillBg: {
+        let base = !isLight
+            ? Theme.pillBg
+            : Theme.alpha(matugenIsLight ? Theme.surface_container_lowest : Theme.blend(Qt.rgba(0.98, 0.97, 1.0, 1.0), Theme.primary, 0.05), Theme.isGlass ? 0.82 : 0.92);
+        return applyAlphaBoost(base, cardOpacityBoost);
+    }
+    readonly property color uiPillHover: {
+        let base = !isLight
+            ? Theme.pillHover
+            : Theme.alpha(matugenIsLight ? Theme.surface_container_high : Theme.blend(Qt.rgba(0.93, 0.91, 0.96, 1.0), Theme.primary, 0.10), 0.94);
+        return applyAlphaBoost(base, cardOpacityBoost);
+    }
+    readonly property color uiPillBorder: !isLight ? Theme.pillBorder : Theme.alpha(uiAccent, 0.24)
+
+    readonly property color uiCardBg: {
+        let base = !isLight
+            ? Theme.cardBg
+            : Theme.alpha(matugenIsLight ? Theme.surface_container_low : Theme.blend(Qt.rgba(0.97, 0.96, 0.99, 1.0), Theme.primary, 0.06), Theme.isGlass ? 0.85 : 0.94);
+        return applyAlphaBoost(base, cardOpacityBoost);
+    }
+    readonly property color uiCardBorder: !isLight ? Theme.cardBorder : Theme.alpha(uiAccent, 0.22)
+
+    readonly property color uiPopupBg: {
+        if (!isLight) return Theme.popupBg;
+        let base = matugenIsLight ? Theme.surface_container_lowest : Theme.blend(Qt.rgba(0.98, 0.97, 1.0, 1.0), Theme.primary, 0.04);
+        return Theme.alpha(base, 0.95);
+    }
+    readonly property color uiPopupBorder: !isLight ? Theme.popupBorderColor : Theme.alpha(uiAccent, 0.26)
+
+    readonly property color uiWidgetBg: {
+        if (!isLight) return Theme.widgetBg;
+        let base = matugenIsLight ? Theme.surface_container : Theme.blend(Qt.rgba(0.93, 0.92, 0.96, 1.0), Theme.primary, 0.07);
+        return Theme.alpha(base, 0.88);
+    }
+    readonly property color uiWidgetHover: {
+        if (!isLight) return Theme.widgetHover;
+        let base = matugenIsLight ? Theme.surface_container_high : Theme.blend(Qt.rgba(0.89, 0.87, 0.93, 1.0), Theme.primary, 0.12);
+        return Theme.alpha(base, 0.94);
+    }
+    readonly property color uiWidgetActive: !isLight ? Theme.widgetActive : Theme.alpha(uiAccent, 0.20)
+    readonly property color uiWidgetBorder: !isLight ? Theme.widgetBorder : Theme.alpha(uiAccent, 0.20)
+
+    SystemClock {
+        id: sysClock
+        precision: lockRoot.locked ? SystemClock.Seconds : SystemClock.Minutes
+    }
+
+    readonly property date currentTime: sysClock.date
     readonly property bool effectiveClock24h: sandboxClock24h
     readonly property bool effectiveShowSeconds: showSeconds
 
-    // How long the screen has been locked
+    readonly property var playerList: Mpris?.players?.values ?? []
+    readonly property var activePlayer: {
+        if (!playerList || playerList.length === 0) return null;
+        if (lockRoot.manualPlayerIndex >= 0 && lockRoot.manualPlayerIndex < playerList.length) {
+            let manual = playerList[lockRoot.manualPlayerIndex];
+            if (manual && manual.isPlaying) return manual;
+            let otherPlaying = playerList.find(p => p.isPlaying);
+            if (!otherPlaying) return manual;
+        }
+        return playerList.find(p => p.isPlaying)
+            ?? playerList.find(p => p.trackTitle)
+            ?? playerList[0]
+            ?? null;
+    }
+    readonly property int currentPlayerIdx: {
+        if (!activePlayer || !playerList) return 0;
+        let idx = playerList.indexOf(activePlayer);
+        return idx >= 0 ? idx : 0;
+    }
+    readonly property bool playerIsPlaying: activePlayer?.isPlaying ?? false
+    readonly property bool anyPlayerPlaying: {
+        for (let i = 0; i < playerList.length; i++) {
+            if (playerList[i]?.isPlaying) return true;
+        }
+        return false;
+    }
+
+    readonly property string coverArtUrl: fixCoverUrl(activePlayer?.trackArtUrl)
+    property string lastFetchedRemoteArtUrl: ""
+    property string localQuantizerArtUrl: ""
+
+    property string pendingCurlUrl: ""
+    property Process artFetchProc: Process {
+        command: ["curl", "-fsSL", "--max-time", "4", "-o", lockRoot.remoteArtCachePath, lockRoot.pendingCurlUrl]
+        onExited: (code) => {
+            if (code === 0 && lockRoot.coverArtUrl === lockRoot.pendingCurlUrl) {
+                lockRoot.lastFetchedRemoteArtUrl = lockRoot.pendingCurlUrl;
+                lockRoot.localQuantizerArtUrl = "";
+                lockRoot.localQuantizerArtUrl = "file://" + lockRoot.remoteArtCachePath;
+            }
+        }
+    }
+
+    onCoverArtUrlChanged: {
+        if (!coverArtUrl || coverArtUrl === "") {
+            localQuantizerArtUrl = "";
+            return;
+        }
+        if (coverArtUrl.startsWith("file://")) {
+            localQuantizerArtUrl = coverArtUrl;
+            return;
+        }
+        if (coverArtUrl.startsWith("http://") || coverArtUrl.startsWith("https://")) {
+            if (coverArtUrl === lastFetchedRemoteArtUrl) {
+                localQuantizerArtUrl = "file://" + remoteArtCachePath;
+            } else {
+                localQuantizerArtUrl = "";
+                pendingCurlUrl = coverArtUrl;
+                if (artFetchProc.running) artFetchProc.running = false;
+                artFetchProc.running = true;
+            }
+        } else {
+            localQuantizerArtUrl = "";
+        }
+    }
+
+    Loader {
+        id: artQuantizerLoader
+        active: lockRoot.localQuantizerArtUrl !== ""
+        sourceComponent: ColorQuantizer {
+            depth: 2
+            rescaleSize: 64
+            source: lockRoot.localQuantizerArtUrl
+        }
+    }
+
+    readonly property color artAccent: {
+        if (Theme.isMonochrome) return lockRoot.uiAccent;
+        let qColors = artQuantizerLoader.item?.colors;
+        if (lockRoot.localQuantizerArtUrl !== "" && qColors && qColors.length > 0) {
+            for (let i = 0; i < qColors.length; i++) {
+                let c = qColors[i];
+                if (!c) continue;
+                let mx = Math.max(c.r, c.g, c.b);
+                let mn = Math.min(c.r, c.g, c.b);
+                let sat = mx === 0 ? 0 : (mx - mn) / mx;
+                if (sat < 0.18) continue;
+
+                if (lockRoot.isLight) {
+                    if (mx > 0.15) {
+                        let darkened = Qt.rgba(c.r * 0.60, c.g * 0.60, c.b * 0.60, 1.0);
+                        return Theme.blend(darkened, lockRoot.uiAccent, 0.45);
+                    }
+                } else {
+                    if (mx > 0.25 && (mx - mn) > 0.15) {
+                        return Theme.blend(c, lockRoot.uiAccent, 0.42);
+                    }
+                }
+            }
+        }
+        return lockRoot.uiAccent;
+    }
+
     readonly property string lockedDurationText: {
         let diffSec = Math.max(0, Math.floor((currentTime.getTime() - lockedAtTime.getTime()) / 1000));
-        if (diffSec < 60) return "just locked";
-        return "locked " + Theme.formatUptime(diffSec);
+        if (diffSec < 60) return fmtText("just locked");
+        return fmtText("locked " + Theme.formatUptime(diffSec));
     }
 
-    // Native PipeWire peak monitor for the lock screen media card
+    readonly property var defaultSink: (typeof Pipewire !== "undefined") ? Pipewire?.defaultAudioSink : null
+    PwObjectTracker {
+        objects: lockRoot.defaultSink ? [lockRoot.defaultSink] : []
+    }
+
     PwNodePeakMonitor {
         id: lockPeakMonitor
-        node: (typeof Pipewire !== "undefined") ? Pipewire?.defaultAudioSink : null
-        enabled: lockRoot.locked && lockRoot.showMediaCard && lockRoot.showMediaVisualizer
+        node: lockRoot.defaultSink
+        enabled: lockRoot.locked && !lockRoot.zenMode && (
+            (lockRoot.showMediaCard && lockRoot.showMediaVisualizer) || lockRoot.ambientOrbs
+        ) && lockRoot.anyPlayerPlaying
     }
 
-    // Read-once, write-debounced FileView controlled exclusively by Quickshell
     property FileView lockStateFile: FileView {
         path: lockRoot.lockStatePath
         blockLoading: false
         watchChanges: false
         printErrors: false
         onLoaded: {
-            if (!lockRoot.stateLoaded) {
-                lockRoot.loadState();
-            }
+            if (!lockRoot.stateLoaded) lockRoot.loadState();
+        }
+        onLoadFailed: {
+            lockRoot.stateLoaded = true;
         }
     }
 
-    // Debounce disk writes so sliders, drags & toggles happen in 0ms without I/O stutter
     Timer {
         id: saveDebounceTimer
-        interval: 120
+        interval: 140
         repeat: false
         onTriggered: lockRoot.flushStateToDisk()
     }
@@ -104,6 +389,12 @@ Scope {
         if (v === "1" || v === "true" || v === "yes") return true;
         if (v === "0" || v === "false" || v === "no") return false;
         return fallback;
+    }
+
+    function parseClamped(val: string, minVal: real, maxVal: real, fallback: real): real {
+        let n = parseFloat(val);
+        if (isNaN(n)) return fallback;
+        return Math.max(minVal, Math.min(maxVal, n));
     }
 
     function loadState() {
@@ -123,15 +414,28 @@ Scope {
             let v = line.slice(eqIdx + 1).trim();
 
             switch (k) {
+                case "studioLocked": lockRoot.studioLocked = parseBool(v, lockRoot.studioLocked); break;
                 case "syncClockGlobal": lockRoot.syncClockGlobal = parseBool(v, lockRoot.syncClockGlobal); break;
+                case "showClock": lockRoot.showClock = parseBool(v, lockRoot.showClock); break;
+                case "showDate": lockRoot.showDate = parseBool(v, lockRoot.showDate); break;
                 case "clock24h": lockRoot.sandboxClock24h = parseBool(v, lockRoot.sandboxClock24h); break;
                 case "showSeconds": lockRoot.showSeconds = parseBool(v, lockRoot.showSeconds); break;
                 case "clockStyle":
-                    if (v === "inline" || v === "stacked" || v === "minimal") lockRoot.clockStyle = v;
+                    if (["inline", "stacked", "split", "typo", "digital", "editorial", "minimal"].includes(v)) lockRoot.clockStyle = v;
                     break;
                 case "secondsStyle":
-                    if (v === "badge" || v === "supersub" || v === "tower" || v === "inline") lockRoot.secondsStyle = v;
+                    if (["badge", "supersub", "tower", "inline"].includes(v)) lockRoot.secondsStyle = v;
                     break;
+                case "dateFormat": if (v !== "") lockRoot.dateFormat = v; break;
+                case "textCase":
+                    if (["lower", "normal", "upper"].includes(v)) lockRoot.textCase = v;
+                    break;
+                case "pwMaskChar": if (v !== "") lockRoot.pwMaskChar = v; break;
+                case "stageWidth": lockRoot.stageWidth = Math.round(parseClamped(v, 340, 620, 448)); break;
+                case "shapePreset":
+                    if (["theme", "pill", "squircle", "sharp"].includes(v)) lockRoot.shapePreset = v;
+                    break;
+                case "cardOpacityBoost": lockRoot.cardOpacityBoost = parseClamped(v, -0.35, 0.35, 0.0); break;
                 case "layoutPosition":
                     if (["center", "top", "bottom", "left", "right", "custom"].includes(v)) lockRoot.layoutPosition = v;
                     break;
@@ -139,35 +443,32 @@ Scope {
                     if (v.includes("clock") && v.includes("media") && v.includes("password")) lockRoot.stackOrder = v;
                     break;
                 case "dateAboveClock": lockRoot.dateAboveClock = parseBool(v, lockRoot.dateAboveClock); break;
-                case "customNormX": {
-                    let nx = parseFloat(v);
-                    if (!isNaN(nx) && nx >= 0.0 && nx <= 1.0) lockRoot.customNormX = nx;
+                case "customNormX": lockRoot.customNormX = parseClamped(v, 0.0, 1.0, 0.5); break;
+                case "customNormY": lockRoot.customNormY = parseClamped(v, 0.0, 1.0, 0.5); break;
+                case "clockScale": lockRoot.clockScale = parseClamped(v, 0.65, 1.65, 1.0); break;
+                case "quoteMode":
+                    if (["smart", "hyprland", "unhinged", "custom", "off"].includes(v)) lockRoot.quoteMode = v;
                     break;
-                }
-                case "customNormY": {
-                    let ny = parseFloat(v);
-                    if (!isNaN(ny) && ny >= 0.0 && ny <= 1.0) lockRoot.customNormY = ny;
+                case "customQuoteText": lockRoot.customQuoteText = v; break;
+                case "backdropMode":
+                    if (["auto", "dark", "light"].includes(v)) lockRoot.backdropMode = v;
                     break;
-                }
-                case "clockScale": {
-                    let num = parseFloat(v);
-                    if (!isNaN(num) && num >= 0.65 && num <= 1.65) lockRoot.clockScale = num;
-                    break;
-                }
-                case "quoteMode": if (v !== "") lockRoot.quoteMode = v; break;
-                case "scrimDim": {
-                    let dim = parseFloat(v);
-                    if (!isNaN(dim) && dim >= 0.1 && dim <= 0.98) lockRoot.scrimDim = dim;
-                    break;
-                }
-                case "focusZoom": {
-                    let zm = parseFloat(v);
-                    if (!isNaN(zm) && zm >= 1.0 && zm <= 1.2) lockRoot.focusZoom = zm;
-                    break;
-                }
+                case "pamService": if (v !== "") lockRoot.pamService = v; break;
+                case "scrimDim": lockRoot.scrimDim = parseClamped(v, 0.05, 0.98, 0.58); break;
+                case "vignetteStrength": lockRoot.vignetteStrength = parseClamped(v, 0.0, 0.95, 0.35); break;
+                case "focusZoom": lockRoot.focusZoom = parseClamped(v, 1.0, 1.25, 1.05); break;
                 case "showMedia": lockRoot.showMediaCard = parseBool(v, lockRoot.showMediaCard); break;
                 case "showMediaVisualizer": lockRoot.showMediaVisualizer = parseBool(v, lockRoot.showMediaVisualizer); break;
                 case "showUser": lockRoot.showUserPill = parseBool(v, lockRoot.showUserPill); break;
+                case "showStatusBar": lockRoot.showStatusBar = parseBool(v, lockRoot.showStatusBar); break;
+                case "showSystemVol": lockRoot.showSystemVol = parseBool(v, lockRoot.showSystemVol); break;
+                case "showPowerDock": lockRoot.showPowerDock = parseBool(v, lockRoot.showPowerDock); break;
+                case "confirmPowerActions": lockRoot.confirmPowerActions = parseBool(v, lockRoot.confirmPowerActions); break;
+                case "allowLogoutOnLock": lockRoot.allowLogoutOnLock = parseBool(v, lockRoot.allowLogoutOnLock); break;
+                case "showScreenCorners": lockRoot.showScreenCorners = parseBool(v, lockRoot.showScreenCorners); break;
+                case "ambientOrbs": lockRoot.ambientOrbs = parseBool(v, lockRoot.ambientOrbs); break;
+                case "albumArtBackdrop": lockRoot.albumArtBackdrop = parseBool(v, lockRoot.albumArtBackdrop); break;
+                case "autoZenIdle": lockRoot.autoZenIdle = parseBool(v, lockRoot.autoZenIdle); break;
                 case "wallpaperSync": lockRoot.wallpaperSync = parseBool(v, lockRoot.wallpaperSync); break;
                 case "customWallpaper": lockRoot.localWallpaperOverride = v; break;
             }
@@ -181,9 +482,81 @@ Scope {
         lockRoot.stateLoaded = true;
     }
 
+    function applyPreset(presetName: string) {
+        if (lockRoot.studioLocked) return;
+        if (presetName === "expressive") {
+            lockRoot.clockStyle = "stacked";
+            lockRoot.secondsStyle = "badge";
+            lockRoot.showSeconds = true;
+            lockRoot.layoutPosition = "center";
+            lockRoot.stackOrder = "clock,media,password";
+            lockRoot.shapePreset = "squircle";
+            lockRoot.clockScale = 1.08;
+            lockRoot.scrimDim = 0.54;
+            lockRoot.vignetteStrength = 0.40;
+            lockRoot.ambientOrbs = true;
+            lockRoot.dateAboveClock = true;
+        } else if (presetName === "cards") {
+            lockRoot.clockStyle = "split";
+            lockRoot.secondsStyle = "badge";
+            lockRoot.showSeconds = true;
+            lockRoot.layoutPosition = "center";
+            lockRoot.stackOrder = "clock,password,media";
+            lockRoot.shapePreset = "squircle";
+            lockRoot.clockScale = 1.0;
+            lockRoot.scrimDim = 0.62;
+            lockRoot.vignetteStrength = 0.45;
+            lockRoot.ambientOrbs = true;
+            lockRoot.dateAboveClock = false;
+        } else if (presetName === "editorial") {
+            lockRoot.clockStyle = "editorial";
+            lockRoot.showSeconds = true;
+            lockRoot.secondsStyle = "tower";
+            lockRoot.layoutPosition = "left";
+            lockRoot.stackOrder = "clock,media,password";
+            lockRoot.shapePreset = "pill";
+            lockRoot.clockScale = 1.05;
+            lockRoot.scrimDim = 0.48;
+            lockRoot.vignetteStrength = 0.45;
+            lockRoot.dateAboveClock = true;
+        } else if (presetName === "cyber") {
+            lockRoot.clockStyle = "digital";
+            lockRoot.showSeconds = true;
+            lockRoot.secondsStyle = "inline";
+            lockRoot.layoutPosition = "center";
+            lockRoot.stackOrder = "clock,password,media";
+            lockRoot.shapePreset = "sharp";
+            lockRoot.clockScale = 1.0;
+            lockRoot.scrimDim = 0.65;
+            lockRoot.vignetteStrength = 0.50;
+            lockRoot.ambientOrbs = true;
+        } else if (presetName === "minimal") {
+            lockRoot.clockStyle = "minimal";
+            lockRoot.showSeconds = false;
+            lockRoot.layoutPosition = "top";
+            lockRoot.stackOrder = "clock,password,media";
+            lockRoot.shapePreset = "theme";
+            lockRoot.clockScale = 0.95;
+            lockRoot.scrimDim = 0.42;
+            lockRoot.vignetteStrength = 0.20;
+            lockRoot.ambientOrbs = false;
+            lockRoot.dateAboveClock = false;
+        }
+        lockRoot.saveSandbox();
+    }
+
     function resetDefaults() {
+        if (lockRoot.studioLocked) return;
+        lockRoot.showClock = true;
+        lockRoot.showDate = true;
         lockRoot.clockStyle = "inline";
         lockRoot.secondsStyle = "badge";
+        lockRoot.dateFormat = "dddd, MMMM d";
+        lockRoot.textCase = "lower";
+        lockRoot.pwMaskChar = "•";
+        lockRoot.stageWidth = 448;
+        lockRoot.shapePreset = "theme";
+        lockRoot.cardOpacityBoost = 0.0;
         lockRoot.layoutPosition = "center";
         lockRoot.stackOrder = "clock,media,password";
         lockRoot.dateAboveClock = false;
@@ -191,45 +564,60 @@ Scope {
         lockRoot.customNormX = 0.5;
         lockRoot.customNormY = 0.5;
         lockRoot.clockScale = 1.0;
+        lockRoot.backdropMode = "auto";
         lockRoot.scrimDim = 0.58;
+        lockRoot.vignetteStrength = 0.35;
         lockRoot.focusZoom = 1.05;
-        lockRoot.quoteMode = "hyprland";
+        lockRoot.quoteMode = "smart";
         lockRoot.showMediaCard = true;
         lockRoot.showMediaVisualizer = true;
         lockRoot.showUserPill = true;
+        lockRoot.showStatusBar = true;
+        lockRoot.showSystemVol = true;
+        lockRoot.showPowerDock = true;
+        lockRoot.confirmPowerActions = true;
+        lockRoot.allowLogoutOnLock = true;
+        lockRoot.showScreenCorners = true;
+        lockRoot.ambientOrbs = true;
+        lockRoot.albumArtBackdrop = false;
+        lockRoot.autoZenIdle = false;
         lockRoot.wallpaperSync = true;
         lockRoot.localWallpaperOverride = "";
         lockRoot.saveSandbox();
     }
 
-    // "Surprise Me!" randomizer: rolls a cohesive aesthetic & layout combination
     function surpriseMe() {
-        const cStyles = ["inline", "stacked", "minimal"];
+        if (lockRoot.studioLocked) return;
+        const cStyles = ["inline", "stacked", "split", "typo", "digital", "editorial", "minimal"];
         const sStyles = ["badge", "supersub", "tower", "inline"];
         const positions = ["center", "top", "bottom", "left", "right"];
+        const shapes = ["theme", "pill", "squircle", "sharp"];
         const orders = [
             "clock,media,password",
             "clock,password,media",
             "media,clock,password"
         ];
-        const qModes = ["hyprland", "unhinged"];
+        const qModes = ["smart", "hyprland", "unhinged"];
 
         lockRoot.clockStyle = cStyles[Math.floor(Math.random() * cStyles.length)];
         lockRoot.secondsStyle = sStyles[Math.floor(Math.random() * sStyles.length)];
+        lockRoot.shapePreset = shapes[Math.floor(Math.random() * shapes.length)];
         lockRoot.showSeconds = true;
         lockRoot.layoutPosition = positions[Math.floor(Math.random() * positions.length)];
         lockRoot.stackOrder = orders[Math.floor(Math.random() * orders.length)];
         lockRoot.dateAboveClock = Math.random() > 0.5;
         lockRoot.sandboxClock24h = Math.random() > 0.45;
-        lockRoot.clockScale = Math.round((0.86 + Math.random() * 0.42) * 100) / 100;
-        lockRoot.scrimDim = Math.round((0.38 + Math.random() * 0.38) * 100) / 100;
+        lockRoot.clockScale = Math.round((0.86 + Math.random() * 0.40) * 100) / 100;
+        lockRoot.scrimDim = Math.round((0.38 + Math.random() * 0.36) * 100) / 100;
+        lockRoot.vignetteStrength = Math.round((0.15 + Math.random() * 0.45) * 100) / 100;
         lockRoot.focusZoom = Math.round((1.03 + Math.random() * 0.09) * 100) / 100;
+        lockRoot.ambientOrbs = Math.random() > 0.25;
         lockRoot.quoteMode = qModes[Math.floor(Math.random() * qModes.length)];
         lockRoot.refreshQuotes();
         lockRoot.saveSandbox();
     }
 
-    function saveSandbox() {
+    function syncToGlobalSettings() {
         if (lockRoot.syncClockGlobal && typeof Settings !== "undefined" && Settings) {
             let fmt = lockRoot.sandboxClock24h
                 ? (lockRoot.showSeconds ? "HH:mm:ss" : "HH:mm")
@@ -238,17 +626,31 @@ Scope {
             Settings.clock24h = lockRoot.sandboxClock24h;
             Settings.clockMilitary = lockRoot.sandboxClock24h;
             Settings.clockShowSeconds = lockRoot.showSeconds;
+            if (Settings.save) Settings.save();
         }
+    }
+
+    function saveSandbox() {
+        syncToGlobalSettings();
         saveDebounceTimer.restart();
     }
 
     function flushStateToDisk() {
         let lines = [
+            "studioLocked=" + (lockRoot.studioLocked ? "1" : "0"),
             "syncClockGlobal=" + (lockRoot.syncClockGlobal ? "1" : "0"),
+            "showClock=" + (lockRoot.showClock ? "1" : "0"),
+            "showDate=" + (lockRoot.showDate ? "1" : "0"),
             "clock24h=" + (lockRoot.sandboxClock24h ? "1" : "0"),
             "showSeconds=" + (lockRoot.showSeconds ? "1" : "0"),
             "clockStyle=" + lockRoot.clockStyle,
             "secondsStyle=" + lockRoot.secondsStyle,
+            "dateFormat=" + lockRoot.dateFormat,
+            "textCase=" + lockRoot.textCase,
+            "pwMaskChar=" + lockRoot.pwMaskChar,
+            "stageWidth=" + lockRoot.stageWidth,
+            "shapePreset=" + lockRoot.shapePreset,
+            "cardOpacityBoost=" + Number(lockRoot.cardOpacityBoost).toFixed(2),
             "layoutPosition=" + lockRoot.layoutPosition,
             "stackOrder=" + lockRoot.stackOrder,
             "dateAboveClock=" + (lockRoot.dateAboveClock ? "1" : "0"),
@@ -256,19 +658,28 @@ Scope {
             "customNormY=" + Number(lockRoot.customNormY).toFixed(4),
             "clockScale=" + Number(lockRoot.clockScale).toFixed(2),
             "quoteMode=" + lockRoot.quoteMode,
+            "customQuoteText=" + lockRoot.customQuoteText,
+            "backdropMode=" + lockRoot.backdropMode,
+            "pamService=" + lockRoot.pamService,
             "scrimDim=" + Number(lockRoot.scrimDim).toFixed(2),
+            "vignetteStrength=" + Number(lockRoot.vignetteStrength).toFixed(2),
             "focusZoom=" + Number(lockRoot.focusZoom).toFixed(3),
             "showMedia=" + (lockRoot.showMediaCard ? "1" : "0"),
             "showMediaVisualizer=" + (lockRoot.showMediaVisualizer ? "1" : "0"),
             "showUser=" + (lockRoot.showUserPill ? "1" : "0"),
+            "showStatusBar=" + (lockRoot.showStatusBar ? "1" : "0"),
+            "showSystemVol=" + (lockRoot.showSystemVol ? "1" : "0"),
+            "showPowerDock=" + (lockRoot.showPowerDock ? "1" : "0"),
+            "confirmPowerActions=" + (lockRoot.confirmPowerActions ? "1" : "0"),
+            "allowLogoutOnLock=" + (lockRoot.allowLogoutOnLock ? "1" : "0"),
+            "showScreenCorners=" + (lockRoot.showScreenCorners ? "1" : "0"),
+            "ambientOrbs=" + (lockRoot.ambientOrbs ? "1" : "0"),
+            "albumArtBackdrop=" + (lockRoot.albumArtBackdrop ? "1" : "0"),
+            "autoZenIdle=" + (lockRoot.autoZenIdle ? "1" : "0"),
             "wallpaperSync=" + (lockRoot.wallpaperSync ? "1" : "0"),
             "customWallpaper=" + lockRoot.localWallpaperOverride
         ];
         lockStateFile.setText(lines.join("\n") + "\n");
-
-        if (lockRoot.syncClockGlobal && typeof Settings !== "undefined" && Settings?.save) {
-            Settings.save();
-        }
     }
 
     property FileView lockTokenFile: FileView {
@@ -277,54 +688,136 @@ Scope {
         watchChanges: false
         printErrors: false
         onLoaded: {
-            let t = text();
-            if (t && t.trim() === "locked" && !lockRoot.locked) {
+            let t = (text() || "").trim();
+            if (t === "locked" && !lockRoot.locked) {
                 lockRoot.locked = true;
             }
         }
+    }
+
+    property Process mkdirProc: Process {
+        command: ["mkdir", "-p", lockRoot.lockStateDir]
     }
 
     property Process splashProc: Process {
         command: ["hyprctl", "splash"]
         stdout: StdioCollector {
             onStreamFinished: {
-                let raw = (text || "").trim().toLowerCase();
-                if (raw !== "" && !raw.startsWith("error") && !raw.startsWith("unknown")) {
+                let raw = (text || "").trim();
+                if (raw !== "" && !raw.toLowerCase().startsWith("error") && !raw.toLowerCase().startsWith("unknown")) {
                     lockRoot.hyprSplash = raw;
                 } else if (lockRoot.hyprSplash === "") {
-                    lockRoot.hyprSplash = "hyprland: wayland compositor";
+                    lockRoot.hyprSplash = "Hyprland: Lua-powered Wayland compositor";
                 }
             }
         }
     }
 
+    // checks caps lock, active xkb layout, AND whether pam_faillock has locked the user out
+    property bool faillockTripped: false
+    property Process kbPollProc: Process {
+        command: [
+            "sh", "-c",
+            "caps=0; for f in /sys/class/leds/*capslock*/brightness; do [ -f \"$f\" ] && [ \"$(cat \"$f\" 2>/dev/null)\" = \"1\" ] && caps=1 && break; done; " +
+            "lay=$(hyprctl devices -j 2>/dev/null | grep -o '\"active_keymap\": *\"[^\"]*\"' | head -n1 | cut -d'\"' -f4); " +
+            "fl=$(faillock --user \"$USER\" 2>/dev/null | grep -c 'V' || true); " +
+            "printf '%s|%s|%s\\n' \"$caps\" \"$lay\" \"$fl\""
+        ]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let raw = (text || "").trim();
+                let parts = raw.split("|");
+                if (parts.length >= 2) {
+                    lockRoot.capsLockActive = parts[0].trim() === "1";
+                    let fullLay = parts[1].trim();
+                    if (fullLay !== "") {
+                        let paren = fullLay.match(/\(([A-Za-z0-9_-]{2,5})\)/);
+                        lockRoot.kbLayoutShort = paren ? paren[1] : fullLay.slice(0, 3);
+                    }
+                }
+                if (parts.length >= 3) {
+                    let validFails = parseInt(parts[2].trim()) || 0;
+                    lockRoot.faillockTripped = validFails >= 3;
+                }
+            }
+        }
+    }
+
+    function pollKeyboardState() {
+        if (!kbPollProc.running) kbPollProc.running = true;
+    }
+
+    function switchKeyboardLayout() {
+        Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", "next"]);
+        kbPollDelayTimer.restart();
+    }
+
+    Timer {
+        id: kbPollDelayTimer
+        interval: 80
+        repeat: false
+        onTriggered: lockRoot.pollKeyboardState()
+    }
+
+    function pickSmartCategory(): string {
+        let batPresent = UPower.displayDevice?.isPresent ?? false;
+        let batPct = Math.round((UPower.displayDevice?.percentage ?? 1.0) * 100);
+        let isCharging = UPower.displayDevice?.state === UPowerDeviceState.Charging;
+
+        if (batPresent && !isCharging && batPct <= 20) return "battery_low";
+        if (batPresent && isCharging && batPct < 95) return "battery_charging";
+        if (lockRoot.anyPlayerPlaying) return "media_playing";
+        if (typeof NetworkService !== "undefined" && NetworkService && !NetworkService.isConnected && !NetworkService.isWiredConnected) {
+            return "network_off";
+        }
+        if (lockRoot.defaultSink?.audio?.muted) return "volume_muted";
+        if ((lockRoot.defaultSink?.audio?.volume ?? 0) > 0.95) return "volume_high";
+        return "system";
+    }
+
     function refreshQuotes() {
-        splashProc.running = true;
-        let pool = Theme.flavorQuotes?.system;
+        if (!splashProc.running) splashProc.running = true;
+        let cat = lockRoot.quoteMode === "smart" ? pickSmartCategory() : "system";
+        let pool = Theme.flavorQuotes?.[cat] ?? Theme.flavorQuotes?.system;
         if (pool && pool.length > 0) {
             let idx = Math.floor(Math.random() * pool.length);
-            lockRoot.unhingedQuote = (pool[idx] || "").toLowerCase();
+            lockRoot.rolledQuote = pool[idx] || "";
         } else if (Theme.getFlavor) {
-            lockRoot.unhingedQuote = (Theme.getFlavor("system", "") || "").toLowerCase();
+            lockRoot.rolledQuote = Theme.getFlavor(cat, "") || "";
         }
     }
 
     readonly property string activeQuoteText: {
         if (lockRoot.quoteMode === "off") return "";
-        if (lockRoot.quoteMode === "unhinged") {
-            return lockRoot.unhingedQuote || (Theme.getFlavor ? Theme.getFlavor("system", "") : "");
+        if (lockRoot.quoteMode === "custom") return fmtText(lockRoot.customQuoteText);
+        if (lockRoot.quoteMode === "unhinged" || lockRoot.quoteMode === "smart") {
+            return fmtText(lockRoot.rolledQuote || lockRoot.hyprSplash);
         }
-        return lockRoot.hyprSplash || (Theme.getFlavor ? Theme.getFlavor("system", "") : "");
+        return fmtText(lockRoot.hyprSplash || lockRoot.rolledQuote);
     }
 
-    function fixCoverUrl(url) {
+    function numberToWords(n: int): string {
+        const ones = [
+            "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+            "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+            "Seventeen", "Eighteen", "Nineteen"
+        ];
+        const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty"];
+        if (n < 0 || n >= 60) return String(n);
+        if (n < 20) return fmtText(ones[n]);
+        let t = Math.floor(n / 10);
+        let r = n % 10;
+        return fmtText(r === 0 ? tens[t] : (tens[t] + "-" + ones[r].toLowerCase()));
+    }
+
+    function fixCoverUrl(url): string {
         if (!url || typeof url !== "string") return "";
         let cleaned = url.trim();
         if (cleaned.startsWith("/")) return "file://" + cleaned;
         return cleaned;
     }
 
-    function formatTime(seconds) {
+    function formatTime(seconds): string {
         if (seconds === undefined || seconds === null || isNaN(seconds) || seconds < 0) return "0:00";
         let sec = Math.floor(seconds);
         let m = Math.floor(sec / 60);
@@ -332,10 +825,24 @@ Scope {
         return m + ":" + (s < 10 ? "0" : "") + s;
     }
 
+    function formatBatteryEta(): string {
+        let dev = UPower.displayDevice;
+        if (!dev || !dev.isPresent) return "";
+        let isChg = dev.state === UPowerDeviceState.Charging;
+        let sec = isChg ? (dev.timeToFull ?? 0) : (dev.timeToEmpty ?? 0);
+        if (!sec || sec <= 60 || isNaN(sec)) return "";
+        return fmtText((isChg ? "full in " : "left ") + Theme.formatUptime(Math.round(sec)));
+    }
+
     Component.onCompleted: {
+        mkdirProc.running = true;
         refreshQuotes();
-        let t = lockTokenFile.text();
-        if (t && t.trim() === "locked" && !lockRoot.locked) {
+        let t = (lockTokenFile.text() || "").trim();
+        if (sessionPersist.wasLocked || t === "locked") {
+            if (sessionPersist.lockedAtEpochMs > 0) {
+                lockRoot.lockedAtTime = new Date(sessionPersist.lockedAtEpochMs);
+            }
+            lockRoot.failedAttempts = sessionPersist.failedCount;
             lockRoot.locked = true;
         }
     }
@@ -370,58 +877,81 @@ Scope {
     }
 
     signal triggerShake()
+    signal clearAllInputs()
 
     onLockedChanged: {
         if (locked) {
-            currentTime = new Date();
-            lockedAtTime = new Date();
+            if (!sessionPersist.wasLocked) {
+                lockedAtTime = new Date();
+                sessionPersist.lockedAtEpochMs = lockedAtTime.getTime();
+                failedAttempts = 0;
+                sessionPersist.failedCount = 0;
+            }
+            sessionPersist.wasLocked = true;
             authFailed = false;
             isChecking = false;
+            pamRespondedThisTurn = false;
+            pamFeedback = "";
+            pamFeedbackIsError = false;
             pendingPassword = "";
             sharedPassword = "";
             revealPassword = false;
             freeDragMode = false;
+            zenMode = false;
+            clearAllInputs();
+
             if (syncClockGlobal && typeof Settings !== "undefined" && Settings) {
                 if (Settings.clock24h !== undefined) sandboxClock24h = Boolean(Settings.clock24h);
                 if (Settings.clockShowSeconds !== undefined) showSeconds = Boolean(Settings.clockShowSeconds);
             }
             refreshQuotes();
+            pollKeyboardState();
             lockTokenFile.setText("locked");
         } else {
+            if (pam.active) pam.abort();
+            pamSafetyTimeout.stop();
+            activeSurface = null;
+            sessionPersist.wasLocked = false;
+            sessionPersist.lockedAtEpochMs = 0;
+            sessionPersist.failedCount = 0;
+            failedAttempts = 0;
+            pendingPassword = "";
             sharedPassword = "";
             revealPassword = false;
             freeDragMode = false;
+            zenMode = false;
+            pamFeedback = "";
+            clearAllInputs();
+            syncToGlobalSettings();
             lockTokenFile.setText("");
             Quickshell.execDetached(["rm", "-f", lockTokenPath]);
         }
     }
 
     Timer {
-        interval: 1000
-        running: lockRoot.locked
-        repeat: true
-        onTriggered: lockRoot.currentTime = new Date()
-    }
-
-    Timer {
-        interval: 80
-        running: lockRoot.locked && lockRoot.showMediaCard && lockRoot.showMediaVisualizer
+        interval: 75
+        running: lockRoot.locked && lockRoot.anyPlayerPlaying && (
+            (lockRoot.showMediaCard && lockRoot.showMediaVisualizer) || lockRoot.ambientOrbs
+        )
         repeat: true
         onTriggered: {
-            lockRoot.wavePhase = (lockRoot.wavePhase + 0.30) % (Math.PI * 20);
+            lockRoot.wavePhase = (lockRoot.wavePhase + 0.28) % (Math.PI * 20);
         }
     }
 
     Timer {
         id: pamSafetyTimeout
-        interval: 8000
+        interval: 9000
         onTriggered: {
             if (lockRoot.isChecking) {
-                pam.abort();
+                if (pam.active) pam.abort();
                 lockRoot.isChecking = false;
                 lockRoot.pendingPassword = "";
                 lockRoot.authFailed = true;
+                lockRoot.pamFeedback = "authentication timed out";
+                lockRoot.pamFeedbackIsError = true;
                 lockRoot.triggerShake();
+                shakeTimer.restart();
             }
         }
     }
@@ -431,34 +961,71 @@ Scope {
         function lock(): void {
             lockRoot.locked = true;
         }
+        function isLocked(): bool {
+            return lockRoot.locked;
+        }
     }
 
+    /*
+    rock-solid PAM handler:
+    never calls pam.abort() inside handleResponse() when both onResponseRequiredChanged
+    and onPamMessage fire on the same prompt!
+    */
     PamContext {
         id: pam
-        config: "login"
+        config: lockRoot.pamService || "login"
         user: Quickshell.env("USER") ?? ""
 
         function handleResponse(): void {
-            if (responseRequired && lockRoot.pendingPassword) {
+            if (responseRequired && !lockRoot.pamRespondedThisTurn) {
+                lockRoot.pamRespondedThisTurn = true;
                 let pw = lockRoot.pendingPassword;
                 lockRoot.pendingPassword = "";
                 pam.respond(pw);
             }
         }
 
-        onPamMessage: handleResponse()
-        onResponseRequiredChanged: handleResponse()
+        onPamMessage: {
+            if (pam.message && pam.message.trim() !== "") {
+                let msg = pam.message.trim();
+                if (!msg.toLowerCase().startsWith("password")) {
+                    lockRoot.pamFeedback = msg;
+                    lockRoot.pamFeedbackIsError = pam.messageIsError;
+                }
+            }
+            handleResponse();
+        }
+
+        onResponseRequiredChanged: {
+            if (!responseRequired) {
+                lockRoot.pamRespondedThisTurn = false;
+            } else {
+                handleResponse();
+            }
+        }
 
         onCompleted: (result) => {
             pamSafetyTimeout.stop();
             lockRoot.isChecking = false;
+            lockRoot.pamRespondedThisTurn = false;
             lockRoot.pendingPassword = "";
 
             if (result === PamResult.Success) {
                 lockRoot.locked = false;
                 lockRoot.authFailed = false;
+                lockRoot.pamFeedback = "";
             } else {
                 lockRoot.authFailed = true;
+                lockRoot.failedAttempts += 1;
+                sessionPersist.failedCount = lockRoot.failedAttempts;
+                lockRoot.pollKeyboardState();
+
+                if (result === PamResult.MaxTries || lockRoot.faillockTripped) {
+                    lockRoot.pamFeedback = "account locked by pam_faillock (run 'faillock --reset' in tty)";
+                } else if (!lockRoot.pamFeedback) {
+                    lockRoot.pamFeedback = "incorrect password, try again";
+                }
+                lockRoot.pamFeedbackIsError = true;
                 lockRoot.triggerShake();
                 shakeTimer.restart();
             }
@@ -466,31 +1033,51 @@ Scope {
 
         onError: (err) => {
             console.warn("[LockScreen PAM Error]:", err);
+            lockRoot.pamFeedback = "pam error: " + err;
+            lockRoot.pamFeedbackIsError = true;
         }
     }
 
     function tryUnlock(pw: string) {
-        if (isChecking || !pw || pw.length === 0) return;
+        if (isChecking) return;
+
+        if (pam.active) {
+            pam.abort();
+        }
 
         isChecking = true;
+        pamRespondedThisTurn = false;
         authFailed = false;
-        pendingPassword = pw;
+        pamFeedback = (!pw || pw.length === 0) ? "checking pam / passkey..." : "authenticating...";
+        pamFeedbackIsError = false;
+        pendingPassword = pw ?? "";
         sharedPassword = "";
+        revealPassword = false;
+        clearAllInputs();
         pamSafetyTimeout.restart();
 
         if (!pam.start()) {
             pamSafetyTimeout.stop();
             isChecking = false;
+            pamRespondedThisTurn = false;
             pendingPassword = "";
             authFailed = true;
+            pamFeedback = "failed to start pam session";
+            pamFeedbackIsError = true;
             triggerShake();
+            shakeTimer.restart();
         }
     }
 
     Timer {
         id: shakeTimer
-        interval: 1600
-        onTriggered: lockRoot.authFailed = false
+        interval: 3200
+        onTriggered: {
+            lockRoot.authFailed = false;
+            if (!lockRoot.isChecking) {
+                lockRoot.pamFeedback = "";
+            }
+        }
     }
 
     WlSessionLock {
@@ -500,15 +1087,52 @@ Scope {
         surface: Component {
             WlSessionLockSurface {
                 id: surface
+                color: lockRoot.uiSurfaceBase
 
                 property string pendingPowerAction: ""
                 property bool optionsOpen: false
                 property bool entered: false
                 property bool volumeHudVisible: false
-                property real trackPosition: activePlayer?.position ?? 0
+                property string volumeHudLabel: ""
+                property real trackPosition: lockRoot.activePlayer?.position ?? 0
+                property real stageBurstScale: 1.0
+                property bool snappedX: false
+                property bool snappedY: false
 
                 Component.onCompleted: {
                     entered = true;
+                    if (lockRoot.activeSurface === null) {
+                        lockRoot.activeSurface = surface;
+                        pwInput.forceActiveFocus();
+                    }
+                }
+
+                Component.onDestruction: {
+                    if (lockRoot.activeSurface === surface) {
+                        lockRoot.activeSurface = null;
+                    }
+                }
+
+                function claimSurfaceFocus() {
+                    if (lockRoot.activeSurface !== surface) {
+                        lockRoot.activeSurface = surface;
+                    }
+                    if (!customQuoteInput.activeFocus && !pwInput.activeFocus) {
+                        pwInput.forceActiveFocus();
+                    }
+                }
+
+                Timer {
+                    id: autoZenTimer
+                    interval: 30000
+                    running: lockRoot.locked && lockRoot.autoZenIdle && !lockRoot.zenMode && !surface.optionsOpen && lockRoot.sharedPassword.length === 0
+                    repeat: false
+                    onTriggered: lockRoot.zenMode = true
+                }
+
+                function wakeFromZen() {
+                    if (lockRoot.zenMode) lockRoot.zenMode = false;
+                    if (lockRoot.autoZenIdle) autoZenTimer.restart();
                 }
 
                 Timer {
@@ -519,14 +1143,40 @@ Scope {
 
                 Timer {
                     id: volumeHudTimer
-                    interval: 1400
+                    interval: 1500
                     onTriggered: surface.volumeHudVisible = false
                 }
 
+                function showVolumeToast(txt: string) {
+                    surface.volumeHudLabel = lockRoot.fmtText(txt);
+                    surface.volumeHudVisible = true;
+                    volumeHudTimer.restart();
+                }
+
+                function adjustSystemVolume(delta: real) {
+                    let audio = lockRoot.defaultSink?.audio;
+                    if (!audio) return;
+                    if (audio.muted && delta > 0) audio.muted = false;
+                    let next = Math.max(0.0, Math.min(1.5, (audio.volume ?? 0.5) + delta));
+                    audio.volume = next;
+                    showVolumeToast("sys " + Math.round(next * 100) + "%");
+                }
+
+                function toggleSystemMute() {
+                    let audio = lockRoot.defaultSink?.audio;
+                    if (!audio) return;
+                    audio.muted = !audio.muted;
+                    showVolumeToast(audio.muted ? "sys muted" : ("sys " + Math.round((audio.volume ?? 0) * 100) + "%"));
+                }
+
                 function requestPowerAction(action: string, cmd: var) {
-                    if (surface.pendingPowerAction === action) {
+                    if (!lockRoot.confirmPowerActions || surface.pendingPowerAction === action) {
                         surface.pendingPowerAction = "";
                         powerActionResetTimer.stop();
+                        surface.optionsOpen = false;
+                        lockRoot.sharedPassword = "";
+                        lockRoot.revealPassword = false;
+                        lockRoot.clearAllInputs();
                         Quickshell.execDetached(cmd);
                     } else {
                         surface.pendingPowerAction = action;
@@ -534,39 +1184,36 @@ Scope {
                     }
                 }
 
-                // Smart MPRIS player resolution
-                readonly property var playerList: Mpris?.players?.values ?? []
-                readonly property var activePlayer: {
-                    if (!playerList || playerList.length === 0) return null;
-                    if (lockRoot.manualPlayerIndex >= 0 && lockRoot.manualPlayerIndex < playerList.length) {
-                        let manual = playerList[lockRoot.manualPlayerIndex];
-                        if (manual && manual.isPlaying) return manual;
-                        let otherPlaying = playerList.find(p => p.isPlaying);
-                        if (!otherPlaying) return manual;
-                    }
-                    return playerList.find(p => p.isPlaying)
-                        ?? playerList.find(p => p.trackTitle)
-                        ?? playerList[0]
-                        ?? null;
+                readonly property var playerList: lockRoot.playerList
+                readonly property var activePlayer: lockRoot.activePlayer
+                readonly property int currentPlayerIdx: lockRoot.currentPlayerIdx
+                readonly property bool playerIsPlaying: lockRoot.playerIsPlaying
+                readonly property string coverArtUrl: lockRoot.coverArtUrl
+                readonly property color artAccent: lockRoot.artAccent
+
+                readonly property real liveAudioPeak: {
+                    if (!surface.playerIsPlaying) return 0.0;
+                    let pList = lockPeakMonitor.peaks;
+                    if (pList && pList.length >= 2) return Math.min(1.0, (pList[0] + pList[1]) * 0.5);
+                    return Math.min(1.0, lockPeakMonitor.peak ?? 0.0);
                 }
-                readonly property int currentPlayerIdx: {
-                    if (!activePlayer || !playerList) return 0;
-                    let idx = playerList.indexOf(activePlayer);
-                    return idx >= 0 ? idx : 0;
-                }
-                readonly property bool playerIsPlaying: activePlayer?.isPlaying ?? false
-                readonly property string coverArtUrl: lockRoot.fixCoverUrl(activePlayer?.trackArtUrl)
 
                 Connections {
                     target: surface.activePlayer
                     function onPositionChanged() {
+                        if (!seekMouse.pressed) {
+                            surface.trackPosition = surface.activePlayer?.position ?? 0;
+                        }
+                    }
+                    function onTrackTitleChanged() {
                         surface.trackPosition = surface.activePlayer?.position ?? 0;
+                        if (lockRoot.quoteMode === "smart") lockRoot.refreshQuotes();
                     }
                 }
 
                 Timer {
                     interval: 500
-                    running: lockRoot.locked && surface.playerIsPlaying && lockRoot.showMediaCard
+                    running: lockRoot.locked && surface.playerIsPlaying && lockRoot.showMediaCard && !lockRoot.zenMode && !seekMouse.pressed
                     repeat: true
                     onTriggered: {
                         if (surface.activePlayer) {
@@ -575,69 +1222,63 @@ Scope {
                     }
                 }
 
-                ColorQuantizer {
-                    id: lockArtQuantizer
-                    depth: 2
-                    source: surface.coverArtUrl
-                }
-
-                readonly property color artAccent: {
-                    if (Theme.isMonochrome) return Theme.primary;
-                    if (surface.coverArtUrl !== "" && lockArtQuantizer.colors && lockArtQuantizer.colors.length > 0) {
-                        for (let i = 0; i < lockArtQuantizer.colors.length; i++) {
-                            let c = lockArtQuantizer.colors[i];
-                            if (!c) continue;
-                            let mx = Math.max(c.r, c.g, c.b);
-                            let mn = Math.min(c.r, c.g, c.b);
-                            if (mx > 0.25 && (mx - mn) > 0.15) {
-                                return Theme.blend(c, Theme.primary, 0.45);
-                            }
-                        }
-                    }
-                    return Theme.primary;
-                }
-
-                // Squishy Theme-cohesive option chip
                 component OptChip: Rectangle {
                     id: cRoot
                     property string label: ""
+                    property string icon: ""
                     property bool selected: false
                     signal clicked()
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: 28
-                    radius: selected ? Theme.radiusMd : Theme.radiusPill
+                    radius: selected ? lockRoot.uiRadiusMd : lockRoot.uiRadiusPill
+                    opacity: lockRoot.studioLocked ? 0.55 : 1.0
                     color: selected
-                        ? Theme.primary_overlay
-                        : (cMouse.pressed ? Theme.widgetActive : (cMouse.containsMouse ? Theme.widgetHover : Theme.widgetBg))
+                        ? lockRoot.uiAccentOverlay
+                        : (cMouse.pressed ? lockRoot.uiWidgetActive : (cMouse.containsMouse ? lockRoot.uiWidgetHover : lockRoot.uiWidgetBg))
                     border.color: selected
-                        ? Theme.alpha(Theme.primary, 0.65)
-                        : (cMouse.containsMouse ? Theme.alpha(Theme.primary, 0.35) : Theme.widgetBorder)
+                        ? Theme.alpha(lockRoot.uiAccent, 0.65)
+                        : (cMouse.containsMouse ? Theme.alpha(lockRoot.uiAccent, 0.35) : lockRoot.uiWidgetBorder)
                     border.width: 1
 
                     Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
                     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                     Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                    Text {
+                    RowLayout {
                         anchors.centerIn: parent
-                        text: cRoot.label
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        font.weight: cRoot.selected ? Theme.fontWeightBold : Theme.fontWeightMedium
-                        color: cRoot.selected ? Theme.primary : Theme.textSecondary
+                        spacing: 4
+
+                        Text {
+                            visible: cRoot.icon !== ""
+                            text: cRoot.icon
+                            font.family: Theme.fontIcon
+                            font.pixelSize: Theme.fontSizeXs
+                            color: cRoot.selected ? lockRoot.uiAccent : lockRoot.uiTextSecondary
+                        }
+
+                        Text {
+                            text: lockRoot.fmtText(cRoot.label)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: cRoot.selected ? Theme.fontWeightBold : Theme.fontWeightMedium
+                            color: cRoot.selected ? lockRoot.uiAccent : lockRoot.uiTextSecondary
+                        }
                     }
 
                     MouseArea {
                         id: cMouse
                         anchors.fill: parent
                         hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: cRoot.clicked()
+                        enabled: !lockRoot.studioLocked
+                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                        onClicked: {
+                            cRoot.clicked();
+                            surface.claimSurfaceFocus();
+                        }
                     }
                 }
 
-                // Interactive, wheel- & drag-enabled Material 3 Expressive slider
                 component SandboxSlider: ColumnLayout {
                     id: sRoot
                     property string label: ""
@@ -651,10 +1292,12 @@ Scope {
 
                     Layout.fillWidth: true
                     spacing: 5
+                    opacity: lockRoot.studioLocked ? 0.55 : 1.0
 
                     readonly property real ratio: Math.max(0.0, Math.min(1.0, (value - from) / Math.max(0.0001, to - from)))
 
                     function setFromRatio(r: real) {
+                        if (lockRoot.studioLocked) return;
                         let clamped = Math.max(0.0, Math.min(1.0, r));
                         let raw = from + clamped * (to - from);
                         if (stepSize > 0) {
@@ -673,24 +1316,24 @@ Scope {
                             text: sRoot.icon
                             font.family: Theme.fontIcon
                             font.pixelSize: Theme.fontSizeXs
-                            color: sMouse.pressed || sMouse.containsMouse ? Theme.primary : Theme.textSecondary
+                            color: sMouse.pressed || sMouse.containsMouse ? lockRoot.uiAccent : lockRoot.uiTextSecondary
                         }
 
                         Text {
-                            text: sRoot.label
+                            text: lockRoot.fmtText(sRoot.label)
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Theme.fontWeightDemiBold
-                            color: Theme.textSecondary
+                            color: lockRoot.uiTextSecondary
                             Layout.fillWidth: true
                         }
 
                         Rectangle {
                             height: 18
                             implicitWidth: valTxt.implicitWidth + 10
-                            radius: Theme.radiusPill
-                            color: sMouse.pressed ? Theme.primary_overlay : Theme.widgetBg
-                            border.color: sMouse.pressed ? Theme.alpha(Theme.primary, 0.5) : Theme.widgetBorder
+                            radius: lockRoot.uiRadiusPill
+                            color: sMouse.pressed ? lockRoot.uiAccentOverlay : lockRoot.uiWidgetBg
+                            border.color: sMouse.pressed ? Theme.alpha(lockRoot.uiAccent, 0.5) : lockRoot.uiWidgetBorder
                             border.width: 1
 
                             Text {
@@ -700,7 +1343,7 @@ Scope {
                                 font.family: Theme.fontMono
                                 font.pixelSize: Theme.fontSizeXs
                                 font.weight: Theme.fontWeightBold
-                                color: Theme.primary
+                                color: lockRoot.uiAccent
                             }
                         }
                     }
@@ -714,9 +1357,9 @@ Scope {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             height: sMouse.pressed ? 14 : (sMouse.containsMouse ? 12 : 8)
-                            radius: Theme.radiusPill
-                            color: Theme.widgetBg
-                            border.color: sMouse.containsMouse ? Theme.alpha(Theme.primary, 0.35) : Theme.widgetBorder
+                            radius: lockRoot.uiRadiusPill
+                            color: lockRoot.uiWidgetBg
+                            border.color: sMouse.containsMouse ? Theme.alpha(lockRoot.uiAccent, 0.35) : lockRoot.uiWidgetBorder
                             border.width: 1
 
                             Behavior on height { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
@@ -727,10 +1370,10 @@ Scope {
                                 anchors.top: parent.top
                                 anchors.bottom: parent.bottom
                                 width: Math.max(parent.height, parent.width * sRoot.ratio)
-                                radius: Theme.radiusPill
+                                radius: lockRoot.uiRadiusPill
                                 color: sMouse.pressed
-                                    ? Theme.statePress(Theme.primary, Theme.on_primary)
-                                    : (sMouse.containsMouse ? Theme.stateHover(Theme.primary, Theme.on_primary) : Theme.primary)
+                                    ? Theme.statePress(lockRoot.uiAccent, lockRoot.uiOnAccent)
+                                    : (sMouse.containsMouse ? Theme.stateHover(lockRoot.uiAccent, lockRoot.uiOnAccent) : lockRoot.uiAccent)
 
                                 Behavior on color { ColorAnimation { duration: Theme.animFast } }
                             }
@@ -739,8 +1382,8 @@ Scope {
                         Rectangle {
                             width: sMouse.pressed ? 6 : 4
                             height: sMouse.pressed ? 20 : (sMouse.containsMouse ? 18 : 14)
-                            radius: Theme.radiusPill
-                            color: Theme.on_surface
+                            radius: lockRoot.uiRadiusPill
+                            color: lockRoot.uiTextPrimary
                             anchors.verticalCenter: parent.verticalCenter
                             x: Math.max(0, Math.min(parent.width - width, (parent.width * sRoot.ratio) - (width / 2)))
 
@@ -752,11 +1395,13 @@ Scope {
                             id: sMouse
                             anchors.fill: parent
                             hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
+                            enabled: !lockRoot.studioLocked
+                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                             onPressed: (mouse) => sRoot.setFromRatio(mouse.x / width)
                             onPositionChanged: (mouse) => {
                                 if (pressed) sRoot.setFromRatio(mouse.x / width);
                             }
+                            onReleased: surface.claimSurfaceFocus()
                             onWheel: (wheel) => {
                                 let dir = wheel.angleDelta.y > 0 ? 1 : -1;
                                 let next = Math.max(sRoot.from, Math.min(sRoot.to, sRoot.value + (dir * sRoot.stepSize)));
@@ -766,7 +1411,6 @@ Scope {
                     }
                 }
 
-                // Single-click full-row toggle item
                 component SandboxToggleRow: Rectangle {
                     id: tRow
                     property string icon: ""
@@ -776,8 +1420,9 @@ Scope {
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: 32
-                    radius: Theme.radiusSm
-                    color: rowMouse.containsMouse ? Theme.widgetHover : "transparent"
+                    radius: lockRoot.uiRadiusSm
+                    opacity: lockRoot.studioLocked ? 0.55 : 1.0
+                    color: rowMouse.containsMouse ? lockRoot.uiWidgetHover : "transparent"
 
                     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
@@ -791,15 +1436,15 @@ Scope {
                             text: tRow.icon
                             font.family: Theme.fontIcon
                             font.pixelSize: Theme.fontSizeMd
-                            color: tRow.checked ? Theme.primary : Theme.textSecondary
+                            color: tRow.checked ? lockRoot.uiAccent : lockRoot.uiTextSecondary
                             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                         }
 
                         Text {
-                            text: tRow.label
+                            text: lockRoot.fmtText(tRow.label)
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
-                            color: Theme.textPrimary
+                            color: lockRoot.uiTextPrimary
                             Layout.fillWidth: true
                             elide: Text.ElideRight
                         }
@@ -821,12 +1466,15 @@ Scope {
                         id: rowMouse
                         anchors.fill: parent
                         hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: tRow.toggled()
+                        enabled: !lockRoot.studioLocked
+                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                        onClicked: {
+                            tRow.toggled();
+                            surface.claimSurfaceFocus();
+                        }
                     }
                 }
 
-                // Squishy 2-step confirmation power pill
                 component PowerPill: Rectangle {
                     id: pRoot
                     property string actionId: ""
@@ -838,14 +1486,14 @@ Scope {
 
                     height: 40
                     implicitWidth: isArmed ? (pRow.implicitWidth + 28) : 40
-                    radius: isArmed ? Theme.radiusMd : Theme.radiusPill
+                    radius: isArmed ? lockRoot.uiRadiusMd : lockRoot.uiRadiusPill
                     color: isArmed
                         ? (pMouse.pressed ? Theme.statePress(Theme.error, Theme.on_error) : Theme.error)
-                        : (pMouse.pressed ? Theme.widgetActive : (pMouse.containsMouse ? Theme.pillHover : Theme.pillBg))
+                        : (pMouse.pressed ? lockRoot.uiWidgetActive : (pMouse.containsMouse ? lockRoot.uiPillHover : lockRoot.uiPillBg))
                     border.color: isArmed
                         ? Theme.error
-                        : (pMouse.containsMouse ? Theme.alpha(Theme.primary, 0.55) : Theme.pillBorder)
-                    border.width: (isArmed || pMouse.containsMouse || Theme.pillBorder.a > 0) ? 1 : 0
+                        : (pMouse.containsMouse ? Theme.alpha(lockRoot.uiAccent, 0.55) : lockRoot.uiPillBorder)
+                    border.width: (isArmed || pMouse.containsMouse || lockRoot.uiPillBorder.a > 0) ? 1 : 0
 
                     Behavior on implicitWidth { NumberAnimation { duration: Theme.expressiveFast; easing.type: Theme.animExpressiveEasing } }
                     Behavior on radius { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
@@ -861,12 +1509,12 @@ Scope {
                             text: pRoot.isArmed ? Theme.iconFlame : pRoot.icon
                             font.family: Theme.fontIcon
                             font.pixelSize: Theme.fontSizeMd
-                            color: pRoot.isArmed ? Theme.on_error : (pMouse.containsMouse ? Theme.primary : Theme.textPrimary)
+                            color: pRoot.isArmed ? Theme.on_error : (pMouse.containsMouse ? lockRoot.uiAccent : lockRoot.uiTextPrimary)
                         }
 
                         Text {
                             visible: pRoot.isArmed
-                            text: "confirm " + pRoot.label + "?"
+                            text: lockRoot.fmtText("confirm " + pRoot.label + "?")
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Theme.fontWeightBold
@@ -886,36 +1534,46 @@ Scope {
                 Rectangle {
                     id: screenCanvas
                     anchors.fill: parent
-                    color: Theme.background
+                    color: lockRoot.uiSurfaceBase
                     clip: true
 
                     focus: true
                     Keys.forwardTo: [pwInput]
 
-                    readonly property bool isDeepFocused: pwInput.text.length > 0 || surface.optionsOpen || lockRoot.isChecking
+                    readonly property bool isDeepFocused: lockRoot.sharedPassword.length > 0 || surface.optionsOpen || lockRoot.isChecking
 
                     MouseArea {
                         anchors.fill: parent
                         z: -1
+                        hoverEnabled: true
+                        onEntered: {
+                            surface.claimSurfaceFocus();
+                        }
+                        onPositionChanged: {
+                            surface.wakeFromZen();
+                        }
                         onClicked: {
+                            surface.wakeFromZen();
                             surface.optionsOpen = false;
                             surface.pendingPowerAction = "";
                             pwInput.forceActiveFocus();
                         }
                     }
 
-                    // Backdrop wallpaper with smooth depth-of-field zoom
                     Image {
+                        id: baseWall
                         anchors.fill: parent
                         source: {
                             let wp = "";
                             if (!lockRoot.wallpaperSync && lockRoot.localWallpaperOverride !== "") {
                                 wp = lockRoot.localWallpaperOverride;
                             } else {
-                                wp = WallpaperService?.currentWallpaperPath ?? lockRoot.localWallpaperOverride ?? "";
+                                wp = (typeof WallpaperService !== "undefined" ? WallpaperService?.currentWallpaperPath : "")
+                                    || lockRoot.localWallpaperOverride || "";
                             }
                             if (!wp || wp === "" || /\.(mp4|webm|mkv|mov)$/i.test(wp)) {
-                                wp = WallpaperService?.currWallStatic ?? ((Quickshell.env("HOME") || "") + "/.curr_wall_static.jpg");
+                                wp = (typeof WallpaperService !== "undefined" ? WallpaperService?.currWallStatic : "")
+                                    || (lockRoot.homeDir + "/.curr_wall_static.jpg");
                             }
                             if (!wp) return "";
                             return (wp.startsWith("file://") || wp.startsWith("http://") || wp.startsWith("https://")) ? wp : ("file://" + wp);
@@ -925,38 +1583,121 @@ Scope {
                         scale: parent.isDeepFocused ? lockRoot.focusZoom : 1.0
 
                         Behavior on scale {
-                            NumberAnimation {
-                                duration: Theme.expressiveSlow
-                                easing.type: Theme.animEasing
-                            }
+                            NumberAnimation { duration: Theme.expressiveSlow; easing.type: Theme.animEasing }
                         }
                     }
 
-                    // Adjustable Matugen scrim overlay
+                    Image {
+                        anchors.fill: parent
+                        source: (lockRoot.albumArtBackdrop && surface.coverArtUrl !== "") ? surface.coverArtUrl : ""
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        opacity: (lockRoot.albumArtBackdrop && surface.playerIsPlaying && status === Image.Ready) ? 0.55 : 0.0
+                        scale: parent.isDeepFocused ? (lockRoot.focusZoom + 0.08) : 1.08
+                        visible: opacity > 0.001
+
+                        Behavior on opacity { NumberAnimation { duration: Theme.expressiveSlow; easing.type: Theme.animEasing } }
+                        Behavior on scale { NumberAnimation { duration: Theme.expressiveSlow; easing.type: Theme.animEasing } }
+                    }
+
+                    // light/dark backdrop scrim
                     Rectangle {
                         anchors.fill: parent
-                        color: Theme.scrim
-                        opacity: Math.min(0.96, lockRoot.scrimDim + (parent.isDeepFocused ? 0.08 : 0.0))
+                        color: lockRoot.isLight ? lockRoot.uiSurfaceBase : Theme.scrim
+                        opacity: {
+                            let base = lockRoot.scrimDim + (parent.isDeepFocused ? 0.08 : 0.0);
+                            if (lockRoot.isLight) return Math.min(0.96, Math.max(0.32, base + 0.12));
+                            return Math.min(0.96, base);
+                        }
+                        Behavior on color { ColorAnimation { duration: Theme.animSlow; easing.type: Theme.animColorEasing } }
                         Behavior on opacity { NumberAnimation { duration: Theme.animSlow; easing.type: Theme.animEasing } }
                     }
 
-                    // Top-left user session & lock duration badge
+                    // ambient audio-reactive glow orbs
+                    Item {
+                        anchors.fill: parent
+                        visible: lockRoot.ambientOrbs
+                        opacity: surface.entered ? 1.0 : 0.0
+                        Behavior on opacity { NumberAnimation { duration: Theme.expressiveSlow } }
+
+                        Rectangle {
+                            width: Math.min(parent.width, parent.height) * (0.48 + surface.liveAudioPeak * 0.14)
+                            height: width
+                            radius: width / 2
+                            x: centerStage.x - width * 0.25 + Math.sin(lockRoot.wavePhase * 0.25) * 32
+                            y: centerStage.y - height * 0.20 + Math.cos(lockRoot.wavePhase * 0.20) * 24
+                            color: surface.artAccent
+                            opacity: (lockRoot.isLight ? 0.16 : 0.11) + (surface.liveAudioPeak * 0.10)
+                            Behavior on width { NumberAnimation { duration: 140; easing.type: Easing.OutQuad } }
+                            Behavior on color { ColorAnimation { duration: Theme.animSlow } }
+                        }
+
+                        Rectangle {
+                            width: Math.min(parent.width, parent.height) * (0.40 + surface.liveAudioPeak * 0.12)
+                            height: width
+                            radius: width / 2
+                            x: centerStage.x + centerStage.width * 0.35 - Math.cos(lockRoot.wavePhase * 0.22) * 28
+                            y: centerStage.y + centerStage.height * 0.25 + Math.sin(lockRoot.wavePhase * 0.18) * 28
+                            color: Theme.tertiary
+                            opacity: (lockRoot.isLight ? 0.13 : 0.08) + (surface.liveAudioPeak * 0.08)
+                            Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutQuad } }
+                        }
+                    }
+
+                    // vignette framing
+                    Rectangle {
+                        anchors.fill: parent
+                        visible: lockRoot.vignetteStrength > 0.01
+                        opacity: lockRoot.vignetteStrength
+
+                        readonly property color vigColor: lockRoot.isLight
+                            ? Theme.blend(Qt.rgba(0.84, 0.82, 0.88, 1.0), lockRoot.uiAccent, 0.16)
+                            : Theme.shadow
+
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Theme.alpha(parent.vigColor, lockRoot.isLight ? 0.65 : 0.75) }
+                            GradientStop { position: 0.22; color: "transparent" }
+                            GradientStop { position: 0.78; color: "transparent" }
+                            GradientStop { position: 1.0; color: Theme.alpha(parent.vigColor, lockRoot.isLight ? 0.75 : 0.85) }
+                        }
+                    }
+
+                    // alignment snap crosshairs
+                    Rectangle {
+                        visible: lockRoot.freeDragMode && stageDragMouse.pressed && surface.snappedX
+                        width: 1
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        x: parent.width / 2
+                        color: Theme.alpha(lockRoot.uiAccent, 0.55)
+                    }
+                    Rectangle {
+                        visible: lockRoot.freeDragMode && stageDragMouse.pressed && surface.snappedY
+                        height: 1
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        y: parent.height / 2
+                        color: Theme.alpha(lockRoot.uiAccent, 0.55)
+                    }
+
+                    // top-left user session, lock duration, and security status pill
                     Rectangle {
                         anchors.top: parent.top
                         anchors.left: parent.left
                         anchors.margins: 32
-                        anchors.topMargin: surface.entered ? 32 : 12
-                        opacity: surface.entered ? 1.0 : 0.0
-                        visible: lockRoot.showUserPill
+                        anchors.topMargin: (surface.entered && !lockRoot.zenMode) ? 32 : 12
+                        opacity: (surface.entered && !lockRoot.zenMode) ? 1.0 : 0.0
+                        visible: lockRoot.showUserPill && opacity > 0.01
                         height: 36
-                        implicitWidth: userRow.implicitWidth + 22
-                        radius: Theme.radiusPill
-                        color: Theme.pillBg
-                        border.color: Theme.pillBorder
-                        border.width: Theme.pillBorder.a > 0 ? 1 : 0
+                        implicitWidth: userRow.implicitWidth + 24
+                        radius: lockRoot.uiRadiusPill
+                        color: lockRoot.uiPillBg
+                        border.color: lockRoot.failedAttempts > 0 ? Theme.alpha(Theme.error, 0.65) : lockRoot.uiPillBorder
+                        border.width: (lockRoot.failedAttempts > 0 || lockRoot.uiPillBorder.a > 0) ? 1 : 0
 
                         Behavior on anchors.topMargin { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
                         Behavior on opacity { NumberAnimation { duration: Theme.animNormal } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                         RowLayout {
                             id: userRow
@@ -964,136 +1705,300 @@ Scope {
                             spacing: 8
 
                             Text {
-                                text: Theme.iconDistro ?? Theme.iconUser
+                                text: sessionLock.secure ? (Theme.iconDistro ?? Theme.iconUser) : Theme.iconShield
                                 font.family: Theme.fontIcon
                                 font.pixelSize: Theme.fontSizeMd
-                                color: Theme.primary
+                                color: lockRoot.uiAccent
                             }
 
                             Text {
-                                text: lockRoot.currentUser
+                                text: lockRoot.fmtText(lockRoot.currentUser)
                                 font.family: Theme.fontMono
                                 font.pixelSize: Theme.fontSizeSm
                                 font.weight: Theme.fontWeightDemiBold
-                                color: Theme.textPrimary
+                                color: lockRoot.uiTextPrimary
                             }
 
                             Text {
                                 text: "• " + lockRoot.lockedDurationText
                                 font.family: Theme.fontMono
                                 font.pixelSize: Theme.fontSizeXs
-                                color: Theme.textSecondary
+                                color: lockRoot.uiTextSecondary
+                            }
+
+                            Rectangle {
+                                visible: lockRoot.failedAttempts > 0
+                                height: 20
+                                implicitWidth: failBadgeTxt.implicitWidth + 12
+                                radius: lockRoot.uiRadiusPill
+                                color: Theme.error_overlay
+                                border.color: Theme.alpha(Theme.error, 0.55)
+                                border.width: 1
+
+                                Text {
+                                    id: failBadgeTxt
+                                    anchors.centerIn: parent
+                                    text: lockRoot.fmtText(lockRoot.failedAttempts + (lockRoot.failedAttempts === 1 ? " failed try" : " failed tries"))
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontSizeXs
+                                    font.weight: Theme.fontWeightBold
+                                    color: Theme.error
+                                }
                             }
                         }
                     }
 
-                    // Top-right status pill
+                    // subtle corner hover zone so if the user hides statusBar, they can still open the studio!
+                    MouseArea {
+                        id: cornerRevealHover
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        width: 160
+                        height: 80
+                        hoverEnabled: true
+                        acceptedButtons: Qt.NoButton
+                        visible: !lockRoot.showStatusBar
+                    }
+
+                    // top-right hardware & studio bar
                     Rectangle {
                         id: statusBar
                         anchors.top: parent.top
                         anchors.right: parent.right
                         anchors.margins: 32
-                        anchors.topMargin: surface.entered ? 32 : 12
-                        opacity: surface.entered ? 1.0 : 0.0
+                        anchors.topMargin: (surface.entered && !lockRoot.zenMode) ? 32 : 12
+                        opacity: (surface.entered && !lockRoot.zenMode && (lockRoot.showStatusBar || surface.optionsOpen || cornerRevealHover.containsMouse || barHoverDetect.containsMouse)) ? 1.0 : 0.0
+                        visible: opacity > 0.01
                         height: 36
                         implicitWidth: statusRow.implicitWidth + 22
-                        radius: Theme.radiusPill
-                        color: surface.optionsOpen ? Theme.widgetActive : Theme.pillBg
-                        border.color: surface.optionsOpen ? Theme.alpha(Theme.primary, 0.55) : Theme.pillBorder
-                        border.width: (surface.optionsOpen || Theme.pillBorder.a > 0) ? 1 : 0
+                        radius: lockRoot.uiRadiusPill
+                        color: surface.optionsOpen ? lockRoot.uiWidgetActive : lockRoot.uiPillBg
+                        border.color: surface.optionsOpen ? Theme.alpha(lockRoot.uiAccent, 0.55) : lockRoot.uiPillBorder
+                        border.width: (surface.optionsOpen || lockRoot.uiPillBorder.a > 0) ? 1 : 0
 
                         Behavior on anchors.topMargin { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
                         Behavior on opacity { NumberAnimation { duration: Theme.animNormal } }
                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                         Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
+                        MouseArea {
+                            id: barHoverDetect
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.NoButton
+                        }
+
                         RowLayout {
                             id: statusRow
                             anchors.centerIn: parent
-                            spacing: 14
+                            spacing: 12
 
-                            RowLayout {
-                                spacing: 6
-                                Text {
-                                    text: Theme.getWifiIcon(
-                                        NetworkService?.signalStrength ?? 100,
-                                        NetworkService?.isConnected ?? false,
-                                        NetworkService?.isWiredConnected ?? false
-                                    )
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeMd
-                                    color: (NetworkService?.isConnected ?? false) ? Theme.primary : Theme.textSecondary
+                            Rectangle {
+                                visible: lockRoot.kbLayoutShort !== ""
+                                height: 22
+                                implicitWidth: kbRow.implicitWidth + 12
+                                radius: lockRoot.uiRadiusPill
+                                color: kbMouse.containsMouse ? lockRoot.uiWidgetHover : lockRoot.uiWidgetBg
+                                border.color: lockRoot.uiWidgetBorder
+                                border.width: 1
+
+                                RowLayout {
+                                    id: kbRow
+                                    anchors.centerIn: parent
+                                    spacing: 4
+
+                                    Text {
+                                        text: Theme.iconKeyboard
+                                        font.family: Theme.fontIcon
+                                        font.pixelSize: Theme.fontSizeXs
+                                        color: lockRoot.uiAccent
+                                    }
+                                    Text {
+                                        text: lockRoot.fmtText(lockRoot.kbLayoutShort)
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightBold
+                                        color: lockRoot.uiTextPrimary
+                                    }
                                 }
-                                Text {
-                                    text: ((NetworkService?.isWiredConnected ?? false)
-                                        ? "wired"
-                                        : (NetworkService?.activeSsid || ((NetworkService?.isConnected ?? false) ? "connected" : "offline"))
-                                    ).toLowerCase()
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Theme.fontWeightMedium
-                                    color: Theme.textPrimary
+
+                                MouseArea {
+                                    id: kbMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        lockRoot.switchKeyboardLayout();
+                                        surface.claimSurfaceFocus();
+                                    }
+                                }
+                            }
+
+                            Item {
+                                visible: lockRoot.showSystemVol && lockRoot.defaultSink !== null
+                                implicitWidth: sysVolRow.implicitWidth
+                                implicitHeight: sysVolRow.implicitHeight
+
+                                readonly property real sinkVol: lockRoot.defaultSink?.audio?.volume ?? 0.0
+                                readonly property bool sinkMuted: lockRoot.defaultSink?.audio?.muted ?? false
+
+                                RowLayout {
+                                    id: sysVolRow
+                                    anchors.centerIn: parent
+                                    spacing: 5
+
+                                    Text {
+                                        text: Theme.getVolumeIcon(parent.parent.sinkVol, parent.parent.sinkMuted)
+                                        font.family: Theme.fontIcon
+                                        font.pixelSize: Theme.fontSizeMd
+                                        color: parent.parent.sinkMuted ? Theme.error : lockRoot.uiAccent
+                                    }
+
+                                    Text {
+                                        text: lockRoot.fmtText(parent.parent.sinkMuted ? "mute" : (Math.round(parent.parent.sinkVol * 100) + "%"))
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightMedium
+                                        color: lockRoot.uiTextPrimary
+                                    }
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        surface.toggleSystemMute();
+                                        surface.claimSurfaceFocus();
+                                    }
+                                    onWheel: (wheel) => {
+                                        surface.adjustSystemVolume(wheel.angleDelta.y > 0 ? 0.05 : -0.05);
+                                    }
                                 }
                             }
 
                             RowLayout {
                                 spacing: 6
+                                Text {
+                                    text: Theme.getWifiIcon(
+                                        (typeof NetworkService !== "undefined" ? NetworkService?.signalStrength : 100) ?? 100,
+                                        (typeof NetworkService !== "undefined" ? NetworkService?.isConnected : false) ?? false,
+                                        (typeof NetworkService !== "undefined" ? NetworkService?.isWiredConnected : false) ?? false
+                                    )
+                                    font.family: Theme.fontIcon
+                                    font.pixelSize: Theme.fontSizeMd
+                                    color: ((typeof NetworkService !== "undefined" && NetworkService?.isConnected) ?? false) ? lockRoot.uiAccent : lockRoot.uiTextSecondary
+                                }
+                                Text {
+                                    text: lockRoot.fmtText(((typeof NetworkService !== "undefined" && NetworkService?.isWiredConnected) ?? false)
+                                        ? "wired"
+                                        : ((typeof NetworkService !== "undefined" ? NetworkService?.activeSsid : "") || (((typeof NetworkService !== "undefined" && NetworkService?.isConnected) ?? false) ? "online" : "offline"))
+                                    )
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeXs
+                                    font.weight: Theme.fontWeightMedium
+                                    color: lockRoot.uiTextPrimary
+                                }
+                            }
+
+                            Item {
                                 visible: UPower.displayDevice?.isPresent ?? false
+                                implicitWidth: batStatusRow.implicitWidth
+                                implicitHeight: batStatusRow.implicitHeight
 
                                 readonly property int batPct: {
                                     let p = UPower.displayDevice?.percentage ?? 1.0;
                                     return Math.min(100, Math.max(0, Math.round(p * 100)));
                                 }
                                 readonly property bool isCharging: UPower.displayDevice?.state === UPowerDeviceState.Charging
+                                readonly property string etaStr: lockRoot.formatBatteryEta()
 
-                                Text {
-                                    text: Theme.getBatteryIcon(parent.batPct, parent.isCharging, !(UPower?.onBattery ?? true), false)
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeMd
-                                    color: Theme.getBatteryColor(parent.batPct, parent.isCharging)
+                                RowLayout {
+                                    id: batStatusRow
+                                    anchors.centerIn: parent
+                                    spacing: 6
+
+                                    Text {
+                                        text: Theme.getBatteryIcon(parent.parent.batPct, parent.parent.isCharging, !(UPower?.onBattery ?? true), false)
+                                        font.family: Theme.fontIcon
+                                        font.pixelSize: Theme.fontSizeMd
+                                        color: parent.parent.isCharging ? lockRoot.uiAccent : (parent.parent.batPct <= 20 ? Theme.error : lockRoot.uiTextPrimary)
+                                    }
+                                    Text {
+                                        text: parent.parent.batPct + "%" + (batHover.containsMouse && parent.parent.etaStr !== "" ? (" (" + parent.parent.etaStr + ")") : "")
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightMedium
+                                        color: lockRoot.uiTextPrimary
+                                    }
                                 }
-                                Text {
-                                    text: parent.batPct + "%"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Theme.fontWeightMedium
-                                    color: Theme.textPrimary
+
+                                MouseArea {
+                                    id: batHover
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                }
+                            }
+
+                            IconButton {
+                                icon: lockRoot.isLight ? Theme.iconSun : Theme.iconMoon
+                                iconSize: Theme.fontSizeSm
+                                tooltip: lockRoot.isLight ? "switch to dark mode" : "switch to light mode"
+                                onClicked: {
+                                    lockRoot.backdropMode = lockRoot.isLight ? "dark" : "light";
+                                    lockRoot.saveSandbox();
+                                    surface.claimSurfaceFocus();
+                                }
+                            }
+
+                            IconButton {
+                                icon: Theme.iconEyeOff
+                                iconSize: Theme.fontSizeSm
+                                tooltip: "zen screensaver mode (tab)"
+                                onClicked: {
+                                    surface.optionsOpen = false;
+                                    lockRoot.zenMode = true;
+                                    surface.claimSurfaceFocus();
                                 }
                             }
 
                             IconButton {
                                 icon: Theme.iconSparkles
                                 iconSize: Theme.fontSizeSm
-                                tooltip: "surprise me! (randomize)"
+                                tooltip: lockRoot.studioLocked ? "studio is locked" : "surprise me! (randomize)"
+                                enabled: !lockRoot.studioLocked
                                 onClicked: {
                                     surpriseBurstAnim.restart();
                                     lockRoot.surpriseMe();
+                                    surface.claimSurfaceFocus();
                                 }
                             }
 
                             IconButton {
                                 icon: Theme.iconSliders
                                 iconSize: Theme.fontSizeSm
-                                tooltip: "customize lock screen"
+                                tooltip: "lock screen studio"
                                 highlighted: surface.optionsOpen
-                                onClicked: surface.optionsOpen = !surface.optionsOpen
+                                onClicked: {
+                                    surface.optionsOpen = !surface.optionsOpen;
+                                    surface.claimSurfaceFocus();
+                                }
                             }
                         }
                     }
 
-                    // Sandbox & global customization dropdown panel
+                    // tabbed lock screen studio drawer
                     Rectangle {
                         id: optionsCard
                         anchors.top: statusBar.bottom
                         anchors.right: statusBar.right
                         anchors.topMargin: 10
-                        width: 356
+                        width: 380
                         height: Math.min(parent.height - 110, optionsLayout.implicitHeight + (Theme.popupPadding * 2))
-                        radius: Theme.radiusLg
-                        color: Theme.popupBg
-                        border.color: Theme.popupBorderColor
+                        radius: lockRoot.uiRadiusLg
+                        color: lockRoot.uiPopupBg
+                        border.color: lockRoot.uiPopupBorder
                         border.width: Theme.popupBorderWidth
-                        visible: opacity > 0
+                        visible: opacity > 0.01 && !lockRoot.zenMode
                         opacity: surface.optionsOpen ? 1.0 : 0.0
                         scale: surface.optionsOpen ? 1.0 : 0.95
                         transformOrigin: Item.TopRight
@@ -1102,6 +2007,8 @@ Scope {
 
                         Behavior on opacity { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
                         Behavior on scale { NumberAnimation { duration: Theme.expressiveFast; easing.type: Theme.animEasingEntrance } }
+                        Behavior on height { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                         MouseArea {
                             anchors.fill: parent
@@ -1128,42 +2035,39 @@ Scope {
                                         text: Theme.iconSliders
                                         font.family: Theme.fontIcon
                                         font.pixelSize: Theme.fontSizeMd
-                                        color: Theme.primary
+                                        color: lockRoot.uiAccent
                                     }
 
                                     Text {
-                                        text: "lock screen studio"
+                                        text: lockRoot.fmtText("lock screen studio")
                                         font.family: Theme.fontDisplay
                                         font.pixelSize: Theme.fontSizeMd
                                         font.weight: Theme.fontWeightBold
-                                        color: Theme.textPrimary
+                                        color: lockRoot.uiTextPrimary
                                         Layout.fillWidth: true
                                     }
 
-                                    Rectangle {
-                                        height: 22
-                                        implicitWidth: scopeBadge.implicitWidth + 12
-                                        radius: Theme.radiusPill
-                                        color: lockRoot.syncClockGlobal ? Theme.primary_overlay : Theme.pillBg
-                                        border.color: lockRoot.syncClockGlobal ? Theme.alpha(Theme.primary, 0.5) : Theme.pillBorder
-                                        border.width: 1
-
-                                        Text {
-                                            id: scopeBadge
-                                            anchors.centerIn: parent
-                                            text: lockRoot.syncClockGlobal ? "global" : "sandbox"
-                                            font.family: Theme.fontMono
-                                            font.pixelSize: Theme.fontSizeXs
-                                            font.weight: Theme.fontWeightBold
-                                            color: lockRoot.syncClockGlobal ? Theme.primary : Theme.textSecondary
+                                    IconButton {
+                                        icon: lockRoot.studioLocked ? Theme.iconLock : Theme.iconShield
+                                        iconSize: Theme.fontSizeXs
+                                        highlighted: lockRoot.studioLocked
+                                        tooltip: lockRoot.studioLocked ? "unlock studio controls" : "lock studio controls"
+                                        onClicked: {
+                                            lockRoot.studioLocked = !lockRoot.studioLocked;
+                                            lockRoot.flushStateToDisk();
+                                            surface.claimSurfaceFocus();
                                         }
                                     }
 
                                     IconButton {
                                         icon: Theme.iconRefresh
                                         iconSize: Theme.fontSizeXs
+                                        enabled: !lockRoot.studioLocked
                                         tooltip: "reset defaults"
-                                        onClicked: lockRoot.resetDefaults()
+                                        onClicked: {
+                                            lockRoot.resetDefaults();
+                                            surface.claimSurfaceFocus();
+                                        }
                                     }
 
                                     IconButton {
@@ -1177,16 +2081,16 @@ Scope {
                                     }
                                 }
 
-                                // Featured "Surprise Me!" Hero Action Button
                                 Rectangle {
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: 38
-                                    radius: surpriseMouse.pressed ? Theme.radiusPill : Theme.radiusMd
+                                    Layout.preferredHeight: 36
+                                    opacity: lockRoot.studioLocked ? 0.5 : 1.0
+                                    radius: surpriseMouse.pressed ? lockRoot.uiRadiusPill : lockRoot.uiRadiusMd
                                     color: surpriseMouse.pressed
-                                        ? Theme.statePress(Theme.primary, Theme.on_primary)
+                                        ? Theme.statePress(lockRoot.uiAccent, lockRoot.uiOnAccent)
                                         : (surpriseMouse.containsMouse
-                                            ? Theme.stateHover(Theme.primary, Theme.on_primary)
-                                            : Theme.primary)
+                                            ? Theme.stateHover(lockRoot.uiAccent, lockRoot.uiOnAccent)
+                                            : lockRoot.uiAccent)
 
                                     Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
                                     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -1199,15 +2103,15 @@ Scope {
                                             text: Theme.iconSparkles
                                             font.family: Theme.fontIcon
                                             font.pixelSize: Theme.fontSizeMd
-                                            color: Theme.on_primary
+                                            color: lockRoot.uiOnAccent
                                         }
 
                                         Text {
-                                            text: "surprise me! (randomize layout & vibe)"
+                                            text: lockRoot.fmtText("surprise me! (roll layout & vibe)")
                                             font.family: Theme.fontDisplay
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightBold
-                                            color: Theme.on_primary
+                                            color: lockRoot.uiOnAccent
                                         }
                                     }
 
@@ -1215,37 +2119,13 @@ Scope {
                                         id: surpriseMouse
                                         anchors.fill: parent
                                         hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
+                                        enabled: !lockRoot.studioLocked
+                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                                         onClicked: {
                                             surpriseBurstAnim.restart();
                                             lockRoot.surpriseMe();
+                                            surface.claimSurfaceFocus();
                                         }
-                                    }
-                                }
-
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    height: Theme.popupDividerHeight
-                                    color: Theme.widgetBorder
-                                }
-
-                                // Screen Position & Free Drag
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text {
-                                        text: "screen position"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Theme.fontWeightDemiBold
-                                        color: Theme.textSecondary
-                                        Layout.fillWidth: true
-                                    }
-                                    Text {
-                                        visible: lockRoot.layoutPosition === "custom"
-                                        text: "custom dragged"
-                                        font.family: Theme.fontMono
-                                        font.pixelSize: Theme.fontSizeXs
-                                        color: Theme.primary
                                     }
                                 }
 
@@ -1254,56 +2134,18 @@ Scope {
                                     spacing: 5
 
                                     Repeater {
-                                        model: ["left", "top", "center", "bottom", "right"]
+                                        model: [
+                                            { id: "layout",  label: "layout",  icon: Theme.iconGrid },
+                                            { id: "clock",   label: "clock",   icon: Theme.iconClock },
+                                            { id: "vibe",    label: "vibe",    icon: Theme.iconPalette },
+                                            { id: "widgets", label: "widgets", icon: Theme.iconSettings }
+                                        ]
                                         delegate: OptChip {
-                                            required property string modelData
-                                            label: modelData
-                                            selected: lockRoot.layoutPosition === modelData
-                                            onClicked: {
-                                                lockRoot.layoutPosition = modelData;
-                                                lockRoot.saveSandbox();
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Block Stack Order (Clock / Media / Password)
-                                Text {
-                                    text: "stack order (click to slide blocks)"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Theme.fontWeightDemiBold
-                                    color: Theme.textSecondary
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 5
-
-                                    OptChip {
-                                        label: "clock • media • pw"
-                                        selected: lockRoot.stackOrder === "clock,media,password"
-                                        onClicked: {
-                                            lockRoot.stackOrder = "clock,media,password";
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    OptChip {
-                                        label: "clock • pw • media"
-                                        selected: lockRoot.stackOrder === "clock,password,media"
-                                        onClicked: {
-                                            lockRoot.stackOrder = "clock,password,media";
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    OptChip {
-                                        label: "media • clock • pw"
-                                        selected: lockRoot.stackOrder === "media,clock,password"
-                                        onClicked: {
-                                            lockRoot.stackOrder = "media,clock,password";
-                                            lockRoot.saveSandbox();
+                                            required property var modelData
+                                            label: modelData.label
+                                            icon: modelData.icon
+                                            selected: lockRoot.studioTab === modelData.id
+                                            onClicked: lockRoot.studioTab = modelData.id
                                         }
                                     }
                                 }
@@ -1311,310 +2153,337 @@ Scope {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     height: Theme.popupDividerHeight
-                                    color: Theme.widgetBorder
+                                    color: lockRoot.uiWidgetBorder
                                 }
 
-                                // Clock Layout Style
-                                Text {
-                                    text: "clock style & format"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Theme.fontWeightDemiBold
-                                    color: Theme.textSecondary
-                                }
-
-                                RowLayout {
+                                // tab 1: presets, position, stack order, stage width, corner shape
+                                ColumnLayout {
+                                    visible: lockRoot.studioTab === "layout"
                                     Layout.fillWidth: true
-                                    spacing: 6
-
-                                    OptChip {
-                                        label: "inline"
-                                        selected: lockRoot.clockStyle === "inline"
-                                        onClicked: {
-                                            lockRoot.clockStyle = "inline";
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    OptChip {
-                                        label: "stacked"
-                                        selected: lockRoot.clockStyle === "stacked"
-                                        onClicked: {
-                                            lockRoot.clockStyle = "stacked";
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    OptChip {
-                                        label: "minimal"
-                                        selected: lockRoot.clockStyle === "minimal"
-                                        onClicked: {
-                                            lockRoot.clockStyle = "minimal";
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 6
-
-                                    OptChip {
-                                        label: "12-hour"
-                                        selected: !lockRoot.effectiveClock24h
-                                        onClicked: {
-                                            lockRoot.sandboxClock24h = false;
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    OptChip {
-                                        label: "24-hour"
-                                        selected: lockRoot.effectiveClock24h
-                                        onClicked: {
-                                            lockRoot.sandboxClock24h = true;
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    OptChip {
-                                        label: "seconds"
-                                        selected: lockRoot.effectiveShowSeconds
-                                        onClicked: {
-                                            lockRoot.showSeconds = !lockRoot.showSeconds;
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-                                }
-
-                                // Proportional Seconds Style Picker
-                                Text {
-                                    visible: lockRoot.effectiveShowSeconds
-                                    text: "seconds design"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Theme.fontWeightDemiBold
-                                    color: Theme.textSecondary
-                                }
-
-                                RowLayout {
-                                    visible: lockRoot.effectiveShowSeconds
-                                    Layout.fillWidth: true
-                                    spacing: 5
-
-                                    OptChip {
-                                        label: "big pill"
-                                        selected: lockRoot.secondsStyle === "badge"
-                                        onClicked: {
-                                            lockRoot.secondsStyle = "badge";
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    OptChip {
-                                        label: "split"
-                                        selected: lockRoot.secondsStyle === "supersub"
-                                        onClicked: {
-                                            lockRoot.secondsStyle = "supersub";
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    OptChip {
-                                        label: "tower / bar"
-                                        selected: lockRoot.secondsStyle === "tower"
-                                        onClicked: {
-                                            lockRoot.secondsStyle = "tower";
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    OptChip {
-                                        label: "inline"
-                                        selected: lockRoot.secondsStyle === "inline"
-                                        onClicked: {
-                                            lockRoot.secondsStyle = "inline";
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-                                }
-
-                                // Interactive Sliders
-                                SandboxSlider {
-                                    label: "clock scale"
-                                    icon: Theme.iconClock
-                                    from: 0.70
-                                    to: 1.45
-                                    stepSize: 0.03
-                                    value: lockRoot.clockScale
-                                    displayText: Math.round(lockRoot.clockScale * 100) + "%"
-                                    onMoved: (v) => {
-                                        lockRoot.clockScale = v;
-                                        lockRoot.saveSandbox();
-                                    }
-                                }
-
-                                SandboxSlider {
-                                    label: "backdrop dim"
-                                    icon: Theme.iconMoon
-                                    from: 0.15
-                                    to: 0.95
-                                    stepSize: 0.02
-                                    value: lockRoot.scrimDim
-                                    displayText: Math.round(lockRoot.scrimDim * 100) + "%"
-                                    onMoved: (v) => {
-                                        lockRoot.scrimDim = v;
-                                        lockRoot.saveSandbox();
-                                    }
-                                }
-
-                                SandboxSlider {
-                                    label: "focus depth zoom"
-                                    icon: Theme.iconExpand
-                                    from: 1.00
-                                    to: 1.15
-                                    stepSize: 0.01
-                                    value: lockRoot.focusZoom
-                                    displayText: Math.round((lockRoot.focusZoom - 1.0) * 100) + "%"
-                                    onMoved: (v) => {
-                                        lockRoot.focusZoom = v;
-                                        lockRoot.saveSandbox();
-                                    }
-                                }
-
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    height: Theme.popupDividerHeight
-                                    color: Theme.widgetBorder
-                                }
-
-                                // Quote source selector
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 6
+                                    spacing: 8
 
                                     Text {
-                                        text: "quote source"
+                                        text: lockRoot.fmtText("quick presets")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
-                                        color: Theme.textSecondary
-                                        Layout.fillWidth: true
+                                        color: lockRoot.uiTextSecondary
                                     }
-
-                                    IconButton {
-                                        icon: Theme.iconRefresh
-                                        iconSize: Theme.fontSizeXs
-                                        tooltip: "roll new quote"
-                                        visible: lockRoot.quoteMode !== "off"
-                                        onClicked: lockRoot.refreshQuotes()
-                                    }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 6
-
-                                    OptChip {
-                                        label: "hyprctl"
-                                        selected: lockRoot.quoteMode === "hyprland"
-                                        onClicked: {
-                                            lockRoot.quoteMode = "hyprland";
-                                            lockRoot.refreshQuotes();
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    OptChip {
-                                        label: "unhinged"
-                                        selected: lockRoot.quoteMode === "unhinged"
-                                        onClicked: {
-                                            lockRoot.quoteMode = "unhinged";
-                                            lockRoot.refreshQuotes();
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    OptChip {
-                                        label: "off"
-                                        selected: lockRoot.quoteMode === "off"
-                                        onClicked: {
-                                            lockRoot.quoteMode = "off";
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-                                }
-
-                                // Shuffle wallpaper button
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: Theme.popupActionHeight + 2
-                                    radius: Theme.radiusMd
-                                    color: shuffleMouse.pressed
-                                        ? Theme.widgetActive
-                                        : (shuffleMouse.containsMouse ? Theme.widgetHover : Theme.widgetBg)
-                                    border.color: shuffleMouse.containsMouse ? Theme.alpha(Theme.primary, 0.55) : Theme.widgetBorder
-                                    border.width: 1
-
-                                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-                                    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                                     RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 12
-                                        anchors.rightMargin: 12
-                                        spacing: 8
+                                        Layout.fillWidth: true
+                                        spacing: 4
 
-                                        Text {
-                                            text: Theme.iconShuffle
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.fontSizeMd
-                                            color: Theme.primary
+                                        Repeater {
+                                            model: ["expressive", "cards", "editorial", "cyber", "minimal"]
+                                            delegate: OptChip {
+                                                required property string modelData
+                                                label: modelData
+                                                selected: false
+                                                onClicked: {
+                                                    surpriseBurstAnim.restart();
+                                                    lockRoot.applyPreset(modelData);
+                                                }
+                                            }
                                         }
+                                    }
 
+                                    RowLayout {
+                                        Layout.fillWidth: true
                                         Text {
-                                            text: "shuffle lock wallpaper"
+                                            text: lockRoot.fmtText("screen position")
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightDemiBold
-                                            color: Theme.textPrimary
+                                            color: lockRoot.uiTextSecondary
                                             Layout.fillWidth: true
+                                        }
+                                        Text {
+                                            visible: lockRoot.layoutPosition === "custom"
+                                            text: Math.round(lockRoot.customNormX * 100) + "% , " + Math.round(lockRoot.customNormY * 100) + "%"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: Theme.fontSizeXs
+                                            color: lockRoot.uiAccent
                                         }
                                     }
 
-                                    MouseArea {
-                                        id: shuffleMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            let nextWp = lockRoot.pickRandomWallpaperInMemory();
-                                            if (nextWp && nextWp !== "") {
-                                                lockRoot.wallpaperSync = false;
-                                                lockRoot.localWallpaperOverride = nextWp;
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 5
+
+                                        Repeater {
+                                            model: ["left", "top", "center", "bottom", "right"]
+                                            delegate: OptChip {
+                                                required property string modelData
+                                                label: modelData
+                                                selected: lockRoot.layoutPosition === modelData
+                                                onClicked: {
+                                                    lockRoot.layoutPosition = modelData;
+                                                    lockRoot.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        text: lockRoot.fmtText("block stack order")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: lockRoot.uiTextSecondary
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Repeater {
+                                            model: [
+                                                { ord: "clock,media,password", lbl: "clk•med•pw" },
+                                                { ord: "clock,password,media", lbl: "clk•pw•med" },
+                                                { ord: "media,clock,password", lbl: "med•clk•pw" },
+                                                { ord: "password,clock,media", lbl: "pw•clk•med" }
+                                            ]
+                                            delegate: OptChip {
+                                                required property var modelData
+                                                label: modelData.lbl
+                                                selected: lockRoot.stackOrder === modelData.ord
+                                                onClicked: {
+                                                    lockRoot.stackOrder = modelData.ord;
+                                                    lockRoot.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        text: lockRoot.fmtText("corner shape style")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: lockRoot.uiTextSecondary
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 5
+
+                                        Repeater {
+                                            model: ["theme", "pill", "squircle", "sharp"]
+                                            delegate: OptChip {
+                                                required property string modelData
+                                                label: modelData
+                                                selected: lockRoot.shapePreset === modelData
+                                                onClicked: {
+                                                    lockRoot.shapePreset = modelData;
+                                                    lockRoot.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    SandboxSlider {
+                                        label: "stage width"
+                                        icon: Theme.iconExpand
+                                        from: 340
+                                        to: 620
+                                        stepSize: 8
+                                        value: lockRoot.stageWidth
+                                        displayText: Math.round(lockRoot.stageWidth) + "px"
+                                        onMoved: (v) => {
+                                            lockRoot.stageWidth = Math.round(v);
+                                            lockRoot.saveSandbox();
+                                        }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconGrid
+                                        label: "free drag mode (snap guides + arrow keys)"
+                                        checked: lockRoot.freeDragMode
+                                        onToggled: lockRoot.freeDragMode = !lockRoot.freeDragMode
+                                    }
+                                }
+
+                                // tab 2: clock design, date format, text casing, password mask
+                                ColumnLayout {
+                                    visible: lockRoot.studioTab === "clock"
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Text {
+                                        text: lockRoot.fmtText("clock architecture")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: lockRoot.uiTextSecondary
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Repeater {
+                                            model: ["inline", "stacked", "split", "typo"]
+                                            delegate: OptChip {
+                                                required property string modelData
+                                                label: modelData
+                                                selected: lockRoot.clockStyle === modelData
+                                                onClicked: {
+                                                    lockRoot.clockStyle = modelData;
+                                                    lockRoot.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Repeater {
+                                            model: ["digital", "editorial", "minimal"]
+                                            delegate: OptChip {
+                                                required property string modelData
+                                                label: modelData
+                                                selected: lockRoot.clockStyle === modelData
+                                                onClicked: {
+                                                    lockRoot.clockStyle = modelData;
+                                                    lockRoot.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        OptChip {
+                                            label: "12-hour"
+                                            selected: !lockRoot.effectiveClock24h
+                                            onClicked: {
+                                                lockRoot.sandboxClock24h = false;
+                                                lockRoot.saveSandbox();
+                                            }
+                                        }
+                                        OptChip {
+                                            label: "24-hour"
+                                            selected: lockRoot.effectiveClock24h
+                                            onClicked: {
+                                                lockRoot.sandboxClock24h = true;
+                                                lockRoot.saveSandbox();
+                                            }
+                                        }
+                                        OptChip {
+                                            label: "seconds"
+                                            selected: lockRoot.effectiveShowSeconds
+                                            onClicked: {
+                                                lockRoot.showSeconds = !lockRoot.showSeconds;
                                                 lockRoot.saveSandbox();
                                             }
                                         }
                                     }
-                                }
 
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    height: Theme.popupDividerHeight
-                                    color: Theme.widgetBorder
-                                }
+                                    RowLayout {
+                                        visible: lockRoot.effectiveShowSeconds
+                                        Layout.fillWidth: true
+                                        spacing: 5
 
-                                // Single-click toggles
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 2
+                                        OptChip {
+                                            label: "pill"
+                                            selected: lockRoot.secondsStyle === "badge"
+                                            onClicked: { lockRoot.secondsStyle = "badge"; lockRoot.saveSandbox(); }
+                                        }
+                                        OptChip {
+                                            label: "split"
+                                            selected: lockRoot.secondsStyle === "supersub"
+                                            onClicked: { lockRoot.secondsStyle = "supersub"; lockRoot.saveSandbox(); }
+                                        }
+                                        OptChip {
+                                            label: "bar"
+                                            selected: lockRoot.secondsStyle === "tower"
+                                            onClicked: { lockRoot.secondsStyle = "tower"; lockRoot.saveSandbox(); }
+                                        }
+                                        OptChip {
+                                            label: "inline"
+                                            selected: lockRoot.secondsStyle === "inline"
+                                            onClicked: { lockRoot.secondsStyle = "inline"; lockRoot.saveSandbox(); }
+                                        }
+                                    }
 
-                                    SandboxToggleRow {
-                                        icon: Theme.iconGrid
-                                        label: "free drag mode (move stack with mouse)"
-                                        checked: lockRoot.freeDragMode
-                                        onToggled: {
-                                            lockRoot.freeDragMode = !lockRoot.freeDragMode;
+                                    Text {
+                                        text: lockRoot.fmtText("date format")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: lockRoot.uiTextSecondary
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Repeater {
+                                            model: [
+                                                { fmt: "dddd, MMMM d", lbl: "full" },
+                                                { fmt: "ddd, MMM d",   lbl: "short" },
+                                                { fmt: "yyyy-MM-dd",   lbl: "iso" },
+                                                { fmt: "dd.MM.yyyy",   lbl: "eu" },
+                                                { fmt: "MM/dd/yyyy",   lbl: "us" }
+                                            ]
+                                            delegate: OptChip {
+                                                required property var modelData
+                                                label: modelData.lbl
+                                                selected: lockRoot.dateFormat === modelData.fmt
+                                                onClicked: {
+                                                    lockRoot.dateFormat = modelData.fmt;
+                                                    lockRoot.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        text: lockRoot.fmtText("text casing (follow user preference)")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: lockRoot.uiTextSecondary
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 5
+
+                                        Repeater {
+                                            model: [
+                                                { id: "lower",  lbl: "lowercase" },
+                                                { id: "normal", lbl: "Normal" },
+                                                { id: "upper",  lbl: "UPPER" }
+                                            ]
+                                            delegate: OptChip {
+                                                required property var modelData
+                                                label: modelData.lbl
+                                                selected: lockRoot.textCase === modelData.id
+                                                onClicked: {
+                                                    lockRoot.textCase = modelData.id;
+                                                    lockRoot.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    SandboxSlider {
+                                        label: "clock scale"
+                                        icon: Theme.iconClock
+                                        from: 0.70
+                                        to: 1.50
+                                        stepSize: 0.03
+                                        value: lockRoot.clockScale
+                                        displayText: Math.round(lockRoot.clockScale * 100) + "%"
+                                        onMoved: (v) => {
+                                            lockRoot.clockScale = v;
+                                            lockRoot.saveSandbox();
                                         }
                                     }
 
@@ -1630,12 +2499,348 @@ Scope {
 
                                     SandboxToggleRow {
                                         icon: Theme.iconClock
-                                        label: "sync clock globally across rice"
+                                        label: "sync clock format across rice"
                                         checked: lockRoot.syncClockGlobal
                                         onToggled: {
                                             lockRoot.syncClockGlobal = !lockRoot.syncClockGlobal;
                                             lockRoot.saveSandbox();
                                         }
+                                    }
+                                }
+
+                                // tab 3: theme mode, atmosphere, custom quote, password mask
+                                ColumnLayout {
+                                    visible: lockRoot.studioTab === "vibe"
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Text {
+                                        text: lockRoot.fmtText("theme mode (" + (lockRoot.isLight ? "light" : "dark") + ")")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: lockRoot.uiTextSecondary
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 5
+
+                                        OptChip {
+                                            label: "auto"
+                                            icon: Theme.iconSparkles
+                                            selected: lockRoot.backdropMode === "auto"
+                                            onClicked: { lockRoot.backdropMode = "auto"; lockRoot.saveSandbox(); }
+                                        }
+                                        OptChip {
+                                            label: "dark"
+                                            icon: Theme.iconMoon
+                                            selected: lockRoot.backdropMode === "dark"
+                                            onClicked: { lockRoot.backdropMode = "dark"; lockRoot.saveSandbox(); }
+                                        }
+                                        OptChip {
+                                            label: "light"
+                                            icon: Theme.iconSun
+                                            selected: lockRoot.backdropMode === "light"
+                                            onClicked: { lockRoot.backdropMode = "light"; lockRoot.saveSandbox(); }
+                                        }
+                                    }
+
+                                    SandboxSlider {
+                                        label: lockRoot.isLight ? "frost wash intensity" : "backdrop dim"
+                                        icon: lockRoot.isLight ? Theme.iconSun : Theme.iconMoon
+                                        from: 0.05
+                                        to: 0.95
+                                        stepSize: 0.02
+                                        value: lockRoot.scrimDim
+                                        displayText: Math.round(lockRoot.scrimDim * 100) + "%"
+                                        onMoved: (v) => {
+                                            lockRoot.scrimDim = v;
+                                            lockRoot.saveSandbox();
+                                        }
+                                    }
+
+                                    SandboxSlider {
+                                        label: "card & pill opacity boost"
+                                        icon: Theme.iconPalette
+                                        from: -0.35
+                                        to: 0.35
+                                        stepSize: 0.05
+                                        value: lockRoot.cardOpacityBoost
+                                        displayText: (lockRoot.cardOpacityBoost >= 0 ? "+" : "") + Math.round(lockRoot.cardOpacityBoost * 100) + "%"
+                                        onMoved: (v) => {
+                                            lockRoot.cardOpacityBoost = v;
+                                            lockRoot.saveSandbox();
+                                        }
+                                    }
+
+                                    SandboxSlider {
+                                        label: "cinematic vignette"
+                                        icon: Theme.iconEye
+                                        from: 0.0
+                                        to: 0.85
+                                        stepSize: 0.05
+                                        value: lockRoot.vignetteStrength
+                                        displayText: Math.round(lockRoot.vignetteStrength * 100) + "%"
+                                        onMoved: (v) => {
+                                            lockRoot.vignetteStrength = v;
+                                            lockRoot.saveSandbox();
+                                        }
+                                    }
+
+                                    SandboxSlider {
+                                        label: "focus depth zoom"
+                                        icon: Theme.iconExpand
+                                        from: 1.00
+                                        to: 1.18
+                                        stepSize: 0.01
+                                        value: lockRoot.focusZoom
+                                        displayText: Math.round((lockRoot.focusZoom - 1.0) * 100) + "%"
+                                        onMoved: (v) => {
+                                            lockRoot.focusZoom = v;
+                                            lockRoot.saveSandbox();
+                                        }
+                                    }
+
+                                    Text {
+                                        text: lockRoot.fmtText("password mask character")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: lockRoot.uiTextSecondary
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Repeater {
+                                            model: [
+                                                { ch: "•",    lbl: "dot •" },
+                                                { ch: "*",    lbl: "star *" },
+                                                { ch: "✦",    lbl: "spark ✦" },
+                                                { ch: "▪",    lbl: "block ▪" },
+                                                { ch: "none", lbl: "stealth" }
+                                            ]
+                                            delegate: OptChip {
+                                                required property var modelData
+                                                label: modelData.lbl
+                                                selected: lockRoot.pwMaskChar === modelData.ch
+                                                onClicked: {
+                                                    lockRoot.pwMaskChar = modelData.ch;
+                                                    lockRoot.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text {
+                                            text: lockRoot.fmtText("quote / greeting source")
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSizeXs
+                                            font.weight: Theme.fontWeightDemiBold
+                                            color: lockRoot.uiTextSecondary
+                                            Layout.fillWidth: true
+                                        }
+                                        IconButton {
+                                            icon: Theme.iconRefresh
+                                            iconSize: Theme.fontSizeXs
+                                            tooltip: "roll new quote"
+                                            visible: lockRoot.quoteMode !== "off" && lockRoot.quoteMode !== "custom"
+                                            onClicked: lockRoot.refreshQuotes()
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Repeater {
+                                            model: ["smart", "hyprland", "unhinged", "custom", "off"]
+                                            delegate: OptChip {
+                                                required property string modelData
+                                                label: modelData
+                                                selected: lockRoot.quoteMode === modelData
+                                                onClicked: {
+                                                    lockRoot.quoteMode = modelData;
+                                                    lockRoot.refreshQuotes();
+                                                    lockRoot.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // custom quote input box when quoteMode === "custom"
+                                    Rectangle {
+                                        visible: lockRoot.quoteMode === "custom"
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 34
+                                        radius: lockRoot.uiRadiusMd
+                                        color: lockRoot.uiWidgetBg
+                                        border.color: customQuoteInput.activeFocus ? lockRoot.uiAccent : lockRoot.uiWidgetBorder
+                                        border.width: 1
+
+                                        TextInput {
+                                            id: customQuoteInput
+                                            anchors.fill: parent
+                                            anchors.leftMargin: 10
+                                            anchors.rightMargin: 10
+                                            verticalAlignment: TextInput.AlignVCenter
+                                            text: lockRoot.customQuoteText
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSizeXs
+                                            color: lockRoot.uiTextPrimary
+                                            clip: true
+                                            onTextEdited: {
+                                                lockRoot.customQuoteText = text;
+                                                lockRoot.saveSandbox();
+                                            }
+                                            onAccepted: pwInput.forceActiveFocus()
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: Theme.popupActionHeight + 2
+                                        radius: lockRoot.uiRadiusMd
+                                        opacity: lockRoot.studioLocked ? 0.5 : 1.0
+                                        color: shuffleMouse.pressed
+                                            ? lockRoot.uiWidgetActive
+                                            : (shuffleMouse.containsMouse ? lockRoot.uiWidgetHover : lockRoot.uiWidgetBg)
+                                        border.color: shuffleMouse.containsMouse ? Theme.alpha(lockRoot.uiAccent, 0.55) : lockRoot.uiWidgetBorder
+                                        border.width: 1
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.leftMargin: 12
+                                            anchors.rightMargin: 12
+                                            spacing: 8
+
+                                            Text {
+                                                text: Theme.iconShuffle
+                                                font.family: Theme.fontIcon
+                                                font.pixelSize: Theme.fontSizeMd
+                                                color: lockRoot.uiAccent
+                                            }
+                                            Text {
+                                                text: lockRoot.fmtText("shuffle lock wallpaper")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSizeXs
+                                                font.weight: Theme.fontWeightDemiBold
+                                                color: lockRoot.uiTextPrimary
+                                                Layout.fillWidth: true
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: shuffleMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            enabled: !lockRoot.studioLocked
+                                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                                            onClicked: {
+                                                let nextWp = lockRoot.pickRandomWallpaperInMemory();
+                                                if (nextWp && nextWp !== "") {
+                                                    lockRoot.wallpaperSync = false;
+                                                    lockRoot.localWallpaperOverride = nextWp;
+                                                    lockRoot.saveSandbox();
+                                                }
+                                                surface.claimSurfaceFocus();
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // tab 4: modular widget visibility (nothing forced!)
+                                ColumnLayout {
+                                    visible: lockRoot.studioTab === "widgets"
+                                    Layout.fillWidth: true
+                                    spacing: 2
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconClock
+                                        label: "show clock readout"
+                                        checked: lockRoot.showClock
+                                        onToggled: { lockRoot.showClock = !lockRoot.showClock; lockRoot.saveSandbox(); }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconCalendar
+                                        label: "show date label"
+                                        checked: lockRoot.showDate
+                                        onToggled: { lockRoot.showDate = !lockRoot.showDate; lockRoot.saveSandbox(); }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: lockRoot.showMediaCard ? Theme.iconMusic : Theme.iconEyeOff
+                                        label: "show now playing media card"
+                                        checked: lockRoot.showMediaCard
+                                        onToggled: { lockRoot.showMediaCard = !lockRoot.showMediaCard; lockRoot.saveSandbox(); }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconEqualizer
+                                        label: "media spectrum & seekbar"
+                                        checked: lockRoot.showMediaVisualizer
+                                        onToggled: { lockRoot.showMediaVisualizer = !lockRoot.showMediaVisualizer; lockRoot.saveSandbox(); }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: lockRoot.showUserPill ? Theme.iconUser : Theme.iconEyeOff
+                                        label: "show top-left user & timer pill"
+                                        checked: lockRoot.showUserPill
+                                        onToggled: { lockRoot.showUserPill = !lockRoot.showUserPill; lockRoot.saveSandbox(); }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconSliders
+                                        label: "show top-right status bar (hover corner if off)"
+                                        checked: lockRoot.showStatusBar
+                                        onToggled: { lockRoot.showStatusBar = !lockRoot.showStatusBar; lockRoot.saveSandbox(); }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconVolHigh
+                                        label: "show system volume in top bar"
+                                        checked: lockRoot.showSystemVol
+                                        onToggled: { lockRoot.showSystemVol = !lockRoot.showSystemVol; lockRoot.saveSandbox(); }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconPower
+                                        label: "show bottom power dock"
+                                        checked: lockRoot.showPowerDock
+                                        onToggled: { lockRoot.showPowerDock = !lockRoot.showPowerDock; lockRoot.saveSandbox(); }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconShield
+                                        label: "2-step confirmation on power buttons"
+                                        checked: lockRoot.confirmPowerActions
+                                        onToggled: { lockRoot.confirmPowerActions = !lockRoot.confirmPowerActions; lockRoot.saveSandbox(); }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconLogout
+                                        label: "include logout button in power dock"
+                                        checked: lockRoot.allowLogoutOnLock
+                                        onToggled: { lockRoot.allowLogoutOnLock = !lockRoot.allowLogoutOnLock; lockRoot.saveSandbox(); }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconSparkles
+                                        label: "ambient audio-reactive glow orbs"
+                                        checked: lockRoot.ambientOrbs
+                                        onToggled: { lockRoot.ambientOrbs = !lockRoot.ambientOrbs; lockRoot.saveSandbox(); }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconMusic
+                                        label: "album art backdrop when playing"
+                                        checked: lockRoot.albumArtBackdrop
+                                        onToggled: { lockRoot.albumArtBackdrop = !lockRoot.albumArtBackdrop; lockRoot.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
@@ -1644,60 +2849,42 @@ Scope {
                                         checked: lockRoot.wallpaperSync
                                         onToggled: {
                                             lockRoot.wallpaperSync = !lockRoot.wallpaperSync;
-                                            if (lockRoot.wallpaperSync) {
-                                                lockRoot.localWallpaperOverride = "";
-                                            }
+                                            if (lockRoot.wallpaperSync) lockRoot.localWallpaperOverride = "";
                                             lockRoot.saveSandbox();
                                         }
                                     }
 
                                     SandboxToggleRow {
-                                        icon: lockRoot.showMediaCard ? Theme.iconMusic : Theme.iconEyeOff
-                                        label: "show now playing card"
-                                        checked: lockRoot.showMediaCard
-                                        onToggled: {
-                                            lockRoot.showMediaCard = !lockRoot.showMediaCard;
-                                            lockRoot.saveSandbox();
-                                        }
+                                        icon: Theme.iconCrop
+                                        label: "show concave screen corners"
+                                        checked: lockRoot.showScreenCorners
+                                        onToggled: { lockRoot.showScreenCorners = !lockRoot.showScreenCorners; lockRoot.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
-                                        icon: Theme.iconEqualizer
-                                        label: "media spectrum & seekbar"
-                                        checked: lockRoot.showMediaVisualizer
-                                        onToggled: {
-                                            lockRoot.showMediaVisualizer = !lockRoot.showMediaVisualizer;
-                                            lockRoot.saveSandbox();
-                                        }
-                                    }
-
-                                    SandboxToggleRow {
-                                        icon: lockRoot.showUserPill ? Theme.iconUser : Theme.iconEyeOff
-                                        label: "show user & lock timer badge"
-                                        checked: lockRoot.showUserPill
-                                        onToggled: {
-                                            lockRoot.showUserPill = !lockRoot.showUserPill;
-                                            lockRoot.saveSandbox();
-                                        }
+                                        icon: Theme.iconMoon
+                                        label: "auto-zen screensaver after 30s idle"
+                                        checked: lockRoot.autoZenIdle
+                                        onToggled: { lockRoot.autoZenIdle = !lockRoot.autoZenIdle; lockRoot.saveSandbox(); }
                                     }
                                 }
                             }
                         }
                     }
 
-                    // Dynamic movable & reorderable lock stage
+                    // main movable & reorderable stage
                     Item {
                         id: centerStage
-                        width: 440
+                        width: lockRoot.stageWidth
                         height: totalStageHeight
 
                         readonly property var orderList: (lockRoot.stackOrder || "clock,media,password").split(",")
                         readonly property int blockGap: 20
 
                         function blockHeight(name: string): real {
-                            if (name === "clock") return clockBlock.implicitHeight;
+                            if (name === "clock") return clockBlock.visible ? clockBlock.implicitHeight : 0;
                             if (name === "media") return mediaBlock.visible ? mediaBlock.implicitHeight : 0;
-                            if (name === "password") return passwordBlock.implicitHeight;
+                            if (name === "password") return lockRoot.zenMode ? 0 : passwordBlock.implicitHeight;
                             return 0;
                         }
 
@@ -1726,7 +2913,6 @@ Scope {
                             return total;
                         }
 
-                        // Target X/Y calculation from preset or custom drag coordinates
                         x: {
                             let availW = Math.max(1, screenCanvas.width - width);
                             if (lockRoot.layoutPosition === "left") return 64;
@@ -1747,6 +2933,7 @@ Scope {
                             return availH / 2;
                         }
 
+                        Behavior on width { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
                         Behavior on x {
                             enabled: !stageDragMouse.pressed
                             NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance }
@@ -1756,7 +2943,7 @@ Scope {
                             NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance }
                         }
 
-                        scale: surface.entered ? 1.0 : 0.94
+                        scale: (surface.entered ? 1.0 : 0.94) * surface.stageBurstScale
                         opacity: surface.entered ? 1.0 : 0.0
 
                         Behavior on scale { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
@@ -1764,32 +2951,31 @@ Scope {
 
                         SequentialAnimation {
                             id: surpriseBurstAnim
-                            NumberAnimation { target: centerStage; property: "scale"; from: 1.0; to: 0.95; duration: 90; easing.type: Easing.OutQuad }
-                            NumberAnimation { target: centerStage; property: "scale"; from: 0.95; to: 1.0; duration: 260; easing.type: Easing.OutBack }
+                            NumberAnimation { target: surface; property: "stageBurstScale"; from: 1.0; to: 0.95; duration: 85; easing.type: Easing.OutQuad }
+                            NumberAnimation { target: surface; property: "stageBurstScale"; from: 0.95; to: 1.0; duration: 250; easing.type: Easing.OutBack }
                         }
 
-                        // Outline highlight when Free Drag Mode is active
                         Rectangle {
                             anchors.fill: parent
                             anchors.margins: -14
-                            radius: Theme.radiusXl
-                            color: stageDragMouse.pressed ? Theme.alpha(Theme.primary, 0.08) : "transparent"
-                            border.color: lockRoot.freeDragMode ? Theme.alpha(Theme.primary, 0.55) : "transparent"
+                            radius: lockRoot.uiRadiusXl
+                            color: stageDragMouse.pressed ? Theme.alpha(lockRoot.uiAccent, 0.08) : "transparent"
+                            border.color: lockRoot.freeDragMode ? Theme.alpha(lockRoot.uiAccent, 0.55) : "transparent"
                             border.width: lockRoot.freeDragMode ? 1 : 0
-                            visible: lockRoot.freeDragMode
+                            visible: lockRoot.freeDragMode && !lockRoot.zenMode
                         }
 
-                        // Interactive Drag Handle Pill (when Free Drag Mode is enabled)
+                        // drag handle pill with center-snap logic
                         Rectangle {
                             id: dragHandlePill
-                            visible: lockRoot.freeDragMode
+                            visible: lockRoot.freeDragMode && !lockRoot.zenMode
                             anchors.top: parent.top
                             anchors.horizontalCenter: parent.horizontalCenter
                             height: 28
                             implicitWidth: dragHandleRow.implicitWidth + 20
-                            radius: Theme.radiusPill
-                            color: stageDragMouse.pressed ? Theme.primary : Theme.pillBg
-                            border.color: Theme.primary
+                            radius: lockRoot.uiRadiusPill
+                            color: stageDragMouse.pressed ? lockRoot.uiAccent : lockRoot.uiPillBg
+                            border.color: lockRoot.uiAccent
                             border.width: 1
 
                             RowLayout {
@@ -1801,15 +2987,15 @@ Scope {
                                     text: Theme.iconGrid
                                     font.family: Theme.fontIcon
                                     font.pixelSize: Theme.fontSizeXs
-                                    color: stageDragMouse.pressed ? Theme.on_primary : Theme.primary
+                                    color: stageDragMouse.pressed ? lockRoot.uiOnAccent : lockRoot.uiAccent
                                 }
 
                                 Text {
-                                    text: "drag anywhere • double-click to center"
+                                    text: lockRoot.fmtText("drag stage (snaps to 50%) • double-click to center")
                                     font.family: Theme.fontMono
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightBold
-                                    color: stageDragMouse.pressed ? Theme.on_primary : Theme.textPrimary
+                                    color: stageDragMouse.pressed ? lockRoot.uiOnAccent : lockRoot.uiTextPrimary
                                 }
                             }
 
@@ -1831,10 +3017,25 @@ Scope {
                                     let availH = Math.max(1, screenCanvas.height - centerStage.height);
                                     let newX = Math.max(24, Math.min(screenCanvas.width - centerStage.width - 24, globalPt.x - pressOffset.x));
                                     let newY = Math.max(64, Math.min(screenCanvas.height - centerStage.height - 88, globalPt.y - pressOffset.y));
-                                    lockRoot.customNormX = newX / availW;
-                                    lockRoot.customNormY = newY / availH;
+
+                                    let nx = newX / availW;
+                                    let ny = newY / availH;
+
+                                    if (Math.abs(nx - 0.5) < 0.025) { nx = 0.5; surface.snappedX = true; }
+                                    else { surface.snappedX = false; }
+
+                                    if (Math.abs(ny - 0.5) < 0.025) { ny = 0.5; surface.snappedY = true; }
+                                    else { surface.snappedY = false; }
+
+                                    lockRoot.customNormX = nx;
+                                    lockRoot.customNormY = ny;
                                     lockRoot.layoutPosition = "custom";
                                     lockRoot.saveSandbox();
+                                }
+                                onReleased: {
+                                    surface.snappedX = false;
+                                    surface.snappedY = false;
+                                    surface.claimSurfaceFocus();
                                 }
                                 onDoubleClicked: {
                                     lockRoot.layoutPosition = "center";
@@ -1845,9 +3046,10 @@ Scope {
                             }
                         }
 
-                        // ==================== BLOCK 1: CLOCK + DATE + QUOTE ====================
+                        // clock, date & quote block
                         ColumnLayout {
                             id: clockBlock
+                            visible: lockRoot.showClock || lockRoot.showDate || lockRoot.activeQuoteText !== ""
                             width: parent.width
                             y: centerStage.blockY("clock")
                             spacing: 6
@@ -1855,52 +3057,55 @@ Scope {
                             Behavior on y { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
 
                             readonly property int baseClockPx: Math.round((lockRoot.clockStyle === "minimal" ? 56 : 86) * Theme.fontScale * lockRoot.clockScale)
-                            readonly property string mainHoursText: Qt.formatDateTime(lockRoot.currentTime, lockRoot.effectiveClock24h ? "HH" : "hh")
-                            readonly property string mainMinutesText: Qt.formatDateTime(lockRoot.currentTime, "mm")
-                            readonly property string secondsDigits: Qt.formatDateTime(lockRoot.currentTime, "ss")
-                            readonly property string amPmText: Qt.formatDateTime(lockRoot.currentTime, "a").toLowerCase()
+                            readonly property int rawHours: lockRoot.currentTime.getHours()
+                            readonly property int displayHourNum: lockRoot.effectiveClock24h ? rawHours : ((rawHours % 12) || 12)
+                            readonly property int displayMinNum: lockRoot.currentTime.getMinutes()
+                            readonly property int displaySecNum: lockRoot.currentTime.getSeconds()
 
-                            // Date ABOVE Clock option
+                            readonly property string mainHoursText: (displayHourNum < 10 ? "0" : "") + displayHourNum
+                            readonly property string mainMinutesText: (displayMinNum < 10 ? "0" : "") + displayMinNum
+                            readonly property string secondsDigits: (displaySecNum < 10 ? "0" : "") + displaySecNum
+                            readonly property string amPmText: lockRoot.fmtText(rawHours >= 12 ? "PM" : "AM")
+                            readonly property string formattedDateText: lockRoot.fmtText(Qt.formatDateTime(lockRoot.currentTime, lockRoot.dateFormat))
+
                             Text {
-                                visible: lockRoot.dateAboveClock
-                                text: Qt.formatDateTime(lockRoot.currentTime, "dddd, MMMM d").toLowerCase()
+                                visible: lockRoot.showDate && lockRoot.dateAboveClock && lockRoot.clockStyle !== "editorial"
+                                text: clockBlock.formattedDateText
                                 font.family: Theme.fontDisplay
                                 font.pixelSize: Theme.fontSizeMd
                                 font.weight: Theme.fontWeightDemiBold
-                                color: Theme.primary
+                                color: lockRoot.uiAccent
                                 Layout.alignment: Qt.AlignHCenter
                             }
 
-                            // ---- INLINE / MINIMAL CLOCK ----
+                            // style 1 & 2: inline or minimal clock
                             RowLayout {
-                                visible: lockRoot.clockStyle !== "stacked"
+                                visible: lockRoot.showClock && (lockRoot.clockStyle === "inline" || lockRoot.clockStyle === "minimal")
                                 Layout.alignment: Qt.AlignHCenter
                                 spacing: 10
 
-                                // Main Time String
                                 Text {
                                     text: {
+                                        let hm = clockBlock.mainHoursText + ":" + clockBlock.mainMinutesText;
                                         if (lockRoot.effectiveShowSeconds && lockRoot.secondsStyle === "inline") {
-                                            let fmt = lockRoot.effectiveClock24h ? "HH:mm:ss" : "hh:mm:ss a";
-                                            return Qt.formatDateTime(lockRoot.currentTime, fmt).toLowerCase();
+                                            return hm + ":" + clockBlock.secondsDigits + (!lockRoot.effectiveClock24h ? (" " + clockBlock.amPmText) : "");
                                         }
                                         if (!lockRoot.effectiveShowSeconds && !lockRoot.effectiveClock24h) {
-                                            return Qt.formatDateTime(lockRoot.currentTime, "hh:mm a").toLowerCase();
+                                            return hm + " " + clockBlock.amPmText;
                                         }
-                                        return clockBlock.mainHoursText + ":" + clockBlock.mainMinutesText;
+                                        return hm;
                                     }
                                     font.family: Theme.fontDisplay
                                     font.pixelSize: (lockRoot.effectiveShowSeconds && lockRoot.secondsStyle === "inline")
-                                        ? Math.round(clockBlock.baseClockPx * 0.78)
+                                        ? Math.round(clockBlock.baseClockPx * 0.76)
                                         : clockBlock.baseClockPx
                                     font.weight: lockRoot.clockStyle === "minimal" ? Theme.fontWeightDemiBold : Theme.fontWeightBold
-                                    color: Theme.textPrimary
+                                    color: lockRoot.uiTextPrimary
                                     Layout.alignment: Qt.AlignVCenter
 
                                     Behavior on font.pixelSize { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
                                 }
 
-                                // Seconds Style 1: "badge" (Proportional Expressive Squircle Pill)
                                 ColumnLayout {
                                     visible: lockRoot.effectiveShowSeconds && lockRoot.secondsStyle === "badge"
                                     Layout.alignment: Qt.AlignVCenter
@@ -1910,9 +3115,9 @@ Scope {
                                         readonly property int badgeFontPx: Math.max(18, Math.round(clockBlock.baseClockPx * 0.38))
                                         height: badgeFontPx + 14
                                         implicitWidth: secBadgeTxt.implicitWidth + 20
-                                        radius: Theme.radiusMd
-                                        color: Theme.primary_overlay
-                                        border.color: Theme.alpha(Theme.primary, 0.55)
+                                        radius: lockRoot.uiRadiusMd
+                                        color: lockRoot.uiAccentOverlay
+                                        border.color: Theme.alpha(lockRoot.uiAccent, 0.55)
                                         border.width: 1
 
                                         Text {
@@ -1922,7 +3127,7 @@ Scope {
                                             font.family: Theme.fontMono
                                             font.pixelSize: parent.badgeFontPx
                                             font.weight: Theme.fontWeightBold
-                                            color: Theme.primary
+                                            color: lockRoot.uiAccent
                                         }
                                     }
 
@@ -1932,12 +3137,11 @@ Scope {
                                         font.family: Theme.fontMono
                                         font.pixelSize: Math.max(11, Math.round(clockBlock.baseClockPx * 0.18))
                                         font.weight: Theme.fontWeightBold
-                                        color: Theme.textSecondary
+                                        color: lockRoot.uiTextSecondary
                                         Layout.alignment: Qt.AlignHCenter
                                     }
                                 }
 
-                                // Seconds Style 2: "supersub" (Typographic Flush Split Stack)
                                 ColumnLayout {
                                     visible: lockRoot.effectiveShowSeconds && lockRoot.secondsStyle === "supersub"
                                     Layout.alignment: Qt.AlignVCenter
@@ -1948,7 +3152,7 @@ Scope {
                                         font.family: Theme.fontDisplay
                                         font.pixelSize: Math.max(20, Math.round(clockBlock.baseClockPx * 0.44))
                                         font.weight: Theme.fontWeightBold
-                                        color: Theme.primary
+                                        color: lockRoot.uiAccent
                                     }
 
                                     Text {
@@ -1957,49 +3161,14 @@ Scope {
                                         font.family: Theme.fontMono
                                         font.pixelSize: Math.max(12, Math.round(clockBlock.baseClockPx * 0.22))
                                         font.weight: Theme.fontWeightBold
-                                        color: Theme.textSecondary
+                                        color: lockRoot.uiTextSecondary
                                     }
                                 }
                             }
 
-                            // Seconds Style 3 ("tower" in inline mode): 60-second animated bar + proportional pill under clock
+                            // style 3: stacked m3 expressive clock
                             RowLayout {
-                                visible: lockRoot.clockStyle !== "stacked" && lockRoot.effectiveShowSeconds && lockRoot.secondsStyle === "tower"
-                                Layout.alignment: Qt.AlignHCenter
-                                spacing: 10
-
-                                Rectangle {
-                                    width: 150
-                                    height: 8
-                                    radius: Theme.radiusPill
-                                    color: Theme.widgetBg
-                                    border.color: Theme.widgetBorder
-                                    border.width: 1
-
-                                    Rectangle {
-                                        anchors.left: parent.left
-                                        anchors.top: parent.top
-                                        anchors.bottom: parent.bottom
-                                        width: Math.max(parent.height, parent.width * ((lockRoot.currentTime.getSeconds() + 1) / 60.0))
-                                        radius: Theme.radiusPill
-                                        color: Theme.primary
-
-                                        Behavior on width { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-                                    }
-                                }
-
-                                Text {
-                                    text: clockBlock.secondsDigits + "s" + (!lockRoot.effectiveClock24h ? (" • " + clockBlock.amPmText) : "")
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: Math.max(13, Math.round(Theme.fontSizeSm * lockRoot.clockScale))
-                                    font.weight: Theme.fontWeightBold
-                                    color: Theme.primary
-                                }
-                            }
-
-                            // ---- STACKED MATERIAL 3 EXPRESSIVE CLOCK ----
-                            RowLayout {
-                                visible: lockRoot.clockStyle === "stacked"
+                                visible: lockRoot.showClock && lockRoot.clockStyle === "stacked"
                                 Layout.alignment: Qt.AlignHCenter
                                 spacing: 14
 
@@ -2011,7 +3180,7 @@ Scope {
                                         font.family: Theme.fontDisplay
                                         font.pixelSize: Math.round(92 * Theme.fontScale * lockRoot.clockScale)
                                         font.weight: Theme.fontWeightBold
-                                        color: Theme.textPrimary
+                                        color: lockRoot.uiTextPrimary
                                         Layout.alignment: Qt.AlignHCenter
                                     }
 
@@ -2020,11 +3189,10 @@ Scope {
                                         font.family: Theme.fontDisplay
                                         font.pixelSize: Math.round(92 * Theme.fontScale * lockRoot.clockScale)
                                         font.weight: Theme.fontWeightBold
-                                        color: Theme.primary
+                                        color: lockRoot.uiAccent
                                         Layout.alignment: Qt.AlignHCenter
                                     }
 
-                                    // 3-Tier Vertical Tower when secondsStyle === "tower"
                                     Text {
                                         visible: lockRoot.effectiveShowSeconds && lockRoot.secondsStyle === "tower"
                                         text: clockBlock.secondsDigits
@@ -2036,7 +3204,6 @@ Scope {
                                     }
                                 }
 
-                                // Proportional side-stack for Stacked mode (scales with clockScale!)
                                 ColumnLayout {
                                     visible: (lockRoot.effectiveShowSeconds && lockRoot.secondsStyle !== "tower") || !lockRoot.effectiveClock24h
                                     Layout.alignment: Qt.AlignVCenter
@@ -2047,9 +3214,9 @@ Scope {
                                         readonly property int amPx: Math.max(14, Math.round(22 * Theme.fontScale * lockRoot.clockScale))
                                         height: amPx + 14
                                         implicitWidth: stackAmTxt.implicitWidth + 18
-                                        radius: Theme.radiusMd
-                                        color: Theme.pillBg
-                                        border.color: Theme.pillBorder
+                                        radius: lockRoot.uiRadiusMd
+                                        color: lockRoot.uiPillBg
+                                        border.color: lockRoot.uiPillBorder
                                         border.width: 1
 
                                         Text {
@@ -2059,7 +3226,7 @@ Scope {
                                             font.family: Theme.fontMono
                                             font.pixelSize: parent.amPx
                                             font.weight: Theme.fontWeightBold
-                                            color: Theme.textSecondary
+                                            color: lockRoot.uiTextSecondary
                                         }
                                     }
 
@@ -2068,9 +3235,9 @@ Scope {
                                         readonly property int secPx: Math.max(22, Math.round(38 * Theme.fontScale * lockRoot.clockScale))
                                         height: secPx + 18
                                         implicitWidth: stackSecTxt.implicitWidth + 22
-                                        radius: Theme.radiusLg
-                                        color: Theme.primary_overlay
-                                        border.color: Theme.alpha(Theme.primary, 0.55)
+                                        radius: lockRoot.uiRadiusLg
+                                        color: lockRoot.uiAccentOverlay
+                                        border.color: Theme.alpha(lockRoot.uiAccent, 0.55)
                                         border.width: 1
 
                                         Text {
@@ -2080,34 +3247,282 @@ Scope {
                                             font.family: Theme.fontMono
                                             font.pixelSize: parent.secPx
                                             font.weight: Theme.fontWeightBold
-                                            color: Theme.primary
+                                            color: lockRoot.uiAccent
                                         }
                                     }
                                 }
                             }
 
-                            // Date BELOW Clock (default)
+                            // style 4: "split" twin squircle flip-cards
+                            RowLayout {
+                                visible: lockRoot.showClock && lockRoot.clockStyle === "split"
+                                Layout.alignment: Qt.AlignHCenter
+                                spacing: 10
+
+                                readonly property int cardSize: Math.round(108 * Theme.fontScale * lockRoot.clockScale)
+                                readonly property int digitPx: Math.round(62 * Theme.fontScale * lockRoot.clockScale)
+
+                                Rectangle {
+                                    width: parent.cardSize
+                                    height: parent.cardSize
+                                    radius: lockRoot.uiRadiusXl
+                                    color: lockRoot.uiCardBg
+                                    border.color: Theme.alpha(lockRoot.uiAccent, 0.35)
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: clockBlock.mainHoursText
+                                        font.family: Theme.fontDisplay
+                                        font.pixelSize: parent.parent.digitPx
+                                        font.weight: Theme.fontWeightBold
+                                        color: lockRoot.uiTextPrimary
+                                    }
+
+                                    Text {
+                                        visible: !lockRoot.effectiveClock24h
+                                        anchors.bottom: parent.bottom
+                                        anchors.right: parent.right
+                                        anchors.margins: 8
+                                        text: clockBlock.amPmText
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightBold
+                                        color: lockRoot.uiAccent
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 10
+                                    Layout.alignment: Qt.AlignVCenter
+                                    Rectangle {
+                                        width: 8; height: 8; radius: 4
+                                        color: lockRoot.uiAccent
+                                        opacity: (clockBlock.displaySecNum % 2 === 0) ? 1.0 : 0.35
+                                        Behavior on opacity { NumberAnimation { duration: 250 } }
+                                    }
+                                    Rectangle {
+                                        width: 8; height: 8; radius: 4
+                                        color: lockRoot.uiAccent
+                                        opacity: (clockBlock.displaySecNum % 2 === 0) ? 1.0 : 0.35
+                                        Behavior on opacity { NumberAnimation { duration: 250 } }
+                                    }
+                                }
+
+                                Rectangle {
+                                    width: parent.cardSize
+                                    height: parent.cardSize
+                                    radius: lockRoot.uiRadiusXl
+                                    color: Theme.blend(lockRoot.uiCardBg, lockRoot.uiAccent, 0.14)
+                                    border.color: Theme.alpha(lockRoot.uiAccent, 0.55)
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: clockBlock.mainMinutesText
+                                        font.family: Theme.fontDisplay
+                                        font.pixelSize: parent.parent.digitPx
+                                        font.weight: Theme.fontWeightBold
+                                        color: lockRoot.uiAccent
+                                    }
+
+                                    Text {
+                                        visible: lockRoot.effectiveShowSeconds
+                                        anchors.bottom: parent.bottom
+                                        anchors.right: parent.right
+                                        anchors.margins: 8
+                                        text: ":" + clockBlock.secondsDigits
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightBold
+                                        color: lockRoot.uiTextSecondary
+                                    }
+                                }
+                            }
+
+                            // style 5: "typo" word clock
+                            ColumnLayout {
+                                visible: lockRoot.showClock && lockRoot.clockStyle === "typo"
+                                Layout.alignment: Qt.AlignHCenter
+                                spacing: -6
+
+                                Text {
+                                    text: lockRoot.numberToWords(clockBlock.displayHourNum)
+                                    font.family: Theme.fontDisplay
+                                    font.pixelSize: Math.round(56 * Theme.fontScale * lockRoot.clockScale)
+                                    font.weight: Theme.fontWeightBold
+                                    color: lockRoot.uiTextPrimary
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                Text {
+                                    text: clockBlock.displayMinNum === 0
+                                        ? lockRoot.fmtText("o'clock")
+                                        : (clockBlock.displayMinNum < 10
+                                            ? (lockRoot.fmtText("oh ") + lockRoot.numberToWords(clockBlock.displayMinNum))
+                                            : lockRoot.numberToWords(clockBlock.displayMinNum))
+                                    font.family: Theme.fontDisplay
+                                    font.pixelSize: Math.round(48 * Theme.fontScale * lockRoot.clockScale)
+                                    font.italic: true
+                                    font.weight: Theme.fontWeightDemiBold
+                                    color: lockRoot.uiAccent
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+                            }
+
+                            // style 6: "digital" terminal monospace readout
+                            Rectangle {
+                                visible: lockRoot.showClock && lockRoot.clockStyle === "digital"
+                                Layout.alignment: Qt.AlignHCenter
+                                implicitWidth: digRow.implicitWidth + 36
+                                implicitHeight: digRow.implicitHeight + 24
+                                radius: lockRoot.uiRadiusLg
+                                color: lockRoot.uiCardBg
+                                border.color: Theme.alpha(lockRoot.uiAccent, 0.55)
+                                border.width: 1
+
+                                RowLayout {
+                                    id: digRow
+                                    anchors.centerIn: parent
+                                    spacing: 6
+
+                                    Text {
+                                        text: clockBlock.mainHoursText + ":" + clockBlock.mainMinutesText + (lockRoot.effectiveShowSeconds ? (":" + clockBlock.secondsDigits) : "")
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Math.round(54 * Theme.fontScale * lockRoot.clockScale)
+                                        font.weight: Theme.fontWeightBold
+                                        color: lockRoot.uiAccent
+                                    }
+
+                                    Text {
+                                        visible: !lockRoot.effectiveClock24h
+                                        text: clockBlock.amPmText
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontSizeSm
+                                        font.weight: Theme.fontWeightBold
+                                        color: lockRoot.uiTextSecondary
+                                        Layout.alignment: Qt.AlignBottom
+                                        Layout.bottomMargin: 8
+                                    }
+                                }
+                            }
+
+                            // style 7: "editorial" magazine weekday banner + time pill
+                            ColumnLayout {
+                                visible: lockRoot.showClock && lockRoot.clockStyle === "editorial"
+                                Layout.alignment: Qt.AlignHCenter
+                                spacing: 6
+
+                                Text {
+                                    text: lockRoot.fmtText(Qt.formatDateTime(lockRoot.currentTime, "dddd"))
+                                    font.family: Theme.fontDisplay
+                                    font.pixelSize: Math.round(58 * Theme.fontScale * lockRoot.clockScale)
+                                    font.weight: Theme.fontWeightBold
+                                    color: lockRoot.uiTextPrimary
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                RowLayout {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    spacing: 8
+
+                                    Rectangle {
+                                        height: 34
+                                        implicitWidth: edTimeTxt.implicitWidth + 24
+                                        radius: lockRoot.uiRadiusPill
+                                        color: lockRoot.uiAccent
+
+                                        Text {
+                                            id: edTimeTxt
+                                            anchors.centerIn: parent
+                                            text: clockBlock.mainHoursText + ":" + clockBlock.mainMinutesText
+                                                + (lockRoot.effectiveShowSeconds ? (":" + clockBlock.secondsDigits) : "")
+                                                + (!lockRoot.effectiveClock24h ? (" " + clockBlock.amPmText) : "")
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: Theme.fontSizeMd
+                                            font.weight: Theme.fontWeightBold
+                                            color: lockRoot.uiOnAccent
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        visible: lockRoot.showDate
+                                        height: 34
+                                        implicitWidth: edDateTxt.implicitWidth + 24
+                                        radius: lockRoot.uiRadiusPill
+                                        color: lockRoot.uiPillBg
+                                        border.color: lockRoot.uiPillBorder
+                                        border.width: 1
+
+                                        Text {
+                                            id: edDateTxt
+                                            anchors.centerIn: parent
+                                            text: lockRoot.fmtText(Qt.formatDateTime(lockRoot.currentTime, "MMMM d, yyyy"))
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSizeSm
+                                            font.weight: Theme.fontWeightDemiBold
+                                            color: lockRoot.uiTextPrimary
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 60-second animated bar when secondsStyle === "tower"
+                            RowLayout {
+                                visible: lockRoot.showClock && lockRoot.clockStyle !== "stacked" && lockRoot.clockStyle !== "editorial" && lockRoot.effectiveShowSeconds && (lockRoot.secondsStyle === "tower" || lockRoot.clockStyle === "typo")
+                                Layout.alignment: Qt.AlignHCenter
+                                spacing: 10
+
+                                Rectangle {
+                                    width: 150
+                                    height: 8
+                                    radius: lockRoot.uiRadiusPill
+                                    color: lockRoot.uiPillBg
+                                    border.color: lockRoot.uiPillBorder
+                                    border.width: 1
+
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        anchors.bottom: parent.bottom
+                                        width: Math.max(parent.height, parent.width * ((clockBlock.displaySecNum + 1) / 60.0))
+                                        radius: lockRoot.uiRadiusPill
+                                        color: lockRoot.uiAccent
+
+                                        Behavior on width { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+                                    }
+                                }
+
+                                Text {
+                                    text: clockBlock.secondsDigits + "s" + (!lockRoot.effectiveClock24h ? (" • " + clockBlock.amPmText) : "")
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Math.max(12, Math.round(Theme.fontSizeSm * lockRoot.clockScale))
+                                    font.weight: Theme.fontWeightBold
+                                    color: lockRoot.uiAccent
+                                }
+                            }
+
                             Text {
-                                visible: !lockRoot.dateAboveClock
-                                text: Qt.formatDateTime(lockRoot.currentTime, "dddd, MMMM d").toLowerCase()
+                                visible: lockRoot.showDate && !lockRoot.dateAboveClock && lockRoot.clockStyle !== "editorial"
+                                text: clockBlock.formattedDateText
                                 font.family: Theme.fontDisplay
                                 font.pixelSize: Theme.fontSizeMd
                                 font.weight: Theme.fontWeightDemiBold
-                                color: Theme.primary
+                                color: lockRoot.uiAccent
                                 Layout.alignment: Qt.AlignHCenter
                             }
 
-                            // Lowercase quote pill (click to cycle a new quote)
+                            // quote pill
                             Rectangle {
                                 visible: lockRoot.activeQuoteText !== ""
                                 Layout.alignment: Qt.AlignHCenter
                                 Layout.topMargin: 4
-                                Layout.maximumWidth: 430
-                                implicitWidth: Math.min(430, quoteTxt.implicitWidth + 24)
+                                Layout.maximumWidth: centerStage.width - 16
+                                implicitWidth: Math.min(centerStage.width - 16, quoteTxt.implicitWidth + 24)
                                 implicitHeight: quoteTxt.implicitHeight + 12
-                                radius: Theme.radiusPill
-                                color: quoteMouse.containsMouse ? Theme.pillHover : "transparent"
-                                border.color: quoteMouse.containsMouse ? Theme.pillBorder : "transparent"
+                                radius: lockRoot.uiRadiusPill
+                                color: quoteMouse.containsMouse ? lockRoot.uiPillHover : "transparent"
+                                border.color: quoteMouse.containsMouse ? lockRoot.uiPillBorder : "transparent"
                                 border.width: 1
 
                                 Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -2115,12 +3530,12 @@ Scope {
                                 Text {
                                     id: quoteTxt
                                     anchors.centerIn: parent
-                                    width: Math.min(406, implicitWidth)
+                                    width: Math.min(centerStage.width - 40, implicitWidth)
                                     text: "\"" + lockRoot.activeQuoteText + "\""
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeXs
                                     font.italic: true
-                                    color: quoteMouse.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                                    color: quoteMouse.containsMouse ? lockRoot.uiTextPrimary : lockRoot.uiTextSecondary
                                     horizontalAlignment: Text.AlignHCenter
                                     wrapMode: Text.WordWrap
                                 }
@@ -2130,21 +3545,24 @@ Scope {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: lockRoot.refreshQuotes()
+                                    onClicked: {
+                                        lockRoot.refreshQuotes();
+                                        surface.claimSurfaceFocus();
+                                    }
                                 }
                             }
                         }
 
-                        // ==================== BLOCK 2: COHESIVE MPRIS MEDIA CARD ====================
+                        // mpris media player card + visualizer
                         ClippingRectangle {
                             id: mediaBlock
                             width: parent.width
                             y: centerStage.blockY("media")
                             implicitHeight: mediaCardCol.implicitHeight + 24
                             height: implicitHeight
-                            radius: Theme.radiusLg
-                            color: Theme.blend(Theme.cardBg, surface.artAccent, surface.playerIsPlaying ? 0.14 : 0.04)
-                            border.color: surface.playerIsPlaying ? Theme.alpha(surface.artAccent, 0.35) : Theme.cardBorder
+                            radius: lockRoot.uiRadiusLg
+                            color: Theme.blend(lockRoot.uiCardBg, surface.artAccent, surface.playerIsPlaying ? 0.14 : 0.04)
+                            border.color: surface.playerIsPlaying ? Theme.alpha(surface.artAccent, 0.45) : lockRoot.uiCardBorder
                             border.width: 1
                             visible: lockRoot.showMediaCard
                                 && surface.activePlayer !== null
@@ -2163,14 +3581,15 @@ Scope {
                                         let cur = (surface.activePlayer.volume !== undefined && !isNaN(surface.activePlayer.volume))
                                             ? surface.activePlayer.volume
                                             : 1.0;
-                                        surface.activePlayer.volume = Math.max(0.0, Math.min(1.0, cur + delta));
-                                        surface.volumeHudVisible = true;
-                                        volumeHudTimer.restart();
+                                        let next = Math.max(0.0, Math.min(1.0, cur + delta));
+                                        surface.activePlayer.volume = next;
+                                        surface.showVolumeToast("vol " + Math.round(next * 100) + "%");
+                                    } else {
+                                        surface.adjustSystemVolume(wheel.angleDelta.y > 0 ? 0.05 : -0.05);
                                     }
                                 }
                             }
 
-                            // Integrated 24-band ambient spectrum backdrop
                             RowLayout {
                                 anchors.left: parent.left
                                 anchors.right: parent.right
@@ -2180,7 +3599,7 @@ Scope {
                                 height: 42
                                 spacing: 3
                                 visible: lockRoot.showMediaVisualizer
-                                opacity: surface.playerIsPlaying ? 0.22 : 0.06
+                                opacity: surface.playerIsPlaying ? (lockRoot.isLight ? 0.28 : 0.22) : 0.06
 
                                 Behavior on opacity { NumberAnimation { duration: Theme.animNormal } }
 
@@ -2198,14 +3617,12 @@ Scope {
                                         }
 
                                         readonly property real chPeak: {
-                                            let pList = (typeof lockPeakMonitor !== "undefined" && lockPeakMonitor.peaks && lockPeakMonitor.peaks.length > 0)
-                                                ? lockPeakMonitor.peaks
-                                                : [];
+                                            let pList = (lockPeakMonitor.peaks && lockPeakMonitor.peaks.length > 0) ? lockPeakMonitor.peaks : [];
                                             if (pList.length >= 2) {
                                                 let mix = index / 23.0;
                                                 return (pList[0] * (1.0 - mix)) + (pList[1] * mix);
                                             }
-                                            return (typeof lockPeakMonitor !== "undefined" && lockPeakMonitor.peak !== undefined) ? lockPeakMonitor.peak : 0;
+                                            return lockPeakMonitor.peak ?? 0;
                                         }
 
                                         height: {
@@ -2222,10 +3639,7 @@ Scope {
                                         color: chPeak > 0.55 ? Theme.tertiary : surface.artAccent
 
                                         Behavior on height {
-                                            NumberAnimation {
-                                                duration: 80
-                                                easing.type: Theme.animColorEasing
-                                            }
+                                            NumberAnimation { duration: 75; easing.type: Theme.animColorEasing }
                                         }
                                     }
                                 }
@@ -2246,9 +3660,9 @@ Scope {
                                     ClippingRectangle {
                                         Layout.preferredWidth: 56
                                         Layout.preferredHeight: 56
-                                        radius: Theme.radiusMd
-                                        color: Theme.widgetBg
-                                        border.color: Theme.isGlass ? Theme.glassHighlight : Theme.cardBorder
+                                        radius: lockRoot.uiRadiusMd
+                                        color: lockRoot.uiWidgetBg
+                                        border.color: lockRoot.uiCardBorder
                                         border.width: 1
 
                                         Image {
@@ -2279,11 +3693,11 @@ Scope {
                                             spacing: 6
 
                                             Text {
-                                                text: (surface.activePlayer?.trackTitle || "unknown track").toLowerCase()
+                                                text: lockRoot.fmtText(surface.activePlayer?.trackTitle || "Unknown Track")
                                                 font.family: Theme.fontDisplay
                                                 font.pixelSize: Theme.fontSizeSm
                                                 font.weight: Theme.fontWeightBold
-                                                color: Theme.textPrimary
+                                                color: lockRoot.uiTextPrimary
                                                 Layout.fillWidth: true
                                                 elide: Text.ElideRight
                                             }
@@ -2292,8 +3706,8 @@ Scope {
                                                 visible: surface.volumeHudVisible || surface.playerList.length > 1
                                                 height: 20
                                                 implicitWidth: mediaBadgeTxt.implicitWidth + 12
-                                                radius: Theme.radiusPill
-                                                color: surface.volumeHudVisible ? Theme.primary_overlay : Theme.pillBg
+                                                radius: lockRoot.uiRadiusPill
+                                                color: surface.volumeHudVisible ? lockRoot.uiAccentOverlay : lockRoot.uiPillBg
                                                 border.color: Theme.alpha(surface.artAccent, 0.45)
                                                 border.width: 1
 
@@ -2301,8 +3715,8 @@ Scope {
                                                     id: mediaBadgeTxt
                                                     anchors.centerIn: parent
                                                     text: surface.volumeHudVisible
-                                                        ? ("vol " + Math.round((surface.activePlayer?.volume ?? 1.0) * 100) + "%")
-                                                        : ((surface.activePlayer?.identity || "player").toLowerCase() + " " + (surface.currentPlayerIdx + 1) + "/" + surface.playerList.length)
+                                                        ? surface.volumeHudLabel
+                                                        : lockRoot.fmtText((surface.activePlayer?.identity || "player") + " " + (surface.currentPlayerIdx + 1) + "/" + surface.playerList.length)
                                                     font.family: Theme.fontMono
                                                     font.pixelSize: Theme.fontSizeXs
                                                     font.weight: Theme.fontWeightBold
@@ -2315,13 +3729,14 @@ Scope {
                                                     cursorShape: Qt.PointingHandCursor
                                                     onClicked: {
                                                         lockRoot.manualPlayerIndex = (surface.currentPlayerIdx + 1) % surface.playerList.length;
+                                                        surface.claimSurfaceFocus();
                                                     }
                                                 }
                                             }
                                         }
 
                                         Text {
-                                            text: (surface.activePlayer?.trackArtist || "unknown artist").toLowerCase()
+                                            text: lockRoot.fmtText(surface.activePlayer?.trackArtist || "Unknown Artist")
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightDemiBold
@@ -2337,17 +3752,20 @@ Scope {
                                         iconSize: Theme.fontSizeSm
                                         tooltip: "previous"
                                         enabled: surface.activePlayer?.canGoPrevious ?? false
-                                        onClicked: surface.activePlayer?.previous()
+                                        onClicked: {
+                                            surface.activePlayer?.previous();
+                                            surface.claimSurfaceFocus();
+                                        }
                                     }
 
                                     Rectangle {
                                         width: surface.playerIsPlaying ? 44 : 36
                                         height: 36
-                                        radius: surface.playerIsPlaying ? Theme.radiusMd : Theme.radiusPill
+                                        radius: surface.playerIsPlaying ? lockRoot.uiRadiusMd : lockRoot.uiRadiusPill
                                         color: lockPlayMouse.pressed
-                                            ? Theme.statePress(surface.artAccent, Theme.on_primary)
+                                            ? Theme.statePress(surface.artAccent, lockRoot.uiOnAccent)
                                             : (lockPlayMouse.containsMouse
-                                                ? Theme.stateHover(surface.artAccent, Theme.on_primary)
+                                                ? Theme.stateHover(surface.artAccent, lockRoot.uiOnAccent)
                                                 : surface.artAccent)
 
                                         Behavior on width { NumberAnimation { duration: Theme.expressiveFast; easing.type: Theme.animExpressiveEasing } }
@@ -2360,7 +3778,7 @@ Scope {
                                             font.family: Theme.fontIcon
                                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                             font.weight: Theme.fontWeightBold
-                                            color: Theme.on_primary
+                                            color: lockRoot.uiOnAccent
                                         }
 
                                         MouseArea {
@@ -2368,7 +3786,10 @@ Scope {
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
-                                            onClicked: surface.activePlayer?.togglePlaying()
+                                            onClicked: {
+                                                surface.activePlayer?.togglePlaying();
+                                                surface.claimSurfaceFocus();
+                                            }
                                         }
                                     }
 
@@ -2377,11 +3798,13 @@ Scope {
                                         iconSize: Theme.fontSizeSm
                                         tooltip: "next"
                                         enabled: surface.activePlayer?.canGoNext ?? false
-                                        onClicked: surface.activePlayer?.next()
+                                        onClicked: {
+                                            surface.activePlayer?.next();
+                                            surface.claimSurfaceFocus();
+                                        }
                                     }
                                 }
 
-                                // Interactive lock screen seekbar + timestamps
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 8
@@ -2391,12 +3814,12 @@ Scope {
                                         text: lockRoot.formatTime(surface.trackPosition)
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontSizeXs
-                                        color: Theme.textSecondary
+                                        color: lockRoot.uiTextSecondary
                                     }
 
                                     Item {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 12
+                                        Layout.preferredHeight: 14
 
                                         readonly property real progRatio: {
                                             let len = surface.activePlayer?.length ?? 0;
@@ -2404,13 +3827,22 @@ Scope {
                                             return Math.max(0.0, Math.min(1.0, surface.trackPosition / len));
                                         }
 
+                                        function seekToMouse(mx: real) {
+                                            let len = surface.activePlayer?.length ?? 0;
+                                            if (len > 0 && surface.activePlayer) {
+                                                let pos = Math.max(0, Math.min(len, (mx / Math.max(1, width)) * len));
+                                                surface.trackPosition = pos;
+                                                surface.activePlayer.position = pos;
+                                            }
+                                        }
+
                                         Rectangle {
                                             anchors.left: parent.left
                                             anchors.right: parent.right
                                             anchors.verticalCenter: parent.verticalCenter
-                                            height: seekMouse.containsMouse ? 7 : 5
-                                            radius: Theme.radiusPill
-                                            color: Theme.alpha(Theme.on_surface, 0.14)
+                                            height: seekMouse.pressed ? 9 : (seekMouse.containsMouse ? 7 : 5)
+                                            radius: lockRoot.uiRadiusPill
+                                            color: Theme.alpha(lockRoot.uiTextPrimary, lockRoot.isLight ? 0.16 : 0.14)
 
                                             Behavior on height { NumberAnimation { duration: Theme.animFast } }
 
@@ -2419,7 +3851,7 @@ Scope {
                                                 anchors.top: parent.top
                                                 anchors.bottom: parent.bottom
                                                 width: parent.width * parent.parent.progRatio
-                                                radius: Theme.radiusPill
+                                                radius: lockRoot.uiRadiusPill
                                                 color: surface.artAccent
                                             }
                                         }
@@ -2430,14 +3862,11 @@ Scope {
                                             hoverEnabled: true
                                             enabled: (surface.activePlayer?.canSeek ?? true) && (surface.activePlayer?.length ?? 0) > 0
                                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                            onClicked: (mouse) => {
-                                                let len = surface.activePlayer?.length ?? 0;
-                                                if (len > 0 && surface.activePlayer) {
-                                                    let pos = Math.max(0, Math.min(len, (mouse.x / width) * len));
-                                                    surface.activePlayer.position = pos;
-                                                    surface.trackPosition = pos;
-                                                }
+                                            onPressed: (mouse) => parent.seekToMouse(mouse.x)
+                                            onPositionChanged: (mouse) => {
+                                                if (pressed) parent.seekToMouse(mouse.x);
                                             }
+                                            onReleased: surface.claimSurfaceFocus()
                                         }
                                     }
 
@@ -2445,33 +3874,41 @@ Scope {
                                         text: lockRoot.formatTime(surface.activePlayer?.length ?? 0)
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontSizeXs
-                                        color: Theme.textSecondary
+                                        color: lockRoot.uiTextSecondary
                                     }
                                 }
                             }
                         }
 
-                        // ==================== BLOCK 3: PASSWORD PILL + STATUS ====================
+                        /*
+                        password input pill:
+                        stays visible: true even in zenMode (only opacity: 0) and uses readOnly instead of enabled: false
+                        so pwInput never drops activeFocus or eats your first character!
+                        */
                         ColumnLayout {
                             id: passwordBlock
                             width: parent.width
                             y: centerStage.blockY("password")
                             spacing: 8
+                            opacity: lockRoot.zenMode ? 0.0 : 1.0
 
                             Behavior on y { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
+                            Behavior on opacity { NumberAnimation { duration: Theme.animNormal } }
 
                             Rectangle {
                                 id: pwContainer
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 50
-                                radius: Theme.radiusPill
-                                color: pwInput.activeFocus ? Theme.pillHover : Theme.pillBg
+                                radius: lockRoot.uiRadiusPill
+                                color: pwInput.activeFocus ? lockRoot.uiPillHover : lockRoot.uiPillBg
                                 border.color: lockRoot.authFailed
                                     ? Theme.error
-                                    : (pwInput.text.length > 0
-                                        ? Theme.primary
-                                        : (pwInput.activeFocus ? Theme.alpha(Theme.primary, 0.65) : Theme.pillBorder))
-                                border.width: (pwInput.activeFocus || lockRoot.authFailed) ? 2 : 1
+                                    : (lockRoot.capsLockActive && lockRoot.sharedPassword.length > 0
+                                        ? Theme.warn
+                                        : (lockRoot.sharedPassword.length > 0
+                                            ? lockRoot.uiAccent
+                                            : (pwInput.activeFocus ? Theme.alpha(lockRoot.uiAccent, 0.65) : lockRoot.uiPillBorder)))
+                                border.width: (pwInput.activeFocus || lockRoot.authFailed || lockRoot.capsLockActive) ? 2 : 1
 
                                 Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                                 Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -2498,6 +3935,14 @@ Scope {
                                     function onTriggerShake() {
                                         shakeAnim.restart();
                                     }
+                                    function onClearAllInputs() {
+                                        if (pwInput.text !== "") pwInput.text = "";
+                                    }
+                                    function onSharedPasswordChanged() {
+                                        if (pwInput.text !== lockRoot.sharedPassword) {
+                                            pwInput.text = lockRoot.sharedPassword;
+                                        }
+                                    }
                                 }
 
                                 RowLayout {
@@ -2513,7 +3958,7 @@ Scope {
                                         font.pixelSize: Theme.fontSizeMd
                                         color: lockRoot.authFailed
                                             ? Theme.error
-                                            : (pwInput.activeFocus ? Theme.primary : Theme.textSecondary)
+                                            : (pwInput.activeFocus ? lockRoot.uiAccent : lockRoot.uiTextSecondary)
 
                                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
@@ -2531,57 +3976,138 @@ Scope {
                                         Layout.fillWidth: true
                                         Layout.fillHeight: true
                                         verticalAlignment: TextInput.AlignVCenter
-                                        text: lockRoot.sharedPassword
-                                        echoMode: lockRoot.revealPassword ? TextInput.Normal : TextInput.Password
+                                        echoMode: lockRoot.revealPassword
+                                            ? TextInput.Normal
+                                            : (lockRoot.pwMaskChar === "none" ? TextInput.NoEcho : TextInput.Password)
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontSizeMd
-                                        color: Theme.textPrimary
-                                        selectionColor: Theme.primary_container
-                                        selectedTextColor: Theme.on_primary_container
-                                        enabled: !lockRoot.isChecking
-                                        passwordCharacter: "•"
+                                        color: lockRoot.uiTextPrimary
+                                        selectionColor: lockRoot.uiAccentOverlay
+                                        selectedTextColor: lockRoot.uiTextPrimary
+                                        readOnly: lockRoot.isChecking
+                                        passwordCharacter: (lockRoot.pwMaskChar !== "" && lockRoot.pwMaskChar !== "none") ? lockRoot.pwMaskChar : "•"
+                                        passwordMaskDelay: 0
                                         clip: true
 
                                         Text {
                                             anchors.fill: parent
                                             verticalAlignment: Text.AlignVCenter
-                                            text: lockRoot.isChecking ? "verifying..." : "enter password to unlock..."
+                                            text: lockRoot.fmtText(
+                                                lockRoot.isChecking
+                                                    ? "verifying..."
+                                                    : (lockRoot.pwMaskChar === "none" && lockRoot.sharedPassword.length > 0
+                                                        ? (lockRoot.sharedPassword.length + " chars typed (stealth)...")
+                                                        : "enter password to unlock...")
+                                            )
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSizeSm
-                                            color: Theme.on_surface_disabled
-                                            visible: pwInput.text.length === 0
+                                            color: lockRoot.pwMaskChar === "none" && lockRoot.sharedPassword.length > 0
+                                                ? lockRoot.uiAccent
+                                                : lockRoot.uiTextDisabled
+                                            visible: pwInput.text.length === 0 || (lockRoot.pwMaskChar === "none" && !lockRoot.revealPassword)
                                         }
 
                                         onTextEdited: {
-                                            lockRoot.sharedPassword = text;
+                                            surface.wakeFromZen();
+                                            lockRoot.sharedPassword = pwInput.text;
                                             if (lockRoot.authFailed) lockRoot.authFailed = false;
                                             keyPulseAnim.restart();
                                         }
 
+                                        Keys.onPressed: (event) => {
+                                            surface.wakeFromZen();
+                                            if (event.key === Qt.Key_CapsLock) {
+                                                kbPollDelayTimer.restart();
+                                            } else if (event.key === Qt.Key_Tab && pwInput.text.length === 0 && !surface.optionsOpen) {
+                                                lockRoot.zenMode = !lockRoot.zenMode;
+                                                event.accepted = true;
+                                            } else if (lockRoot.freeDragMode && pwInput.text.length === 0) {
+                                                let step = (event.modifiers & Qt.ShiftModifier) ? 0.04 : 0.01;
+                                                if (event.key === Qt.Key_Left) {
+                                                    lockRoot.customNormX = Math.max(0.02, lockRoot.customNormX - step);
+                                                    lockRoot.layoutPosition = "custom";
+                                                    lockRoot.saveSandbox();
+                                                    event.accepted = true;
+                                                } else if (event.key === Qt.Key_Right) {
+                                                    lockRoot.customNormX = Math.min(0.98, lockRoot.customNormX + step);
+                                                    lockRoot.layoutPosition = "custom";
+                                                    lockRoot.saveSandbox();
+                                                    event.accepted = true;
+                                                } else if (event.key === Qt.Key_Up) {
+                                                    lockRoot.customNormY = Math.max(0.05, lockRoot.customNormY - step);
+                                                    lockRoot.layoutPosition = "custom";
+                                                    lockRoot.saveSandbox();
+                                                    event.accepted = true;
+                                                } else if (event.key === Qt.Key_Down) {
+                                                    lockRoot.customNormY = Math.min(0.95, lockRoot.customNormY + step);
+                                                    lockRoot.layoutPosition = "custom";
+                                                    lockRoot.saveSandbox();
+                                                    event.accepted = true;
+                                                }
+                                            }
+                                        }
+
                                         Keys.onEscapePressed: {
-                                            if (surface.optionsOpen) {
+                                            if (lockRoot.zenMode) {
+                                                lockRoot.zenMode = false;
+                                            } else if (surface.optionsOpen) {
                                                 surface.optionsOpen = false;
+                                            } else if (lockRoot.isChecking && pam.active) {
+                                                pam.abort();
+                                                pamSafetyTimeout.stop();
+                                                lockRoot.isChecking = false;
+                                                lockRoot.pamFeedback = "cancelled";
                                             } else {
                                                 lockRoot.sharedPassword = "";
+                                                lockRoot.revealPassword = false;
                                                 lockRoot.authFailed = false;
+                                                pwInput.text = "";
                                             }
                                         }
 
                                         onAccepted: {
-                                            const p = lockRoot.sharedPassword;
+                                            const p = pwInput.text !== "" ? pwInput.text : lockRoot.sharedPassword;
                                             lockRoot.sharedPassword = "";
+                                            pwInput.text = "";
                                             lockRoot.tryUnlock(p);
                                         }
-
-                                        Component.onCompleted: forceActiveFocus()
 
                                         Connections {
                                             target: lockRoot
                                             function onLockedChanged() {
                                                 if (lockRoot.locked) {
+                                                    pwInput.text = "";
+                                                    if (lockRoot.activeSurface === null || lockRoot.activeSurface === surface) {
+                                                        lockRoot.activeSurface = surface;
+                                                        pwInput.forceActiveFocus();
+                                                    }
+                                                }
+                                            }
+                                            function onIsCheckingChanged() {
+                                                if (!lockRoot.isChecking && lockRoot.locked && lockRoot.activeSurface === surface) {
                                                     pwInput.forceActiveFocus();
                                                 }
                                             }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        visible: lockRoot.capsLockActive
+                                        height: 22
+                                        implicitWidth: capsTxt.implicitWidth + 10
+                                        radius: lockRoot.uiRadiusPill
+                                        color: Theme.warn_overlay
+                                        border.color: Theme.alpha(Theme.warn, 0.65)
+                                        border.width: 1
+
+                                        Text {
+                                            id: capsTxt
+                                            anchors.centerIn: parent
+                                            text: lockRoot.fmtText("caps")
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: Theme.fontSizeXs
+                                            font.weight: Theme.fontWeightBold
+                                            color: Theme.warn
                                         }
                                     }
 
@@ -2589,10 +4115,12 @@ Scope {
                                         icon: Theme.iconClose
                                         tooltip: "clear"
                                         iconSize: Theme.fontSizeXs
-                                        visible: pwInput.text.length > 0 && !lockRoot.isChecking
+                                        visible: lockRoot.sharedPassword.length > 0 && !lockRoot.isChecking
                                         onClicked: {
                                             lockRoot.sharedPassword = "";
+                                            lockRoot.revealPassword = false;
                                             lockRoot.authFailed = false;
+                                            pwInput.text = "";
                                             pwInput.forceActiveFocus();
                                         }
                                     }
@@ -2601,7 +4129,7 @@ Scope {
                                         icon: lockRoot.revealPassword ? Theme.iconEyeOff : Theme.iconEye
                                         tooltip: lockRoot.revealPassword ? "hide password" : "show password"
                                         iconSize: Theme.fontSizeSm
-                                        visible: pwInput.text.length > 0 && !lockRoot.isChecking
+                                        visible: lockRoot.sharedPassword.length > 0 && !lockRoot.isChecking
                                         onClicked: {
                                             lockRoot.revealPassword = !lockRoot.revealPassword;
                                             pwInput.forceActiveFocus();
@@ -2609,17 +4137,17 @@ Scope {
                                     }
 
                                     Rectangle {
-                                        readonly property bool canSubmit: pwInput.text.length > 0 && !lockRoot.isChecking
+                                        readonly property bool canSubmit: lockRoot.sharedPassword.length > 0 && !lockRoot.isChecking
                                         width: canSubmit ? 38 : 0
                                         height: 34
                                         opacity: canSubmit ? 1.0 : 0.0
                                         visible: width > 0
-                                        radius: Theme.radiusPill
+                                        radius: lockRoot.uiRadiusPill
                                         color: submitMouse.pressed
-                                            ? Theme.statePress(Theme.primary, Theme.on_primary)
+                                            ? Theme.statePress(lockRoot.uiAccent, lockRoot.uiOnAccent)
                                             : (submitMouse.containsMouse
-                                                ? Theme.stateHover(Theme.primary, Theme.on_primary)
-                                                : Theme.primary)
+                                                ? Theme.stateHover(lockRoot.uiAccent, lockRoot.uiOnAccent)
+                                                : lockRoot.uiAccent)
 
                                         Behavior on width { NumberAnimation { duration: Theme.expressiveFast; easing.type: Theme.animExpressiveEasing } }
                                         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
@@ -2631,7 +4159,7 @@ Scope {
                                             font.family: Theme.fontIcon
                                             font.pixelSize: Theme.fontSizeSm
                                             font.weight: Theme.fontWeightBold
-                                            color: Theme.on_primary
+                                            color: lockRoot.uiOnAccent
                                         }
 
                                         MouseArea {
@@ -2640,8 +4168,9 @@ Scope {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                const p = lockRoot.sharedPassword;
+                                                const p = pwInput.text !== "" ? pwInput.text : lockRoot.sharedPassword;
                                                 lockRoot.sharedPassword = "";
+                                                pwInput.text = "";
                                                 lockRoot.tryUnlock(p);
                                             }
                                         }
@@ -2655,14 +4184,24 @@ Scope {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: lockRoot.isChecking
-                                        ? "authenticating..."
-                                        : (lockRoot.authFailed ? "incorrect password, try again" : "")
-                                    opacity: (lockRoot.isChecking || lockRoot.authFailed) ? 1.0 : 0.0
+                                    text: lockRoot.fmtText(
+                                        lockRoot.pamFeedback !== ""
+                                            ? lockRoot.pamFeedback
+                                            : (lockRoot.isChecking
+                                                ? "authenticating..."
+                                                : (lockRoot.authFailed
+                                                    ? (lockRoot.faillockTripped
+                                                        ? "account locked by pam_faillock (run 'faillock --reset' in tty)"
+                                                        : "incorrect password, try again")
+                                                    : (lockRoot.capsLockActive ? "caps lock is on" : "")))
+                                    )
+                                    opacity: text !== "" ? 1.0 : 0.0
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightMedium
-                                    color: lockRoot.authFailed ? Theme.error : Theme.textSecondary
+                                    color: (lockRoot.authFailed || lockRoot.pamFeedbackIsError)
+                                        ? Theme.error
+                                        : (lockRoot.capsLockActive ? Theme.warn : lockRoot.uiTextSecondary)
 
                                     Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
                                 }
@@ -2670,13 +4209,14 @@ Scope {
                         }
                     }
 
-                    // Bottom power dock with inline 2-step confirmation pills
+                    // bottom power dock
                     RowLayout {
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.margins: 36
-                        anchors.bottomMargin: surface.entered ? 36 : 12
-                        opacity: surface.entered ? 1.0 : 0.0
+                        anchors.bottomMargin: (surface.entered && !lockRoot.zenMode && lockRoot.showPowerDock) ? 36 : 12
+                        opacity: (surface.entered && !lockRoot.zenMode && lockRoot.showPowerDock) ? 1.0 : 0.0
+                        visible: opacity > 0.01
                         spacing: 12
 
                         Behavior on anchors.bottomMargin { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
@@ -2704,14 +4244,18 @@ Scope {
                         }
 
                         PowerPill {
+                            visible: lockRoot.allowLogoutOnLock
                             actionId: "logout"
                             icon: Theme.iconLogout
                             label: "log out"
-                            command: ["hyprctl", "dispatch", "exit"]
+                            command: [
+                                "sh", "-c",
+                                "hyprshutdown 2>/dev/null || uwsm stop 2>/dev/null || hyprctl dispatch 'hl.dsp.exit()' 2>/dev/null || hyprctl dispatch exit"
+                            ]
                         }
                     }
 
-                    // Themed concave screen corners
+                    // concave screen corners
                     ConcaveCorner {
                         anchors.top: parent.top
                         anchors.left: parent.left
@@ -2720,7 +4264,7 @@ Scope {
                         fillColor: Theme.cornerFill
                         flipX: false
                         flipY: false
-                        visible: Theme.screenCornerRadius > 0
+                        visible: lockRoot.showScreenCorners && Theme.screenCornerRadius > 0
                     }
 
                     ConcaveCorner {
@@ -2731,7 +4275,7 @@ Scope {
                         fillColor: Theme.cornerFill
                         flipX: true
                         flipY: false
-                        visible: Theme.screenCornerRadius > 0
+                        visible: lockRoot.showScreenCorners && Theme.screenCornerRadius > 0
                     }
 
                     ConcaveCorner {
@@ -2742,7 +4286,7 @@ Scope {
                         fillColor: Theme.cornerFill
                         flipX: false
                         flipY: true
-                        visible: Theme.screenCornerRadius > 0
+                        visible: lockRoot.showScreenCorners && Theme.screenCornerRadius > 0
                     }
 
                     ConcaveCorner {
@@ -2753,7 +4297,7 @@ Scope {
                         fillColor: Theme.cornerFill
                         flipX: true
                         flipY: true
-                        visible: Theme.screenCornerRadius > 0
+                        visible: lockRoot.showScreenCorners && Theme.screenCornerRadius > 0
                     }
                 }
             }

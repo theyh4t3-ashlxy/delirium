@@ -52,7 +52,7 @@ in
 
   # 1.5 power containment: public execution of power-profiles-daemon before tlp murders it in cold blood
   services.power-profiles-daemon.enable = false;
-  
+
   # ThinkPad T16 Gen 1 (i7-1260p + MX550) specialized containment grid
   services.tlp = {
     enable = true;
@@ -61,7 +61,7 @@ in
       # Governor sets active scaling mode; EPP governs the actual frequency curve
       CPU_SCALING_GOVERNOR_ON_AC = "powersave";
       CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
-      
+
       # Energy Performance Preference: balance_performance on AC, balance_power on battery
       # Never use "power" on Alder Lake hybrid architecture unless you enjoy 400MHz sludge
       CPU_ENERGY_PERF_POLICY_ON_AC = "balance_performance";
@@ -349,7 +349,8 @@ in
     gnomeExtensions.dash-to-dock
     gnomeExtensions.appindicator
 
-    # antigravity cli compiled directly into system closure from flake input
+    # antigravity desktop app & cli compiled directly into system closure from flake input
+    inputs.antigravity-nix.packages.${pkgs.stdenv.hostPlatform.system}.default
     inputs.antigravity-nix.packages.${pkgs.stdenv.hostPlatform.system}.google-antigravity-cli
   ];
 
