@@ -71,7 +71,7 @@ Scope {
             return extractedCommand.replace(/^\/(?:run\/current-system\/sw\/bin|nix\/store\/[^/]+\/bin|usr\/local\/bin|usr\/bin|bin)\//, "");
         }
         readonly property string cleanPromptMessage: {
-            if (!rawMessage) return "An application is requesting privileges to perform an administrative action.";
+            if (!rawMessage) return "an application is requesting privileges to perform an administrative action.";
             if (!extractedCommand) return rawMessage;
             let stripped = rawMessage
                 .replace("`" + extractedCommand + "'", "")
@@ -80,13 +80,13 @@ Scope {
                 .replace(/\s+/g, " ")
                 .trim();
             if (!stripped.endsWith(".") && !stripped.endsWith(":")) stripped += ":";
-            return stripped;
+            return stripped.toLowerCase();
         }
 
         onHasActiveFlowChanged: {
             if (hasActiveFlow) {
                 passwordText = "";
-                feedbackMessage = (flow?.supplementaryMessage ?? "").trim();
+                feedbackMessage = (flow?.supplementaryMessage ?? "").trim().toLowerCase();
                 isError = Boolean(flow?.supplementaryIsError);
                 isSubmitting = false;
                 revealPassword = false;
@@ -111,11 +111,10 @@ Scope {
     signal triggerShake()
     signal clearAllInputs()
 
+    readonly property string capsScript: Qt.resolvedUrl("../scripts/detect-capslock.zsh").toString().replace(/^file:\/\//, "")
+
     property Process capsPollProc: Process {
-        command: [
-            "sh", "-c",
-            "caps=0; for f in /sys/class/leds/*capslock*/brightness; do [ -f \"$f\" ] && [ \"$(cat \"$f\" 2>/dev/null)\" = \"1\" ] && caps=1 && break; done; printf '%s\\n' \"$caps\""
-        ]
+        command: [root.capsScript]
         stdout: StdioCollector {
             onStreamFinished: {
                 dialogState.capsLockActive = (text || "").trim() === "1";
@@ -419,7 +418,7 @@ Scope {
                                 spacing: 4
 
                                 Text {
-                                    text: "Authentication Required"
+                                    text: "authentication required"
                                     font.family: Theme.fontDisplay
                                     font.pixelSize: Theme.fontSizeMd
                                     font.weight: Theme.fontWeightBold
@@ -726,7 +725,7 @@ Scope {
                                             color: Theme.primary
                                         }
                                         Text {
-                                            text: dialogState.copiedKey === "id" ? "copied!" : "copy id"
+                                            text: dialogState.copiedKey === "id" ? "copied" : "copy id"
                                             font.family: Theme.fontMono
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightBold
@@ -793,8 +792,8 @@ Scope {
 
                             Text {
                                 text: dialogState.feedbackMessage !== ""
-                                    ? dialogState.feedbackMessage
-                                    : "Waiting for fingerprint or security key..."
+                                    ? dialogState.feedbackMessage.toLowerCase()
+                                    : "waiting for fingerprint or security key..."
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeXs
                                 font.weight: Theme.fontWeightBold
@@ -868,9 +867,9 @@ Scope {
                                     anchors.fill: parent
                                     verticalAlignment: Text.AlignVCenter
                                     text: {
-                                        if (dialogState.isSubmitting) return "Verifying credentials...";
-                                        let prompt = (dialogState.flow?.inputPrompt ?? "").trim().replace(/[:\s]+$/, "");
-                                        return prompt !== "" ? (prompt + "...") : "Enter password...";
+                                        if (dialogState.isSubmitting) return "verifying credentials...";
+                                        let prompt = (dialogState.flow?.inputPrompt ?? "").trim().replace(/[:\s]+$/, "").toLowerCase();
+                                        return prompt !== "" ? (prompt + "...") : "enter password...";
                                     }
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeSm
@@ -911,7 +910,7 @@ Scope {
                                 Text {
                                     id: capsTxt
                                     anchors.centerIn: parent
-                                    text: "CAPS"
+                                    text: "caps"
                                     font.family: Theme.fontMono
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightBold
@@ -950,8 +949,8 @@ Scope {
                         Layout.fillWidth: true
                         visible: !dialogState.waitingForBiometric && (dialogState.feedbackMessage !== "" || dialogState.isError)
                         text: dialogState.feedbackMessage !== ""
-                            ? dialogState.feedbackMessage
-                            : ("Authentication failed" + (dialogState.attemptCount > 1 ? (" (" + dialogState.attemptCount + " tries)") : " — try again"))
+                            ? dialogState.feedbackMessage.toLowerCase()
+                            : ("authentication failed" + (dialogState.attemptCount > 1 ? (" (" + dialogState.attemptCount + " tries)") : " — try again"))
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Theme.fontWeightMedium
@@ -991,7 +990,7 @@ Scope {
                             Text {
                                 id: cancelLbl
                                 anchors.centerIn: parent
-                                text: "Cancel (Esc)"
+                                text: "cancel (esc)"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeXs
                                 font.weight: Theme.fontWeightDemiBold
@@ -1035,7 +1034,7 @@ Scope {
                                 }
 
                                 Text {
-                                    text: dialogState.isSubmitting ? "Verifying..." : "Authenticate"
+                                    text: dialogState.isSubmitting ? "verifying..." : "authenticate"
                                     font.family: Theme.fontDisplay
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightBold
