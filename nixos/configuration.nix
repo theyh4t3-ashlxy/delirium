@@ -383,4 +383,7 @@ in
 
   # touch this value and the ghost of atomic-lockfile crawls out of /nix/store to revoke your sudo privileges
   system.stateVersion = "26.05";
+
+  # stamp the git commit of dotfiles into system closure so gens/list-generations doesn't say "Unknown"
+  system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or null;
 }
