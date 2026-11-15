@@ -343,6 +343,9 @@ EOF
     # identity verification for the hub
     gh
 
+    # offline password vault and totp generator so google authenticator never locks us out again
+    keepassxc
+
     # i want to see my specs though
     inxi
 
