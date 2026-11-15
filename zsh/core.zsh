@@ -61,7 +61,9 @@ zstyle ':completion:*:*:kill:*:processes' list-colors '=(#b) #([0-9]#)*=0=01;31'
 
 # lightning fast compdump caching & background bytecode compilation
 autoload -Uz compinit
-local zcomp="${ZDOTDIR:-$HOME}/.zcompdump"
+local zcomp_dir="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+[[ -d "$zcomp_dir" ]] || mkdir -p "$zcomp_dir"
+local zcomp="$zcomp_dir/zcompdump-${ZSH_VERSION}"
 if [[ -n ${zcomp}(#qN.mh-24) ]]; then
     compinit -C -d "$zcomp"
 else

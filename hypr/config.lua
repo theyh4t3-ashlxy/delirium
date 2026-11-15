@@ -19,7 +19,8 @@ if ok and type(user_colors) == "table" then
 end
 
 -- cursor & system environment fixes
-hl.env("XCURSOR_THEME", "Bibata-Modern-Ice")
+hl.env("XCURSOR_THEME", "Windows-Aero")
+hl.env("HYPRCURSOR_THEME", "Windows-Aero")
 hl.env("XCURSOR_SIZE", "24")
 hl.env("TZDIR", "/etc/zoneinfo")
 hl.env("TZ", "America/Chicago")

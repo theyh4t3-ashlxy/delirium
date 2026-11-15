@@ -233,13 +233,25 @@ in
     shell = pkgs.zsh;
     hashedPasswordFile = "/persist/etc/shadow-ashley";
   };
-  users.users."root".hashedPasswordFile = "/persist/etc/shadow-root";
+  users.users."root" = {
+    shell = pkgs.zsh;
+    hashedPasswordFile = "/persist/etc/shadow-root";
+  };
+
+  # declarative root zsh wiring across ephemeral tmpfs boots
+  system.activationScripts.rootZsh = ''
+    mkdir -p /root/.config
+    ln -sfn /home/ashley/.local/share/dotfiles/zsh /root/.config/zsh
+    cat <<'EOF' > /root/.zshrc
+# dotfiles master hook for root
+[[ -f "/root/.config/zsh/sources.zsh" ]] && source "/root/.config/zsh/sources.zsh"
+EOF
+  '';
 
   # passwordless sudo so typing passwords during endless rebuilds stops draining the remaining will to live
   security.sudo.wheelNeedsPassword = false;
 
   # 8. flakes & experimental hubris: drinking the deterministic kool-aid to forget mutable state ever existed
-  programs.firefox.enable = true;
   programs.zsh.enable = true;
   nixpkgs.config.allowUnfree = true;
   nix.settings.experimental-features = [ "nix-command" "flakes" ];

@@ -1,5 +1,9 @@
-# plugin graveyard location
-typeset -g _PLUGIN_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/zsh/plugins"
+# plugin graveyard location (shared with root so root doesn't spam git clone on startup)
+if [[ -d "/home/ashley/.local/share/zsh/plugins" ]]; then
+    typeset -g _PLUGIN_DIR="/home/ashley/.local/share/zsh/plugins"
+else
+    typeset -g _PLUGIN_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/zsh/plugins"
+fi
 
 # only fork mkdir if the directory actually doesn't exist
 [[ -d "$_PLUGIN_DIR" ]] || mkdir -p "$_PLUGIN_DIR"

@@ -122,3 +122,13 @@ gens() {
 }
 alias generations="gens"
 alias snaps="gens"
+
+# recompile all zsh modules into wordcode (.zwc) for instant startup
+compile-zsh() {
+    local dir="${DOTFILES_DIR:-/home/ashley/.local/share/dotfiles}/zsh"
+    print -P "%F{cyan}󰄛 compiling zsh bytecode in %F{green}$dir%f..."
+    for f in "$dir"/*.zsh; do
+        zcompile -R "$f" && print -P "  %F{green}󰄲%f ${f:t}"
+    done
+    print -P "%F{green}󰄲 all zsh modules compiled to .zwc%f"
+}

@@ -1,7 +1,8 @@
 # nixos system rebuild & package management (flake-driven)
-alias rebuild='sudo nixos-rebuild switch --flake "$HOME/.local/share/dotfiles#lost"'
-alias test-build='sudo nixos-rebuild test --flake "$HOME/.local/share/dotfiles#lost"'
-alias boot-build='sudo nixos-rebuild boot --flake "$HOME/.local/share/dotfiles#lost"'
+_dotfiles_dir="${DOTFILES_DIR:-/home/ashley/.local/share/dotfiles}"
+alias rebuild="sudo nixos-rebuild switch --flake '$_dotfiles_dir#lost'"
+alias test-build="sudo nixos-rebuild test --flake '$_dotfiles_dir#lost'"
+alias boot-build="sudo nixos-rebuild boot --flake '$_dotfiles_dir#lost'"
 alias nsearch="nix search nixpkgs"
 alias nshell="nix-shell -p"
 alias nrun="nix run nixpkgs#"
@@ -67,7 +68,7 @@ alias ...='cd ../..'
 alias ....='cd ../../..'
 alias .....='cd ../../../..'
 alias -- -='cd -'
-alias dots="cd $HOME/.local/share/dotfiles"
+alias dots="cd '$_dotfiles_dir'"
 
 # quick terminal commands
 alias q="exit"

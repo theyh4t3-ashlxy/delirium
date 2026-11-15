@@ -19,6 +19,8 @@ quickshell/launcher-frecency.json
 *.log
 *.tmp
 *.bak
+quickshell/launcher_state.json
+.zcompdump*
 *.zwc
 .DS_Store
 __pycache__/
