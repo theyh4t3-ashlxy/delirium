@@ -1,23 +1,11 @@
 # prompt.zsh
-# A small terminal creature with questionable professionalism.
 #
-# Settings (set before sourcing, or change interactively):
-#   PROMPT_STYLE=unhinged
-#     unhinged | two-line | single-line | minimal | bracket
-#     gremlin | kaomoji-speech | cyberpunk | capsule
-#   KAOMOJI_SET=reactive       # reactive | cats | cute | rage | ascii
-#   PROMPT_ACCENT=primary     # primary | secondary | tertiary
-#                             # cyan | green | magenta | yellow | white
-#   PROMPT_SYMBOL='❯'
-#   SHOW_GIT_PROMPT=true
-#   SHOW_CMD_TIMER=true
-#   SHOW_PROMPT_BANTER=true
-#
-# Git: + staged, ~ unstaged, ? untracked entries, ! conflicts
-#      ↑ ahead, ↓ behind
-#
-# Nerd Font recommended for icons.
-# Git status is synchronous; disable it for very large repositories.
+# PROMPT_STYLE:    unhinged | two-line | single-line | minimal | bracket
+#                  gremlin | kaomoji-speech | cyberpunk | capsule
+# KAOMOJI_SET:     reactive | cats | cute | rage | doom | ascii | none
+# PROMPT_ACCENT:   primary | secondary | tertiary | cyan | green | magenta | yellow | white
+# PROMPT_SYMBOL:   '❯'
+# SHOW_GIT_PROMPT / SHOW_CMD_TIMER / SHOW_PROMPT_BANTER / SHOW_TIMESTAMP: true | false
 
 autoload -Uz add-zsh-hook
 zmodload -F zsh/stat b:zstat 2>/dev/null
@@ -25,7 +13,6 @@ zmodload -F zsh/stat b:zstat 2>/dev/null
 setopt PROMPT_SUBST PROMPT_PERCENT
 unsetopt PROMPT_BANG
 
-# Remove hooks from the previous version when sourcing in a live shell.
 add-zsh-hook -d preexec _cmd_timer_start 2>/dev/null
 add-zsh-hook -d precmd _prompt_precmd 2>/dev/null
 add-zsh-hook -d preexec _gp_preexec 2>/dev/null
@@ -37,23 +24,36 @@ typeset -g _GP_START="" _GP_STAMP="" _GP_MOOD_KEY=""
 typeset -g _GP_FACE="" _GP_BANTER=""
 typeset -g _GP_LEFT="" _GP_RIGHT="" _GP_GIT=""
 
-# Keep assembled text in parameters instead of inserting arbitrary data
-# directly into the prompt's shell-substitution source.
 PROMPT='${_GP_LEFT}'
 RPROMPT='${_GP_RIGHT}'
 
 _gp_literal() {
+    emulate -L zsh
     REPLY="${1//[[:cntrl:]]/}"
     REPLY="${REPLY//\%/%%}"
 }
 
+_gp_color() {
+    emulate -L zsh -o extended_glob
+    local val="$1" fallback="$2"
+    if [[ "$val" == '#'[0-9a-fA-F](#c6) || "$val" == [0-9](#c1,3) || \
+          "$val" == (black|red|green|yellow|blue|magenta|cyan|white|default) ]]; then
+        REPLY="$val"
+    else
+        REPLY="$fallback"
+    fi
+}
+
 _gp_colors() {
-    typeset -g _GP_OUT="%F{${MATUGEN_OUTLINE:-#a08d86}}"
-    typeset -g _GP_PRI="%F{${MATUGEN_PRIMARY:-#ffb59a}}"
-    typeset -g _GP_SEC="%F{${MATUGEN_SECONDARY:-#e7beaf}}"
-    typeset -g _GP_TER="%F{${MATUGEN_TERTIARY:-#d5c68e}}"
-    typeset -g _GP_ERR="%F{${MATUGEN_ERROR:-#ffb4ab}}"
-    typeset -g _GP_RST="%f"
+    emulate -L zsh
+    local REPLY
+
+    _gp_color "${MATUGEN_OUTLINE-}"           '#a08d86'; typeset -g _GP_OUT="%F{$REPLY}"
+    _gp_color "${MATUGEN_PRIMARY-}"           '#ffb59a'; typeset -g _GP_PRI="%F{$REPLY}"
+    _gp_color "${MATUGEN_SECONDARY-}"         '#e7beaf'; typeset -g _GP_SEC="%F{$REPLY}"
+    _gp_color "${MATUGEN_TERTIARY-}"          '#d5c68e'; typeset -g _GP_TER="%F{$REPLY}"
+    _gp_color "${MATUGEN_ERROR-}"             '#ffb4ab'; typeset -g _GP_ERR="%F{$REPLY}"
+    _gp_color "${MATUGEN_SURFACE_CONTAINER-}" '#2b2220'; typeset -g _GP_BG="$REPLY"
     typeset -g _GP_ACC="$_GP_PRI"
 
     case "${PROMPT_ACCENT:-primary}" in
@@ -68,23 +68,32 @@ _gp_colors() {
 }
 
 _gp_matugen() {
+    emulate -L zsh -o extended_glob
     local file="${ZDOTDIR:-$HOME/.config/zsh}/matugen.zsh"
-    local stamp=loaded
+    local stamp=loaded line key val
     local -A info
 
-    [[ -f "$file" ]] || return 0
+    [[ -f "$file" && -r "$file" ]] || return 0
 
-    if (( $+builtins[zstat] )); then
-        if zstat -H info "$file" 2>/dev/null; then
-            stamp="${info[mtime]}:${info[size]}:${info[ino]}"
-        fi
+    if (( $+builtins[zstat] )) && zstat -H info "$file" 2>/dev/null; then
+        stamp="${info[mtime]}:${info[size]}:${info[ino]}"
     fi
 
     if [[ "$stamp" != "$_GP_STAMP" ]] || (( _GP_REFRESH )); then
-        # This is executable configuration: only source a trusted file.
-        if source "$file" 2>/dev/null; then
-            _GP_STAMP="$stamp"
-        fi
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            line="${line##[[:space:]]#}"
+            [[ -z "$line" || "$line" == '#'* ]] && continue
+            line="${line#(export|typeset[[:space:]]##-[a-zA-Z]##)[[:space:]]##}"
+            [[ "$line" == *=* ]] || continue
+            key="${line%%=*}"
+            val="${line#*=}"
+            val="${val%%[[:space:]]*}"
+            val="${val#[\"\']}"
+            val="${val%[\"\']}"
+            [[ "$key" == MATUGEN_[A-Z0-9_]## && "$val" == '#'[0-9a-fA-F](#c6) ]] || continue
+            typeset -g "${key}=${val}"
+        done < "$file"
+        _GP_STAMP="$stamp"
     fi
 
     _GP_REFRESH=0
@@ -92,6 +101,7 @@ _gp_matugen() {
 }
 
 _gp_git() {
+    emulate -L zsh
     _GP_GIT=""
     _GP_DIRTY=0
     _GP_CONFLICT=0
@@ -113,7 +123,7 @@ _gp_git() {
             '# branch.oid '*)  oid="${line#\# branch.oid }" ;;
             '# branch.ab '*)
                 tracking="${line#\# branch.ab }"
-                counts=(${=tracking})
+                counts=(${(s: :)tracking})
                 ;;
             '1 '*|'2 '*)
                 xy="${line[3,4]}"
@@ -128,7 +138,6 @@ _gp_git() {
     [[ -n "$branch" ]] || return 0
     [[ "$branch" == '(detached)' ]] && branch="@${oid[1,8]}"
 
-    _prompt_unused_placeholder=  # Removed below; no external helpers needed.
     _gp_literal "$branch"
     branch="$REPLY"
 
@@ -138,10 +147,8 @@ _gp_git() {
     (( conflicts )) && details+=("${_GP_ERR}!${conflicts}%f")
 
     if (( ${#counts} == 2 )); then
-        [[ "${counts[1]}" != '+0' ]] &&
-            details+=("${_GP_PRI}↑${counts[1]#+}%f")
-        [[ "${counts[2]}" != '-0' ]] &&
-            details+=("${_GP_SEC}↓${counts[2]#-}%f")
+        [[ "${counts[1]}" != '+0' ]] && details+=("${_GP_PRI}↑${counts[1]#+}%f")
+        [[ "${counts[2]}" != '-0' ]] && details+=("${_GP_SEC}↓${counts[2]#-}%f")
     fi
 
     (( staged + unstaged + untracked + conflicts )) && _GP_DIRTY=1
@@ -158,18 +165,15 @@ _gp_git() {
 }
 
 _gp_preexec() {
-    _GP_START="$SECONDS"
+    emulate -L zsh
+    _GP_START="${SECONDS%.*}"
     _GP_RAN=1
     return 0
 }
 
 _gp_mood() {
-    if [[ "${KAOMOJI_SET:-reactive}" == (none|off|disabled|false) ]]; then
-        _GP_FACE=""
-        _GP_BANTER=""
-        return 0
-    fi
-
+    emulate -L zsh
+    local set="${KAOMOJI_SET:-reactive}"
     local state=happy key
     local -a faces words
 
@@ -177,6 +181,8 @@ _gp_mood() {
         state=root
     elif (( _GP_EXIT == 130 )); then
         state=cancelled
+    elif (( _GP_EXIT == 127 )); then
+        state=notfound
     elif (( _GP_EXIT != 0 )); then
         state=error
     elif (( _GP_CONFLICT )); then
@@ -187,8 +193,8 @@ _gp_mood() {
         state=dirty
     fi
 
-    key="${KAOMOJI_SET:-reactive}:${state}"
-    if [[ "$key" == "$_GP_MOOD_KEY" && -n "$_GP_FACE" ]] &&
+    key="${set}:${state}"
+    if [[ "$key" == "$_GP_MOOD_KEY" && ( -n "$_GP_FACE" || -n "$_GP_BANTER" ) ]] &&
        (( ! _GP_RAN )); then
         return 0
     fi
@@ -196,81 +202,149 @@ _gp_mood() {
 
     case "$state" in
         root)
-            faces=('(ಠ_ಠ)' '(눈_눈)')
-            words=('files do not have plot armor' 'god mode. mortal judgment.')
+            faces=('(ಠ_ಠ)' '(눈_눈)' '(¬_¬ )')
+            words=(
+                'files do not have plot armor'
+                'god mode. mortal judgment.'
+                'one typo away from a fresh install'
+                'no guardrails, just vibes'
+                'the kernel is sweating'
+            )
             ;;
         cancelled)
-            faces=('(￣▽￣)ゞ' '( ._.)')
-            words=('tactical retreat' 'we saw nothing' 'actually never mind')
+            faces=('(￣▽￣)ゞ' '( ._.)' '(；￣Д￣)')
+            words=(
+                'tactical retreat'
+                'we saw nothing'
+                'actually never mind'
+                'changed my mind, valid'
+                'pretend that never happened'
+            )
+            ;;
+        notfound)
+            faces=('(・_・?)' '(⊙_⊙?)' '(・・?)')
+            words=(
+                'never heard of her'
+                'typo or hallucination?'
+                'bestie that is not a command'
+                'you just made that up'
+                'keyboard smash detected'
+            )
             ;;
         error)
-            faces=('(╯°□°)╯彡┻━┻' '(ಥ_ಥ)' '(╥﹏╥)' '(ノಠ益ಠ)ノ')
-            words=('that was character development' 'computer says no'
-                   'the plot thickens' 'well shit')
+            faces=('(╯°□°)╯︵ ┻━┻' '(ಥ_ಥ)' '(╥﹏╥)' '(ノಠ益ಠ)ノ')
+            words=(
+                'that was character development'
+                'computer says no'
+                'the plot thickens'
+                'well shit'
+                'skill issue (affectionate)'
+                'certified oopsie'
+                'bold move. did not pay off.'
+                'the audacity of this exit code'
+            )
             ;;
         conflict)
             faces=('(ง •̀_•́)ง' '(⊙_⊙;)' '(ಠ益ಠ)')
-            words=('git chose violence' 'pick a timeline'
-                   'both sides brought receipts')
+            words=(
+                'git chose violence'
+                'pick a timeline'
+                'both sides brought receipts'
+                'merge drama'
+                'reality has forked'
+                'two branches enter, one survives'
+            )
             ;;
         slow)
-            faces=('(－_－) zzZ' '(눈_눈)' '(∪｡∪)｡｡｡')
-            words=('i grew a beard' 'finally' 'a geological event')
+            faces=('(－_－) zzZ' '(눈_눈)' '(∪｡∪)｡｡｡zzZ')
+            words=(
+                'finally'
+                'a geological event'
+                'took three business days'
+                'did it walk there?'
+                'thought we froze ngl'
+                'welcome back from the void'
+            )
             ;;
         dirty)
             faces=('(・_・;)' '(¬_¬ )' '(；・∀・)')
-            words=('little crimes, uncommitted' 'the worktree has lore'
-                   'nothing to see here')
+            words=(
+                'little crimes, uncommitted'
+                'the worktree has lore'
+                'nothing to see here'
+                'commit issues, literally'
+                'chaos in the working tree'
+                'future you will hate this diff'
+            )
             ;;
         *)
-            faces=('(◕‿◕✿)' 'ᓚᘏᗢ' '(⌐■_■)' '( ˘▽˘)っ♨')
-            words=('professionally unserious' 'it works. suspicious.'
-                   'certified terminal creature' 'tiny wins count')
+            faces=('(◕‿◕✿)' 'ᓚᘏᗢ' '(⌐■_■)' '( ˘▽˘)っ旦' '(｡•̀ᴗ-)✧')
+            words=(
+                'professionally unserious'
+                'it works. suspicious.'
+                'certified terminal creature'
+                'tiny wins count'
+                'zero errors, suspiciously peaceful'
+                'brain empty, shell ready'
+                'suspiciously competent today'
+                'running on vibes and caffeine'
+                'clean slate, go break something'
+            )
             ;;
     esac
 
-    case "${KAOMOJI_SET:-reactive}" in
+    case "$set" in
+        none|off|disabled|false)
+            faces=()
+            ;;
         cats)
-            faces=('ᓚᘏᗢ' '(=^･ω･^=)' '(=①ω①=)' '(^・x・^)')
+            faces=('ᓚᘏᗢ' '(=^･ω･^=)' '(=^･ｪ･^=)' '/ᐠ｡ꞈ｡ᐟ\' '(=｀ω´=)')
             ;;
         cute)
-            faces=('(◕‿◕✿)' '(✿◠‿◠)' '(｡♥‿♥｡)' '(✿◡‿◡)')
+            faces=('(◕‿◕✿)' '(✿◠‿◠)' '(｡♥‿♥｡)' '(✿◡‿◡)' '(≧◡≦)' '(｡•̀ᴗ-)✧')
             ;;
         rage)
-            faces=('(╯°□°)╯彡┻━┻' '(ノಠ益ಠ)ノ' '(╬ಠ益ಠ)')
+            faces=('(╯°□°)╯︵ ┻━┻' '(ノಠ益ಠ)ノ' '(╬ಠ益ಠ)' '(ﾒ｀ﾛ´)')
             ;;
         doom)
-            faces=('(눈_눈)' '(x_x)' '(¬_¬ )' '(⚆_⚆)' '(-_-)')
+            faces=('(눈_눈)' '(x_x)' '(¬_¬ )' '(⚆_⚆)' '(；一_一)')
             ;;
         ascii)
             case "$state" in
                 error|conflict) faces=('(>_<)' '(x_x)' 'D:') ;;
-                slow)          faces=('(-_-) zzz' '(-.-)') ;;
-                dirty)         faces=('(o_o;)' '(^_^;)') ;;
-                root)          faces=('(-_-)') ;;
-                cancelled)     faces=('(._.)') ;;
-                *)             faces=('(^_^)' '(=^.^=)' '(^o^)') ;;
+                notfound)       faces=('(?_?)' '(o_O)') ;;
+                slow)           faces=('(-_-) zzz' '(-.-)') ;;
+                dirty)          faces=('(o_o;)' '(^_^;)') ;;
+                root)           faces=('(-_-)') ;;
+                cancelled)      faces=('(._.)') ;;
+                *)              faces=('(^_^)' '(=^.^=)' '(^o^)') ;;
             esac
             ;;
     esac
 
-    _GP_FACE="${faces[RANDOM % ${#faces} + 1]}"
+    if (( ${#faces} )); then
+        _GP_FACE="${faces[RANDOM % ${#faces} + 1]}"
+    else
+        _GP_FACE=""
+    fi
+
     _GP_BANTER="${words[RANDOM % ${#words} + 1]}"
     return 0
 }
 
 _gp_build() {
+    emulate -L zsh
     local out="$_GP_OUT" pri="$_GP_PRI" sec="$_GP_SEC"
-    local ter="$_GP_TER" err="$_GP_ERR" acc="$_GP_ACC"
-    local REPLY symbol face identity dir extras="" venv=""
-    local elapsed="" style="${PROMPT_STYLE:-unhinged}"
+    local ter="$_GP_TER" err="$_GP_ERR" acc="$_GP_ACC" bg="$_GP_BG"
+    local REPLY symbol face="" identity dir extras="" venv=""
+    local elapsed="" vname style="${PROMPT_STYLE:-unhinged}"
+    local -a rparts
 
     (( _GP_EXIT != 0 || EUID == 0 )) && acc="$err"
 
     _gp_literal "${PROMPT_SYMBOL:-❯}"
     symbol="${acc}${REPLY}%f"
 
-    local face=""
     if [[ -n "$_GP_FACE" ]]; then
         _gp_literal "$_GP_FACE"
         face="${acc}${REPLY}%f"
@@ -292,7 +366,9 @@ _gp_build() {
     fi
 
     if [[ -n "${VIRTUAL_ENV-}" ]]; then
-        _gp_literal "${VIRTUAL_ENV:t}"
+        vname="${VIRTUAL_ENV:t}"
+        [[ "$vname" == (.venv|venv) ]] && vname="${VIRTUAL_ENV:h:t}"
+        _gp_literal "$vname"
         venv=" ${out}[${sec}󰌠 ${REPLY}${out}]%f"
     elif [[ -n "${CONDA_DEFAULT_ENV-}" ]]; then
         _gp_literal "$CONDA_DEFAULT_ENV"
@@ -328,7 +404,7 @@ _gp_build() {
             _GP_LEFT+=$'\n'"${out}└──╼%f ${symbol} "
             ;;
         capsule)
-            _GP_LEFT=$'\n'"${out}${identity}${out} ${dir}${out}%f${face:+ ${face}}${context}"
+            _GP_LEFT=$'\n'"%F{${bg}}%K{${bg}}${identity}%k%F{${bg}} %K{${bg}}${dir}%k%F{${bg}}%f${face:+ ${face}}${context}"
             _GP_LEFT+=$'\n'" ${symbol} "
             ;;
         two-line)
@@ -337,23 +413,19 @@ _gp_build() {
             ;;
         unhinged|*)
             _GP_LEFT=$'\n'"${out}╭── ${face:+${face} }${identity} ${out}in ${dir}${context}"
-            _GP_LEFT+=$'\n'"${out}╰───%f${symbol} "
+            _GP_LEFT+=$'\n'"${out}╰───%f ${symbol} "
             ;;
     esac
 
-    _GP_RIGHT=""
-
-    (( _GP_EXIT != 0 )) &&
-        _GP_RIGHT+="${err}✘ ${_GP_EXIT}%f "
+    (( _GP_EXIT != 0 )) && rparts+=("${err}✘ ${_GP_EXIT}%f")
 
     if [[ "${SHOW_PROMPT_BANTER:-true}" == true && -n "$_GP_BANTER" ]] &&
        (( ${COLUMNS:-80} >= 110 )); then
         _gp_literal "$_GP_BANTER"
-        _GP_RIGHT+="${out}${REPLY}%f "
+        rparts+=("${out}${REPLY}%f")
     fi
 
-    if [[ "${SHOW_CMD_TIMER:-true}" == true ]] &&
-       (( _GP_ELAPSED >= 1 )); then
+    if [[ "${SHOW_CMD_TIMER:-true}" == true ]] && (( _GP_ELAPSED >= 1 )); then
         local -i hours=$(( _GP_ELAPSED / 3600 ))
         local -i mins=$(( _GP_ELAPSED / 60 % 60 ))
         local -i secs=$(( _GP_ELAPSED % 60 ))
@@ -361,28 +433,32 @@ _gp_build() {
         (( hours )) && elapsed+="${hours}h"
         (( hours || mins )) && elapsed+="${mins}m"
         elapsed+="${secs}s"
-        _GP_RIGHT+="${sec}${elapsed}%f "
+        rparts+=("${sec}${elapsed}%f")
     fi
 
-    if [[ "${SHOW_TIMESTAMP:-true}" == true ]]; then
-        _GP_RIGHT+="${out}%T%f"
-    fi
+    [[ "${SHOW_TIMESTAMP:-true}" == true ]] && rparts+=("${out}%T%f")
+
+    _GP_RIGHT="${(j: :)rparts}"
     return 0
 }
 
 _gp_precmd() {
     local -i last_exit=$?
+    emulate -L zsh
 
     if (( _GP_RAN )); then
         _GP_EXIT=$last_exit
         _GP_ELAPSED=0
 
         if [[ -n "$_GP_START" ]]; then
-            (( _GP_ELAPSED = SECONDS - _GP_START ))
+            (( _GP_ELAPSED = ${SECONDS%.*} - _GP_START ))
             (( _GP_ELAPSED < 0 )) && _GP_ELAPSED=0
         fi
 
         _GP_START=""
+    else
+        _GP_EXIT=0
+        _GP_ELAPSED=0
     fi
 
     _gp_matugen
@@ -396,9 +472,13 @@ _gp_precmd() {
 }
 
 TRAPUSR2() {
-    # Defer the refresh to precmd so a signal cannot partially overwrite
-    # prompt state while another refresh or command is running.
     _GP_REFRESH=1
+    if [[ -o zle ]] && zle 2>/dev/null; then
+        _gp_matugen
+        _gp_colors
+        _gp_build
+        zle reset-prompt 2>/dev/null
+    fi
     return 0
 }
 
