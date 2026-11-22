@@ -1,0 +1,78 @@
+#compdef wp
+
+local curcontext="$curcontext" state line
+typeset -A opt_args
+
+local -a commands=(
+    'status:show active wallpaper, mode, scheme & count'
+    'info:alias for status'
+    'mode:switch or toggle dark / light mode'
+    'scheme:switch matugen palette algorithm'
+    'toggle:quick toggle between dark and light mode'
+    'dark:switch to dark mode'
+    'light:switch to light mode'
+    'random:roll random wallpaper from library'
+    'roll:roll random wallpaper'
+    'wh:roll random online wallpaper from wallhaven'
+    'online:alias for wh'
+    'reload:re-apply current wallpaper & matugen palette'
+    'refresh:re-apply current wallpaper'
+    'set:apply specific image or video file'
+    'color:apply solid color theme'
+    'scan:rescan library & rebuild saved_wp'
+    'download:download image or video and apply'
+    'stop:stop live video wallpapers (mpvpaper)'
+    'kill:alias for stop'
+    'get:print current wallpaper path'
+)
+
+_arguments -C \
+    '1: :->command' \
+    '*: :->args'
+
+case $state in
+    command)
+        _describe -t commands 'wp subcommand' commands
+        ;;
+    args)
+        case $line[1] in
+            mode)
+                local -a modes=('dark:dark mode' 'light:light mode' 'toggle:toggle mode')
+                _describe -t modes 'theme mode' modes
+                ;;
+            scheme)
+                local -a schemes=(
+                    'scheme-tonal-spot:material tonal spot (balanced)'
+                    'scheme-smart:smart adaptive palette'
+                    'scheme-vibrant:high chroma vibrant colors'
+                    'scheme-expressive:expressive complementary colors'
+                    'scheme-fruit-salad:fruit salad playful tones'
+                    'scheme-rainbow:full color wheel spectrum'
+                    'scheme-fidelity:faithful to source colors'
+                    'scheme-monochrome:monochrome grayscale'
+                    'scheme-neutral:neutral low-saturation'
+                )
+                _describe -t schemes 'matugen scheme' schemes
+                ;;
+            set)
+                _files -g "*.{png,jpg,jpeg,webp,avif,gif,mp4,webm,mkv,mov,PNG,JPG,JPEG,WEBP,AVIF,GIF,MP4,WEBM,MKV,MOV}"
+                ;;
+            random|roll)
+                local -a cats
+                if [[ -d "$HOME/.wallpapers" ]]; then
+                    local d
+                    for d in "$HOME/.wallpapers"/*(N/); do
+                        cats+=("${d:t}:wallpaper category")
+                    done
+                fi
+                _describe -t cats 'category' cats
+                ;;
+            color)
+                _message 'hex color (e.g. #7aa2f7 or 7aa2f7)'
+                ;;
+            *)
+                return 0
+                ;;
+        esac
+        ;;
+esac

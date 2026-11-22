@@ -1,0 +1,84 @@
+#compdef cli qs-switch
+
+local curcontext="$curcontext" state line
+typeset -A opt_args
+
+local -a commands=(
+    'shell:switch or toggle active shell (quickshell <-> brain_shell)'
+    'qs:shortcut to switch to standard quickshell'
+    'bs:shortcut to switch to brain_shell'
+    'reload:gracefully reload active shell'
+    'restart:gracefully reload active shell'
+    'kill:kill running shell instances'
+    'stop:kill running shell instances'
+    'status:show active shell, pids, and memory'
+    'info:show active shell info'
+    'launcher:toggle app launcher'
+    'dashboard:toggle dashboard / control center'
+    'notifs:toggle notification center'
+    'clip:toggle clipboard history'
+    'files:open preferred file manager'
+    'wall:roll random wallpaper & regenerate tokens'
+    'audio:toggle volume / audio control'
+    'mixer:toggle audio mixer'
+    'screenshot:capture screenshot'
+    'record:screen recording controls'
+    'lock:lock session'
+    'power:open power menu'
+    'keybinds:view keybindings cheatsheet'
+    'welcome:open welcome wizard'
+    'act:dispatch arbitrary shell action'
+    'ipc:raw pass-through to quickshell ipc'
+)
+
+_arguments -C \
+    '1: :->command' \
+    '*: :->args'
+
+case $state in
+    command)
+        _describe -t commands 'cli subcommand' commands
+        ;;
+    args)
+        case $line[1] in
+            shell|switch|toggle|t)
+                local -a targets=(
+                    'qs:standard quickshell'
+                    'bs:brain_shell'
+                    'toggle:toggle between shells'
+                    'restart:restart active shell'
+                )
+                _describe -t targets 'shell target' targets
+                ;;
+            record|rec)
+                local -a rec_cmds=(
+                    'screen:record entire screen'
+                    'region:record selected region'
+                    'window:record active window'
+                    'stop:stop active recording'
+                )
+                _describe -t rec_cmds 'record action' rec_cmds
+                ;;
+            files|fm|e)
+                _directories
+                ;;
+            act|action)
+                local -a acts=(
+                    'launcher:app launcher'
+                    'dashboard:dashboard'
+                    'notifs:notifications'
+                    'clipboard:clipboard manager'
+                    'files:file manager'
+                    'wallpaper:roll wallpaper'
+                    'powermenu:power menu'
+                    'keybinds:cheatsheet'
+                    'welcome:welcome wizard'
+                )
+                _describe -t acts 'action' acts
+                ;;
+            *)
+                return 0
+                ;;
+        esac
+        ;;
+esac

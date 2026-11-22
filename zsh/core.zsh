@@ -34,6 +34,7 @@ zstyle ':completion:*' cache-path "${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
 zstyle ':completion:*' rehash true
 
 # category headers styled with matugen accents
+zstyle ':completion:*' verbose yes
 zstyle ':completion:*:*:*:*:descriptions' format '%F{cyan}󰅂 %d%f'
 zstyle ':completion:*:messages' format '%F{yellow}󰅂 %d%f'
 zstyle ':completion:*:warnings' format '%F{red}󰅂 no matches found: %d%f'
@@ -63,6 +64,11 @@ zstyle ':completion:*:*:kill:*:processes' list-colors '=(#b) #([0-9]#)*=0=01;31'
 autoload -Uz compinit
 local zcomp_dir="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
 [[ -d "$zcomp_dir" ]] || mkdir -p "$zcomp_dir"
+
+# custom completions for dotfiles scripts (cli, wp, qs)
+local _compdir="${ZDOTDIR:-$HOME/.config/zsh}/completions"
+[[ -d "$_compdir" ]] && fpath=("$_compdir" $fpath)
+
 local zcomp="$zcomp_dir/zcompdump-${ZSH_VERSION}"
 if [[ -n ${zcomp}(#qN.mh-24) ]]; then
     compinit -C -d "$zcomp"

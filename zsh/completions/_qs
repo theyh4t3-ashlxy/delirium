@@ -1,0 +1,7 @@
+#compdef qs quickshell
+
+_arguments \
+    '-d[run quickshell in detached daemon mode]' \
+    '-p[specify shell project directory]:directory:_directories' \
+    '1:action:(kill ipc)' \
+    '*:args:_default'
