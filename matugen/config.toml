@@ -39,15 +39,6 @@ output_path = "~/.config/gtk-3.0/matugen.css"
 # terrorize both gtk versions simultaneously
 post_hook = "$HOME/.config/matugen/post-hook-scripts/gtk-themes-reload.zsh 2>/dev/null || true"
 
-[templates.yazi]
-input_path = "~/.config/matugen/templates/yazi-theme.toml"
-output_path = "~/.config/yazi/theme.toml"
-
-[templates.nvim]
-input_path = "~/.config/matugen/templates/nvim-colors.lua"
-output_path = "~/.config/nvim/lua/config/colors.lua"
-
-# inject dynamic matugen palette into qt/kde applications
 [templates.kde]
 input_path = "~/.config/matugen/templates/kde-colors.colors"
 output_path = "~/.local/share/color-schemes/Matugen.colors"

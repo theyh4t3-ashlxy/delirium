@@ -1,6 +1,66 @@
 # ~/.config/yazi/keymap.toml
 
-# 1. Nautilus-style Enter (smart-enter plugin) & Backspace
+# 1. IJKL Navigation
+[[manager.prepend_keymap]]
+on   = "i"
+run  = "arrow prev"
+desc = "Move cursor up"
+
+[[manager.prepend_keymap]]
+on   = "k"
+run  = "arrow next"
+desc = "Move cursor down"
+
+[[manager.prepend_keymap]]
+on   = "j"
+run  = "leave"
+desc = "Back to parent directory"
+
+[[manager.prepend_keymap]]
+on   = "l"
+run  = "enter"
+desc = "Enter child directory"
+
+# Preview scrolling
+[[manager.prepend_keymap]]
+on   = "I"
+run  = "seek -5"
+desc = "Seek up 5 lines in preview"
+
+[[manager.prepend_keymap]]
+on   = "K"
+run  = "seek 5"
+desc = "Seek down 5 lines in preview"
+
+# Unbind old h so muscle memory forces ijkl
+[[manager.prepend_keymap]]
+on   = "h"
+run  = "noop"
+desc = "Unbound (use j for parent)"
+
+# Tasks menu IJKL
+[[tasks.prepend_keymap]]
+on   = "i"
+run  = "arrow prev"
+desc = "Previous task"
+
+[[tasks.prepend_keymap]]
+on   = "k"
+run  = "arrow next"
+desc = "Next task"
+
+# Select menu IJKL
+[[select.prepend_keymap]]
+on   = "i"
+run  = "arrow prev"
+desc = "Previous item"
+
+[[select.prepend_keymap]]
+on   = "k"
+run  = "arrow next"
+desc = "Next item"
+
+# 2. Nautilus-style Enter (smart-enter plugin) & Backspace
 [[manager.prepend_keymap]]
 on   = "<Enter>"
 run  = "plugin smart-enter"
@@ -11,7 +71,7 @@ on   = "<Backspace>"
 run  = "leave"
 desc = "Go back to parent directory"
 
-# 2. File Operations
+# 3. File Operations
 [[manager.prepend_keymap]]
 on   = "n"
 run  = "create"
@@ -27,7 +87,7 @@ on   = "d"
 run  = "remove"
 desc = "Move selected to trash"
 
-# 3. Zoxide jump (replaces default 'z')
+# 4. Zoxide jump (replaces default 'z')
 [[manager.prepend_keymap]]
 on   = "z"
 run  = "plugin zoxide"

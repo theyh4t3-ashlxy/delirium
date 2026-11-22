@@ -39,6 +39,12 @@ return {
           ellipsis_char = "...",
         }),
       },
+
+      -- rounded borders for completions and doc popups
+      window = {
+        completion = cmp.config.window.bordered({ border = "rounded" }),
+        documentation = cmp.config.window.bordered({ border = "rounded" }),
+      },
     })
   end,
 }

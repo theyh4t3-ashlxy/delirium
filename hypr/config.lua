@@ -7,15 +7,24 @@ local colors = {
 	active_border_1 = "rgba(95CDF7ff)",
 	active_border_2 = "rgba(2BB0F6ff)",
 	inactive_border = "rgba(41474Dff)",
+	surface = "rgba(101417ff)",
+	surface_container = "rgba(1C2024ff)",
+	on_primary = "rgba(00344Eff)",
+	on_surface = "rgba(E0E3E8ff)",
 }
 
 -- do not touch. do not breathe near this. do not make sudden eye contact.
 -- if matugen breaks, we will literally lose the only thing tethering our sanity to this computer: pretty dynamic colors.
 local ok, user_colors = pcall(require, "colors")
 if ok and type(user_colors) == "table" then
-	if user_colors.active_border_1 then colors.active_border_1 = user_colors.active_border_1 end
-	if user_colors.active_border_2 then colors.active_border_2 = user_colors.active_border_2 end
-	if user_colors.inactive_border then colors.inactive_border = user_colors.inactive_border end
+	for k, v in pairs(user_colors) do
+		colors[k] = v
+	end
+end
+
+-- swap the "ff" alpha channel on any "rgba(rrggbbaa)" string
+local function alpha(rgba, hex_a)
+	return rgba:sub(1, 11) .. hex_a .. ")"
 end
 
 -- cursor & system environment fixes
@@ -56,12 +65,13 @@ hl.config({
 
 	decoration = {
 		-- 16px round corners because sharp edges are a hazard to my health
-		rounding = 16, 
+		rounding = 16,
 		-- 2.0 is a circle, 4.0 is a squircle. keeping it at 2.0 because squircles sound like a weird custom plugin that crashed wayland
-		rounding_power = 2.0,  
+		rounding_power = 2.0,
 		dim_inactive = false,
 		shadow = {
 			render_power = 4,
+			color = alpha(colors.surface, "cc"),
 		},
 		blur = {
 			-- look, hyprmod enabled blur. so yes we are doing blur now. if my thinkpad explodes because of 2 passes of blur, so be it
@@ -75,6 +85,21 @@ hl.config({
 			contrast = 1.0,
 			vibrancy = 0.15,
 			popups = false,
+		},
+	},
+
+	group = {
+		col = {
+			border_active = colors.active_border_1,
+			border_inactive = colors.inactive_border,
+		},
+		groupbar = {
+			text_color = colors.on_primary,
+			text_color_inactive = colors.on_surface,
+			col = {
+				active = colors.active_border_1,
+				inactive = colors.surface_container,
+			},
 		},
 	},
 
@@ -95,6 +120,7 @@ hl.config({
 		-- thank god we can disable the classic anime mascot wallpaper from staring into our soul
 		disable_hyprland_logo = true,
 		disable_splash_rendering = true,
+		background_color = colors.surface,
 	},
 
 	xwayland = {

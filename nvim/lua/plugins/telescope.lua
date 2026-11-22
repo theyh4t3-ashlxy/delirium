@@ -11,6 +11,10 @@ return {
 
         telescope.setup({
             defaults = {
+                prompt_prefix = "  ",
+                selection_caret = " ",
+                entry_prefix = "  ",
+                borderchars = { "─", "│", "─", "│", "╭", "╮", "╯", "╰" },
                 mappings = {
                     i = {
                         ["<C-k>"] = "move_selection_next",
