@@ -115,11 +115,10 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 6
 
-        Text {
+        Icon {
             anchors.verticalCenter: parent.verticalCenter
-            text: root.isPowered ? (root.hasConnectedDevice ? Theme.iconBluetoothConnected : Theme.iconBluetooth) : Theme.iconBluetoothOff
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+            source: root.isPowered ? (root.hasConnectedDevice ? Theme.iconBluetoothConnected : Theme.iconBluetooth) : Theme.iconBluetoothOff
+            size: Theme.fontSizeSm
             color: !root.isPowered ? Theme.on_surface_variant : (root.hasConnectedDevice || popup.open || btMouse.containsMouse ? Theme.primary : Theme.on_surface)
 
             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -209,11 +208,10 @@ Rectangle {
 
                     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: root.isPowered ? (root.hasConnectedDevice ? Theme.iconBluetoothConnected : Theme.iconBluetooth) : Theme.iconBluetoothOff
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                        source: root.isPowered ? (root.hasConnectedDevice ? Theme.iconBluetoothConnected : Theme.iconBluetooth) : Theme.iconBluetoothOff
+                        size: Theme.fontSizeLg
                         color: root.isPowered ? Theme.primary : Theme.on_surface_variant
                     }
                 }
@@ -235,7 +233,9 @@ Rectangle {
                             if (!root.isPowered) return "adapter powered down • radio silence";
                             if (root.isDiscovering) return "scanning nearby airwaves for devices...";
                             if (root.hasConnectedDevice) return "linked to " + root.primaryDeviceName;
-                            return Theme.getFlavor("media_playing", "bluez daemon ready • idle");
+                            return Theme.getStatusFlavor
+                                ? Theme.getStatusFlavor("system", "bluetooth ready • idle")
+                                : (Theme.getFlavor ? Theme.getFlavor("system", "bluetooth ready • idle") : "bluetooth ready • idle");
                         }
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
@@ -302,10 +302,9 @@ Rectangle {
                         Layout.fillWidth: true
                         spacing: 6
 
-                        Text {
-                            text: Theme.iconBluetooth
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                        Icon {
+                            source: Theme.iconBluetooth
+                            size: Theme.fontSizeSm
                             color: Theme.primary
                         }
 
@@ -335,11 +334,10 @@ Rectangle {
                                 anchors.centerIn: parent
                                 spacing: 4
 
-                                Text {
+                                Icon {
                                     visible: !Theme.isTextIconSet
-                                    text: Theme.iconRefresh
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeXs
+                                    source: Theme.iconRefresh
+                                    size: Theme.fontSizeXs
                                     color: root.isDiscovering ? Theme.primary : Theme.on_surface_variant
                                 }
 
@@ -428,11 +426,10 @@ Rectangle {
                                             border.color: modelData.connected ? Theme.alpha(Theme.primary, 0.45) : Theme.widgetBorder
                                             border.width: 1
 
-                                            Text {
+                                            Icon {
                                                 anchors.centerIn: parent
-                                                text: root.getDeviceIcon(modelData)
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
+                                                source: root.getDeviceIcon(modelData)
+                                                size: Theme.fontSizeMd
                                                 color: modelData.connected ? Theme.primary : Theme.on_surface_variant
                                             }
                                         }
@@ -520,11 +517,10 @@ Rectangle {
                                             border.color: forgetMouse.containsMouse ? Theme.error : Theme.widgetBorder
                                             border.width: 1
 
-                                            Text {
+                                            Icon {
                                                 anchors.centerIn: parent
-                                                text: Theme.iconTrash
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.fontSizeXs
+                                                source: Theme.iconTrash
+                                                size: Theme.fontSizeXs
                                                 color: forgetMouse.containsMouse ? Theme.error : Theme.on_surface_variant
                                             }
 
@@ -563,11 +559,10 @@ Rectangle {
                                 border.color: Theme.widgetBorder
                                 border.width: 1
 
-                                Text {
+                                Icon {
                                     anchors.centerIn: parent
-                                    text: !root.isPowered ? Theme.iconBluetoothOff : Theme.iconBluetooth
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
+                                    source: !root.isPowered ? Theme.iconBluetoothOff : Theme.iconBluetooth
+                                    size: Theme.fontSizeTitle
                                     color: Theme.on_surface_variant
                                 }
                             }

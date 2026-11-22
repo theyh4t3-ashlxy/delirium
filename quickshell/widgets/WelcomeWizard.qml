@@ -292,11 +292,10 @@ PanelWindow {
                         border.color: Theme.alpha(Theme.primary, 0.35)
                         border.width: 1
 
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: Theme.iconDistro
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                            source: Theme.iconDistro
+                            size: Theme.fontSizeLg
                             color: Theme.primary
                         }
                     }
@@ -337,7 +336,9 @@ PanelWindow {
                         }
 
                         Text {
-                            text: Theme.getFlavor("system", "keyboard-driven layer-shell environment configured for zero mouse friction")
+                            text: Theme.getStatusFlavor
+                                ? Theme.getStatusFlavor("system", "keyboard-driven layer-shell environment configured for zero mouse friction")
+                                : (Theme.getFlavor ? Theme.getFlavor("system", "keyboard-driven layer-shell environment configured for zero mouse friction") : "keyboard-driven layer-shell environment configured for zero mouse friction")
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.on_surface_variant
@@ -375,11 +376,10 @@ PanelWindow {
 
                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: Theme.iconClose
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeXs
+                            source: Theme.iconClose
+                            size: Theme.fontSizeXs
                             color: closeMouse.containsMouse ? Theme.error : Theme.on_surface
                         }
 
@@ -436,11 +436,10 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     spacing: 5
 
-                                    Text {
+                                    Icon {
                                         visible: !Theme.isTextIconSet
-                                        text: isPassed ? Theme.iconCheck : modelData.icon
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeXs
+                                        source: isPassed ? Theme.iconCheck : modelData.icon
+                                        size: Theme.fontSizeXs
                                         color: isActive ? Theme.on_primary : (isPassed ? Theme.primary : Theme.on_surface_variant)
                                     }
 
@@ -514,10 +513,9 @@ PanelWindow {
                                         Layout.fillWidth: true
                                         spacing: 6
 
-                                        Text {
-                                            text: Theme.iconPalette
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                                        Icon {
+                                            source: Theme.iconPalette
+                                            size: Theme.fontSizeSm
                                             color: Theme.primary
                                         }
 
@@ -650,11 +648,10 @@ PanelWindow {
                                                     RowLayout {
                                                         anchors.centerIn: parent
                                                         spacing: 5
-                                                        Text {
+                                                        Icon {
                                                             visible: !Theme.isTextIconSet
-                                                            text: modelData.icon
-                                                            font.family: Theme.fontIcon
-                                                            font.pixelSize: Theme.fontSizeXs
+                                                            source: modelData.icon
+                                                            size: Theme.fontSizeXs
                                                             color: parent.parent.isSel ? Theme.on_primary : Theme.primary
                                                         }
                                                         Text {
@@ -701,10 +698,9 @@ PanelWindow {
                                         RowLayout {
                                             Layout.alignment: Qt.AlignHCenter
                                             spacing: 6
-                                            Text {
-                                                text: Theme.iconShuffle
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
+                                            Icon {
+                                                source: Theme.iconShuffle
+                                                size: Theme.fontSizeMd
                                                 color: rollMouse.pressed ? Theme.on_primary : Theme.primary
                                             }
                                             Text {
@@ -845,10 +841,9 @@ PanelWindow {
 
                                         RowLayout {
                                             spacing: 8
-                                            Text {
-                                                text: Theme.iconSparkles
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
+                                            Icon {
+                                                source: Theme.iconSparkles
+                                                size: Theme.fontSizeMd
                                                 color: Theme.primary
                                             }
                                             Text {
@@ -934,10 +929,9 @@ PanelWindow {
 
                                         RowLayout {
                                             spacing: 8
-                                            Text {
-                                                text: Theme.iconWorkspaces
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
+                                            Icon {
+                                                source: Theme.iconWorkspaces
+                                                size: Theme.fontSizeMd
                                                 color: Theme.tertiary
                                             }
                                             Text {
@@ -1173,10 +1167,9 @@ PanelWindow {
 
                                         RowLayout {
                                             spacing: 6
-                                            Text {
-                                                text: Theme.iconEdit
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                                            Icon {
+                                                source: Theme.iconEdit
+                                                size: Theme.fontSizeSm
                                                 color: Theme.primary
                                             }
                                             Text {
@@ -1258,10 +1251,9 @@ PanelWindow {
 
                                         RowLayout {
                                             spacing: 6
-                                            Text {
-                                                text: Theme.iconFolder
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                                            Icon {
+                                                source: Theme.iconFolder
+                                                size: Theme.fontSizeSm
                                                 color: Theme.primary
                                             }
                                             Text {
@@ -1340,10 +1332,9 @@ PanelWindow {
 
                                     RowLayout {
                                         spacing: 6
-                                        Text {
-                                            text: Theme.iconThermo
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                                        Icon {
+                                            source: Theme.iconThermo
+                                            size: Theme.fontSizeSm
                                             color: Theme.primary
                                         }
                                         Text {
@@ -1423,10 +1414,9 @@ PanelWindow {
 
                                     RowLayout {
                                         spacing: 6
-                                        Text {
-                                            text: Theme.iconKeyboard
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                                        Icon {
+                                            source: Theme.iconKeyboard
+                                            size: Theme.fontSizeSm
                                             color: Theme.primary
                                         }
                                         Text {
@@ -1555,10 +1545,9 @@ PanelWindow {
                                             anchors.rightMargin: 10
                                             spacing: 8
 
-                                            Text {
-                                                text: Theme.iconKeyboard
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                                            Icon {
+                                                source: Theme.iconKeyboard
+                                                size: Theme.fontSizeSm
                                                 color: Theme.primary
                                             }
 
@@ -1598,10 +1587,9 @@ PanelWindow {
 
                                     RowLayout {
                                         spacing: 6
-                                        Text {
-                                            text: Theme.iconTerminal
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                                        Icon {
+                                            source: Theme.iconTerminal
+                                            size: Theme.fontSizeSm
                                             color: Theme.primary
                                         }
                                         Text {
@@ -1699,10 +1687,9 @@ PanelWindow {
                                         RowLayout {
                                             anchors.centerIn: parent
                                             spacing: 8
-                                            Text {
-                                                text: Theme.iconSparkles
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeMd
+                                            Icon {
+                                                source: Theme.iconSparkles
+                                                size: Theme.fontSizeMd
                                                 color: Theme.on_primary
                                             }
                                             Text {
@@ -1748,10 +1735,9 @@ PanelWindow {
                             id: backRow
                             anchors.centerIn: parent
                             spacing: 5
-                            Text {
-                                text: Theme.iconChevronLeft
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.fontSizeXs
+                            Icon {
+                                source: Theme.iconChevronLeft
+                                size: Theme.fontSizeXs
                                 color: Theme.on_surface
                             }
                             Text {
@@ -1800,10 +1786,9 @@ PanelWindow {
                                 font.weight: Font.Bold
                                 color: Theme.on_primary
                             }
-                            Text {
-                                text: root.currentStep === root.totalSteps - 1 ? Theme.iconCheck : Theme.iconChevronRight
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.fontSizeXs
+                            Icon {
+                                source: root.currentStep === root.totalSteps - 1 ? Theme.iconCheck : Theme.iconChevronRight
+                                size: Theme.fontSizeXs
                                 color: Theme.on_primary
                             }
                         }

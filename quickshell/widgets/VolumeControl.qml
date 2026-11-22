@@ -73,12 +73,11 @@ Rectangle {
         anchors.horizontalCenter: Theme.isVertical ? parent.horizontalCenter : undefined
         spacing: 4
 
-        Text {
+        Icon {
             id: volIcon
             anchors.verticalCenter: parent.verticalCenter
-            text: Theme.getVolumeIcon(volRoot.vol, volRoot.muted)
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.fontSizeMd
+            source: Theme.getVolumeIcon(volRoot.vol, volRoot.muted)
+            size: Theme.fontSizeMd
             color: popup.open
                 ? Theme.primary
                 : (volRoot.muted ? Theme.on_surface_disabled : (volRoot.isOverdriven ? Theme.warn : Theme.on_surface))
@@ -91,9 +90,8 @@ Rectangle {
             opacity: (vMouse.containsMouse || popup.open) ? 1.0 : 0.0
             Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
             text: {
-                if (volRoot.muted) return Theme.getVibe(Theme.kaoAnger + " shh", "muted", "muted");
+                if (volRoot.muted) return "muted";
                 let pct = Math.round(volRoot.vol * 100);
-                if (pct > 100) return Theme.getVibe(Theme.kaoPanic + " " + pct + "%", pct + "%", pct + "%");
                 return pct + "%";
             }
             font.family: Theme.fontFamily
@@ -203,10 +201,24 @@ Rectangle {
                     Text {
                         Layout.fillWidth: true
                         text: {
-                            if (volRoot.muted) return Theme.getFlavor("volume_muted", "output muted");
-                            if (volRoot.isOverdriven) return Theme.getFlavor("volume_high", "overdriving preamp past 100%");
-                            if (volRoot.appStreams.length > 0) return Theme.getFlavor("media_playing", volRoot.appStreams.length + " active audio stream(s)");
-                            return Theme.getFlavor("media_quiet", "pipewire graph idle");
+                            if (volRoot.muted) {
+                                return Theme.getStatusFlavor
+                                    ? Theme.getStatusFlavor("volume_muted", "output muted")
+                                    : (Theme.getFlavor ? Theme.getFlavor("volume_muted", "output muted") : "output muted");
+                            }
+                            if (volRoot.isOverdriven) {
+                                return Theme.getStatusFlavor
+                                    ? Theme.getStatusFlavor("volume_high", "volume above 100%")
+                                    : (Theme.getFlavor ? Theme.getFlavor("volume_high", "volume above 100%") : "volume above 100%");
+                            }
+                            if (volRoot.appStreams.length > 0) {
+                                return Theme.getStatusFlavor
+                                    ? Theme.getStatusFlavor("media_playing", volRoot.appStreams.length + " active audio stream(s)")
+                                    : (Theme.getFlavor ? Theme.getFlavor("media_playing", volRoot.appStreams.length + " active audio stream(s)") : (volRoot.appStreams.length + " active audio stream(s)"));
+                            }
+                            return Theme.getStatusFlavor
+                                ? Theme.getStatusFlavor("media_quiet", "audio idle")
+                                : (Theme.getFlavor ? Theme.getFlavor("media_quiet", "audio idle") : "audio idle");
                         }
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
@@ -588,12 +600,11 @@ Rectangle {
                                             visible: source !== "" && status !== Image.Error
                                         }
 
-                                        Text {
+                                        Icon {
                                             anchors.centerIn: parent
                                             visible: !sIcon.visible
-                                            text: streamCard.streamMuted ? Theme.iconVolMute : Theme.iconMusic
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.fontSizeSm
+                                            source: streamCard.streamMuted ? Theme.iconVolMute : Theme.iconMusic
+                                            size: Theme.fontSizeSm
                                             color: streamCard.streamMuted ? Theme.on_surface_disabled : Theme.primary
                                         }
 
@@ -776,12 +787,11 @@ Rectangle {
                                     anchors.rightMargin: 8
                                     spacing: 8
 
-                                    Text {
-                                        text: devDelegate.isCurrent
+                                    Icon {
+                                        source: devDelegate.isCurrent
                                             ? Theme.iconCheckCircle
                                             : (volRoot.showInputs ? Theme.iconMic : Theme.iconHeadphones)
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeSm
+                                        size: Theme.fontSizeSm
                                         color: devDelegate.isCurrent ? Theme.primary : Theme.on_surface_variant
                                     }
 

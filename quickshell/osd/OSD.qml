@@ -128,7 +128,9 @@ PanelWindow {
             osdRoot.source.audio.volume = clamped;
         } else if (osdRoot.isBrightness && typeof BrightnessService !== "undefined") {
             let pct = Math.max(1, Math.round(clamped * 100));
-            if (BrightnessService.setBrightness) {
+            if (BrightnessService.setBrightnessPercent) {
+                BrightnessService.setBrightnessPercent(pct);
+            } else if (BrightnessService.setBrightness) {
                 BrightnessService.setBrightness(pct);
             }
         }
@@ -144,7 +146,9 @@ PanelWindow {
         } else if (osdRoot.isBrightness && typeof BrightnessService !== "undefined") {
             let step = direction > 0 ? osdRoot.stepPct : -osdRoot.stepPct;
             let nextPct = Math.min(100, Math.max(1, osdRoot.osdValue + step));
-            if (BrightnessService.setBrightness) {
+            if (BrightnessService.setBrightnessPercent) {
+                BrightnessService.setBrightnessPercent(nextPct);
+            } else if (BrightnessService.setBrightness) {
                 BrightnessService.setBrightness(nextPct);
             }
         }
@@ -318,15 +322,30 @@ PanelWindow {
                     NumberAnimation { target: iconText; property: "scale"; to: 1.0; duration: 140; easing.type: Easing.OutBack }
                 }
 
-                Text {
+                Item {
                     id: iconText
                     anchors.centerIn: parent
-                    text: osdRoot.osdIcon
-                    font.family: osdRoot.isKaomoji ? Theme.fontFamily : Theme.fontIcon
-                    font.pixelSize: osdRoot.isKaomoji ? Theme.fontSizeXs : Theme.fontSizeLg
-                    font.weight: osdRoot.isKaomoji ? Font.Bold : Font.Normal
-                    color: osdRoot.activeColor
-                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+                    width: osdRoot.isKaomoji ? kaomojiText.implicitWidth : Theme.fontSizeLg
+                    height: osdRoot.isKaomoji ? kaomojiText.implicitHeight : Theme.fontSizeLg
+
+                    Icon {
+                        anchors.centerIn: parent
+                        visible: !osdRoot.isKaomoji
+                        source: osdRoot.osdIcon
+                        size: Theme.fontSizeLg
+                        color: osdRoot.activeColor
+                    }
+
+                    Text {
+                        id: kaomojiText
+                        anchors.centerIn: parent
+                        visible: osdRoot.isKaomoji
+                        text: osdRoot.osdIcon
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeXs
+                        font.weight: Font.Bold
+                        color: osdRoot.activeColor
+                    }
                 }
 
                 MouseArea {

@@ -99,11 +99,10 @@ PopupPanel {
                     visible: source !== "" && status !== Image.Error
                 }
 
-                Text {
+                Icon {
                     anchors.centerIn: parent
-                    text: root.activeTop ? (Theme.iconTerminal ?? "") : (Theme.iconDistro ?? Theme.iconArch ?? "desktop")
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeMd
+                    source: root.activeTop ? (Theme.iconTerminal ?? "") : (Theme.iconDistro ?? Theme.iconArch ?? "desktop")
+                    size: Theme.fontSizeMd
                     color: Theme.primary
                     visible: !popupAppIcon.visible
                 }
@@ -184,7 +183,7 @@ PopupPanel {
                     Layout.fillWidth: true
                     text: (root.winTitle.length > 0
                         ? root.winTitle
-                        : Theme.getFlavor("system", "no window focused")).toLowerCase()
+                        : (Theme.getStatusFlavor ? Theme.getStatusFlavor("system", "no window focused") : (Theme.getFlavor ? Theme.getFlavor("system", "no window focused") : "no window focused"))).toLowerCase()
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSm
                     font.weight: Theme.fontWeightMedium
@@ -278,11 +277,10 @@ PopupPanel {
                         anchors.centerIn: parent
                         spacing: 4
 
-                        Text {
+                        Icon {
                             visible: !Theme.isTextIconSet
-                            text: actionBtn.modelData.icon
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeSm
+                            source: actionBtn.modelData.icon
+                            size: Theme.fontSizeSm
                             color: actionBtn.fgColor
                         }
 

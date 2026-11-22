@@ -55,10 +55,9 @@ PopupPanel {
             Layout.fillWidth: true
             spacing: 8
 
-            Text {
-                text: Theme.iconCoffee
-                font.family: Theme.fontIcon
-                font.pixelSize: Theme.fontSizeLg
+            Icon {
+                source: Theme.iconCoffee
+                size: Theme.fontSizeLg
                 color: !IdleService.enabled ? Theme.primary : Theme.on_surface_variant
             }
 
@@ -209,10 +208,9 @@ PopupPanel {
                     anchors.centerIn: parent
                     spacing: 4
 
-                    Text {
-                        text: Theme.iconEyeOff
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeSm
+                    Icon {
+                        source: Theme.iconEyeOff
+                        size: Theme.fontSizeSm
                         color: Theme.on_surface
                     }
 
@@ -246,10 +244,9 @@ PopupPanel {
                     anchors.centerIn: parent
                     spacing: 4
 
-                    Text {
-                        text: Theme.iconLock
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeSm
+                    Icon {
+                        source: Theme.iconLock
+                        size: Theme.fontSizeSm
                         color: Theme.on_surface
                     }
 

@@ -1,4 +1,6 @@
 import QtQuick
+import Quickshell
+import Quickshell.Widgets
 import ".."
 
 Rectangle {
@@ -26,12 +28,21 @@ Rectangle {
 
     Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
-    Text {
-        text: root.icon
-        font.family: Theme.fontIcon
-        font.pixelSize: root.iconSize
-        color: root.iconColor
+    readonly property string resolvedIcon: {
+        let s = root.icon;
+        if (!s || s === "") return "";
+        if (s.startsWith("/") || s.startsWith("file://") || s.startsWith("image://") || s.startsWith("qrc:/")) return s;
+        if (Theme?.resolveIconSource) return Theme.resolveIconSource(s);
+        return Quickshell.iconPath(s);
+    }
+
+    IconImage {
+        id: iconImg
         anchors.centerIn: parent
+        width: root.iconSize
+        height: root.iconSize
+        source: root.resolvedIcon
+        visible: root.resolvedIcon !== "" && status !== Image.Error
     }
 
     MouseArea {

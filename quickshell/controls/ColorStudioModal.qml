@@ -261,11 +261,10 @@ Item {
                         radius: 16
                         color: copyMouse.containsMouse ? Qt.rgba(0, 0, 0, 0.3) : Qt.rgba(0, 0, 0, 0.15)
 
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: root.copiedToast ? "✓" : (Theme.iconClipboard ?? "📋")
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeSm
+                            source: root.copiedToast ? Theme.iconCheck : Theme.iconClipboard
+                            size: Theme.fontSizeSm
                             color: root.lit > 55 ? "#111111" : "#ffffff"
                         }
 
@@ -335,11 +334,10 @@ Item {
                     border.color: Theme.outline_variant
                     border.width: 1
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: Theme.iconSparkles ?? "👁"
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeMd
+                        source: Theme.iconSparkles
+                        size: Theme.fontSizeMd
                         color: Theme.primary
                     }
 

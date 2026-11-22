@@ -69,14 +69,12 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 5
 
-        Text {
+        Icon {
             anchors.verticalCenter: parent.verticalCenter
-            text: root.isDnd
+            source: root.isDnd
                 ? Theme.iconBellOff
                 : (root.notifCount > 0 ? Theme.iconBell : Theme.iconBellOutline)
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
-            font.weight: Theme.isTextIconSet ? Theme.fontWeightBold : Theme.fontWeightRegular
+            size: Theme.fontSizeSm
             color: root.isDnd
                 ? Theme.tertiary
                 : (root.notifCount > 0 ? Theme.primary : Theme.textSecondary)
@@ -204,11 +202,10 @@ Rectangle {
 
                     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: root.isDnd ? Theme.iconBellOff : Theme.iconBell
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeMd
+                        source: root.isDnd ? Theme.iconBellOff : Theme.iconBell
+                        size: Theme.fontSizeMd
                         color: root.isDnd ? Theme.tertiary : Theme.primary
                     }
                 }
@@ -257,10 +254,9 @@ Rectangle {
                         anchors.centerIn: parent
                         spacing: 5
 
-                        Text {
-                            text: root.isDnd ? Theme.iconBellOff : Theme.iconBell
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeXs
+                        Icon {
+                            source: root.isDnd ? Theme.iconBellOff : Theme.iconBell
+                            size: Theme.fontSizeXs
                             color: root.isDnd ? Theme.tertiary : Theme.textSecondary
                         }
 
@@ -404,12 +400,11 @@ Rectangle {
                                         visible: source !== "" && status !== Image.Error
                                     }
 
-                                    Text {
+                                    Icon {
                                         anchors.centerIn: parent
                                         visible: !notifIconImg.visible
-                                        text: notifCard.isCritical ? Theme.iconFlame : Theme.iconBell
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeXs
+                                        source: notifCard.isCritical ? Theme.iconFlame : Theme.iconBell
+                                        size: Theme.fontSizeXs
                                         color: notifCard.cardAccent
                                     }
                                 }
@@ -580,11 +575,18 @@ Rectangle {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: root.isDnd
-                                    ? Theme.iconBellOff
-                                    : (Theme.iconSet === "kaomoji" ? Theme.kaoSleepy : Theme.iconBellOutline)
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
+                                visible: !root.isDnd && Theme.iconSet === "kaomoji"
+                                text: Theme.kaoSleepy
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
+                                color: Theme.primary
+                            }
+
+                            Icon {
+                                anchors.centerIn: parent
+                                visible: root.isDnd || Theme.iconSet !== "kaomoji"
+                                source: root.isDnd ? Theme.iconBellOff : Theme.iconBellOutline
+                                size: Theme.fontSizeTitle
                                 color: root.isDnd ? Theme.tertiary : Theme.primary
                             }
                         }
@@ -599,9 +601,16 @@ Rectangle {
                         }
 
                         Text {
-                            text: root.isDnd
-                                ? Theme.getFlavor("dnd_on", "notifications are silenced right now")
-                                : Theme.getFlavor("notifs_empty", "zero unread notifications in the queue")
+                            text: {
+                                if (root.isDnd) {
+                                    return Theme.getStatusFlavor
+                                        ? Theme.getStatusFlavor("dnd_on", "notifications are silenced right now")
+                                        : (Theme.getFlavor ? Theme.getFlavor("dnd_on", "notifications are silenced right now") : "notifications are silenced right now");
+                                }
+                                return Theme.getStatusFlavor
+                                    ? Theme.getStatusFlavor("notifs_empty", "zero unread notifications in the queue")
+                                    : (Theme.getFlavor ? Theme.getFlavor("notifs_empty", "zero unread notifications in the queue") : "zero unread notifications in the queue");
+                            }
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textSecondary
@@ -617,10 +626,9 @@ Rectangle {
                 Layout.fillWidth: true
                 spacing: 6
 
-                Text {
-                    text: root.isDnd ? Theme.iconBellOff : Theme.iconCheck
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeXs
+                Icon {
+                    source: root.isDnd ? Theme.iconBellOff : Theme.iconCheck
+                    size: Theme.fontSizeXs
                     color: root.isDnd ? Theme.tertiary : Theme.primary
                 }
 

@@ -97,10 +97,9 @@ Item {
                     anchors.rightMargin: 10
                     spacing: 6
 
-                    Text {
-                        text: Theme.iconSearch
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeSm
+                    Icon {
+                        source: Theme.iconSearch
+                        size: Theme.fontSizeSm
                         color: searchInput.activeFocus ? Theme.primary : Theme.on_surface_variant
                     }
 
@@ -345,11 +344,10 @@ Item {
                         anchors.centerIn: parent
                         spacing: 6
 
-                        Text {
+                        Icon {
                             Layout.alignment: Qt.AlignHCenter
-                            text: Theme.iconSearch
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeXl
+                            source: Theme.iconSearch
+                            size: Theme.fontSizeXl
                             color: Theme.on_surface_variant
                         }
 

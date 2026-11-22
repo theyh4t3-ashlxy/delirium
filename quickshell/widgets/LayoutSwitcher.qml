@@ -45,7 +45,7 @@ Rectangle {
             id: "monocle",
             title: "monocle layout",
             badge: "deck stack",
-            icon: "󰊓",
+            icon: "⊡",
             desc: "stretches the focused window across the workspace and stacks the rest behind it."
         }
     ]
@@ -59,10 +59,10 @@ Rectangle {
     implicitHeight: (Theme?.isVertical ?? false) ? Math.max(36, pillCol.implicitHeight + 12) : ((Theme?.barHeight ?? 32) - 8)
     radius: Theme?.radiusPill ?? 999
     color: popup.open
-        ? (Theme?.primary_overlay ?? "#33ffffff")
-        : (lMouse.containsMouse ? (Theme?.pillHover ?? "#22ffffff") : (Theme?.pillBg ?? "#11ffffff"))
-    border.color: (Theme?.isCyberNeon ?? false) ? (Theme?.primary ?? "#00ffff") : (Theme?.pillBorder ?? "transparent")
-    border.width: ((Theme?.isCyberNeon ?? false) || ((Theme?.pillBorder ?? "transparent") !== "transparent")) ? 1 : 0
+        ? (Theme.primary_overlay)
+        : (lMouse.containsMouse ? (Theme.pillHover) : (Theme.pillBg))
+    border.color: (Theme?.isCyberNeon ?? false) ? (Theme.primary) : (Theme.pillBorder)
+    border.width: ((Theme?.isCyberNeon ?? false) || ((Theme.pillBorder) !== "transparent")) ? 1 : 0
     visible: Settings?.showLayoutSwitcher ?? true
 
     Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
@@ -94,8 +94,8 @@ Rectangle {
         if (l === "dwindle") return "⊞";
         if (l === "master") return "◫";
         if (l === "scrolling") return "↔";
-        if (l === "monocle") return "󰊓";
-        return "";
+        if (l === "monocle") return "⊡";
+        return "</>";
     }
 
     function getLayoutLabel(layout: string): string {
@@ -298,7 +298,7 @@ Rectangle {
             font.family: Theme?.fontMono ?? "monospace"
             font.pixelSize: Theme?.fontSizeXs ?? 9
             font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
-            color: Theme?.primary ?? "#00ffff"
+            color: Theme.primary
             opacity: 0.85
         }
     }
@@ -325,7 +325,7 @@ Rectangle {
             font.family: Theme?.fontMono ?? "monospace"
             font.pixelSize: Theme?.fontSizeXs ?? 9
             font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
-            color: Theme?.primary ?? "#00ffff"
+            color: Theme.primary
         }
     }
 
@@ -406,7 +406,7 @@ Rectangle {
                     width: 32
                     height: 32
                     radius: Theme?.radiusSm ?? 8
-                    color: Theme?.primary_overlay ?? "#33ffffff"
+                    color: Theme.primary_overlay
 
                     Text {
                         anchors.centerIn: parent
@@ -442,7 +442,7 @@ Rectangle {
                     width: 26
                     height: 26
                     radius: Theme?.radiusPill ?? 999
-                    color: closeMouse.containsMouse ? (Theme?.pillHover ?? "#33ffffff") : "transparent"
+                    color: closeMouse.containsMouse ? (Theme.pillHover) : "transparent"
 
                     Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120 } }
 
@@ -492,10 +492,10 @@ Rectangle {
 
                             readonly property bool isCurrent: root.currentLayout === modelData.id
                             color: isCurrent
-                                ? (Theme?.primary_overlay ?? "#33ffffff")
+                                ? (Theme.primary_overlay)
                                 : (cardMouse.pressed
                                     ? Theme.statePress(Theme.cardBg, Theme.on_surface)
-                                    : (cardMouse.containsMouse ? (Theme?.pillHover ?? "#22ffffff") : (Theme?.cardBg ?? "#11ffffff")))
+                                    : (cardMouse.containsMouse ? (Theme.pillHover) : (Theme.cardBg)))
                             border.color: isCurrent ? Theme.primary : (Theme?.cardBorder ?? Qt.rgba(1, 1, 1, 0.06))
                             border.width: isCurrent ? 1.5 : 1
 
@@ -534,7 +534,7 @@ Rectangle {
                                         radius: Theme?.radiusPill ?? 999
                                         color: layoutCard.isCurrent
                                             ? (Theme?.alpha ? Theme.alpha(Theme.primary, 0.2) : Qt.rgba(0, 1, 1, 0.2))
-                                            : (Theme?.pillBg ?? "#22ffffff")
+                                            : (Theme.pillBg)
 
                                         Text {
                                             id: badgeText
@@ -592,8 +592,8 @@ Rectangle {
 
                         readonly property bool isCustomActive: !root.layoutDefinitions.some(d => d.id === root.currentLayout)
                         color: isCustomActive
-                            ? (Theme?.primary_overlay ?? "#33ffffff")
-                            : (Theme?.cardBg ?? "#11ffffff")
+                            ? (Theme.primary_overlay)
+                            : (Theme.cardBg)
                         border.color: isCustomActive ? Theme.primary : (Theme?.cardBorder ?? Qt.rgba(1, 1, 1, 0.06))
                         border.width: isCustomActive ? 1.5 : 1
 
@@ -608,7 +608,7 @@ Rectangle {
                                 spacing: 8
 
                                 Text {
-                                    text: ""
+                                    text: "</>"
                                     font.family: Theme?.fontMono ?? "monospace"
                                     font.pixelSize: Theme?.fontSizeMd ?? 13
                                     font.weight: Theme?.fontWeightBold ?? Font.Bold
@@ -629,7 +629,7 @@ Rectangle {
                                     radius: Theme?.radiusPill ?? 999
                                     color: customCard.isCustomActive
                                         ? (Theme?.alpha ? Theme.alpha(Theme.primary, 0.2) : Qt.rgba(0, 1, 1, 0.2))
-                                        : (Theme?.pillBg ?? "#22ffffff")
+                                        : (Theme.pillBg)
 
                                     Text {
                                         id: luaBadge
@@ -671,8 +671,8 @@ Rectangle {
                                     Layout.fillWidth: true
                                     height: 28
                                     radius: Theme?.radiusXs ?? 4
-                                    color: Theme?.pillBg ?? "#22ffffff"
-                                    border.color: luaInput.activeFocus ? Theme.primary : (Theme?.pillBorder ?? "transparent")
+                                    color: Theme.pillBg
+                                    border.color: luaInput.activeFocus ? Theme.primary : (Theme.pillBorder)
                                     border.width: 1
 
                                     TextInput {
@@ -714,7 +714,7 @@ Rectangle {
                                     width: applyBtnText.implicitWidth + 16
                                     height: 28
                                     radius: Theme?.radiusXs ?? 4
-                                    color: applyMouse.containsMouse ? (Theme?.primary_overlay ?? "#33ffffff") : (Theme?.pillBg ?? "#22ffffff")
+                                    color: applyMouse.containsMouse ? (Theme.primary_overlay) : (Theme.pillBg)
                                     border.color: Theme.primary
                                     border.width: 1
 

@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import ".."
-import "../components"
+import "../corners"
 
 Rectangle {
     id: root
@@ -17,20 +17,24 @@ Rectangle {
 
     property bool isRecordMode: false
     property string activeMode: typeof ScreenshotService !== "undefined" ? (ScreenshotService?.activeMode ?? "region") : "region"
-    property string currentQuote: Theme.getFlavor ? Theme.getFlavor("screenshot", "snitch mode: engaged") : "snitch mode: engaged"
+    property string currentQuote: Theme.getStatusFlavor
+        ? Theme.getStatusFlavor("screenshot", "ready to capture")
+        : (Theme.getFlavor ? Theme.getFlavor("screenshot", "ready to capture") : "ready to capture")
 
-    // pick a fresh quote from Theme.flavorQuotes.screenshot on each open when unhingedFlavor is enabled
+    // pick a fresh quote from Theme.statusFlavor.screenshot on each open when unhingedFlavor is enabled
     function randomizeQuote() {
         if (!(Settings?.unhingedFlavor ?? false)) {
-            currentQuote = "snitch mode: engaged";
+            currentQuote = "ready to capture";
             return;
         }
-        let pool = Theme.flavorQuotes?.screenshot;
+        let pool = Theme.statusFlavor?.screenshot;
         if (pool && pool.length > 0) {
             let idx = Math.floor(Math.random() * pool.length);
             currentQuote = pool[idx];
+        } else if (Theme.getStatusFlavor) {
+            currentQuote = Theme.getStatusFlavor("screenshot", "ready to capture");
         } else if (Theme.getFlavor) {
-            currentQuote = Theme.getFlavor("screenshot", "snitch mode: engaged");
+            currentQuote = Theme.getFlavor("screenshot", "ready to capture");
         }
     }
 
@@ -42,15 +46,15 @@ Rectangle {
         property bool isDanger: false
         property color iconColor: isDanger ? (Theme.error ?? "#ff5449") : (selected ? Theme.primary : Theme.on_surface)
         property color hoverColor: isDanger
-            ? (Theme.error_overlay ?? Theme.alpha(Theme.error ?? "#ff5449", 0.18))
+            ? Theme.error_overlay
             : Theme.primary_overlay
-        property color activeColor: isDanger ? (Theme.error ?? "#ff5449") : Theme.primary
+        property color activeColor: isDanger ? Theme.error : Theme.primary
         signal clicked()
 
         readonly property color fgColor: {
-            if (btnMouse.pressed) return btnRoot.isDanger ? (Theme.on_error ?? "#ffffff") : Theme.on_primary;
+            if (btnMouse.pressed) return btnRoot.isDanger ? Theme.on_error : Theme.on_primary;
             if (btnMouse.containsMouse || btnRoot.selected) {
-                return btnRoot.isDanger ? (Theme.error ?? "#ff5449") : Theme.primary;
+                return btnRoot.isDanger ? Theme.error : Theme.primary;
             }
             return btnRoot.label !== "" ? Theme.on_surface : btnRoot.iconColor;
         }
@@ -64,8 +68,8 @@ Rectangle {
             return "transparent";
         }
         border.color: {
-            if (btnRoot.selected) return btnRoot.isDanger ? (Theme.error ?? "#ff5449") : Theme.primary;
-            if (btnMouse.containsMouse) return btnRoot.isDanger ? (Theme.error ?? "#ff5449") : Theme.outline_variant;
+            if (btnRoot.selected) return btnRoot.isDanger ? Theme.error : Theme.primary;
+            if (btnMouse.containsMouse) return btnRoot.isDanger ? Theme.error : Theme.outline_variant;
             return "transparent";
         }
         border.width: 1
@@ -78,12 +82,11 @@ Rectangle {
             anchors.centerIn: parent
             spacing: 5
 
-            Text {
-                text: btnRoot.icon
-                font.family: Theme.fontIcon
-                font.pixelSize: Theme.fontSizeSm
+            Icon {
+                source: btnRoot.icon
+                size: Theme.fontSizeSm
                 color: btnMouse.pressed
-                    ? (btnRoot.isDanger ? (Theme.on_error ?? "#ffffff") : Theme.on_primary)
+                    ? (btnRoot.isDanger ? Theme.on_error : Theme.on_primary)
                     : (btnMouse.containsMouse || btnRoot.selected ? btnRoot.fgColor : btnRoot.iconColor)
             }
 
@@ -150,11 +153,19 @@ Rectangle {
             anchors.centerIn: parent
             spacing: 6
 
+            Icon {
+                visible: root.isRecordMode
+                source: Theme.iconCamera
+                size: Theme.fontSizeXs
+                color: Theme.error
+            }
+
             Text {
-                text: root.isRecordMode ? Theme.iconCamera : Theme.kaoWink
-                font.family: root.isRecordMode ? Theme.fontIcon : Theme.fontFamily
+                visible: !root.isRecordMode
+                text: Theme.kaoWink
+                font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeXs
-                color: root.isRecordMode ? (Theme.error ?? "#ff5449") : Theme.primary
+                color: Theme.primary
             }
 
             Text {
@@ -162,7 +173,7 @@ Rectangle {
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeXs
                 font.weight: Font.Medium
-                color: root.isRecordMode ? (Theme.error ?? "#ff5449") : Theme.on_surface
+                color: root.isRecordMode ? Theme.error : Theme.on_surface
                 elide: Text.ElideRight
             }
         }
@@ -179,24 +190,24 @@ Rectangle {
         z: 1
     }
 
-    ConcaveCurves {
+    ConcaveCorner {
         width: 8
         height: 8
         radius: 8
         color: Theme.surface_container_highest
-        isTop: false
+        flipY: true
         flipX: false
         visible: headerTab.visible
         anchors.right: headerTab.left
         anchors.bottom: headerTab.bottom
     }
 
-    ConcaveCurves {
+    ConcaveCorner {
         width: 8
         height: 8
         radius: 8
         color: Theme.surface_container_highest
-        isTop: false
+        flipY: true
         flipX: true
         visible: headerTab.visible
         anchors.left: headerTab.right

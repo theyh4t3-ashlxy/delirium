@@ -80,7 +80,7 @@ def get_running_pids() -> List[int]:
     return sorted(list(pids))
 
 def kill_running_shell(graceful_timeout: float = 1.5):
-    print(f"{C_DIM}󰚰 terminating running shell instances...{C_RESET}")
+    print(f"{C_DIM}:: terminating running shell instances...{C_RESET}")
     brain_dir = str(get_brain_shell_dir())
 
     # 1. Graceful IPC kill
@@ -128,7 +128,7 @@ def kill_running_shell(graceful_timeout: float = 1.5):
                 pass
 
 def launch_shell(shell_name: str):
-    print(f"{C_CYAN}󰄛 launching {C_BOLD}{shell_name}{C_RESET}...")
+    print(f"{C_CYAN}:: launching {C_BOLD}{shell_name}{C_RESET}...")
     has_uwsm = shutil.which("uwsm") is not None
 
     if shell_name == "brain_shell":
@@ -152,7 +152,7 @@ def launch_shell(shell_name: str):
             stderr=subprocess.DEVNULL,
         )
         time.sleep(0.3)
-        print(f"{C_GREEN}󰄲 {C_BOLD}{shell_name}{C_RESET} {C_GREEN}engaged successfully.{C_RESET}")
+        print(f"{C_GREEN}+ {C_BOLD}{shell_name}{C_RESET} {C_GREEN}engaged successfully.{C_RESET}")
     except Exception as e:
         print(f"{C_RED}error launching {shell_name}: {e}{C_RESET}", file=sys.stderr)
 
@@ -172,7 +172,7 @@ def switch_shell(target: str):
         print(f"{C_RED}error:{C_RESET} unknown shell target '{target}'. use 'quickshell' or 'brain_shell'.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"{C_MAGENTA}󰑐 switching shell:{C_RESET} {C_DIM}{current}{C_RESET} -> {C_BOLD}{C_CYAN}{target}{C_RESET}")
+    print(f"{C_MAGENTA}~> switching shell:{C_RESET} {C_DIM}{current}{C_RESET} -> {C_BOLD}{C_CYAN}{target}{C_RESET}")
     set_current_shell(target)
     kill_running_shell()
     launch_shell(target)
@@ -421,24 +421,24 @@ def interactive_menu():
     other = "quickshell" if current == "brain_shell" else "brain_shell"
 
     options = [
-        f"󰑐 switch shell -> {other} (currently: {current})",
-        f"󰁕 reload / restart {current}",
-        "󰚰 kill running shell instances",
-        "󰍜 toggle app launcher",
-        "󰕮 toggle dashboard / home",
-        "󰂚 toggle notification center",
-        "󰅇 toggle clipboard history",
-        "󰈙 open file manager (yazi / dolphin)",
-        "󰄛 roll random wallpaper",
-        "󰐥 open power menu",
-        "󰌌 view keybindings cheatsheet",
-        "󰋜 open welcome wizard",
+        f"~> switch shell -> {other} (currently: {current})",
+        f"* reload / restart {current}",
+        "x kill running shell instances",
+        ":: toggle app launcher",
+        ":: toggle dashboard / home",
+        ":: toggle notification center",
+        ":: toggle clipboard history",
+        ":: open file manager (yazi / dolphin)",
+        "* roll random wallpaper",
+        "! open power menu",
+        "? view keybindings cheatsheet",
+        "* open welcome wizard",
     ]
 
     proc = subprocess.Popen(
         [
             "fzf",
-            "--header=[󰄛 cli shell control - select action]",
+            "--header=[:: cli shell control - select action]",
             "--reverse",
             "--height=45%",
         ],
@@ -457,7 +457,7 @@ def interactive_menu():
         switch_shell("restart")
     elif "kill running shell" in choice:
         kill_running_shell()
-        print(f"{C_YELLOW}󰅚 shells killed.{C_RESET}")
+        print(f"{C_YELLOW}x shells killed.{C_RESET}")
     elif "toggle app launcher" in choice:
         dispatch_action("launcher")
     elif "toggle dashboard" in choice:
@@ -550,7 +550,7 @@ def main():
 
     if cmd in ("kill", "stop", "k"):
         kill_running_shell()
-        print(f"{C_YELLOW}󰅚 quickshell processes terminated.{C_RESET}")
+        print(f"{C_YELLOW}x quickshell processes terminated.{C_RESET}")
         return
 
     if cmd == "ipc":

@@ -284,11 +284,10 @@ Rectangle {
                 spacing: 8
                 visible: sCard.title !== ""
 
-                Text {
+                Icon {
                     visible: sCard.icon !== "" && !Theme.isTextIconSet
-                    text: sCard.icon
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeSm
+                    source: sCard.icon
+                    size: Theme.fontSizeSm
                     color: Theme.primary
                 }
 
@@ -361,10 +360,9 @@ Rectangle {
             anchors.rightMargin: 8
             spacing: 8
 
-            Text {
-                text: fieldRoot.icon
-                font.family: Theme.fontIcon
-                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+            Icon {
+                source: fieldRoot.icon
+                size: Theme.fontSizeSm
                 color: inputItem.activeFocus ? Theme.primary : Theme.on_surface_variant
             }
 
@@ -470,11 +468,10 @@ Rectangle {
             anchors.centerIn: parent
             spacing: 5
 
-            Text {
+            Icon {
                 visible: chipRoot.icon !== "" && (!Theme.isTextIconSet || chipRoot.label === "")
-                text: chipRoot.icon
-                font.family: Theme.fontIcon
-                font.pixelSize: chipRoot.fontSize
+                source: chipRoot.icon
+                size: chipRoot.fontSize
                 color: chipRoot.selected ? chipRoot.activeFg : chipRoot.inactiveFg
             }
 
@@ -519,11 +516,10 @@ Rectangle {
                 border.color: Theme.widgetBorder
                 border.width: 1
 
-                Text {
+                Icon {
                     anchors.centerIn: parent
-                    text: emptyRoot.loading ? Theme.iconRefresh : emptyRoot.icon
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
+                    source: emptyRoot.loading ? Theme.iconRefresh : emptyRoot.icon
+                    size: Theme.fontSizeTitle
                     color: emptyRoot.loading ? Theme.primary : Theme.on_surface_variant
 
                     RotationAnimator on rotation {
@@ -654,11 +650,10 @@ Rectangle {
                     color: Theme.primary
                     visible: cardRoot.isSelected
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: Theme.iconCheck
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeXs
+                        source: Theme.iconCheck
+                        size: Theme.fontSizeXs
                         color: Theme.on_primary
                     }
                 }
@@ -699,11 +694,10 @@ Rectangle {
                     border.width: 1
                     visible: cardRoot.allowDownload
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: Theme.iconDownload
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeXs
+                        source: Theme.iconDownload
+                        size: Theme.fontSizeXs
                         color: dlMouse.containsMouse ? Theme.on_primary : Theme.on_surface
                     }
 
@@ -725,11 +719,10 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 6
 
-        Text {
+        Icon {
             anchors.verticalCenter: parent.verticalCenter
-            text: Theme.iconWallpaper
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+            source: Theme.iconWallpaper
+            size: Theme.fontSizeSm
             color: popup.open || wpMouse.containsMouse ? Theme.primary : Theme.on_surface
 
             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -818,11 +811,10 @@ Rectangle {
                     border.color: Theme.alpha(Theme.primary, 0.35)
                     border.width: 1
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: Theme.iconWallpaper
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                        source: Theme.iconWallpaper
+                        size: Theme.fontSizeLg
                         color: Theme.primary
                     }
                 }
@@ -955,11 +947,10 @@ Rectangle {
                                 anchors.centerIn: parent
                                 spacing: 6
 
-                                Text {
+                                Icon {
                                     visible: !Theme.isTextIconSet
-                                    text: modelData.icon
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeSm
+                                    source: modelData.icon
+                                    size: Theme.fontSizeSm
                                     color: isSelected ? Theme.primary : Theme.on_surface_variant
                                 }
 
@@ -1097,11 +1088,10 @@ Rectangle {
                             color: Theme.widgetBorder
                         }
 
-                        Text {
+                        Icon {
                             visible: localView.uniqueSubCategories.length > 0 && !Theme.isTextIconSet
-                            text: Theme.iconFolder
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeXs
+                            source: Theme.iconFolder
+                            size: Theme.fontSizeXs
                             color: Theme.primary
                         }
 

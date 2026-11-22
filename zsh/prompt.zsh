@@ -8,7 +8,6 @@
 # SHOW_GIT_PROMPT / SHOW_CMD_TIMER / SHOW_PROMPT_BANTER / SHOW_TIMESTAMP: true | false
 
 autoload -Uz add-zsh-hook
-zmodload -F zsh/stat b:zstat 2>/dev/null
 
 setopt PROMPT_SUBST PROMPT_PERCENT
 unsetopt PROMPT_BANG
@@ -19,8 +18,8 @@ add-zsh-hook -d preexec _gp_preexec 2>/dev/null
 add-zsh-hook -d precmd _gp_precmd 2>/dev/null
 
 typeset -gi _GP_EXIT=0 _GP_RAN=0 _GP_ELAPSED=0
-typeset -gi _GP_DIRTY=0 _GP_CONFLICT=0 _GP_REFRESH=0
-typeset -g _GP_START="" _GP_STAMP="" _GP_MOOD_KEY=""
+typeset -gi _GP_DIRTY=0 _GP_CONFLICT=0
+typeset -g _GP_START="" _GP_MOOD_KEY=""
 typeset -g _GP_FACE="" _GP_BANTER=""
 typeset -g _GP_LEFT="" _GP_RIGHT="" _GP_GIT=""
 
@@ -33,27 +32,14 @@ _gp_literal() {
     REPLY="${REPLY//\%/%%}"
 }
 
-_gp_color() {
-    emulate -L zsh -o extended_glob
-    local val="$1" fallback="$2"
-    if [[ "$val" == '#'[0-9a-fA-F](#c6) || "$val" == [0-9](#c1,3) || \
-          "$val" == (black|red|green|yellow|blue|magenta|cyan|white|default) ]]; then
-        REPLY="$val"
-    else
-        REPLY="$fallback"
-    fi
-}
-
 _gp_colors() {
     emulate -L zsh
-    local REPLY
-
-    _gp_color "${MATUGEN_OUTLINE-}"           '#a08d86'; typeset -g _GP_OUT="%F{$REPLY}"
-    _gp_color "${MATUGEN_PRIMARY-}"           '#ffb59a'; typeset -g _GP_PRI="%F{$REPLY}"
-    _gp_color "${MATUGEN_SECONDARY-}"         '#e7beaf'; typeset -g _GP_SEC="%F{$REPLY}"
-    _gp_color "${MATUGEN_TERTIARY-}"          '#d5c68e'; typeset -g _GP_TER="%F{$REPLY}"
-    _gp_color "${MATUGEN_ERROR-}"             '#ffb4ab'; typeset -g _GP_ERR="%F{$REPLY}"
-    _gp_color "${MATUGEN_SURFACE_CONTAINER-}" '#2b2220'; typeset -g _GP_BG="$REPLY"
+    typeset -g _GP_OUT='%F{8}'
+    typeset -g _GP_PRI='%F{4}'
+    typeset -g _GP_SEC='%F{5}'
+    typeset -g _GP_TER='%F{6}'
+    typeset -g _GP_ERR='%F{1}'
+    typeset -g _GP_BG='0'
     typeset -g _GP_ACC="$_GP_PRI"
 
     case "${PROMPT_ACCENT:-primary}" in
@@ -65,39 +51,6 @@ _gp_colors() {
         yellow)    _GP_ACC='%F{221}' ;;
         white)     _GP_ACC='%F{white}' ;;
     esac
-}
-
-_gp_matugen() {
-    emulate -L zsh -o extended_glob
-    local file="${ZDOTDIR:-$HOME/.config/zsh}/matugen.zsh"
-    local stamp=loaded line key val
-    local -A info
-
-    [[ -f "$file" && -r "$file" ]] || return 0
-
-    if (( $+builtins[zstat] )) && zstat -H info "$file" 2>/dev/null; then
-        stamp="${info[mtime]}:${info[size]}:${info[ino]}"
-    fi
-
-    if [[ "$stamp" != "$_GP_STAMP" ]] || (( _GP_REFRESH )); then
-        while IFS= read -r line || [[ -n "$line" ]]; do
-            line="${line##[[:space:]]#}"
-            [[ -z "$line" || "$line" == '#'* ]] && continue
-            line="${line#(export|typeset[[:space:]]##-[a-zA-Z]##)[[:space:]]##}"
-            [[ "$line" == *=* ]] || continue
-            key="${line%%=*}"
-            val="${line#*=}"
-            val="${val%%[[:space:]]*}"
-            val="${val#[\"\']}"
-            val="${val%[\"\']}"
-            [[ "$key" == MATUGEN_[A-Z0-9_]## && "$val" == '#'[0-9a-fA-F](#c6) ]] || continue
-            typeset -g "${key}=${val}"
-        done < "$file"
-        _GP_STAMP="$stamp"
-    fi
-
-    _GP_REFRESH=0
-    return 0
 }
 
 _gp_git() {
@@ -461,24 +414,12 @@ _gp_precmd() {
         _GP_ELAPSED=0
     fi
 
-    _gp_matugen
     _gp_colors
     _gp_git
     _gp_mood
     _gp_build
 
     _GP_RAN=0
-    return 0
-}
-
-TRAPUSR2() {
-    _GP_REFRESH=1
-    if [[ -o zle ]] && zle 2>/dev/null; then
-        _gp_matugen
-        _gp_colors
-        _gp_build
-        zle reset-prompt 2>/dev/null
-    fi
     return 0
 }
 

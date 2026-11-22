@@ -352,11 +352,10 @@ PopupPanel {
                 border.color: Theme.alpha(Theme.primary, 0.35)
                 border.width: 1
 
-                Text {
+                Icon {
                     anchors.centerIn: parent
-                    text: Theme.iconSparkles
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                    source: Theme.iconSparkles
+                    size: Theme.fontSizeLg
                     color: Theme.primary
                 }
             }
@@ -380,7 +379,6 @@ PopupPanel {
 
             Row {
                 spacing: 6
-                Layout.alignment: Qt.AlignVCenter
 
                 Text {
                     text: "preset:"
@@ -439,11 +437,10 @@ PopupPanel {
                         anchors.centerIn: parent
                         spacing: 4
 
-                        Text {
+                        Icon {
                             visible: !Theme.isTextIconSet
-                            text: Theme.iconSave
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeXs
+                            source: Theme.iconSave
+                            size: Theme.fontSizeXs
                             color: Theme.primary
                             anchors.verticalCenter: parent.verticalCenter
                         }
@@ -487,11 +484,10 @@ PopupPanel {
                     id: resetRow
                     anchors.centerIn: parent
                     spacing: 5
-                    Text {
+                    Icon {
                         visible: !Theme.isTextIconSet
-                        text: Theme.iconRefresh
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeXs
+                        source: Theme.iconRefresh
+                        size: Theme.fontSizeXs
                         color: Theme.on_surface
                         anchors.verticalCenter: parent.verticalCenter
                     }
@@ -526,11 +522,10 @@ PopupPanel {
 
                 Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                Text {
+                Icon {
                     anchors.centerIn: parent
-                    text: Theme.iconClose
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeXs
+                    source: Theme.iconClose
+                    size: Theme.fontSizeXs
                     color: closeMouse.containsMouse ? Theme.error : Theme.on_surface
                 }
 
@@ -614,12 +609,11 @@ PopupPanel {
                         border.color: isGhostTarget ? Theme.primary : "transparent"
                         border.width: 1
 
-                        Text {
+                        Icon {
                             id: mText
                             anchors.centerIn: parent
-                            text: parent.info.icon
-                            font.family: Theme.fontIcon
-                            font.pixelSize: 8
+                            source: parent.info.icon
+                            size: 8
                             color: parent.isGhostTarget ? Theme.surface : (parent.isVis ? Theme.on_primary : Theme.on_surface_disabled)
                         }
                     }
@@ -861,11 +855,10 @@ PopupPanel {
                                     anchors.centerIn: parent
                                     spacing: 5
 
-                                    Text {
+                                    Icon {
                                         visible: !Theme.isTextIconSet
-                                        text: parent.parent.info.icon
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeXs
+                                        source: parent.parent.info.icon
+                                        size: Theme.fontSizeXs
                                         color: Theme.primary
                                         anchors.verticalCenter: parent.verticalCenter
                                     }
@@ -1188,11 +1181,10 @@ PopupPanel {
                 border.color: Theme.alpha(dragGhost.ghostColor, 0.35)
                 border.width: 1
 
-                Text {
+                Icon {
                     anchors.centerIn: parent
-                    text: dragGhost.info?.icon ?? Theme.iconGrid
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                    source: dragGhost.info?.icon ?? Theme.iconGrid
+                    size: Theme.fontSizeSm
                     color: dragGhost.ghostColor
                 }
             }

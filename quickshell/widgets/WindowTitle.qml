@@ -22,9 +22,7 @@ Rectangle {
         return (c || "").trim();
     }
     readonly property bool isDesktop: !activeTop || rawTitle.length === 0
-    readonly property string fallbackText: Theme?.getFlavor
-        ? Theme.getFlavor("system", (Theme?.getVibe ? Theme.getVibe(Theme?.kaoEmpty, Theme?.iconDistro ?? Theme?.iconArch ?? "desktop", "desktop") : "desktop"))
-        : "desktop"
+    readonly property string fallbackText: "desktop"
     readonly property string displayTitle: (!isDesktop ? rawTitle : fallbackText).toLowerCase()
 
     // let Theme.qml do the heavy lifting instead of duplicating the desktop entry crawl here
@@ -62,7 +60,7 @@ Rectangle {
     width: parent ? parent.width : implicitWidth
     radius: Theme?.radiusPill ?? 999
     clip: true
-    color: wtMouse.containsMouse ? (Theme?.pillHover ?? "#33ffffff") : (Theme?.pillBg ?? "#1a000000")
+    color: wtMouse.containsMouse ? Theme.pillHover : Theme.pillBg
     border.color: Theme?.pillBorder ?? "transparent"
     border.width: (Theme?.pillBorder ?? "transparent") === "transparent" ? 0 : 1
 
@@ -81,25 +79,27 @@ Rectangle {
         anchors.rightMargin: 10
         spacing: 6
 
-        IconImage {
+        Loader {
             id: appIcon
             Layout.preferredWidth: 16
             Layout.preferredHeight: 16
-            width: 16
-            height: 16
             Layout.alignment: Qt.AlignVCenter
-            source: windowTitleRoot.resolvedIcon
-            visible: windowTitleRoot.hasAppIcon
+            active: windowTitleRoot.hasAppIcon && Boolean(windowTitleRoot.resolvedIcon)
+            visible: active && (!item || item.status !== Image.Error)
+            sourceComponent: IconImage {
+                width: 16
+                height: 16
+                source: windowTitleRoot.resolvedIcon
+            }
         }
 
-        Text {
+        Icon {
             id: fallbackIcon
             Layout.alignment: Qt.AlignVCenter
-            text: windowTitleRoot.isDesktop ? (Theme.iconDistro ?? Theme.iconArch ?? "") : (Theme.iconTerminal ?? "")
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.fontSizeSm
+            source: windowTitleRoot.isDesktop ? (Theme.iconDistro ?? Theme.iconArch ?? "") : (Theme.iconTerminal ?? "")
+            size: Theme.fontSizeSm
             color: Theme.primary
-            visible: windowTitleRoot.showAppIcon && (!appIcon.visible || appIcon.status === Image.Error)
+            visible: windowTitleRoot.showAppIcon && (!appIcon.active || (appIcon.item && appIcon.item.status === Image.Error))
         }
 
         Text {
@@ -109,7 +109,7 @@ Rectangle {
             text: windowTitleRoot.displayTitle
             font.family: Theme?.fontFamily ?? "sans-serif"
             font.pixelSize: Theme?.fontSizeSm ?? 12
-            color: Theme?.on_surface ?? "#ffffff"
+            color: Theme.on_surface
             elide: Text.ElideRight
             maximumLineCount: 1
             opacity: (!windowTitleRoot.isDesktop) ? 1.0 : 0.6

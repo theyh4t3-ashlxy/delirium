@@ -98,11 +98,10 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 4
 
-        Text {
+        Icon {
             anchors.verticalCenter: parent.verticalCenter
-            text: Theme.iconClipboard
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.fontSizeMd
+            source: Theme.iconClipboard
+            size: Theme.fontSizeMd
             color: popup.open ? Theme.primary : Theme.on_surface
         }
     }
@@ -241,10 +240,9 @@ Rectangle {
                     anchors.margins: Theme.widgetPaddingH
                     spacing: 8
 
-                    Text {
-                        text: Theme.iconSearch
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeSm
+                    Icon {
+                        source: Theme.iconSearch
+                        size: Theme.fontSizeSm
                         color: Theme.on_surface_variant
                     }
 
@@ -363,7 +361,7 @@ Rectangle {
                                         font.family: Theme?.fontMono ?? "monospace"
                                         font.pixelSize: 10
                                         font.weight: Font.Bold
-                                        color: Theme?.on_primary ?? "#ffffff"
+                                        color: Theme.on_primary
                                     }
                                 }
                             }
@@ -407,14 +405,21 @@ Rectangle {
                 Layout.fillHeight: true
                 visible: clipModel.count === 0
 
-                Text {
-                    text: Theme.iconClipboard + "\nclipboard is empty"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeMd
-                    color: Theme.on_surface_variant
-                    horizontalAlignment: Text.AlignHCenter
+                Column {
                     anchors.centerIn: parent
-                    lineHeight: 1.5
+                    spacing: Theme.spacingSm
+                    Icon {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        source: Theme.iconClipboard
+                        size: 32
+                    }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "clipboard is empty"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeMd
+                        color: Theme.on_surface_variant
+                    }
                 }
             }
         }

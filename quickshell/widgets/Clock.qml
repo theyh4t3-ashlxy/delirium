@@ -29,10 +29,10 @@ Rectangle {
     bottomRightRadius: isFlared ? (!isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.radiusPill ?? 999)
 
     color: calPopup.open
-        ? (Theme?.primary_overlay ?? Theme?.primaryOverlay ?? Theme?.surface_container_highest ?? "#3389b4fa")
-        : (clkMouse.containsMouse ? (Theme?.pillHover ?? "#33ffffff") : (Theme?.pillBg ?? "#1e1e2e"))
-    border.color: Theme?.pillBorder ?? "transparent"
-    border.width: (Theme?.pillBorder ?? "transparent") === "transparent" ? 0 : 1
+        ? Theme.primary_overlay
+        : (clkMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+    border.color: Theme.pillBorder
+    border.width: (Theme.pillBorder === "transparent" || Theme.pillBorder.a === 0) ? 0 : 1
     visible: Settings?.showClock ?? true
     clip: false
 
@@ -107,13 +107,13 @@ Rectangle {
     function getClockMoodIcon(hrs) {
         if (!Theme) return "";
         if (hrs < 6) {
-            return Theme?.iconMoon ?? "󰖔";
+            return Theme?.iconMoon ?? "weather-clear-night";
         } else if (hrs < 12) {
-            return Theme?.iconCoffee ?? "󰅶";
+            return Theme?.iconCoffee ?? "coffee";
         } else if (hrs < 18) {
-            return Theme?.iconSun ?? "󰖙";
+            return Theme?.iconSun ?? "weather-clear";
         } else {
-            return Theme?.iconMusic ?? "󰎈";
+            return Theme?.iconMusic ?? "audio-x-generic";
         }
     }
 
@@ -125,18 +125,17 @@ Rectangle {
         anchors.horizontalCenter: (Theme?.isVertical ?? false) ? parent.horizontalCenter : undefined
         spacing: 6
 
-        Text {
+        Icon {
             id: clockMoodText
             anchors.verticalCenter: parent.verticalCenter
-            text: {
+            source: {
                 if (Theme?.isVertical ?? false) return "";
                 let hrs = clockRoot.now.getHours();
                 return clockRoot.getClockMoodIcon(hrs);
             }
-            visible: text !== "" && !(Theme?.isVertical ?? false)
-            font.family: Theme?.fontIcon ?? "sans-serif"
-            font.pixelSize: Theme?.fontSizeSm ?? 12
-            color: calPopup.open ? (Theme?.primary ?? "#89b4fa") : (Theme?.on_surface_variant ?? "#a6adc8")
+            visible: source !== "" && !(Theme?.isVertical ?? false)
+            size: Theme?.fontSizeSm ?? 12
+            color: calPopup.open ? Theme.primary : Theme.on_surface_variant
         }
 
         Text {
@@ -174,7 +173,7 @@ Rectangle {
             font.family: Theme?.fontFamily ?? "sans-serif"
             font.pixelSize: (Theme?.isVertical ?? false) ? 10 : (Theme?.fontSizeMd ?? 14)
             font.weight: Font.Medium
-            color: calPopup.open ? (Theme?.primary ?? "#89b4fa") : (Theme?.on_surface ?? "#cdd6f4")
+            color: calPopup.open ? Theme.primary : Theme.on_surface
         }
 
         Row {
@@ -187,7 +186,7 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "•"
                 font.pixelSize: Theme?.fontSizeSm ?? 12
-                color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService?.timerRemaining <= 30) ? (Theme?.error ?? "#f38ba8") : (Theme?.primary ?? "#89b4fa")
+                color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService?.timerRemaining <= 30) ? Theme.error : Theme.primary
                 SequentialAnimation on opacity {
                     loops: Animation.Infinite
                     running: typeof TimerService !== "undefined" && (TimerService?.timerRunning ?? false) && ((TimerService?.timerRemaining ?? 999) <= 30)
@@ -209,7 +208,7 @@ Rectangle {
                 font.family: Theme?.fontMono ?? "monospace"
                 font.pixelSize: Theme?.fontSizeSm ?? 11
                 font.weight: Font.Bold
-                color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService?.timerRemaining <= 30) ? (Theme?.error ?? "#f38ba8") : (Theme?.primary ?? "#89b4fa")
+                color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService?.timerRemaining <= 30) ? Theme.error : Theme.primary
             }
         }
     }
@@ -348,25 +347,24 @@ Rectangle {
                     Layout.preferredHeight: 32
                     implicitHeight: 32
                     radius: Theme?.radiusPill ?? 16
-                    color: calPopup.activeTab === "calendar" ? (Theme?.primary ?? "#89b4fa") : (Theme?.cardBg ?? Theme?.surface_container_highest ?? "#1e1e2e")
-                    border.color: calPopup.activeTab === "calendar" ? (Theme?.primary ?? "#89b4fa") : (Theme?.cardBorder ?? Theme?.widgetBorder ?? "#313244")
+                    color: calPopup.activeTab === "calendar" ? Theme.primary : Theme.cardBg
+                    border.color: calPopup.activeTab === "calendar" ? Theme.primary : Theme.cardBorder
                     border.width: 1
 
                     RowLayout {
                         anchors.centerIn: parent
                         spacing: 6
-                        Text {
-                            text: Theme?.iconCalendar ?? "\uE935"
-                            font.family: Theme?.fontIcon ?? "sans-serif"
-                            font.pixelSize: Theme?.fontSizeSm ?? 12
-                            color: calPopup.activeTab === "calendar" ? (Theme?.on_primary ?? "#11111b") : (Theme?.on_surface ?? "#cdd6f4")
+                        Icon {
+                            source: Theme?.iconCalendar ?? "x-office-calendar"
+                            size: Theme?.fontSizeSm ?? 12
+                            color: calPopup.activeTab === "calendar" ? Theme.on_primary : Theme.on_surface
                         }
                         Text {
                             text: "calendar"
                             font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
                             font.pixelSize: Theme?.fontSizeSm ?? 12
                             font.weight: Font.DemiBold
-                            color: calPopup.activeTab === "calendar" ? (Theme?.on_primary ?? "#11111b") : (Theme?.on_surface ?? "#cdd6f4")
+                            color: calPopup.activeTab === "calendar" ? Theme.on_primary : Theme.on_surface
                         }
                     }
                     MouseArea {
@@ -381,25 +379,24 @@ Rectangle {
                     Layout.preferredHeight: 32
                     implicitHeight: 32
                     radius: Theme?.radiusPill ?? 16
-                    color: calPopup.activeTab === "timer" ? (Theme?.primary ?? "#89b4fa") : (Theme?.cardBg ?? Theme?.surface_container_highest ?? "#1e1e2e")
-                    border.color: calPopup.activeTab === "timer" ? (Theme?.primary ?? "#89b4fa") : (Theme?.cardBorder ?? Theme?.widgetBorder ?? "#313244")
+                    color: calPopup.activeTab === "timer" ? Theme.primary : Theme.cardBg
+                    border.color: calPopup.activeTab === "timer" ? Theme.primary : Theme.cardBorder
                     border.width: 1
 
                     RowLayout {
                         anchors.centerIn: parent
                         spacing: 6
-                        Text {
-                            text: Theme?.iconClock ?? "\uEFD6"
-                            font.family: Theme?.fontIcon ?? "sans-serif"
-                            font.pixelSize: Theme?.fontSizeSm ?? 12
-                            color: calPopup.activeTab === "timer" ? (Theme?.on_primary ?? "#11111b") : (Theme?.on_surface ?? "#cdd6f4")
+                        Icon {
+                            source: Theme?.iconClock ?? "preferences-system-time"
+                            size: Theme?.fontSizeSm ?? 12
+                            color: calPopup.activeTab === "timer" ? Theme.on_primary : Theme.on_surface
                         }
                         Text {
                             text: "timer"
                             font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
                             font.pixelSize: Theme?.fontSizeSm ?? 12
                             font.weight: Font.DemiBold
-                            color: calPopup.activeTab === "timer" ? (Theme?.on_primary ?? "#11111b") : (Theme?.on_surface ?? "#cdd6f4")
+                            color: calPopup.activeTab === "timer" ? Theme.on_primary : Theme.on_surface
                         }
                     }
                     MouseArea {
@@ -423,8 +420,8 @@ Rectangle {
                     Layout.preferredHeight: 64
                     implicitHeight: 64
                     radius: Theme?.widgetRadius ?? Theme?.radiusMd ?? 8
-                    color: Theme?.cardBg ?? Theme?.surface_container_highest ?? "#1e1e2e"
-                    border.color: Theme?.widgetBorder ?? Theme?.cardBorder ?? "#313244"
+                    color: Theme.cardBg
+                    border.color: Theme.cardBorder
                     border.width: 1
 
                     RowLayout {
@@ -446,14 +443,14 @@ Rectangle {
                                 font.family: Theme?.fontFamily ?? "sans-serif"
                                 font.pixelSize: Theme?.fontSizeSm ?? 12
                                 font.weight: Font.Bold
-                                color: Theme?.on_surface ?? "#cdd6f4"
+                                color: Theme.on_surface
                             }
 
                             Text {
                                 text: "day " + clockRoot.getDayOfYear(clockRoot.now) + " of " + clockRoot.now.getFullYear()
                                 font.family: Theme?.fontFamily ?? "sans-serif"
                                 font.pixelSize: 10
-                                color: Theme?.on_surface_variant ?? "#a6adc8"
+                                color: Theme.on_surface_variant
                             }
                         }
 
@@ -469,15 +466,14 @@ Rectangle {
                                 font.family: Theme?.fontMono ?? "monospace"
                                 font.pixelSize: Theme?.fontSizeLg ?? 16
                                 font.weight: Font.Bold
-                                color: Theme?.primary ?? "#89b4fa"
+                                color: Theme.primary
                                 Layout.alignment: Qt.AlignRight
                             }
 
-                            Text {
-                                text: Theme?.iconClock ?? "\uE8B5"
-                                font.family: Theme?.fontIcon ?? "sans-serif"
-                                font.pixelSize: 11
-                                color: Theme?.primary ?? "#89b4fa"
+                            Icon {
+                                source: Theme?.iconClock ?? "preferences-system-time"
+                                size: 11
+                                color: Theme.primary
                                 Layout.alignment: Qt.AlignRight
                             }
                         }
@@ -498,7 +494,7 @@ Rectangle {
                         font.family: Theme?.fontFamily ?? "sans-serif"
                         font.pixelSize: Theme?.fontSizeMd ?? 14
                         font.weight: Font.Bold
-                        color: Theme?.primary ?? "#89b4fa"
+                        color: Theme.primary
                     }
 
                     Item {
@@ -520,7 +516,7 @@ Rectangle {
                     }
 
                     IconButton {
-                        icon: Theme?.iconClock ?? "󰅐"
+                        icon: Theme?.iconClock ?? "preferences-system-time"
                         iconSize: Theme?.fontSizeSm ?? 12
                         tooltip: "jump to today"
                         onClicked: {
@@ -555,7 +551,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 1
                     implicitHeight: 1
-                    color: Theme?.widgetBorder ?? Theme?.cardBorder ?? "#313244"
+                    color: Theme.cardBorder
                 }
 
                 // Days of Week Headers (Mo, Tu, We, Th, Fr, Sa, Su)
@@ -580,7 +576,7 @@ Rectangle {
                                 font.family: Theme?.fontMono ?? "monospace"
                                 font.pixelSize: 10
                                 font.weight: Font.Bold
-                                color: (index >= 5) ? (Theme?.primary ?? "#89b4fa") : (Theme?.on_surface_variant ?? "#a6adc8")
+                                color: (index >= 5) ? Theme.primary : Theme.on_surface_variant
                             }
                         }
                     }
@@ -626,12 +622,12 @@ Rectangle {
                             implicitHeight: 32
                             radius: Theme?.radiusSm ?? 6
                             color: (modelData.currentMonth && modelData.isToday)
-                                ? (Theme?.primary ?? "#89b4fa")
+                                ? Theme.primary
                                 : (dayMouse.containsMouse
-                                    ? (Theme?.surface_container_highest ?? "#313244")
+                                    ? Theme.surface_container_highest
                                     : "transparent")
 
-                            border.color: (modelData.currentMonth && modelData.isToday) ? (Theme?.primary ?? "#89b4fa") : "transparent"
+                            border.color: (modelData.currentMonth && modelData.isToday) ? Theme.primary : "transparent"
                             border.width: 1
 
                             Text {
@@ -641,10 +637,10 @@ Rectangle {
                                 font.pixelSize: 11
                                 font.weight: modelData.isToday ? Font.Bold : Font.Normal
                                 color: (modelData.currentMonth && modelData.isToday)
-                                    ? (Theme?.on_primary ?? "#11111b")
+                                    ? Theme.on_primary
                                     : (modelData.currentMonth
-                                        ? (Theme?.on_surface ?? "#cdd6f4")
-                                        : (Theme?.on_surface_disabled ?? Qt.alpha(Theme?.on_surface ?? "#cdd6f4", 0.35)))
+                                        ? Theme.on_surface
+                                        : Theme.on_surface_disabled)
                             }
 
                             MouseArea {
@@ -680,7 +676,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 1
                     implicitHeight: 1
-                    color: Theme?.widgetBorder ?? Theme?.cardBorder ?? "#313244"
+                    color: Theme.cardBorder
                 }
 
                 // Footer: Day progress
@@ -693,7 +689,7 @@ Rectangle {
                         Layout.preferredHeight: 6
                         implicitHeight: 6
                         radius: 3
-                        color: Theme?.surface_container_highest ?? "#313244"
+                        color: Theme.surface_container_highest
                         clip: true
 
                         Rectangle {
@@ -702,7 +698,7 @@ Rectangle {
                             anchors.bottom: parent.bottom
                             width: parent.width * Math.min(1.0, Math.max(0.0, ((clockRoot.now.getHours() * 60 + clockRoot.now.getMinutes()) / 1440)))
                             radius: 3
-                            color: Theme?.primary ?? "#89b4fa"
+                            color: Theme.primary
                         }
                     }
 
@@ -710,7 +706,7 @@ Rectangle {
                         text: Math.round(((clockRoot.now.getHours() * 60 + clockRoot.now.getMinutes()) / 1440) * 100) + "% day elapsed"
                         font.family: Theme?.fontMono ?? "monospace"
                         font.pixelSize: 9
-                        color: Theme?.on_surface_variant ?? "#a6adc8"
+                        color: Theme.on_surface_variant
                     }
                 }
             }
@@ -727,8 +723,8 @@ Rectangle {
                     Layout.preferredHeight: timerInnerLayout.implicitHeight + 32
                     implicitHeight: timerInnerLayout.implicitHeight + 32
                     radius: Theme?.radiusMd ?? 10
-                    color: Theme?.cardBg ?? Theme?.surface_container_highest ?? "#1e1e2e"
-                    border.color: Theme?.cardBorder ?? Theme?.widgetBorder ?? "#313244"
+                    color: Theme.cardBg
+                    border.color: Theme.cardBorder
                     border.width: 1
 
                     ColumnLayout {
@@ -750,7 +746,7 @@ Rectangle {
                             font.family: Theme?.fontMono ?? "monospace"
                             font.pixelSize: 46
                             font.weight: Font.Bold
-                            color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService.timerRemaining <= 30) ? (Theme?.error ?? "#f38ba8") : (Theme?.primary ?? "#89b4fa")
+                            color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService.timerRemaining <= 30) ? Theme.error : Theme.primary
                         }
 
                         // Quick Preset Chips (+1m, +5m, +15m, +25m Pomodoro)
@@ -771,8 +767,8 @@ Rectangle {
                                     implicitWidth: 68
                                     implicitHeight: 32
                                     radius: Theme?.radiusPill ?? 16
-                                    color: Theme?.surface_container_highest ?? "#313244"
-                                    border.color: Theme?.cardBorder ?? Theme?.widgetBorder ?? "#45475a"
+                                    color: Theme.surface_container_highest
+                                    border.color: Theme.cardBorder
                                     border.width: 1
 
                                     Text {
@@ -781,7 +777,7 @@ Rectangle {
                                         font.family: Theme?.fontMono ?? "monospace"
                                         font.pixelSize: Theme?.fontSizeSm ?? 12
                                         font.weight: Font.DemiBold
-                                        color: Theme?.on_surface ?? "#cdd6f4"
+                                        color: Theme.on_surface
                                     }
                                     MouseArea {
                                         anchors.fill: parent
@@ -807,23 +803,22 @@ Rectangle {
                                 implicitWidth: 110
                                 implicitHeight: 40
                                 radius: 20
-                                color: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.error ?? "#f38ba8") : (Theme?.primary ?? "#89b4fa")
+                                color: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? Theme.error : Theme.primary
 
                                 RowLayout {
                                     anchors.centerIn: parent
                                     spacing: 6
-                                    Text {
-                                        text: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.iconPause ?? "\uE034") : (Theme?.iconPlay ?? "\uE037")
-                                        font.family: Theme?.fontIcon ?? "sans-serif"
-                                        font.pixelSize: Theme?.fontSizeSm ?? 12
-                                        color: Theme?.on_primary ?? "#11111b"
+                                    Icon {
+                                        source: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.iconPause ?? "media-playback-pause") : (Theme?.iconPlay ?? "media-playback-start")
+                                        size: Theme?.fontSizeSm ?? 12
+                                        color: Theme.on_primary
                                     }
                                     Text {
                                         text: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? "pause" : "start"
                                         font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
                                         font.pixelSize: Theme?.fontSizeSm ?? 12
                                         font.weight: Font.Bold
-                                        color: Theme?.on_primary ?? "#11111b"
+                                        color: Theme.on_primary
                                     }
                                 }
 
@@ -847,8 +842,8 @@ Rectangle {
                                 implicitWidth: 96
                                 implicitHeight: 40
                                 radius: 20
-                                color: Theme?.surface_container_highest ?? "#313244"
-                                border.color: Theme?.cardBorder ?? Theme?.widgetBorder ?? "#45475a"
+                                color: Theme.surface_container_highest
+                                border.color: Theme.cardBorder
                                 border.width: 1
 
                                 Text {
@@ -857,7 +852,7 @@ Rectangle {
                                     font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
                                     font.pixelSize: Theme?.fontSizeSm ?? 12
                                     font.weight: Font.Medium
-                                    color: Theme?.on_surface ?? "#cdd6f4"
+                                    color: Theme.on_surface
                                 }
 
                                 MouseArea {
@@ -880,14 +875,14 @@ Rectangle {
                             implicitWidth: 180
                             implicitHeight: 32
                             radius: 16
-                            color: Theme?.surface_container_high ?? "#262837"
+                            color: Theme.surface_container_high
 
                             Text {
                                 anchors.centerIn: parent
                                 text: (typeof TimerService !== "undefined" && (TimerService?.stopwatchRunning || TimerService?.stopwatchElapsed > 0)) ? "switch to timer" : "switch to stopwatch"
                                 font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
                                 font.pixelSize: Theme?.fontSizeXs ?? 11
-                                color: Theme?.primary ?? "#89b4fa"
+                                color: Theme.primary
                             }
                             MouseArea {
                                 anchors.fill: parent

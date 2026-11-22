@@ -486,11 +486,10 @@ Rectangle {
                     border.color: Theme.alpha(Theme.primary, 0.35)
                     border.width: 1
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: Theme.iconWorkspaces
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                        source: Theme.iconWorkspaces
+                        size: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                         color: Theme.primary
                     }
                 }
@@ -658,7 +657,7 @@ Rectangle {
                                         }
                                     }
 
-                                    // use Theme.fontIcon for iconCheck so Material mode doesn't turn it into a tofu box
+                                    // icon badge for active workspace check
                                     Rectangle {
                                         Layout.preferredWidth: 22
                                         Layout.preferredHeight: 22
@@ -670,11 +669,10 @@ Rectangle {
 
                                         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
 
-                                        Text {
+                                        Icon {
                                             anchors.centerIn: parent
-                                            text: isCurrent ? Theme.iconCheck : Theme.iconChevronRight
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.fontSizeXs
+                                            source: isCurrent ? Theme.iconCheck : Theme.iconChevronRight
+                                            size: Theme.fontSizeXs
                                             color: isCurrent ? Theme.on_primary : Theme.primary
                                         }
                                     }
@@ -720,10 +718,9 @@ Rectangle {
                     anchors.rightMargin: 10
                     spacing: 8
 
-                    Text {
-                        text: Theme.iconSparkles
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                    Icon {
+                        source: Theme.iconSparkles
+                        size: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                         color: Theme.primary
                     }
 

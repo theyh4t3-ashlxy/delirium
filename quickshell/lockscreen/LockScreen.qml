@@ -37,9 +37,16 @@ Scope {
     property string kbLayoutShort: ""
 
     readonly property string homeDir: Quickshell.env("HOME") || ""
+    readonly property string stateDir: {
+        let xdgState = Quickshell.env("XDG_STATE_HOME");
+        if (xdgState && xdgState.trim() !== "") return xdgState.trim() + "/quickshell";
+        return homeDir ? (homeDir + "/.local/state/quickshell") : "/tmp/quickshell-state";
+    }
     readonly property string configDir: Quickshell.env("XDG_CONFIG_HOME") || (homeDir + "/.config")
-    readonly property string lockStateDir: configDir + "/quickshell/lockscreen"
+    readonly property string lockStateDir: stateDir + "/lockscreen"
     readonly property string lockStatePath: lockStateDir + "/state"
+    readonly property string fallbackLockStatePath: decodeURIComponent(Qt.resolvedUrl("state").toString().replace(/^file:\/\//, ""))
+    readonly property string legacyLockStatePath: configDir + "/quickshell/lockscreen/state"
 
     readonly property string runtimeDir: {
         let xdg = (Quickshell.env("XDG_RUNTIME_DIR") || "").trim();
@@ -88,7 +95,7 @@ Scope {
     property int autoSubmitTargetLen: 0
 
     // user-controlled vibe & quotes
-    property string quoteMode: "smart"         // "smart" | "hyprland" | "unhinged" | "custom" | "off"
+    property string quoteMode: "smart"         // "smart" | "quotes" | "status" | "hyprland" | "custom" | "off"
     property string customQuoteText: "welcome back"
     property string backdropMode: "auto"       // "auto" | "dark" | "light"
     property string pamService: "login"
@@ -158,7 +165,7 @@ Scope {
     readonly property real surfaceLuminance: (0.2126 * Theme.surface.r) + (0.7152 * Theme.surface.g) + (0.0722 * Theme.surface.b)
     readonly property bool matugenIsLight: surfaceLuminance > 0.5
     readonly property bool globalCfgLight: (typeof Settings !== "undefined" && Settings)
-        ? Boolean(Settings.lightMode || Settings.isLight || Settings.themeMode === "light" || Settings.colorScheme === "light")
+        ? Boolean(Settings.matugenMode === "light" || Settings.lightMode || Settings.isLight || Settings.themeMode === "light" || Settings.colorScheme === "light")
         : false
     readonly property bool isLight: backdropMode === "light" || (backdropMode === "auto" && (matugenIsLight || globalCfgLight))
 
@@ -364,6 +371,20 @@ Scope {
         ) && lockRoot.anyPlayerPlaying
     }
 
+    property FileView fallbackLockStateFile: FileView {
+        path: lockRoot.fallbackLockStatePath
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
+
+    property FileView legacyLockStateFile: FileView {
+        path: lockRoot.legacyLockStatePath
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
+
     property FileView lockStateFile: FileView {
         path: lockRoot.lockStatePath
         blockLoading: false
@@ -373,7 +394,7 @@ Scope {
             if (!lockRoot.stateLoaded) lockRoot.loadState();
         }
         onLoadFailed: {
-            lockRoot.stateLoaded = true;
+            if (!lockRoot.stateLoaded) lockRoot.loadState();
         }
     }
 
@@ -399,6 +420,12 @@ Scope {
 
     function loadState() {
         let raw = lockStateFile.text();
+        if (!raw || raw.trim() === "") {
+            raw = legacyLockStateFile.text();
+        }
+        if (!raw || raw.trim() === "") {
+            raw = fallbackLockStateFile.text();
+        }
         if (!raw || raw.trim() === "") {
             lockRoot.stateLoaded = true;
             return;
@@ -447,7 +474,10 @@ Scope {
                 case "customNormY": lockRoot.customNormY = parseClamped(v, 0.0, 1.0, 0.5); break;
                 case "clockScale": lockRoot.clockScale = parseClamped(v, 0.65, 1.65, 1.0); break;
                 case "quoteMode":
-                    if (["smart", "hyprland", "unhinged", "custom", "off"].includes(v)) lockRoot.quoteMode = v;
+                    let qm = v === "unhinged" ? "status" : v;
+                    if (["smart", "quotes", "status", "hyprland", "custom", "off"].includes(qm)) {
+                        lockRoot.quoteMode = qm;
+                    }
                     break;
                 case "customQuoteText": lockRoot.customQuoteText = v; break;
                 case "backdropMode":
@@ -597,7 +627,7 @@ Scope {
             "clock,password,media",
             "media,clock,password"
         ];
-        const qModes = ["smart", "hyprland", "unhinged"];
+        const qModes = ["smart", "quotes", "status", "hyprland"];
 
         lockRoot.clockStyle = cStyles[Math.floor(Math.random() * cStyles.length)];
         lockRoot.secondsStyle = sStyles[Math.floor(Math.random() * sStyles.length)];
@@ -777,23 +807,44 @@ Scope {
 
     function refreshQuotes() {
         if (!splashProc.running) splashProc.running = true;
-        let cat = lockRoot.quoteMode === "smart" ? pickSmartCategory() : "system";
-        let pool = Theme.flavorQuotes?.[cat] ?? Theme.flavorQuotes?.system;
-        if (pool && pool.length > 0) {
-            let idx = Math.floor(Math.random() * pool.length);
-            lockRoot.rolledQuote = pool[idx] || "";
-        } else if (Theme.getFlavor) {
-            lockRoot.rolledQuote = Theme.getFlavor(cat, "") || "";
+        let mode = lockRoot.quoteMode === "unhinged" ? "status" : lockRoot.quoteMode;
+
+        if (mode === "quotes") {
+            const quoteCats = ["philosophy", "focus", "simplicity", "system"];
+            let qCat = quoteCats[Math.floor(Math.random() * quoteCats.length)];
+            if (Theme.getQuote) {
+                lockRoot.rolledQuote = Theme.getQuote(qCat, "") || "";
+            } else if (Theme.getFlavor) {
+                lockRoot.rolledQuote = Theme.getFlavor(qCat, "") || "";
+            }
+        } else if (mode === "status") {
+            let cat = pickSmartCategory();
+            if (Theme.getStatusFlavor) {
+                lockRoot.rolledQuote = Theme.getStatusFlavor(cat, "") || "";
+            } else if (Theme.getFlavor) {
+                lockRoot.rolledQuote = Theme.getFlavor(cat, "") || "";
+            }
+        } else if (mode === "smart") {
+            let cat = pickSmartCategory();
+            if (Theme.getStatusFlavor) {
+                lockRoot.rolledQuote = Theme.getStatusFlavor(cat, "") || "";
+            } else if (Theme.getFlavor) {
+                lockRoot.rolledQuote = Theme.getFlavor(cat, "") || "";
+            }
+        } else if (mode === "hyprland") {
+            lockRoot.rolledQuote = lockRoot.hyprSplash || "";
         }
     }
 
     readonly property string activeQuoteText: {
-        if (lockRoot.quoteMode === "off") return "";
-        if (lockRoot.quoteMode === "custom") return fmtText(lockRoot.customQuoteText);
-        if (lockRoot.quoteMode === "unhinged" || lockRoot.quoteMode === "smart") {
+        let mode = lockRoot.quoteMode === "unhinged" ? "status" : lockRoot.quoteMode;
+        if (mode === "off") return "";
+        if (mode === "custom") return fmtText(lockRoot.customQuoteText);
+        if (mode === "hyprland") return fmtText(lockRoot.hyprSplash || lockRoot.rolledQuote);
+        if (mode === "quotes" || mode === "status" || mode === "smart") {
             return fmtText(lockRoot.rolledQuote || lockRoot.hyprSplash);
         }
-        return fmtText(lockRoot.hyprSplash || lockRoot.rolledQuote);
+        return fmtText(lockRoot.rolledQuote || lockRoot.hyprSplash);
     }
 
     function numberToWords(n: int): string {
@@ -859,14 +910,20 @@ Scope {
                 let p = item?.path ?? item?.url ?? "";
                 if (p !== "") return p;
             }
-            if (WallpaperService.localWpListFile) {
+            if (WallpaperService.savedWpFile) {
                 try {
-                    let raw = WallpaperService.localWpListFile.text();
-                    let parsed = JSON.parse(raw) || [];
-                    let staticList = parsed.filter(w => w && w.path && !/\.(mp4|webm|mkv|mov)$/i.test(w.path));
-                    let pool = staticList.length > 0 ? staticList : parsed;
+                    let raw = WallpaperService.savedWpFile.text();
+                    let lines = raw.split("\n");
+                    let pool = [];
+                    for (let i = 0; i < lines.length; i++) {
+                        let line = lines[i].trim();
+                        if (line.startsWith("wp=")) {
+                            let p = line.slice(3).split("|")[0].trim();
+                            if (p && !/\.(mp4|webm|mkv|mov)$/i.test(p)) pool.push(p);
+                        }
+                    }
                     if (pool.length > 0) {
-                        return pool[Math.floor(Math.random() * pool.length)].path || "";
+                        return pool[Math.floor(Math.random() * pool.length)];
                     }
                 } catch (e) {}
             }
@@ -1207,7 +1264,7 @@ Scope {
                     }
                     function onTrackTitleChanged() {
                         surface.trackPosition = surface.activePlayer?.position ?? 0;
-                        if (lockRoot.quoteMode === "smart") lockRoot.refreshQuotes();
+                        if (lockRoot.quoteMode === "smart" || lockRoot.quoteMode === "status" || lockRoot.quoteMode === "quotes" || lockRoot.quoteMode === "unhinged") lockRoot.refreshQuotes();
                     }
                 }
 
@@ -1249,11 +1306,10 @@ Scope {
                         anchors.centerIn: parent
                         spacing: 4
 
-                        Text {
+                        Icon {
                             visible: cRoot.icon !== ""
-                            text: cRoot.icon
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeXs
+                            source: cRoot.icon
+                            size: Theme.fontSizeXs
                             color: cRoot.selected ? lockRoot.uiAccent : lockRoot.uiTextSecondary
                         }
 
@@ -1311,11 +1367,10 @@ Scope {
                         Layout.fillWidth: true
                         spacing: 6
 
-                        Text {
+                        Icon {
                             visible: sRoot.icon !== ""
-                            text: sRoot.icon
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeXs
+                            source: sRoot.icon
+                            size: Theme.fontSizeXs
                             color: sMouse.pressed || sMouse.containsMouse ? lockRoot.uiAccent : lockRoot.uiTextSecondary
                         }
 
@@ -1432,10 +1487,9 @@ Scope {
                         anchors.rightMargin: 6
                         spacing: 10
 
-                        Text {
-                            text: tRow.icon
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeMd
+                        Icon {
+                            source: tRow.icon
+                            size: Theme.fontSizeMd
                             color: tRow.checked ? lockRoot.uiAccent : lockRoot.uiTextSecondary
                             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                         }
@@ -1505,10 +1559,9 @@ Scope {
                         anchors.centerIn: parent
                         spacing: 6
 
-                        Text {
-                            text: pRoot.isArmed ? Theme.iconFlame : pRoot.icon
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeMd
+                        Icon {
+                            source: pRoot.isArmed ? Theme.iconFlame : pRoot.icon
+                            size: Theme.fontSizeMd
                             color: pRoot.isArmed ? Theme.on_error : (pMouse.containsMouse ? lockRoot.uiAccent : lockRoot.uiTextPrimary)
                         }
 
@@ -1704,10 +1757,9 @@ Scope {
                             anchors.centerIn: parent
                             spacing: 8
 
-                            Text {
-                                text: sessionLock.secure ? (Theme.iconDistro ?? Theme.iconUser) : Theme.iconShield
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.fontSizeMd
+                            Icon {
+                                source: sessionLock.secure ? (Theme.iconDistro ?? Theme.iconUser) : Theme.iconShield
+                                size: Theme.fontSizeMd
                                 color: lockRoot.uiAccent
                             }
 
@@ -1807,10 +1859,9 @@ Scope {
                                     anchors.centerIn: parent
                                     spacing: 4
 
-                                    Text {
-                                        text: Theme.iconKeyboard
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeXs
+                                    Icon {
+                                        source: Theme.iconKeyboard
+                                        size: Theme.fontSizeXs
                                         color: lockRoot.uiAccent
                                     }
                                     Text {
@@ -1847,10 +1898,9 @@ Scope {
                                     anchors.centerIn: parent
                                     spacing: 5
 
-                                    Text {
-                                        text: Theme.getVolumeIcon(parent.parent.sinkVol, parent.parent.sinkMuted)
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeMd
+                                    Icon {
+                                        source: Theme.getVolumeIcon(parent.parent.sinkVol, parent.parent.sinkMuted)
+                                        size: Theme.fontSizeMd
                                         color: parent.parent.sinkMuted ? Theme.error : lockRoot.uiAccent
                                     }
 
@@ -1878,14 +1928,13 @@ Scope {
 
                             RowLayout {
                                 spacing: 6
-                                Text {
-                                    text: Theme.getWifiIcon(
+                                Icon {
+                                    source: Theme.getWifiIcon(
                                         (typeof NetworkService !== "undefined" ? NetworkService?.signalStrength : 100) ?? 100,
                                         (typeof NetworkService !== "undefined" ? NetworkService?.isConnected : false) ?? false,
                                         (typeof NetworkService !== "undefined" ? NetworkService?.isWiredConnected : false) ?? false
                                     )
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeMd
+                                    size: Theme.fontSizeMd
                                     color: ((typeof NetworkService !== "undefined" && NetworkService?.isConnected) ?? false) ? lockRoot.uiAccent : lockRoot.uiTextSecondary
                                 }
                                 Text {
@@ -1917,10 +1966,9 @@ Scope {
                                     anchors.centerIn: parent
                                     spacing: 6
 
-                                    Text {
-                                        text: Theme.getBatteryIcon(parent.parent.batPct, parent.parent.isCharging, !(UPower?.onBattery ?? true), false)
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeMd
+                                    Icon {
+                                        source: Theme.getBatteryIcon(parent.parent.batPct, parent.parent.isCharging, !(UPower?.onBattery ?? true), false)
+                                        size: Theme.fontSizeMd
                                         color: parent.parent.isCharging ? lockRoot.uiAccent : (parent.parent.batPct <= 20 ? Theme.error : lockRoot.uiTextPrimary)
                                     }
                                     Text {
@@ -2031,10 +2079,9 @@ Scope {
                                     Layout.fillWidth: true
                                     spacing: 8
 
-                                    Text {
-                                        text: Theme.iconSliders
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeMd
+                                    Icon {
+                                        source: Theme.iconSliders
+                                        size: Theme.fontSizeMd
                                         color: lockRoot.uiAccent
                                     }
 
@@ -2099,10 +2146,9 @@ Scope {
                                         anchors.centerIn: parent
                                         spacing: 8
 
-                                        Text {
-                                            text: Theme.iconSparkles
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.fontSizeMd
+                                        Icon {
+                                            source: Theme.iconSparkles
+                                            size: Theme.fontSizeMd
                                             color: lockRoot.uiOnAccent
                                         }
 
@@ -2658,11 +2704,11 @@ Scope {
                                         spacing: 4
 
                                         Repeater {
-                                            model: ["smart", "hyprland", "unhinged", "custom", "off"]
+                                            model: ["smart", "quotes", "status", "hyprland", "custom", "off"]
                                             delegate: OptChip {
                                                 required property string modelData
                                                 label: modelData
-                                                selected: lockRoot.quoteMode === modelData
+                                                selected: lockRoot.quoteMode === modelData || (modelData === "status" && lockRoot.quoteMode === "unhinged")
                                                 onClicked: {
                                                     lockRoot.quoteMode = modelData;
                                                     lockRoot.refreshQuotes();
@@ -2718,10 +2764,9 @@ Scope {
                                             anchors.rightMargin: 12
                                             spacing: 8
 
-                                            Text {
-                                                text: Theme.iconShuffle
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.fontSizeMd
+                                            Icon {
+                                                source: Theme.iconShuffle
+                                                size: Theme.fontSizeMd
                                                 color: lockRoot.uiAccent
                                             }
                                             Text {
@@ -2983,10 +3028,9 @@ Scope {
                                 anchors.centerIn: parent
                                 spacing: 6
 
-                                Text {
-                                    text: Theme.iconGrid
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeXs
+                                Icon {
+                                    source: Theme.iconGrid
+                                    size: Theme.fontSizeXs
                                     color: stageDragMouse.pressed ? lockRoot.uiOnAccent : lockRoot.uiAccent
                                 }
 
@@ -3675,11 +3719,18 @@ Scope {
 
                                         Text {
                                             anchors.centerIn: parent
-                                            text: Theme.iconSet === "kaomoji" ? Theme.kaoMusic : Theme.iconMusic
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                                            text: Theme.kaoMusic
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSizeSm
                                             color: surface.artAccent
-                                            visible: surface.coverArtUrl === ""
+                                            visible: surface.coverArtUrl === "" && Theme.iconSet === "kaomoji"
+                                        }
+                                        Icon {
+                                            anchors.centerIn: parent
+                                            source: Theme.iconMusic
+                                            size: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                                            color: surface.artAccent
+                                            visible: surface.coverArtUrl === "" && Theme.iconSet !== "kaomoji"
                                         }
                                     }
 
@@ -3772,12 +3823,10 @@ Scope {
                                         Behavior on radius { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
                                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                                        Text {
+                                        Icon {
                                             anchors.centerIn: parent
-                                            text: surface.playerIsPlaying ? Theme.iconPause : Theme.iconPlay
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
-                                            font.weight: Theme.fontWeightBold
+                                            source: surface.playerIsPlaying ? Theme.iconPause : Theme.iconPlay
+                                            size: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                             color: lockRoot.uiOnAccent
                                         }
 
@@ -3951,11 +4000,10 @@ Scope {
                                     anchors.rightMargin: 8
                                     spacing: 10
 
-                                    Text {
+                                    Icon {
                                         id: lockGlyph
-                                        text: lockRoot.isChecking ? Theme.iconRefresh : Theme.iconLock
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeMd
+                                        source: lockRoot.isChecking ? Theme.iconRefresh : Theme.iconLock
+                                        size: Theme.fontSizeMd
                                         color: lockRoot.authFailed
                                             ? Theme.error
                                             : (pwInput.activeFocus ? lockRoot.uiAccent : lockRoot.uiTextSecondary)
@@ -4153,12 +4201,10 @@ Scope {
                                         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
                                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                                        Text {
+                                        Icon {
                                             anchors.centerIn: parent
-                                            text: Theme.iconChevronRight
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.fontSizeSm
-                                            font.weight: Theme.fontWeightBold
+                                            source: Theme.iconChevronRight
+                                            size: Theme.fontSizeSm
                                             color: lockRoot.uiOnAccent
                                         }
 

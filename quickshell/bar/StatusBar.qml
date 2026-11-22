@@ -290,12 +290,11 @@ PanelWindow {
         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-        Text {
+        Icon {
             id: launcherText
             anchors.centerIn: parent
-            text: Theme.iconDistro ?? Theme.iconArch
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.isTextIconSet ? (root.isVertical ? Theme.fontSizeXs : Theme.fontSizeSm) : Theme.fontSizeLg
+            source: Theme.iconDistro ?? Theme.iconArch
+            size: Theme.isTextIconSet ? (root.isVertical ? Theme.fontSizeXs : Theme.fontSizeSm) : Theme.fontSizeLg
             color: root.launcherPopup.open || lMouse.containsMouse ? Theme.primary : Theme.on_surface
             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         }
@@ -640,7 +639,7 @@ PanelWindow {
                         ctx.strokeStyle = Theme.glassHighlight;
                     } else if (hasPureBlack) {
                         ctx.lineWidth = 1;
-                        ctx.strokeStyle = "#1f1f1f";
+                        ctx.strokeStyle = Theme.barBorderColor;
                     }
                     ctx.stroke();
                 }
@@ -694,9 +693,9 @@ PanelWindow {
                 visible: root.isIslandMode && !root.isVertical && leftRowH.visible && (leftRowH.implicitWidth > 0)
                 anchors.verticalCenter: leftRowH.verticalCenter
                 anchors.left: leftRowH.left
-                anchors.leftMargin: -6
-                width: leftRowH.implicitWidth + 12
-                height: Theme.barHeight - 6
+                anchors.leftMargin: -(Settings?.bentoGap ?? 8)
+                width: leftRowH.implicitWidth + ((Settings?.bentoGap ?? 8) * 2)
+                height: Theme.barHeight - Math.min(6, (Settings?.bentoGap ?? 8))
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
                 border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
@@ -731,8 +730,8 @@ PanelWindow {
                 id: bentoCenterIsland
                 visible: root.isIslandMode && !root.isVertical && centerRowH.visible && (centerRowH.implicitWidth > 0)
                 anchors.centerIn: centerRowH
-                width: centerRowH.implicitWidth + 24
-                height: Theme.barHeight - 6
+                width: centerRowH.implicitWidth + ((Settings?.bentoGap ?? 8) * 3)
+                height: Theme.barHeight - Math.min(6, (Settings?.bentoGap ?? 8))
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
                 border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
@@ -768,9 +767,9 @@ PanelWindow {
                 visible: root.isIslandMode && !root.isVertical && rightRowContainer.visible && (rightRowContainer.width > 0)
                 anchors.verticalCenter: rightRowContainer.verticalCenter
                 anchors.right: rightRowContainer.right
-                anchors.rightMargin: -6
-                width: rightRowContainer.width + 12
-                height: Theme.barHeight - 6
+                anchors.rightMargin: -(Settings?.bentoGap ?? 8)
+                width: rightRowContainer.width + ((Settings?.bentoGap ?? 8) * 2)
+                height: Theme.barHeight - Math.min(6, (Settings?.bentoGap ?? 8))
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
                 border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
@@ -852,59 +851,10 @@ PanelWindow {
                 z: 10
 
                 // fallback live screen recording pill if ScreenCapture isn't already on the bar
-                Rectangle {
+                Loader {
                     visible: (typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording) && !root.hasCaptureModuleOnBar
-                    implicitHeight: Theme.barHeight - 8
-                    implicitWidth: recRowH.implicitWidth + 18
-                    radius: Theme.radiusPill
-                    color: recMouseH.pressed ? Theme.error : (recMouseH.containsMouse ? Theme.alpha(Theme.error, 0.28) : Theme.error_overlay)
-                    border.color: Theme.error
-                    border.width: 1
-
-                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                    RowLayout {
-                        id: recRowH
-                        anchors.centerIn: parent
-                        spacing: 6
-
-                        Rectangle {
-                            width: 8
-                            height: 8
-                            radius: 4
-                            color: recMouseH.pressed ? Theme.on_error : Theme.error
-
-                            SequentialAnimation on opacity {
-                                loops: Animation.Infinite
-                                running: typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording
-                                NumberAnimation { from: 1.0; to: 0.20; duration: 650; easing.type: Easing.InOutQuad }
-                                NumberAnimation { from: 0.20; to: 1.0; duration: 650; easing.type: Easing.InOutQuad }
-                            }
-                        }
-
-                        Text {
-                            text: "REC " + (ScreenRecService?.elapsedTimeString ?? "00:00")
-                            font.family: Theme.fontMono
-                            font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
-                            color: recMouseH.pressed ? Theme.on_error : Theme.error
-                        }
-                    }
-
-                    MouseArea {
-                        id: recMouseH
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: (mouse) => {
-                            if (mouse.button === Qt.RightButton) {
-                                ScreenRecService?.discardRecording();
-                            } else {
-                                ScreenRecService?.stopRecording();
-                            }
-                        }
-                    }
+                    active: visible
+                    sourceComponent: compScreenCapture
                 }
 
                 Repeater {
@@ -975,9 +925,9 @@ PanelWindow {
                 visible: root.isIslandMode && root.isVertical && leftRowV.visible && (leftRowV.implicitHeight > 0)
                 anchors.horizontalCenter: leftRowV.horizontalCenter
                 anchors.top: leftRowV.top
-                anchors.topMargin: -6
-                width: Theme.barHeight - 6
-                height: leftRowV.implicitHeight + 12
+                anchors.topMargin: -(Settings?.bentoGap ?? 8)
+                width: Theme.barHeight - Math.min(6, (Settings?.bentoGap ?? 8))
+                height: leftRowV.implicitHeight + ((Settings?.bentoGap ?? 8) * 2)
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
                 border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
@@ -1012,8 +962,8 @@ PanelWindow {
                 id: bentoCenterIslandV
                 visible: root.isIslandMode && root.isVertical && centerRowV.visible && (centerRowV.implicitHeight > 0)
                 anchors.centerIn: centerRowV
-                width: Theme.barHeight - 6
-                height: centerRowV.implicitHeight + 16
+                width: Theme.barHeight - Math.min(6, (Settings?.bentoGap ?? 8))
+                height: centerRowV.implicitHeight + ((Settings?.bentoGap ?? 8) * 2)
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
                 border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
@@ -1049,9 +999,9 @@ PanelWindow {
                 visible: root.isIslandMode && root.isVertical && rightRowV.visible && (rightRowV.implicitHeight > 0)
                 anchors.horizontalCenter: rightRowV.horizontalCenter
                 anchors.bottom: rightRowV.bottom
-                anchors.bottomMargin: -6
-                width: Theme.barHeight - 6
-                height: rightRowV.implicitHeight + 12
+                anchors.bottomMargin: -(Settings?.bentoGap ?? 8)
+                width: Theme.barHeight - Math.min(6, (Settings?.bentoGap ?? 8))
+                height: rightRowV.implicitHeight + ((Settings?.bentoGap ?? 8) * 2)
                 radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
                 color: Theme.cardBg
                 border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
@@ -1117,46 +1067,10 @@ PanelWindow {
                 z: 10
 
                 // fallback live screen recording pill (vertical)
-                Rectangle {
+                Loader {
                     visible: (typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording) && !root.hasCaptureModuleOnBar
-                    implicitWidth: Theme.barHeight - 8
-                    implicitHeight: Theme.barHeight - 8
-                    radius: Theme.radiusPill
-                    color: recMouseV.pressed ? Theme.error : (recMouseV.containsMouse ? Theme.alpha(Theme.error, 0.28) : Theme.error_overlay)
-                    border.color: Theme.error
-                    border.width: 1
-
-                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 10
-                        height: 10
-                        radius: 5
-                        color: recMouseV.pressed ? Theme.on_error : Theme.error
-
-                        SequentialAnimation on opacity {
-                            loops: Animation.Infinite
-                            running: typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording
-                            NumberAnimation { from: 1.0; to: 0.20; duration: 650; easing.type: Easing.InOutQuad }
-                            NumberAnimation { from: 0.20; to: 1.0; duration: 650; easing.type: Easing.InOutQuad }
-                        }
-                    }
-
-                    MouseArea {
-                        id: recMouseV
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: (mouse) => {
-                            if (mouse.button === Qt.RightButton) {
-                                ScreenRecService?.discardRecording();
-                            } else {
-                                ScreenRecService?.stopRecording();
-                            }
-                        }
-                    }
+                    active: visible
+                    sourceComponent: compScreenCapture
                 }
 
                 Repeater {

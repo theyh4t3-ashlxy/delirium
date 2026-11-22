@@ -163,11 +163,10 @@ Rectangle {
             anchors.centerIn: parent
             spacing: 3
 
-            Text {
+            Icon {
                 Layout.alignment: Qt.AlignHCenter
-                text: tileRoot.icon
-                font.family: Theme.fontIcon
-                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeMd
+                source: tileRoot.icon
+                size: Theme.fontSizeMd
                 color: {
                     if (tileMouse.pressed) return tileRoot.accentRed ? Theme.on_error : Theme.on_primary;
                     return tileRoot.accentRed ? Theme.error : Theme.primary;
@@ -218,11 +217,10 @@ Rectangle {
             spacing: 4
 
             // hide prefix icon in text mode so we don't end up with "mic mic" or "clip clipboard"
-            Text {
+            Icon {
                 visible: chipRoot.icon !== "" && !Theme.isTextIconSet
-                text: chipRoot.icon
-                font.family: Theme.fontIcon
-                font.pixelSize: Theme.fontSizeXs
+                source: chipRoot.icon
+                size: Theme.fontSizeXs
                 color: chipRoot.selected ? Theme.primary : Theme.on_surface_variant
             }
 
@@ -251,11 +249,10 @@ Rectangle {
         spacing: 6
         visible: !root.isRecording && !countdownTimer.running
 
-        Text {
+        Icon {
             anchors.verticalCenter: parent.verticalCenter
-            text: Theme.iconCamera
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+            source: Theme.iconCamera
+            size: Theme.fontSizeSm
             color: popup.open || cMouse.containsMouse ? Theme.primary : Theme.on_surface
 
             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -384,11 +381,10 @@ Rectangle {
                     border.color: root.isRecording ? Theme.error : Theme.alpha(Theme.primary, 0.35)
                     border.width: 1
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: Theme.iconCamera
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                        source: Theme.iconCamera
+                        size: Theme.fontSizeLg
                         color: root.isRecording ? Theme.error : Theme.primary
                     }
                 }
@@ -406,7 +402,9 @@ Rectangle {
                     }
 
                     Text {
-                        text: Theme.getFlavor("screenshot", "gpu accelerated • native wayland")
+                        text: Theme.getStatusFlavor
+                            ? Theme.getStatusFlavor("screenshot", "gpu accelerated • native wayland")
+                            : (Theme.getFlavor ? Theme.getFlavor("screenshot", "gpu accelerated • native wayland") : "gpu accelerated • native wayland")
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface_variant
@@ -464,10 +462,9 @@ Rectangle {
                         Layout.fillWidth: true
                         spacing: 6
 
-                        Text {
-                            text: Theme.iconScreenshot
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                        Icon {
+                            source: Theme.iconScreenshot
+                            size: Theme.fontSizeSm
                             color: Theme.primary
                         }
 
@@ -586,10 +583,9 @@ Rectangle {
                         Layout.fillWidth: true
                         spacing: 6
 
-                        Text {
-                            text: Theme.iconPlay
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                        Icon {
+                            source: Theme.iconPlay
+                            size: Theme.fontSizeSm
                             color: root.isRecording ? Theme.error : Theme.primary
                         }
 

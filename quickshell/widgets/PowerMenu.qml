@@ -29,11 +29,10 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 4
 
-        Text {
+        Icon {
             anchors.verticalCenter: parent.verticalCenter
-            text: Theme.iconPower ?? "󰐥"
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.fontSizeMd
+            source: Theme.iconPower
+            size: Theme.fontSizeMd
             color: popup.open ? Theme.error : Theme.on_surface
         }
     }
@@ -164,11 +163,10 @@ Rectangle {
                     border.color: Theme.alpha(Theme.error, 0.35)
                     border.width: 1
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: Theme.iconPower ?? "󰐥"
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeMd
+                        source: Theme.iconPower
+                        size: Theme.fontSizeMd
                         color: Theme.error
                     }
                 }
@@ -187,10 +185,9 @@ Rectangle {
 
                     Text {
                         Layout.fillWidth: true
-                        text: Theme.getFlavor(
-                            "system",
-                            Theme.getVibe(Theme.kaoChaos + " choose your destiny", "manage desktop session", "manage desktop session")
-                        )
+                        text: Theme.getStatusFlavor
+                            ? Theme.getStatusFlavor("system", "manage desktop session")
+                            : (Theme.getFlavor ? Theme.getFlavor("system", "manage desktop session") : "manage desktop session")
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface_variant
@@ -228,7 +225,7 @@ Rectangle {
                             key: "lock",
                             label: "lock",
                             sub: "",
-                            icon: Theme.iconLock ?? "󰌾",
+                            icon: Theme.iconLock,
                             span: 1,
                             confirm: false,
                             role: "primary"
@@ -237,7 +234,7 @@ Rectangle {
                             key: "suspend",
                             label: "sleep",
                             sub: "",
-                            icon: Theme.iconSuspend ?? "󰤄",
+                            icon: Theme.iconSuspend,
                             span: 1,
                             confirm: false,
                             role: "primary"
@@ -246,7 +243,7 @@ Rectangle {
                             key: "logout",
                             label: "log out",
                             sub: "",
-                            icon: Theme.iconLogout ?? "󰍃",
+                            icon: Theme.iconLogout,
                             span: 1,
                             // confirm logout too so one slip of the mouse doesn't vaporize unsaved work
                             confirm: true,
@@ -256,7 +253,7 @@ Rectangle {
                             key: "reboot",
                             label: "restart",
                             sub: "",
-                            icon: Theme.iconReboot ?? "󰑐",
+                            icon: Theme.iconReboot,
                             span: 1,
                             confirm: true,
                             role: "warn"
@@ -264,8 +261,8 @@ Rectangle {
                         {
                             key: "poweroff",
                             label: "shut down",
-                            sub: Theme.getVibe(Theme.kaoSleepy + " goodnight", "power off machine", "power off machine"),
-                            icon: Theme.iconPower ?? "󰐥",
+                            sub: "power off machine",
+                            icon: Theme.iconPower,
                             span: 2,
                             confirm: true,
                             role: "error"
@@ -313,10 +310,9 @@ Rectangle {
                             anchors.centerIn: parent
                             spacing: 4
 
-                            Text {
-                                text: actionCard.modelData.icon
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.fontSizeTitle
+                            Icon {
+                                source: actionCard.modelData.icon
+                                size: Theme.fontSizeTitle
                                 color: actionCard.isConfirming ? actionCard.confirmFg : actionCard.accentColor
                                 Layout.alignment: Qt.AlignHCenter
                             }
@@ -339,10 +335,9 @@ Rectangle {
                             anchors.centerIn: parent
                             spacing: 10
 
-                            Text {
-                                text: actionCard.modelData.icon
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.fontSizeTitle + 2
+                            Icon {
+                                source: actionCard.modelData.icon
+                                size: Theme.fontSizeTitle + 2
                                 color: actionCard.isConfirming ? actionCard.confirmFg : actionCard.accentColor
                             }
 

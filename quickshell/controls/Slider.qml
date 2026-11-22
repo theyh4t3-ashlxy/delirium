@@ -51,11 +51,10 @@ Item {
             visible: root.label !== "" || root.showValue
             spacing: 6
 
-            Text {
+            Icon {
                 visible: root.icon !== ""
-                text: root.icon
-                font.family: Theme.fontIcon
-                font.pixelSize: Theme.fontSizeSm
+                source: root.icon
+                size: Theme.fontSizeSm
                 color: Theme.on_surface_variant
             }
 

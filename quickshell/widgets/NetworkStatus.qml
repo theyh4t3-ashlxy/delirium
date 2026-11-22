@@ -100,14 +100,24 @@ Rectangle {
     }
 
     function getConnectionText() {
-        if (!NetworkService.isConnected) return Theme.getFlavor("network_off", "disconnected • offline");
-        if (NetworkService.isWiredConnected) return Theme.getFlavor("network_on", "wired ethernet • link up");
+        if (!NetworkService.isConnected) {
+            return Theme.getStatusFlavor
+                ? Theme.getStatusFlavor("network_off", "disconnected • offline")
+                : (Theme.getFlavor ? Theme.getFlavor("network_off", "disconnected • offline") : "disconnected • offline");
+        }
+        if (NetworkService.isWiredConnected) {
+            return Theme.getStatusFlavor
+                ? Theme.getStatusFlavor("network_on", "wired ethernet • link up")
+                : (Theme.getFlavor ? Theme.getFlavor("network_on", "wired ethernet • link up") : "wired ethernet • link up");
+        }
 
         let txt = "connected • " + root.activeSignalPct + "% signal";
         if (NetworkService.rawActiveSsid && NetworkService.rawActiveSsid !== NetworkService.activeSsid) {
             txt += " (" + NetworkService.rawActiveSsid.toLowerCase() + ")";
         }
-        return Theme.getFlavor("network_on", txt);
+        return Theme.getStatusFlavor
+            ? Theme.getStatusFlavor("network_on", txt)
+            : (Theme.getFlavor ? Theme.getFlavor("network_on", txt) : txt);
     }
 
     function toSignalPct(sig) {
@@ -120,11 +130,10 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 6
 
-        Text {
+        Icon {
             anchors.verticalCenter: parent.verticalCenter
-            text: root.netIcon
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+            source: root.netIcon
+            size: Theme.fontSizeSm
             color: !NetworkService.isConnected
                 ? Theme.on_surface_variant
                 : (popup.open || netMouse.containsMouse ? Theme.primary : Theme.on_surface)
@@ -214,11 +223,10 @@ Rectangle {
 
                     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: root.netIcon
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                        source: root.netIcon
+                        size: Theme.fontSizeLg
                         color: NetworkService.isConnected ? Theme.primary : Theme.on_surface_variant
                     }
                 }
@@ -312,13 +320,12 @@ Rectangle {
                         border.color: NetworkService.isConnected ? Theme.alpha(Theme.primary, 0.45) : Theme.widgetBorder
                         border.width: 1
 
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: NetworkService.isWiredConnected
+                            source: NetworkService.isWiredConnected
                                 ? Theme.iconEthernet
                                 : (NetworkService.isWifiConnected ? Theme.iconWifiHigh : Theme.iconWifiOff)
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
+                            size: Theme.fontSizeMd
                             color: NetworkService.isConnected ? Theme.primary : Theme.on_surface_variant
                         }
                     }
@@ -496,10 +503,9 @@ Rectangle {
                         Layout.fillWidth: true
                         spacing: 6
 
-                        Text {
-                            text: Theme.iconWifi
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+                        Icon {
+                            source: Theme.iconWifi
+                            size: Theme.fontSizeSm
                             color: Theme.primary
                         }
 
@@ -530,11 +536,10 @@ Rectangle {
                                 anchors.centerIn: parent
                                 spacing: 4
 
-                                Text {
+                                Icon {
                                     visible: !Theme.isTextIconSet
-                                    text: Theme.iconRefresh
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeXs
+                                    source: Theme.iconRefresh
+                                    size: Theme.fontSizeXs
                                     color: rescanMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
                                 }
 
@@ -571,11 +576,10 @@ Rectangle {
                                 anchors.centerIn: parent
                                 spacing: 4
 
-                                Text {
+                                Icon {
                                     visible: !Theme.isTextIconSet
-                                    text: Theme.iconTerminal
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeXs
+                                    source: Theme.iconTerminal
+                                    size: Theme.fontSizeXs
                                     color: nmtuiMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
                                 }
 
@@ -675,11 +679,10 @@ Rectangle {
                                         border.color: netItem.isItemConnected ? Theme.alpha(Theme.primary, 0.45) : Theme.widgetBorder
                                         border.width: 1
 
-                                        Text {
+                                        Icon {
                                             anchors.centerIn: parent
-                                            text: Theme.getWifiIcon(netItem.sigPct, true, false)
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
+                                            source: Theme.getWifiIcon(netItem.sigPct, true, false)
+                                            size: Theme.fontSizeMd
                                             color: netItem.isItemConnected ? Theme.primary : Theme.on_surface_variant
                                         }
                                     }
@@ -716,10 +719,9 @@ Rectangle {
                                                 visible: netItem.isSecured && !netItem.isItemConnected
                                             }
 
-                                            Text {
-                                                text: Theme.iconLock
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.fontSizeXs
+                                            Icon {
+                                                source: Theme.iconLock
+                                                size: Theme.fontSizeXs
                                                 color: Theme.on_surface_variant
                                                 visible: netItem.isSecured && !netItem.isItemConnected && !Theme.isTextIconSet
                                             }
@@ -854,11 +856,10 @@ Rectangle {
                                 border.color: Theme.widgetBorder
                                 border.width: 1
 
-                                Text {
+                                Icon {
                                     anchors.centerIn: parent
-                                    text: !NetworkService.wifiEnabled ? Theme.iconWifiOff : Theme.iconWifi
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
+                                    source: !NetworkService.wifiEnabled ? Theme.iconWifiOff : Theme.iconWifi
+                                    size: Theme.fontSizeTitle
                                     color: Theme.on_surface_variant
                                 }
                             }

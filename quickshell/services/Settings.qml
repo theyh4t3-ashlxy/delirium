@@ -256,9 +256,10 @@ QtObject {
     property bool _initialized: false
     property bool _loading: false
     property bool _isSaving: false
+    property string _rawConfText: ""
 
     property Timer autoSaveTimer: Timer {
-        interval: 80
+        interval: 200
         repeat: false
         onTriggered: {
             if (root._initialized && !root._loading) {
@@ -617,7 +618,10 @@ QtObject {
         { key: "launcherCustomCategories", type: "json", def: [] },
         { key: "adaptiveTransparency", type: "bool", def: true },
         { key: "dynamicNotchFlared", type: "bool", def: true },
-        { key: "notchFlareRadius", type: "int", def: 16 }
+        { key: "notchFlareRadius", type: "int", def: 16 },
+        { key: "globalRounding", type: "int", def: 24 },
+        { key: "showShellTab", type: "bool", def: true },
+        { key: "hasCompletedWelcome", type: "bool", def: false }
     ]
 
     function loadObject(data) {
@@ -725,6 +729,7 @@ QtObject {
     }
 
     function loadConf(str) {
+        root._rawConfText = str;
         let lines = str.split("\n");
         let data = {};
         for (let i = 0; i < lines.length; i++) {
@@ -855,25 +860,100 @@ QtObject {
     }
 
     function toConf() {
-        let lines = [];
+        let baseText = (root._rawConfText && root._rawConfText.trim() !== "")
+            ? root._rawConfText
+            : ((confFile && confFile.text() && confFile.text().trim() !== "") ? confFile.text() : fallbackConfFile.text());
+
+        let schemaMap = Object.create(null);
         for (let i = 0; i < _schema.length; i++) {
-            let item = _schema[i];
-            let val = root[item.key] !== undefined ? root[item.key] : item.def;
+            schemaMap[_schema[i].key] = _schema[i];
+        }
+
+        function formatValue(item, val) {
             if (item.type === "string") {
-                lines.push(item.key + '="' + val + '"');
+                return item.key + '="' + val + '"';
             } else if (item.type === "json") {
-                lines.push(item.key + "='" + JSON.stringify(val ?? item.def) + "'");
+                return item.key + "='" + JSON.stringify(val ?? item.def) + "'";
             } else {
-                lines.push(item.key + "=" + val);
+                return item.key + "=" + val;
             }
         }
-        lines.push("hasCompletedWelcome=" + (root.hasCompletedWelcome ? "true" : "false"));
-        return lines.join("\n");
+
+        function getTrailingComment(str) {
+            let inDouble = false;
+            let inSingle = false;
+            for (let j = 0; j < str.length; j++) {
+                let c = str[j];
+                let prev = j > 0 ? str[j - 1] : "";
+                if (c === '"' && !inSingle && prev !== "\\") {
+                    inDouble = !inDouble;
+                } else if (c === "'" && !inDouble && prev !== "\\") {
+                    inSingle = !inSingle;
+                } else if (c === "#" && !inDouble && !inSingle) {
+                    let k = j;
+                    while (k > 0 && (str[k - 1] === " " || str[k - 1] === "\t")) {
+                        k--;
+                    }
+                    return str.substring(k).replace(/\s+$/, "");
+                }
+            }
+            return "";
+        }
+
+        let lines = [];
+        let emittedKeys = Object.create(null);
+
+        if (baseText && baseText.trim() !== "") {
+            let rawLines = baseText.split("\n");
+            if (rawLines.length > 0 && rawLines[rawLines.length - 1] === "") {
+                rawLines.pop();
+            }
+            for (let i = 0; i < rawLines.length; i++) {
+                let line = rawLines[i];
+                let trimmed = line.trim();
+                if (trimmed === "" || trimmed.startsWith("#")) {
+                    lines.push(line);
+                    continue;
+                }
+                let eqIdx = trimmed.indexOf("=");
+                if (eqIdx !== -1) {
+                    let key = trimmed.substring(0, eqIdx).trim();
+                    if (schemaMap[key] && schemaMap[key].key === key) {
+                        let item = schemaMap[key];
+                        let val = root[item.key] !== undefined ? root[item.key] : item.def;
+                        let comment = getTrailingComment(line);
+                        lines.push(formatValue(item, val) + comment);
+                        emittedKeys[key] = true;
+                    } else {
+                        lines.push(line);
+                        emittedKeys[key] = true;
+                    }
+                } else {
+                    lines.push(line);
+                }
+            }
+        }
+
+        for (let i = 0; i < _schema.length; i++) {
+            let item = _schema[i];
+            if (!emittedKeys[item.key]) {
+                let val = root[item.key] !== undefined ? root[item.key] : item.def;
+                lines.push(formatValue(item, val));
+                emittedKeys[item.key] = true;
+            }
+        }
+
+        let result = lines.join("\n");
+        if (!result.endsWith("\n")) {
+            result += "\n";
+        }
+        return result;
     }
 
     function save() {
         root._isSaving = true;
         let confStr = toConf();
+        root._rawConfText = confStr;
         confFile.setText(confStr);
         resetSavingTimer.restart();
     }

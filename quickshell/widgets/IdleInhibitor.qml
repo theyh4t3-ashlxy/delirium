@@ -31,11 +31,10 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 4
 
-        Text {
+        Icon {
             anchors.verticalCenter: parent.verticalCenter
-            text: Theme.iconCoffee
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.fontSizeMd
+            source: Theme.iconCoffee
+            size: Theme.fontSizeMd
             color: cafRoot.active ? Theme.primary : Theme.on_surface
         }
     }

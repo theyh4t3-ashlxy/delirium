@@ -90,11 +90,10 @@ Item {
             anchors.rightMargin: 10
             spacing: 6
 
-            Text {
+            Icon {
                 visible: root.icon !== ""
-                text: root.icon
-                font.family: Theme.fontIcon
-                font.pixelSize: Theme.fontSizeSm
+                source: root.icon
+                size: Theme.fontSizeSm
                 color: root.expanded ? root.accentColor : Theme.on_surface_variant
             }
 
@@ -122,10 +121,9 @@ Item {
                 elide: Text.ElideRight
             }
 
-            Text {
-                text: Theme.iconChevronDown
-                font.family: Theme.fontIcon
-                font.pixelSize: Theme.fontSizeXs
+            Icon {
+                source: Theme.iconChevronDown
+                size: Theme.fontSizeXs
                 color: root.expanded ? root.accentColor : Theme.on_surface_variant
                 rotation: root.expanded ? 180 : 0
 
@@ -207,11 +205,10 @@ Item {
                             anchors.rightMargin: 8
                             spacing: 6
 
-                            Text {
+                            Icon {
                                 visible: itemDelegate.itemIcon !== ""
-                                text: itemDelegate.itemIcon
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.fontSizeSm
+                                source: itemDelegate.itemIcon
+                                size: Theme.fontSizeSm
                                 color: itemDelegate.isSelected ? Theme.on_primary_container : Theme.on_surface_variant
                             }
 
@@ -225,11 +222,10 @@ Item {
                                 elide: Text.ElideRight
                             }
 
-                            Text {
+                            Icon {
                                 visible: itemDelegate.isSelected
-                                text: Theme.iconCheck
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.fontSizeXs
+                                source: Theme.iconCheck
+                                size: Theme.fontSizeXs
                                 color: Theme.on_primary_container
                             }
                         }

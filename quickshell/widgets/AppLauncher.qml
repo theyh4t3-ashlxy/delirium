@@ -40,9 +40,17 @@ PopupPanel {
     property bool launcherWide: false
 
     readonly property string homeDir: Quickshell.env("HOME") || ""
+    readonly property string stateDir: {
+        let xdgState = Quickshell.env("XDG_STATE_HOME");
+        if (xdgState && xdgState.trim() !== "") return xdgState.trim() + "/quickshell";
+        return homeDir ? (homeDir + "/.local/state/quickshell") : "/tmp/quickshell-state";
+    }
     readonly property string configDir: Quickshell.env("XDG_CONFIG_HOME") || (homeDir + "/.config")
-    readonly property string pinnedStatePath: configDir + "/quickshell/pinned_apps"
-    readonly property string launcherStatePath: configDir + "/quickshell/launcher_state.json"
+    readonly property string pinnedStatePath: stateDir + "/pinned_apps"
+    readonly property string launcherStatePath: stateDir + "/launcher_state.conf"
+    readonly property string legacyStatePath: stateDir + "/launcher_state.json"
+    readonly property string legacyConfigStatePath: configDir + "/quickshell/launcher_state.json"
+    readonly property string legacyPinnedStatePath: configDir + "/quickshell/pinned_apps"
     readonly property string userShell: Quickshell.env("SHELL") || "zsh"
     readonly property string userTerminal: Quickshell.env("TERMINAL") || ""
 
@@ -58,6 +66,30 @@ PopupPanel {
     }
 
     FileView {
+        id: legacyPinnedFile
+        path: root.legacyPinnedStatePath
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
+
+    FileView {
+        id: legacyStateFile
+        path: root.legacyStatePath
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
+
+    FileView {
+        id: legacyConfigStateFile
+        path: root.legacyConfigStatePath
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
+
+    FileView {
         id: pinnedFile
         path: root.pinnedStatePath
         blockLoading: false
@@ -65,8 +97,23 @@ PopupPanel {
         printErrors: false
         onLoaded: {
             let raw = text();
-            if (!raw || raw.trim() === "") return;
+            if (!raw || raw.trim() === "") {
+                let leg = legacyPinnedFile.text();
+                if (leg && leg.trim() !== "") {
+                    root.pinnedApps = leg.trim().split("\n").map(s => s.trim().toLowerCase()).filter(Boolean);
+                    pinnedFile.setText(leg.trim() + "\n");
+                    return;
+                }
+                return;
+            }
             root.pinnedApps = raw.trim().split("\n").map(s => s.trim().toLowerCase()).filter(Boolean);
+        }
+        onLoadFailed: {
+            let leg = legacyPinnedFile.text();
+            if (leg && leg.trim() !== "") {
+                root.pinnedApps = leg.trim().split("\n").map(s => s.trim().toLowerCase()).filter(Boolean);
+                pinnedFile.setText(leg.trim() + "\n");
+            }
         }
     }
 
@@ -80,19 +127,55 @@ PopupPanel {
             if (!root.stateLoaded) root.loadLauncherState();
         }
         onLoadFailed: {
-            root.stateLoaded = true;
+            if (!root.stateLoaded) root.loadLauncherState();
         }
     }
 
-    function loadLauncherState() {
-        let raw = launcherStateFile.text();
-        if (!raw || raw.trim() === "") {
-            root.stateLoaded = true;
-            return;
+    function parseKeyValueText(raw: string) {
+        let lines = raw.split("\n");
+        let usage = {};
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (!line || line.startsWith("#")) continue;
+            let eqIdx = line.startsWith("usage.") ? line.lastIndexOf("=") : line.indexOf("=");
+            if (eqIdx === -1) continue;
+            let key = line.substring(0, eqIdx).trim();
+            let val = line.substring(eqIdx + 1).trim();
+            if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                val = val.substring(1, val.length - 1);
+            }
+
+            if (key === "gridViewMode") root.gridViewMode = (val === "true");
+            else if (key === "sortMode" && ["smart", "recent", "alpha"].includes(val)) root.sortMode = val;
+            else if (key === "textCase" && ["lower", "normal", "upper"].includes(val)) root.textCase = val;
+            else if (key === "subtitleMode" && ["desc", "exec", "hide"].includes(val)) root.subtitleMode = val;
+            else if (key === "rowDensity" && ["compact", "cozy", "roomy"].includes(val)) root.rowDensity = val;
+            else if (key === "gridColumns") { let n = parseInt(val); if ([3, 4, 5].includes(n)) root.gridColumns = n; }
+            else if (key === "autoDesktopCats") root.autoDesktopCats = (val === "true");
+            else if (key === "showUsageBadges") root.showUsageBadges = (val === "true");
+            else if (key === "launcherWide") root.launcherWide = (val === "true");
+            else if (key.startsWith("usage.")) {
+                let id = key.substring(6);
+                let parts = val.split(",");
+                usage[id] = {
+                    count: parseInt(parts[0]) || 0,
+                    lastUsed: parseInt(parts[1]) || 0
+                };
+            }
         }
+        root.usageMap = usage;
+    }
+
+    function tryMigrateLegacyJson(): bool {
+        let legacyRaw = legacyStateFile.text();
+        if (!legacyRaw || legacyRaw.trim() === "") {
+            legacyRaw = legacyConfigStateFile.text();
+        }
+        if (!legacyRaw || legacyRaw.trim() === "") return false;
+
         try {
-            let data = JSON.parse(raw);
-            if (data) {
+            let data = JSON.parse(legacyRaw);
+            if (data && typeof data === "object") {
                 if (typeof data.gridViewMode === "boolean") root.gridViewMode = data.gridViewMode;
                 if (["smart", "recent", "alpha"].includes(data.sortMode)) root.sortMode = data.sortMode;
                 if (["lower", "normal", "upper"].includes(data.textCase)) root.textCase = data.textCase;
@@ -103,30 +186,54 @@ PopupPanel {
                 if (typeof data.showUsageBadges === "boolean") root.showUsageBadges = data.showUsageBadges;
                 if (typeof data.launcherWide === "boolean") root.launcherWide = data.launcherWide;
                 if (data.usage && typeof data.usage === "object") root.usageMap = data.usage;
+                saveLauncherState();
+                return true;
             }
         } catch (e) {}
+        return false;
+    }
+
+    function loadLauncherState() {
+        let raw = launcherStateFile.text();
+        if (raw && raw.trim() !== "") {
+            parseKeyValueText(raw);
+            root.stateLoaded = true;
+            return;
+        }
+        tryMigrateLegacyJson();
         root.stateLoaded = true;
     }
 
     function saveLauncherState() {
-        let payload = {
-            gridViewMode: root.gridViewMode,
-            sortMode: root.sortMode,
-            textCase: root.textCase,
-            subtitleMode: root.subtitleMode,
-            rowDensity: root.rowDensity,
-            gridColumns: root.gridColumns,
-            autoDesktopCats: root.autoDesktopCats,
-            showUsageBadges: root.showUsageBadges,
-            launcherWide: root.launcherWide,
-            usage: root.usageMap
-        };
-        launcherStateFile.setText(JSON.stringify(payload, null, 2) + "\n");
+        let lines = [
+            "# Quickshell App Launcher State & Preferences",
+            "gridViewMode=" + root.gridViewMode,
+            'sortMode="' + root.sortMode + '"',
+            'textCase="' + root.textCase + '"',
+            'subtitleMode="' + root.subtitleMode + '"',
+            'rowDensity="' + root.rowDensity + '"',
+            "gridColumns=" + root.gridColumns,
+            "autoDesktopCats=" + root.autoDesktopCats,
+            "showUsageBadges=" + root.showUsageBadges,
+            "launcherWide=" + root.launcherWide,
+            "",
+            "# App Usage Statistics: usage.<appKey>=<count>,<lastUsed>"
+        ];
+
+        let keys = Object.keys(root.usageMap || {}).sort();
+        for (let i = 0; i < keys.length; i++) {
+            let k = keys[i];
+            let entry = root.usageMap[k];
+            if (entry && (entry.count > 0 || entry.lastUsed > 0)) {
+                lines.push("usage." + k + "=" + (entry.count || 0) + "," + (entry.lastUsed || 0));
+            }
+        }
+        launcherStateFile.setText(lines.join("\n") + "\n");
     }
 
     function appKey(app): string {
         if (!app) return "";
-        return ((app.id || app.name) || "").trim().toLowerCase();
+        return ((app.id || app.name) || "").trim().toLowerCase().replace(/=/g, "_");
     }
 
     function recordAppLaunch(app) {
@@ -269,20 +376,20 @@ PopupPanel {
     }
 
     readonly property var availableIcons: [
-        { key: "terminal", icon: Theme?.iconTerminal ?? "󰆍", label: "dev" },
-        { key: "globe",    icon: Theme?.iconGlobe ?? "󰖟",    label: "web" },
-        { key: "music",    icon: Theme?.iconMusic ?? "󰝚",    label: "media" },
-        { key: "flame",    icon: Theme?.iconFlame ?? "󰈸",    label: "games" },
-        { key: "folder",   icon: Theme?.iconFolder ?? "󰉋",   label: "files" },
-        { key: "settings", icon: Theme?.iconSettings ?? "󰒓", label: "sys" },
-        { key: "heart",    icon: Theme?.iconHeart ?? "󰋑",    label: "fav" },
-        { key: "sparkles", icon: Theme?.iconSparkles ?? "󰓏", label: "cool" },
-        { key: "palette",  icon: Theme?.iconPalette ?? "󰏘",  label: "art" },
-        { key: "sliders",  icon: Theme?.iconSliders ?? "󰔡",  label: "tools" }
+        { key: "terminal", icon: Theme?.iconTerminal ?? "utilities-terminal", label: "dev" },
+        { key: "globe",    icon: Theme?.iconGlobe ?? "applications-internet", label: "web" },
+        { key: "music",    icon: Theme?.iconMusic ?? "audio-x-generic", label: "media" },
+        { key: "flame",    icon: Theme?.iconFlame ?? "dialog-warning", label: "games" },
+        { key: "folder",   icon: Theme?.iconFolder ?? "folder", label: "files" },
+        { key: "settings", icon: Theme?.iconSettings ?? "preferences-system", label: "sys" },
+        { key: "heart",    icon: Theme?.iconHeart ?? "emblem-favorite", label: "fav" },
+        { key: "sparkles", icon: Theme?.iconSparkles ?? "applications-other", label: "cool" },
+        { key: "palette",  icon: Theme?.iconPalette ?? "preferences-desktop-theme", label: "art" },
+        { key: "sliders",  icon: Theme?.iconSliders ?? "preferences-other", label: "tools" }
     ]
 
     function resolveCategoryIcon(iconKey) {
-        if (!iconKey) return Theme?.iconFolder ?? "󰉋";
+        if (!iconKey) return Theme?.iconFolder ?? "folder";
         for (let i = 0; i < availableIcons.length; i++) {
             if (availableIcons[i].key === iconKey) return availableIcons[i].icon;
         }
@@ -309,12 +416,12 @@ PopupPanel {
     }
 
     readonly property var categoryList: {
-        let list = [{ id: "all", label: fmtText("all"), icon: Theme?.iconGrid ?? "󰕰" }];
+        let list = [{ id: "all", label: fmtText("all"), icon: Theme?.iconGrid ?? "view-grid" }];
         if (root.pinnedApps.length > 0) {
             list.push({ id: "pinned", label: fmtText("pinned"), icon: Theme?.iconHeart ?? "♥" });
         }
         if ((Hyprland?.toplevels?.values?.length ?? 0) > 0) {
-            list.push({ id: "windows", label: fmtText("win"), icon: Theme?.iconWorkspaces ?? "󱂬" });
+            list.push({ id: "windows", label: fmtText("win"), icon: Theme?.iconWorkspaces ?? "view-paged" });
         }
         let custom = Settings?.launcherCustomCategories ?? [];
         if (Array.isArray(custom)) {
@@ -660,25 +767,29 @@ PopupPanel {
 
                         Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: root.isCommand
+                            visible: root.calcResult === null
+                            source: root.isCommand
                                 ? Theme.iconTerminal
-                                : (root.calcResult !== null
-                                    ? "="
-                                    : (root.isWindowMode
-                                        ? Theme.iconWorkspaces
-                                        : (root.isActionMode
-                                            ? Theme.iconFlame
-                                            : (root.isWebSearch ? Theme.iconGlobe : Theme.iconSearch))))
-                            font.family: root.calcResult !== null ? Theme.fontMono : Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeMd
-                            font.weight: Theme.fontWeightBold
+                                : (root.isWindowMode
+                                    ? Theme.iconWorkspaces
+                                    : (root.isActionMode
+                                        ? Theme.iconFlame
+                                        : (root.isWebSearch ? Theme.iconGlobe : Theme.iconSearch)))
+                            size: Theme.fontSizeMd
                             color: root.isCommand
                                 ? Theme.tertiary
-                                : (searchInput.activeFocus || root.calcResult !== null ? Theme.primary : Theme.textSecondary)
-
-                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                                : (searchInput.activeFocus ? Theme.primary : Theme.textSecondary)
+                        }
+                        Text {
+                            anchors.centerIn: parent
+                            visible: root.calcResult !== null
+                            text: "="
+                            font.family: Theme.fontMono
+                            font.pixelSize: Theme.fontSizeMd
+                            font.weight: Theme.fontWeightBold
+                            color: Theme.primary
                         }
                     }
 
@@ -874,11 +985,10 @@ PopupPanel {
                         Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: root.gridViewMode ? Theme.iconClipboard : Theme.iconGrid
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeSm
+                            source: root.gridViewMode ? Theme.iconClipboard : Theme.iconGrid
+                            size: Theme.fontSizeSm
                             color: root.gridViewMode ? Theme.primary : Theme.textSecondary
                         }
 
@@ -909,11 +1019,10 @@ PopupPanel {
                         border.color: root.showLauncherStudio ? Theme.alpha(Theme.primary, 0.5) : Theme.widgetBorder
                         border.width: 1
 
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: Theme.iconSliders
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeSm
+                            source: Theme.iconSliders
+                            size: Theme.fontSizeSm
                             color: root.showLauncherStudio ? Theme.primary : Theme.textSecondary
                         }
 
@@ -1276,10 +1385,9 @@ PopupPanel {
                                     id: chipLayout
                                     anchors.centerIn: parent
                                     spacing: 5
-                                    Text {
-                                        text: modelData.icon
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeXs
+                                    Icon {
+                                        source: modelData.icon
+                                        size: Theme.fontSizeXs
                                         color: isSelected ? Theme.primary : Theme.textSecondary
                                     }
                                     Text {
@@ -1455,12 +1563,20 @@ PopupPanel {
                         border.color: Theme.alpha(root.isWebSearch ? Theme.primary : Theme.tertiary, 0.45)
                         border.width: 1
 
+                        Icon {
+                            visible: root.isWebSearch
+                            source: Theme.iconGlobe
+                            size: Theme.fontSizeSm
+                            color: Theme.primary
+                            anchors.centerIn: parent
+                        }
                         Text {
-                            text: root.isWebSearch ? Theme.iconGlobe : ">_"
-                            font.family: root.isWebSearch ? Theme.fontIcon : Theme.fontMono
+                            visible: !root.isWebSearch
+                            text: ">_"
+                            font.family: Theme.fontMono
                             font.pixelSize: Theme.fontSizeSm
                             font.weight: Theme.fontWeightBold
-                            color: root.isWebSearch ? Theme.primary : Theme.tertiary
+                            color: Theme.tertiary
                             anchors.centerIn: parent
                         }
                     }
@@ -1557,11 +1673,10 @@ PopupPanel {
                                 radius: Theme.radiusSm
                                 color: Theme.primary_overlay
 
-                                Text {
+                                Icon {
                                     anchors.centerIn: parent
-                                    text: modelData.icon
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeMd
+                                    source: modelData.icon
+                                    size: Theme.fontSizeMd
                                     color: Theme.primary
                                 }
                             }
@@ -1869,11 +1984,10 @@ PopupPanel {
                                 radius: Theme.radiusPill
                                 color: pinMouse.containsMouse ? Theme.primary_overlay : "transparent"
 
-                                Text {
+                                Icon {
                                     anchors.centerIn: parent
-                                    text: Theme.iconHeart
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeXs
+                                    source: Theme.iconHeart
+                                    size: Theme.fontSizeXs
                                     color: appDelegate.isPinned ? Theme.primary : Theme.textSecondary
                                     opacity: appDelegate.isPinned ? 1.0 : 0.55
                                 }
@@ -2020,14 +2134,13 @@ PopupPanel {
                             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                             Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                            Text {
+                            Icon {
                                 visible: gridCell.isPinned
                                 anchors.top: parent.top
                                 anchors.right: parent.right
                                 anchors.margins: 6
-                                text: Theme.iconHeart
-                                font.family: Theme.fontIcon
-                                font.pixelSize: 9
+                                source: Theme.iconHeart
+                                size: 9
                                 color: Theme.primary
                             }
 
@@ -2128,9 +2241,17 @@ PopupPanel {
                         spacing: 8
 
                         Text {
-                            text: Theme.iconSet === "kaomoji" ? Theme.kaoShrug : Theme.iconSearch
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeLg : Theme.fontSizeTitle
+                            visible: Theme.iconSet === "kaomoji"
+                            text: Theme.kaoShrug
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeTitle
+                            color: Theme.textSecondary
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+                        Icon {
+                            visible: Theme.iconSet !== "kaomoji"
+                            source: Theme.iconSearch
+                            size: Theme.fontSizeTitle
                             color: Theme.textSecondary
                             Layout.alignment: Qt.AlignHCenter
                         }
@@ -2216,11 +2337,10 @@ PopupPanel {
                         border.color: Theme.widgetBorder
                         border.width: 1
 
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: Theme.iconChevronLeft
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeSm
+                            source: Theme.iconChevronLeft
+                            size: Theme.fontSizeSm
                             color: Theme.textPrimary
                         }
 
@@ -2403,11 +2523,10 @@ PopupPanel {
                                             border.color: isCurrent ? Theme.primary : Theme.widgetBorder
                                             border.width: 1
 
-                                            Text {
+                                            Icon {
                                                 anchors.centerIn: parent
-                                                text: modelData.icon
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.fontSizeXs
+                                                source: modelData.icon
+                                                size: Theme.fontSizeXs
                                                 color: isCurrent ? Theme.primary : Theme.textSecondary
                                             }
 
@@ -2455,11 +2574,10 @@ PopupPanel {
                                     radius: Theme.radiusSm
                                     color: Theme.primary_overlay
 
-                                    Text {
+                                    Icon {
                                         anchors.centerIn: parent
-                                        text: root.resolveCategoryIcon(modelData.icon)
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeSm
+                                        source: root.resolveCategoryIcon(modelData.icon)
+                                        size: Theme.fontSizeSm
                                         color: Theme.primary
                                     }
                                 }
@@ -2548,10 +2666,9 @@ PopupPanel {
                             anchors.rightMargin: 12
                             spacing: 8
 
-                            Text {
-                                text: Theme.iconSearch
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.fontSizeSm
+                            Icon {
+                                source: Theme.iconSearch
+                                size: Theme.fontSizeSm
                                 color: catAppFilterInput.activeFocus ? Theme.primary : Theme.textSecondary
                             }
 
@@ -2659,13 +2776,11 @@ PopupPanel {
                                     border.color: isChecked ? Theme.primary : Theme.widgetBorder
                                     border.width: 1
 
-                                    Text {
+                                    Icon {
                                         anchors.centerIn: parent
                                         visible: isChecked
-                                        text: Theme.iconCheck
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Theme.fontWeightBold
+                                        source: Theme.iconCheck
+                                        size: Theme.fontSizeXs
                                         color: Theme.on_primary
                                     }
                                 }
@@ -2732,10 +2847,14 @@ PopupPanel {
                             radius: Theme.radiusMd
                             color: Theme.widgetBg
 
-                            IconImage {
+                            Loader {
                                 anchors.centerIn: parent
                                 width: 22; height: 22
-                                source: root.resolveIconSource(root.categoryAssignApp)
+                                active: Boolean(root.categoryAssignApp)
+                                sourceComponent: IconImage {
+                                    anchors.fill: parent
+                                    source: root.resolveIconSource(root.categoryAssignApp)
+                                }
                             }
                         }
 
@@ -2798,10 +2917,9 @@ PopupPanel {
                                 RowLayout {
                                     anchors.centerIn: parent
                                     spacing: 4
-                                    Text {
-                                        text: modelData.icon
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeXs
+                                    Icon {
+                                        source: modelData.icon
+                                        size: Theme.fontSizeXs
                                         color: Theme.primary
                                     }
                                     Text {
@@ -2870,10 +2988,9 @@ PopupPanel {
                                     anchors.rightMargin: 10
                                     spacing: 8
 
-                                    Text {
-                                        text: Theme.iconChevronRight
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeXs
+                                    Icon {
+                                        source: Theme.iconChevronRight
+                                        size: Theme.fontSizeXs
                                         color: Theme.primary
                                     }
 
@@ -2959,10 +3076,9 @@ PopupPanel {
                                 anchors.margins: 8
                                 spacing: 8
 
-                                Text {
-                                    text: root.resolveCategoryIcon(modelData.icon)
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeSm
+                                Icon {
+                                    source: root.resolveCategoryIcon(modelData.icon)
+                                    size: Theme.fontSizeSm
                                     color: Theme.primary
                                 }
 
@@ -2983,13 +3099,11 @@ PopupPanel {
                                     border.color: isAssigned ? Theme.primary : Theme.widgetBorder
                                     border.width: 1
 
-                                    Text {
+                                    Icon {
                                         anchors.centerIn: parent
                                         visible: isAssigned
-                                        text: Theme.iconCheck
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Theme.fontWeightBold
+                                        source: Theme.iconCheck
+                                        size: Theme.fontSizeXs
                                         color: Theme.on_primary
                                     }
                                 }

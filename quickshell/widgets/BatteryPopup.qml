@@ -138,11 +138,10 @@ PopupPanel {
             anchors.centerIn: parent
             spacing: 5
 
-            Text {
+            Icon {
                 visible: pPill.icon !== ""
-                text: pPill.icon
-                font.family: Theme.fontIcon
-                font.pixelSize: Theme.fontSizeXs
+                source: pPill.icon
+                size: Theme.fontSizeXs
                 color: pPill.isCurrent ? Theme.primary : Theme.textSecondary
             }
 
@@ -184,11 +183,10 @@ PopupPanel {
                 border.color: Theme.alpha(root.batAccent, 0.4)
                 border.width: 1
 
-                Text {
+                Icon {
                     anchors.centerIn: parent
-                    text: Theme.getBatteryIcon(root.pct, root.isCharging, root.isSaver, false)
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeLg
+                    source: Theme.getBatteryIcon(root.pct, root.isCharging, root.isSaver, false)
+                    size: Theme.fontSizeLg
                     color: root.batAccent
                 }
             }
@@ -298,16 +296,24 @@ PopupPanel {
                             elide: Text.ElideRight
                             text: {
                                 if (root.isFull) {
-                                    return Theme.getFlavor("battery_full", "cells balanced and full");
+                                    return Theme.getStatusFlavor
+                                        ? Theme.getStatusFlavor("battery_full", "fully charged")
+                                        : (Theme.getFlavor ? Theme.getFlavor("battery_full", "fully charged") : "fully charged");
                                 }
                                 if (root.isCharging) {
                                     let sec = root.device?.timeToFull ?? root.physicalBattery?.timeToFull ?? 0;
                                     let fallback = sec > 0 ? (Theme.formatUptime(sec) + " until full") : "charging";
-                                    return Theme.getFlavor("battery_charging", fallback);
+                                    return Theme.getStatusFlavor
+                                        ? Theme.getStatusFlavor("battery_charging", fallback)
+                                        : (Theme.getFlavor ? Theme.getFlavor("battery_charging", fallback) : fallback);
                                 }
                                 let sec = root.device?.timeToEmpty ?? root.physicalBattery?.timeToEmpty ?? 0;
                                 let fallback = sec > 0 ? (Theme.formatUptime(sec) + " remaining") : "discharging";
-                                if (root.pct <= 20) return Theme.getFlavor("battery_low", fallback);
+                                if (root.pct <= 20) {
+                                    return Theme.getStatusFlavor
+                                        ? Theme.getStatusFlavor("battery_low", fallback)
+                                        : (Theme.getFlavor ? Theme.getFlavor("battery_low", fallback) : fallback);
+                                }
                                 return fallback;
                             }
                             font.family: Theme.fontFamily
@@ -416,10 +422,9 @@ PopupPanel {
                             Layout.alignment: Qt.AlignHCenter
                             spacing: 4
 
-                            Text {
-                                text: modelData.icon
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.fontSizeXs
+                            Icon {
+                                source: modelData.icon
+                                size: Theme.fontSizeXs
                                 color: Theme.primary
                             }
 
@@ -513,10 +518,9 @@ PopupPanel {
                 anchors.centerIn: parent
                 spacing: 6
 
-                Text {
-                    text: root.showDiagnostics ? Theme.iconChevronUp : Theme.iconChevronDown
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeXs
+                Icon {
+                    source: root.showDiagnostics ? Theme.iconChevronUp : Theme.iconChevronDown
+                    size: Theme.fontSizeXs
                     color: Theme.primary
                 }
 
@@ -573,10 +577,9 @@ PopupPanel {
                         anchors.centerIn: parent
                         spacing: 6
 
-                        Text {
-                            text: Theme.iconTerminal
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeSm
+                        Icon {
+                            source: Theme.iconTerminal
+                            size: Theme.fontSizeSm
                             color: Theme.primary
                         }
 
@@ -615,10 +618,9 @@ PopupPanel {
                         anchors.centerIn: parent
                         spacing: 6
 
-                        Text {
-                            text: Theme.iconCpu
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeSm
+                        Icon {
+                            source: Theme.iconCpu
+                            size: Theme.fontSizeSm
                             color: Theme.primary
                         }
 

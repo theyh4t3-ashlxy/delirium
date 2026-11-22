@@ -42,13 +42,35 @@ Rectangle {
     property int noteCharCount: 0
     property int noteLineCount: 1
 
-    readonly property string dataDir: (Quickshell.env("XDG_DATA_HOME") || ((Quickshell.env("HOME") || "") + "/.local/share")) + "/quickshell"
-    readonly property string notesFilePath: dataDir + "/notes.json"
-    readonly property string tasksFilePath: dataDir + "/tasks.json"
+    readonly property string homeDir: Quickshell.env("HOME") || ""
+    readonly property string stateDir: {
+        let xdgState = Quickshell.env("XDG_STATE_HOME");
+        if (xdgState && xdgState.trim() !== "") return xdgState.trim() + "/quickshell";
+        return homeDir ? (homeDir + "/.local/state/quickshell") : "/tmp/quickshell-state";
+    }
+    readonly property string notesFilePath: stateDir + "/notes.conf"
+    readonly property string tasksFilePath: stateDir + "/tasks.conf"
+    readonly property string legacyDataDir: (Quickshell.env("XDG_DATA_HOME") || (homeDir + "/.local/share")) + "/quickshell"
+    readonly property string legacyNotesFilePath: legacyDataDir + "/notes.json"
+    readonly property string legacyTasksFilePath: legacyDataDir + "/tasks.json"
 
     ListModel { id: notesModel }
     ListModel { id: tasksModel }
     ListModel { id: filteredTasksModel }
+
+    property FileView legacyNotesFile: FileView {
+        path: root.legacyNotesFilePath
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
+
+    property FileView legacyTasksFile: FileView {
+        path: root.legacyTasksFilePath
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
 
     property FileView notesFile: FileView {
         path: root.notesFilePath
@@ -59,7 +81,25 @@ Rectangle {
             reload();
             root.loadNotes(text());
         }
-        onLoaded: root.loadNotes(text())
+        onLoaded: {
+            let t = text();
+            if (!t || t.trim() === "") {
+                let leg = legacyNotesFile.text();
+                if (leg && leg.trim() !== "") {
+                    root.loadNotes(leg);
+                    return;
+                }
+            }
+            root.loadNotes(t);
+        }
+        onLoadFailed: {
+            let leg = legacyNotesFile.text();
+            if (leg && leg.trim() !== "") {
+                root.loadNotes(leg);
+            } else {
+                root.createDefaultNotes();
+            }
+        }
     }
 
     property FileView tasksFile: FileView {
@@ -71,7 +111,25 @@ Rectangle {
             reload();
             root.loadTasks(text());
         }
-        onLoaded: root.loadTasks(text())
+        onLoaded: {
+            let t = text();
+            if (!t || t.trim() === "") {
+                let leg = legacyTasksFile.text();
+                if (leg && leg.trim() !== "") {
+                    root.loadTasks(leg);
+                    return;
+                }
+            }
+            root.loadTasks(t);
+        }
+        onLoadFailed: {
+            let leg = legacyTasksFile.text();
+            if (leg && leg.trim() !== "") {
+                root.loadTasks(leg);
+            } else {
+                root.createDefaultTasks();
+            }
+        }
     }
 
     function isTargetMonitorActive() {
@@ -183,12 +241,57 @@ Rectangle {
                 createDefaultNotes();
                 return;
             }
-            let parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                for (let i = 0; i < parsed.length; i++) {
+            if (raw.trim().startsWith("[")) {
+                let parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    for (let i = 0; i < parsed.length; i++) {
+                        notesModel.append({
+                            title: parsed[i].title || ("note " + (i + 1)),
+                            content: parsed[i].content || ""
+                        });
+                    }
+                    if (root.activeIndex >= notesModel.count) {
+                        root.activeIndex = Math.max(0, notesModel.count - 1);
+                    }
+                    root.syncEditorFromModel();
+                    saveNotesNow();
+                    return;
+                }
+            }
+            let lines = raw.split("\n");
+            let notesMap = {};
+            let order = [];
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (!line || line.startsWith("#")) continue;
+                let eqIdx = line.indexOf("=");
+                if (eqIdx === -1) continue;
+                let k = line.substring(0, eqIdx).trim();
+                let v = line.substring(eqIdx + 1);
+                if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+                    v = v.substring(1, v.length - 1);
+                }
+                if (k.startsWith("note.")) {
+                    let parts = k.split(".");
+                    let noteId = parts[1];
+                    let field = parts[2];
+                    if (!notesMap[noteId]) {
+                        notesMap[noteId] = { id: noteId, title: "note " + noteId, content: "" };
+                        order.push(noteId);
+                    }
+                    if (field === "title") {
+                        notesMap[noteId].title = v;
+                    } else if (field === "content") {
+                        notesMap[noteId].content = v.replace(/\\([\\n])/g, function(_, ch) { return ch === "n" ? "\n" : "\\"; });
+                    }
+                }
+            }
+            if (order.length > 0) {
+                for (let j = 0; j < order.length; j++) {
+                    let n = notesMap[order[j]];
                     notesModel.append({
-                        title: parsed[i].title || ("note " + (i + 1)),
-                        content: parsed[i].content || ""
+                        title: n.title || ("note " + (j + 1)),
+                        content: n.content || ""
                     });
                 }
                 if (root.activeIndex >= notesModel.count) {
@@ -220,16 +323,21 @@ Rectangle {
 
     function saveNotesNow() {
         root.computeFullNoteStats(noteArea.text);
-        let arr = [];
+        let lines = [
+            "# Quickshell Notes",
+            "# Format: note.<id>.title=<title>, note.<id>.content=<content>",
+            ""
+        ];
         for (let i = 0; i < notesModel.count; i++) {
             let item = notesModel.get(i);
-            arr.push({
-                title: item.title,
-                content: item.content
-            });
+            let idx = i + 1;
+            let escTitle = item.title || ("note " + idx);
+            let escContent = (item.content || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n");
+            lines.push('note.' + idx + '.title="' + escTitle + '"');
+            lines.push('note.' + idx + '.content="' + escContent + '"');
         }
         root.isSavingNotes = true;
-        notesFile.setText(JSON.stringify(arr));
+        notesFile.setText(lines.join("\n") + "\n");
         writeGuardTimer.restart();
         root.savedFeedback = true;
         savedBadgeTimer.restart();
@@ -273,18 +381,51 @@ Rectangle {
                 createDefaultTasks();
                 return;
             }
-            let parsed = JSON.parse(raw);
-            let items = Array.isArray(parsed) ? parsed : (parsed.tasks || []);
-            if (Array.isArray(items) && items.length > 0) {
-                for (let i = 0; i < items.length; i++) {
-                    tasksModel.append({
-                        id: items[i].id || (Date.now() + i),
-                        text: items[i].text || "",
-                        done: Boolean(items[i].done),
-                        priority: items[i].priority || "normal",
-                        createdAt: items[i].createdAt || Date.now()
-                    });
+            if (raw.trim().startsWith("[") || raw.trim().startsWith("{")) {
+                let parsed = JSON.parse(raw);
+                let items = Array.isArray(parsed) ? parsed : (parsed.tasks || []);
+                if (Array.isArray(items) && items.length > 0) {
+                    for (let i = 0; i < items.length; i++) {
+                        tasksModel.append({
+                            id: items[i].id || (Date.now() + i),
+                            text: items[i].text || "",
+                            done: Boolean(items[i].done),
+                            priority: items[i].priority || "normal",
+                            createdAt: items[i].createdAt || Date.now()
+                        });
+                    }
+                    root.rebuildFilteredTasks();
+                    saveTasksNow();
+                    return;
                 }
+            }
+            let lines = raw.split("\n");
+            let count = 0;
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (!line || line.startsWith("#")) continue;
+                let eqIdx = line.indexOf("=");
+                if (eqIdx === -1) continue;
+                let k = line.substring(0, eqIdx).trim();
+                let v = line.substring(eqIdx + 1).trim();
+                if (k.startsWith("task.")) {
+                    let taskId = parseInt(k.substring(5)) || (Date.now() + i);
+                    let parts = v.split("|");
+                    let done = (parts[0] === "1" || parts[0] === "true" || parts[0] === "done");
+                    let priority = parts[1] || "normal";
+                    let createdAt = parseInt(parts[2]) || Date.now();
+                    let text = parts.slice(3).join("|").replace(/\\([\\n])/g, function(_, ch) { return ch === "n" ? "\n" : "\\"; });
+                    tasksModel.append({
+                        id: taskId,
+                        text: text,
+                        done: done,
+                        priority: priority,
+                        createdAt: createdAt
+                    });
+                    count++;
+                }
+            }
+            if (count > 0 || raw.includes("# Quickshell Tasks")) {
                 root.rebuildFilteredTasks();
             } else {
                 createDefaultTasks();
@@ -329,19 +470,21 @@ Rectangle {
     }
 
     function saveTasksNow() {
-        let arr = [];
+        let lines = [
+            "# Quickshell Tasks",
+            "# Format: task.<id>=<done>|<priority>|<createdAt>|<text>",
+            ""
+        ];
         for (let i = 0; i < tasksModel.count; i++) {
             let item = tasksModel.get(i);
-            arr.push({
-                id: item.id,
-                text: item.text,
-                done: item.done,
-                priority: item.priority,
-                createdAt: item.createdAt
-            });
+            let doneStr = item.done ? "1" : "0";
+            let priorityStr = item.priority || "normal";
+            let createdStr = item.createdAt || Date.now();
+            let textStr = (item.text || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n");
+            lines.push("task." + item.id + "=" + doneStr + "|" + priorityStr + "|" + createdStr + "|" + textStr);
         }
         root.isSavingTasks = true;
-        tasksFile.setText(JSON.stringify(arr));
+        tasksFile.setText(lines.join("\n") + "\n");
         writeGuardTimer.restart();
         root.savedFeedback = true;
         savedBadgeTimer.restart();
@@ -495,7 +638,7 @@ Rectangle {
             return "transparent";
         }
         border.color: {
-            if (mChip.selected) return mChip.danger ? (Theme.error ?? "#ff5449") : Theme.primary;
+            if (mChip.selected) return mChip.danger ? (Theme.error) : Theme.primary;
             if (mChipMouse.containsMouse) return Theme.outline;
             return Theme.outline_variant ?? Theme.widgetBorder;
         }
@@ -509,12 +652,11 @@ Rectangle {
             anchors.centerIn: parent
             spacing: 4
 
-            Text {
+            Icon {
                 visible: mChip.icon !== ""
-                text: mChip.icon
-                font.family: Theme.fontIcon
-                font.pixelSize: 10
-                color: mChip.danger ? (Theme.error ?? "#ff5449") : (mChip.selected ? Theme.primary : Theme.on_surface_variant)
+                source: mChip.icon
+                size: 10
+                color: mChip.danger ? (Theme.error) : (mChip.selected ? Theme.primary : Theme.on_surface_variant)
             }
 
             Text {
@@ -522,7 +664,7 @@ Rectangle {
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeXs
                 font.weight: mChip.selected ? Font.Bold : Font.Medium
-                color: mChip.danger ? (Theme.error ?? "#ff5449") : (mChip.selected ? Theme.primary : Theme.on_surface_variant)
+                color: mChip.danger ? (Theme.error) : (mChip.selected ? Theme.primary : Theme.on_surface_variant)
             }
         }
 
@@ -540,11 +682,10 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 5
 
-        Text {
+        Icon {
             anchors.verticalCenter: parent.verticalCenter
-            text: root.activeTab === "tasks" ? Theme.iconCheck : Theme.iconNote
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.fontSizeSm
+            source: root.activeTab === "tasks" ? Theme.iconCheck : Theme.iconNote
+            size: Theme.fontSizeSm
             color: popup.open || nMouse.containsMouse ? Theme.primary : Theme.on_surface
 
             Behavior on color { ColorAnimation { duration: Theme.animFast } }
@@ -700,11 +841,10 @@ Rectangle {
                     border.color: Theme.alpha(Theme.primary, 0.35)
                     border.width: 1
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: root.activeTab === "tasks" ? Theme.iconCheck : Theme.iconNote
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeLg
+                        source: root.activeTab === "tasks" ? Theme.iconCheck : Theme.iconNote
+                        size: Theme.fontSizeLg
                         color: Theme.primary
                     }
                 }
@@ -725,8 +865,10 @@ Rectangle {
                         text: {
                             if (root.copiedFeedback) return "copied to clipboard ✓";
                             if (!popup.pinned) return "preview mode • click to edit";
-                            if (root.activeTab === "tasks" && root.pendingTasksCount === 0 && Theme.getFlavor) {
-                                return Theme.getFlavor("notes_empty", "zero pending tasks · absolute zen");
+                            if (root.activeTab === "tasks" && root.pendingTasksCount === 0) {
+                                return Theme.getStatusFlavor
+                                    ? Theme.getStatusFlavor("notes_empty", "all tasks completed")
+                                    : (Theme.getFlavor ? Theme.getFlavor("notes_empty", "all tasks completed") : "all tasks completed");
                             }
                             return notesModel.count + (notesModel.count === 1 ? " note" : " notes")
                                 + "  •  " + root.pendingTasksCount + " pending " + (root.pendingTasksCount === 1 ? "task" : "tasks");
@@ -823,10 +965,9 @@ Rectangle {
                                 anchors.centerIn: parent
                                 spacing: 6
 
-                                Text {
-                                    text: modelData.icon
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeSm
+                                Icon {
+                                    source: modelData.icon
+                                    size: Theme.fontSizeSm
                                     color: isSelected ? Theme.primary : Theme.on_surface_variant
                                 }
 
@@ -934,13 +1075,12 @@ Rectangle {
                                             width: 16
                                             height: 16
                                             radius: 8
-                                            color: delTabMouse.containsMouse ? (Theme.error ?? "#ff5449") : Theme.alpha(Theme.primary, 0.2)
+                                            color: delTabMouse.containsMouse ? (Theme.error) : Theme.alpha(Theme.primary, 0.2)
 
-                                            Text {
+                                            Icon {
                                                 anchors.centerIn: parent
-                                                text: Theme.iconClose
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: 8
+                                                source: Theme.iconClose
+                                                size: 8
                                                 color: delTabMouse.containsMouse ? "#ffffff" : Theme.primary
                                             }
 
@@ -1011,10 +1151,9 @@ Rectangle {
                                 anchors.rightMargin: 10
                                 spacing: 6
 
-                                Text {
-                                    text: Theme.iconEdit
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeSm
+                                Icon {
+                                    source: Theme.iconEdit
+                                    size: Theme.fontSizeSm
                                     color: titleInput.activeFocus ? Theme.primary : Theme.on_surface_variant
                                 }
 
@@ -1154,9 +1293,7 @@ Rectangle {
                                         anchors.top: parent.top
                                         anchors.left: parent.left
                                         width: parent.width
-                                        text: Theme.getFlavor
-                                            ? Theme.getFlavor("notes_empty", "type notes, snippets, or markdown memos here...")
-                                            : "type notes, snippets, or markdown memos here..."
+                                        text: "type notes, snippets, or markdown memos here..."
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontSizeSm
                                         color: Theme.on_surface_disabled
@@ -1236,7 +1373,7 @@ Rectangle {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 10
                                     font.weight: Font.Medium
-                                    color: clearNoteMouse.containsMouse ? (Theme.error ?? "#ff5449") : Theme.on_surface_variant
+                                    color: clearNoteMouse.containsMouse ? (Theme.error) : Theme.on_surface_variant
 
                                     MouseArea {
                                         id: clearNoteMouse
@@ -1294,12 +1431,12 @@ Rectangle {
                             implicitWidth: prioComposerRow.implicitWidth + 14
                             radius: Theme.radiusPill
                             color: {
-                                if (root.newPriority === "urgent") return Theme.alpha(Theme.error ?? "#ff5449", 0.16);
+                                if (root.newPriority === "urgent") return Theme.alpha(Theme.error, 0.16);
                                 if (root.newPriority === "low") return Theme.surface_container_highest;
                                 return Theme.primary_overlay;
                             }
                             border.color: {
-                                if (root.newPriority === "urgent") return Theme.error ?? "#ff5449";
+                                if (root.newPriority === "urgent") return Theme.error;
                                 if (root.newPriority === "low") return Theme.outline_variant;
                                 return Theme.primary;
                             }
@@ -1315,7 +1452,7 @@ Rectangle {
                                     height: 6
                                     radius: 3
                                     color: {
-                                        if (root.newPriority === "urgent") return Theme.error ?? "#ff5449";
+                                        if (root.newPriority === "urgent") return Theme.error;
                                         if (root.newPriority === "low") return Theme.on_surface_variant;
                                         return Theme.primary;
                                     }
@@ -1327,7 +1464,7 @@ Rectangle {
                                     font.pixelSize: 10
                                     font.weight: Font.Bold
                                     color: {
-                                        if (root.newPriority === "urgent") return Theme.error ?? "#ff5449";
+                                        if (root.newPriority === "urgent") return Theme.error;
                                         if (root.newPriority === "low") return Theme.on_surface_variant;
                                         return Theme.primary;
                                     }
@@ -1487,7 +1624,7 @@ Rectangle {
 
                         Text {
                             text: root.pendingTasksCount === 0
-                                ? (Theme.getFlavor ? Theme.getFlavor("notes_empty", "zero pending tasks · absolute zen status") : "zero pending tasks · absolute zen status")
+                                ? (Theme.getStatusFlavor ? Theme.getStatusFlavor("notes_empty", "all tasks completed") : (Theme.getFlavor ? Theme.getFlavor("notes_empty", "all tasks completed") : "all tasks completed"))
                                 : "no tasks match this filter"
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeSm
@@ -1557,11 +1694,10 @@ Rectangle {
 
                                     Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
-                                    Text {
+                                    Icon {
                                         anchors.centerIn: parent
-                                        text: Theme.iconCheck
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: 11
+                                        source: Theme.iconCheck
+                                        size: 11
                                         color: Theme.on_primary
                                         visible: taskCard.done
                                     }
@@ -1582,12 +1718,12 @@ Rectangle {
                                     Layout.alignment: Qt.AlignVCenter
                                     radius: Theme.radiusPill
                                     color: {
-                                        if (taskCard.priority === "urgent") return Theme.alpha(Theme.error ?? "#ff5449", 0.16);
+                                        if (taskCard.priority === "urgent") return Theme.alpha(Theme.error, 0.16);
                                         if (taskCard.priority === "low") return Theme.surface_container_highest;
                                         return Theme.primary_overlay;
                                     }
                                     border.color: {
-                                        if (taskCard.priority === "urgent") return Theme.error ?? "#ff5449";
+                                        if (taskCard.priority === "urgent") return Theme.error;
                                         if (taskCard.priority === "low") return Theme.outline_variant;
                                         return Theme.primary;
                                     }
@@ -1601,7 +1737,7 @@ Rectangle {
                                         font.pixelSize: 9
                                         font.weight: Font.Bold
                                         color: {
-                                            if (taskCard.priority === "urgent") return Theme.error ?? "#ff5449";
+                                            if (taskCard.priority === "urgent") return Theme.error;
                                             if (taskCard.priority === "low") return Theme.on_surface_variant;
                                             return Theme.primary;
                                         }

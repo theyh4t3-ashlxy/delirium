@@ -41,10 +41,10 @@ Rectangle {
     readonly property real scoopR: Math.min(18, Math.max(8, Theme?.scoopRadiusX ?? 14))
     readonly property color cardBg: isCritical
         ? Theme.blend(Theme.popupBg, Theme.error, 0.12)
-        : (Theme?.popupBg ?? Theme?.surface ?? "#1e1e2e")
+        : Theme.popupBg
     readonly property color cardBorderColor: isCritical
         ? Theme.error
-        : (Theme?.popupBorderColor ?? Theme?.widgetBorder ?? "#33ffffff")
+        : Theme.popupBorderColor
     readonly property real cardBorderWidth: Theme?.popupBorderWidth ?? 1
 
     width: 360
@@ -379,7 +379,7 @@ Rectangle {
                 Layout.preferredWidth: 24
                 Layout.preferredHeight: 24
                 radius: Theme?.radiusSm ?? 6
-                color: Theme?.pillBg ?? "#2a2a3c"
+                color: Theme.pillBg
                 border.color: Theme?.pillBorder ?? "transparent"
                 border.width: 1
                 clip: true
@@ -393,12 +393,11 @@ Rectangle {
                     visible: root.resolvedIcon !== "" && notifIconImg.status !== Image.Error
                 }
 
-                Text {
+                Icon {
                     anchors.centerIn: parent
                     visible: !notifIconImg.visible
-                    text: root.isCritical ? Theme.iconFlame : (Theme?.iconBell ?? "󰂚")
-                    font.family: Theme?.fontIcon ?? Theme?.fontMono
-                    font.pixelSize: Theme?.fontSizeXs ?? 12
+                    source: root.isCritical ? Theme.iconFlame : (Theme?.iconBell ?? "preferences-system-notifications")
+                    size: Theme?.fontSizeXs ?? 12
                     color: root.accentColor
                 }
             }
@@ -434,7 +433,7 @@ Rectangle {
             }
 
             IconButton {
-                icon: Theme?.iconClose ?? "󰅖"
+                icon: Theme?.iconClose ?? "window-close"
                 iconSize: Theme?.fontSizeXs ?? 11
                 Layout.preferredWidth: 22
                 Layout.preferredHeight: 22
@@ -448,7 +447,7 @@ Rectangle {
             font.family: Theme?.fontDisplay ?? Theme?.fontFamily ?? "sans-serif"
             font.pixelSize: Theme?.fontSizeSm ?? 13
             font.weight: Theme?.fontWeightBold ?? Font.DemiBold
-            color: Theme?.on_surface ?? "#cdd6f4"
+            color: Theme.on_surface
             Layout.fillWidth: true
             wrapMode: Text.Wrap
             visible: text !== ""
@@ -458,7 +457,7 @@ Rectangle {
             text: (root.notif?.body ?? "").replace(/<[^>]*>/g, "").toLowerCase()
             font.family: Theme?.fontFamily ?? "sans-serif"
             font.pixelSize: Theme?.fontSizeXs ?? 11
-            color: Theme?.on_surface_variant ?? "#a6adc8"
+            color: Theme.on_surface_variant
             Layout.fillWidth: true
             wrapMode: Text.Wrap
             visible: text !== ""
@@ -502,7 +501,7 @@ Rectangle {
                         : (actMouse.containsMouse
                             ? (root.isCritical ? Theme.error_overlay : Theme.primary_overlay)
                             : Theme.pillBg)
-                    border.color: actMouse.containsMouse ? root.accentColor : (Theme?.pillBorder ?? "#33ffffff")
+                    border.color: actMouse.containsMouse ? root.accentColor : Theme.pillBorder
                     border.width: 1
 
                     Behavior on radius { NumberAnimation { duration: Theme?.animFast ?? 120 } }
@@ -547,7 +546,7 @@ Rectangle {
         anchors.rightMargin: root.isConcave ? (root.scoopR + 4) : 0
         height: 3
         radius: 1.5
-        color: Theme?.pillBg ?? "#2a2a3c"
+        color: Theme.pillBg
         visible: root.timeoutMs > 0
 
         Rectangle {

@@ -210,19 +210,18 @@ Rectangle {
             opacity: visible ? 1.0 : 0.0
             Behavior on opacity { NumberAnimation { duration: Theme?.animFast ?? 120 } }
 
-            Text {
+            Icon {
                 id: clockMood
                 anchors.verticalCenter: parent.verticalCenter
                 visible: !(Theme?.isVertical ?? false)
-                text: {
+                source: {
                     let hrs = root.currentTime.getHours();
-                    if (hrs < 6) return Theme?.iconMoon ?? "\uF186";
-                    if (hrs < 12) return Theme?.iconCoffee ?? "\uEFEF";
-                    if (hrs < 18) return Theme?.iconSun ?? "\uE518";
-                    return Theme?.iconMusic ?? "\uE405";
+                    if (hrs < 6) return Theme?.iconMoon ?? "weather-clear-night";
+                    if (hrs < 12) return Theme?.iconCoffee ?? "coffee";
+                    if (hrs < 18) return Theme?.iconSun ?? "weather-clear";
+                    return Theme?.iconMusic ?? "audio-x-generic";
                 }
-                font.family: Theme?.fontIcon ?? "sans-serif"
-                font.pixelSize: Theme?.fontSizeSm ?? 12
+                size: Theme?.fontSizeSm ?? 12
                 color: notchPopup.open ? Theme.primary : Theme.on_surface_variant
             }
 
@@ -271,11 +270,10 @@ Rectangle {
             opacity: visible ? 1.0 : 0.0
             Behavior on opacity { NumberAnimation { duration: Theme?.animFast ?? 120 } }
 
-            Text {
+            Icon {
                 anchors.verticalCenter: parent.verticalCenter
-                text: (typeof TimerService !== "undefined" && TimerService?.stopwatchRunning) ? (Theme?.iconClock ?? "\uEFD6") : (Theme?.iconBell ?? "\uE7F5")
-                font.family: Theme?.fontIcon ?? "sans-serif"
-                font.pixelSize: Theme?.fontSizeSm ?? 12
+                source: (typeof TimerService !== "undefined" && TimerService?.stopwatchRunning) ? (Theme?.iconClock ?? "preferences-system-time") : (Theme?.iconBell ?? "preferences-system-notifications")
+                size: Theme?.fontSizeSm ?? 12
                 color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService.timerRemaining <= 30) ? Theme.error : Theme.primary
             }
 
@@ -303,12 +301,11 @@ Rectangle {
             }
 
             // Quick Play/Pause on bar for timer
-            Text {
+            Icon {
                 visible: !(Theme?.isVertical ?? false)
                 anchors.verticalCenter: parent.verticalCenter
-                text: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.iconPause ?? "\uE034") : (Theme?.iconPlay ?? "\uE037")
-                font.family: Theme?.fontIcon ?? "sans-serif"
-                font.pixelSize: Theme?.fontSizeSm ?? 12
+                source: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.iconPause ?? "media-playback-pause") : (Theme?.iconPlay ?? "media-playback-start")
+                size: Theme?.fontSizeSm ?? 12
                 color: Theme.primary
                 MouseArea {
                     anchors.fill: parent
@@ -415,10 +412,9 @@ Rectangle {
                     RowLayout {
                         anchors.centerIn: parent
                         spacing: 6
-                        Text {
-                            text: Theme?.iconCalendar ?? "\uE935"
-                            font.family: Theme?.fontIcon ?? "sans-serif"
-                            font.pixelSize: Theme?.fontSizeSm ?? 12
+                        Icon {
+                            source: Theme?.iconCalendar ?? "x-office-calendar"
+                            size: Theme?.fontSizeSm ?? 12
                             color: notchPopup.activeTab === "calendar" ? Theme.on_primary : Theme.on_surface
                         }
                         Text {
@@ -447,10 +443,9 @@ Rectangle {
                     RowLayout {
                         anchors.centerIn: parent
                         spacing: 6
-                        Text {
-                            text: Theme?.iconClock ?? "\uEFD6"
-                            font.family: Theme?.fontIcon ?? "sans-serif"
-                            font.pixelSize: Theme?.fontSizeSm ?? 12
+                        Icon {
+                            source: Theme?.iconClock ?? "preferences-system-time"
+                            size: Theme?.fontSizeSm ?? 12
                             color: notchPopup.activeTab === "timer" ? Theme.on_primary : Theme.on_surface
                         }
                         Text {
@@ -516,10 +511,9 @@ Rectangle {
                             }
                         }
 
-                        Text {
-                            text: Theme?.iconCalendar ?? "\uE935"
-                            font.family: Theme?.fontIcon ?? "sans-serif"
-                            font.pixelSize: 20
+                        Icon {
+                            source: Theme?.iconCalendar ?? "x-office-calendar"
+                            size: 20
                             color: Theme.primary
                             Layout.alignment: Qt.AlignRight
                         }
@@ -562,7 +556,7 @@ Rectangle {
                     }
 
                     IconButton {
-                        icon: Theme?.iconClock ?? "󰅐"
+                        icon: Theme?.iconClock ?? "preferences-system-time"
                         iconSize: Theme?.fontSizeSm ?? 12
                         tooltip: "jump to today"
                         onClicked: {
@@ -682,7 +676,7 @@ Rectangle {
                                 font.pixelSize: 11
                                 font.weight: modelData.isToday ? Font.Bold : Font.Normal
                                 color: (modelData.currentMonth && modelData.isToday)
-                                    ? (Theme.on_primary ?? "#ffffff")
+                                    ? Theme.on_primary
                                     : (modelData.currentMonth ? Theme.on_surface : Theme.on_surface_disabled)
                             }
 
@@ -783,10 +777,9 @@ Rectangle {
                                 RowLayout {
                                     anchors.centerIn: parent
                                     spacing: 6
-                                    Text {
-                                        text: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.iconPause ?? "\uE034") : (Theme?.iconPlay ?? "\uE037")
-                                        font.family: Theme?.fontIcon ?? "sans-serif"
-                                        font.pixelSize: Theme?.fontSizeSm ?? 12
+                                    Icon {
+                                        source: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.iconPause ?? "media-playback-pause") : (Theme?.iconPlay ?? "media-playback-start")
+                                        size: Theme?.fontSizeSm ?? 12
                                         color: Theme.on_primary
                                     }
                                     Text {

@@ -184,9 +184,9 @@ PanelWindow {
     Item {
         id: morphContainer
         anchors.fill: parent
-        opacity: root.open
+        opacity: (root.open
             ? Math.min(1.0, root.morphProgress * 2.0)
-            : Math.min(1.0, root.morphProgress * 1.4)
+            : Math.min(1.0, root.morphProgress * 1.4)) * (Theme.surfaceOpacity ?? 1.0)
 
         // ==========================================
         // AMBIENT ELEVATION DROP SHADOWS
@@ -828,6 +828,17 @@ PanelWindow {
             height: root.bh
             clip: true
             z: 2
+
+            Rectangle {
+                visible: (Theme.glassmorphismLevel ?? 0.85) > 0.1
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 1
+                color: Theme.glassHighlight
+                opacity: Theme.glassmorphismLevel ?? 0.85
+                z: 10
+            }
 
             MouseArea {
                 id: cardHoverArea

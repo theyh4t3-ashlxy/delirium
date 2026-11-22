@@ -48,11 +48,10 @@ Rectangle {
                 anchors.rightMargin: 12
                 spacing: 8
 
-                Text {
+                Icon {
                     visible: root.icon !== ""
-                    text: root.icon
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeMd
+                    source: root.icon
+                    size: Theme.fontSizeMd
                     color: root.collapsed ? Theme.on_surface_variant : root.accentColor
 
                     Behavior on color { ColorAnimation { duration: Theme.animFast } }
@@ -101,10 +100,9 @@ Rectangle {
                     }
                 }
 
-                Text {
-                    text: Theme.iconChevronDown
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeSm
+                Icon {
+                    source: Theme.iconChevronDown
+                    size: Theme.fontSizeSm
                     color: headerMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
                     rotation: root.collapsed ? -90 : 0
 

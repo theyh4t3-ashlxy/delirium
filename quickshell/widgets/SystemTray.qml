@@ -25,9 +25,14 @@ Rectangle {
     Text {
         anchors.centerIn: parent
         visible: trayRoot.itemCount === 0
-        text: Theme.iconTray
-        font.family: (Theme.iconSet === "kaomoji" || Theme.iconSet === "text") ? Theme.fontFamily : Theme.fontIcon
-        font.pixelSize: (Theme.iconSet === "kaomoji" || Theme.iconSet === "text") ? Theme.fontSizeXs : Theme.fontSizeSm
+        visible: false
+        text: ""
+    }
+    Icon {
+        anchors.centerIn: parent
+        visible: trayRoot.itemCount === 0
+        source: Theme.iconTray
+        size: (Theme.iconSet === "kaomoji" || Theme.iconSet === "text") ? Theme.fontSizeXs : Theme.fontSizeSm
         color: Theme.on_surface_variant
         opacity: 0.65
     }
@@ -50,7 +55,7 @@ Rectangle {
                     id: trayIconV
                     source: {
                         let ic = modelData.icon || "";
-                        if (!ic) return "";
+                        if (!ic || ic.trim() === "") return undefined;
                         if (ic.startsWith("/") || ic.startsWith("file://") || ic.startsWith("image://")) return ic;
                         return Quickshell.iconPath(ic);
                     }
@@ -99,7 +104,7 @@ Rectangle {
                     id: trayIconH
                     source: {
                         let ic = modelData.icon || "";
-                        if (!ic) return "";
+                        if (!ic || ic.trim() === "") return undefined;
                         if (ic.startsWith("/") || ic.startsWith("file://") || ic.startsWith("image://")) return ic;
                         return Quickshell.iconPath(ic);
                     }

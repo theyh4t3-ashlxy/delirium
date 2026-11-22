@@ -48,7 +48,7 @@ QtObject {
             type: "widget",
             category: "tools",
             name: blockId,
-            icon: Theme?.iconGrid ?? "\uE9B0",
+            icon: Theme?.iconGrid ?? "view-grid",
             desc: "custom widget",
             color: root.getCategoryColor("tools")
         };
@@ -108,7 +108,7 @@ QtObject {
                         type: item.type || "widget",
                         category: item.category || "tools",
                         name: item.name || k,
-                        icon: item.icon || "\uE9B0",
+                        icon: item.icon || "view-grid",
                         desc: item.desc || "",
                         color: root.getCategoryColor(item.category || "tools")
                     };
@@ -134,7 +134,7 @@ QtObject {
                         let id = fullKey.substring(0, dotIdx);
                         let prop = fullKey.substring(dotIdx + 1);
                         if (!map[id]) {
-                            map[id] = { id: id, type: "widget", category: "tools", name: id, icon: "\uE9B0", desc: "" };
+                            map[id] = { id: id, type: "widget", category: "tools", name: id, icon: "view-grid", desc: "" };
                         }
                         map[id][prop] = val;
                     }
@@ -171,12 +171,83 @@ QtObject {
         printErrors: false
     }
 
+    property FileView dynamicPresetFile: FileView {
+        path: ""
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
+
+    property Process presetScanProc: Process {
+        id: presetScanProc
+        command: ["sh", "-c", 'for d in "$@"; do [ -d "$d" ] && find "$d" -maxdepth 1 -name "*.conf" ! -name "catalog.conf"; done', "sh", root.userPresetsDir, root.presetsDir]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let out = (text || "").trim();
+                let list = [];
+                let seen = {};
+
+                if (out) {
+                    let lines = out.split("\n");
+                    for (let i = 0; i < lines.length; i++) {
+                        let fullPath = lines[i].trim();
+                        if (!fullPath || !fullPath.endsWith(".conf")) continue;
+                        let filename = fullPath.substring(fullPath.lastIndexOf("/") + 1);
+                        let id = filename.replace(/\.conf$/, "");
+                        if (id === "catalog" || seen[id]) continue;
+                        seen[id] = true;
+                        let isBuiltin = fullPath.startsWith(root.presetsDir);
+                        list.push({
+                            id: id,
+                            name: id,
+                            path: fullPath,
+                            desc: isBuiltin ? "built-in preset" : "user custom preset",
+                            isBuiltin: isBuiltin
+                        });
+                    }
+                }
+
+                let builtins = [
+                    { id: "default", name: "default", desc: "standard balanced bar", isBuiltin: true, path: root.presetsDir + "/default.conf" },
+                    { id: "minimal", name: "minimal", desc: "clean floating dock", isBuiltin: true, path: root.presetsDir + "/minimal.conf" },
+                    { id: "island",  name: "island",  desc: "dynamic notch centered", isBuiltin: true, path: root.presetsDir + "/island.conf" }
+                ];
+                for (let bIdx = 0; bIdx < builtins.length; bIdx++) {
+                    let b = builtins[bIdx];
+                    if (!seen[b.id]) {
+                        seen[b.id] = true;
+                        list.push(b);
+                    }
+                }
+                root.availablePresets = list;
+            }
+        }
+    }
+
     function getPresetData(presetId) {
         try {
-            let t = "";
-            if (presetId === "default") t = defaultPresetFile.text();
-            else if (presetId === "minimal") t = minimalPresetFile.text();
-            else if (presetId === "island") t = islandPresetFile.text();
+            let item = (root.availablePresets || []).find(p => p && p.id === presetId);
+            let userPath = root.userPresetsDir + "/" + presetId + ".conf";
+            let path = (item && !item.isBuiltin) ? item.path : userPath;
+            dynamicPresetFile.path = path;
+            dynamicPresetFile.reload();
+            let t = dynamicPresetFile.text();
+
+            if (!t || t.trim() === "") {
+                let builtinPath = (item && item.isBuiltin) ? item.path : (root.presetsDir + "/" + presetId + ".conf");
+                if (path !== builtinPath) {
+                    dynamicPresetFile.path = builtinPath;
+                    dynamicPresetFile.reload();
+                    t = dynamicPresetFile.text();
+                }
+            }
+
+            if (!t || t.trim() === "") {
+                if (presetId === "default") t = defaultPresetFile.text();
+                else if (presetId === "minimal") t = minimalPresetFile.text();
+                else if (presetId === "island") t = islandPresetFile.text();
+            }
 
             if (t && t.trim() !== "") {
                 if (t.trim().startsWith("{")) {
@@ -191,11 +262,16 @@ QtObject {
     }
 
     function refreshPresets() {
-        root.availablePresets = [
-            { id: "default", name: "default", desc: "standard balanced bar", isBuiltin: true },
-            { id: "minimal", name: "minimal", desc: "clean floating dock", isBuiltin: true },
-            { id: "island",  name: "island",  desc: "dynamic notch centered", isBuiltin: true }
-        ];
+        if (!root.availablePresets || root.availablePresets.length === 0) {
+            root.availablePresets = [
+                { id: "default", name: "default", desc: "standard balanced bar", isBuiltin: true, path: root.presetsDir + "/default.conf" },
+                { id: "minimal", name: "minimal", desc: "clean floating dock", isBuiltin: true, path: root.presetsDir + "/minimal.conf" },
+                { id: "island",  name: "island",  desc: "dynamic notch centered", isBuiltin: true, path: root.presetsDir + "/island.conf" }
+            ];
+        }
+        if (!presetScanProc.running) {
+            presetScanProc.running = true;
+        }
     }
 
     function applyPresetById(presetId) {
@@ -210,19 +286,69 @@ QtObject {
     function applyPreset(presetData, presetName) {
         if (!presetData) return false;
 
-        // Native .conf flat properties
+        // Bar layout & geometry
         if (presetData.barPosition !== undefined) Settings.barPosition = presetData.barPosition;
         if (presetData.barFloating !== undefined) Settings.barFloating = Boolean(presetData.barFloating);
         if (presetData.barMargin !== undefined) Settings.barMargin = Number(presetData.barMargin);
         if (presetData.barHeight !== undefined) Settings.barHeight = Number(presetData.barHeight);
         if (presetData.barStyle !== undefined) Settings.barStyle = presetData.barStyle;
+        if (presetData.barRadius !== undefined) Settings.barRadius = Number(presetData.barRadius);
+        if (presetData.barOpacity !== undefined) Settings.barOpacity = Number(presetData.barOpacity);
+        if (presetData.barIslandMode !== undefined) Settings.barIslandMode = Boolean(presetData.barIslandMode);
+        if (presetData.bentoGap !== undefined) Settings.bentoGap = Number(presetData.bentoGap);
+        if (presetData.bentoHoverLift !== undefined) Settings.bentoHoverLift = Boolean(presetData.bentoHoverLift);
+
+        // Modules placement & visibilities
         if (presetData.barModulesLeft !== undefined) Settings.barModulesLeft = presetData.barModulesLeft;
         if (presetData.barModulesCenter !== undefined) Settings.barModulesCenter = presetData.barModulesCenter;
         if (presetData.barModulesRight !== undefined) Settings.barModulesRight = presetData.barModulesRight;
+        if (presetData.showWorkspaces !== undefined) Settings.showWorkspaces = Boolean(presetData.showWorkspaces);
+        if (presetData.showLayoutSwitcher !== undefined) Settings.showLayoutSwitcher = Boolean(presetData.showLayoutSwitcher);
+        if (presetData.showWindowTitle !== undefined) Settings.showWindowTitle = Boolean(presetData.showWindowTitle);
+        if (presetData.showClock !== undefined) Settings.showClock = Boolean(presetData.showClock);
+        if (presetData.showBattery !== undefined) Settings.showBattery = Boolean(presetData.showBattery);
+        if (presetData.showSystemTray !== undefined) Settings.showSystemTray = Boolean(presetData.showSystemTray);
+        if (presetData.showVolume !== undefined) Settings.showVolume = Boolean(presetData.showVolume);
+        if (presetData.showMedia !== undefined) Settings.showMedia = Boolean(presetData.showMedia);
+        if (presetData.showNotifications !== undefined) Settings.showNotifications = Boolean(presetData.showNotifications);
+        if (presetData.showLauncher !== undefined) Settings.showLauncher = Boolean(presetData.showLauncher);
+        if (presetData.showPowerMenu !== undefined) Settings.showPowerMenu = Boolean(presetData.showPowerMenu);
+        if (presetData.showNetwork !== undefined) Settings.showNetwork = Boolean(presetData.showNetwork);
+        if (presetData.showBluetooth !== undefined) Settings.showBluetooth = Boolean(presetData.showBluetooth);
+        if (presetData.showClipboard !== undefined) Settings.showClipboard = Boolean(presetData.showClipboard);
+        if (presetData.showIdleInhibitor !== undefined) Settings.showIdleInhibitor = Boolean(presetData.showIdleInhibitor);
+        if (presetData.showScreenCapture !== undefined) Settings.showScreenCapture = Boolean(presetData.showScreenCapture);
+        if (presetData.showDynamicNotch !== undefined) Settings.showDynamicNotch = Boolean(presetData.showDynamicNotch);
+
+        // Styling & Granular
         if (presetData.cornerStyle !== undefined) Settings.cornerStyle = presetData.cornerStyle;
         if (presetData.notificationCornerStyle !== undefined) Settings.notificationCornerStyle = presetData.notificationCornerStyle;
         if (presetData.scoopRadius !== undefined) Settings.scoopRadius = Number(presetData.scoopRadius);
         if (presetData.widgetRadius !== undefined) Settings.widgetRadius = Number(presetData.widgetRadius);
+        if (presetData.popupRadius !== undefined) Settings.popupRadius = Number(presetData.popupRadius);
+        if (presetData.widgetSpacing !== undefined) Settings.widgetSpacing = Number(presetData.widgetSpacing);
+        if (presetData.widgetPaddingH !== undefined) Settings.widgetPaddingH = Number(presetData.widgetPaddingH);
+        if (presetData.widgetPaddingV !== undefined) Settings.widgetPaddingV = Number(presetData.widgetPaddingV);
+        if (presetData.paddingScale !== undefined) Settings.paddingScale = presetData.paddingScale;
+        if (presetData.globalRounding !== undefined) Settings.globalRounding = Number(presetData.globalRounding);
+        if (presetData.cardOpacity !== undefined) Settings.cardOpacity = Number(presetData.cardOpacity);
+        if (presetData.surfaceOpacity !== undefined) Settings.surfaceOpacity = Number(presetData.surfaceOpacity);
+        if (presetData.glassmorphismLevel !== undefined) Settings.glassmorphismLevel = Number(presetData.glassmorphismLevel);
+        if (presetData.adaptiveTransparency !== undefined) Settings.adaptiveTransparency = Boolean(presetData.adaptiveTransparency);
+
+        // Animation & Fonts
+        if (presetData.animCurve !== undefined) Settings.animCurve = presetData.animCurve;
+        if (presetData.animEasingType !== undefined) Settings.animEasingType = presetData.animEasingType;
+        if (presetData.animDurationFast !== undefined) Settings.animDurationFast = Number(presetData.animDurationFast);
+        if (presetData.animDurationNormal !== undefined) Settings.animDurationNormal = Number(presetData.animDurationNormal);
+        if (presetData.animDurationSlow !== undefined) Settings.animDurationSlow = Number(presetData.animDurationSlow);
+        if (presetData.fontFamily !== undefined) Settings.fontFamily = presetData.fontFamily;
+        if (presetData.fontScale !== undefined) Settings.fontScale = Number(presetData.fontScale);
+
+        // Theming
+        if (presetData.matugenMode !== undefined) Settings.matugenMode = presetData.matugenMode;
+        if (presetData.matugenScheme !== undefined) Settings.matugenScheme = presetData.matugenScheme;
+        if (presetData.customColorsEnabled !== undefined) Settings.customColorsEnabled = Boolean(presetData.customColorsEnabled);
 
         // Nested JSON backward compatibility
         if (presetData.bar) {
@@ -259,22 +385,80 @@ QtObject {
             'barMargin=' + (Settings?.barMargin ?? 0),
             'barHeight=' + (Settings?.barHeight ?? 32),
             'barStyle="' + (Settings?.barStyle ?? "regular") + '"',
+            'barRadius=' + (Settings?.barRadius ?? 0),
+            'barOpacity=' + (Settings?.barOpacity ?? 1.0),
+            'barIslandMode=' + (Settings?.barIslandMode ?? true),
+            'bentoGap=' + (Settings?.bentoGap ?? 8),
+            'bentoHoverLift=' + (Settings?.bentoHoverLift ?? true),
             "barModulesLeft='" + JSON.stringify(Settings?.barModulesLeft ?? []) + "'",
             "barModulesCenter='" + JSON.stringify(Settings?.barModulesCenter ?? []) + "'",
             "barModulesRight='" + JSON.stringify(Settings?.barModulesRight ?? []) + "'",
+            'showWorkspaces=' + (Settings?.showWorkspaces ?? true),
+            'showLayoutSwitcher=' + (Settings?.showLayoutSwitcher ?? true),
+            'showWindowTitle=' + (Settings?.showWindowTitle ?? true),
+            'showClock=' + (Settings?.showClock ?? true),
+            'showBattery=' + (Settings?.showBattery ?? true),
+            'showSystemTray=' + (Settings?.showSystemTray ?? true),
+            'showVolume=' + (Settings?.showVolume ?? true),
+            'showMedia=' + (Settings?.showMedia ?? true),
+            'showNotifications=' + (Settings?.showNotifications ?? true),
+            'showLauncher=' + (Settings?.showLauncher ?? true),
+            'showPowerMenu=' + (Settings?.showPowerMenu ?? true),
+            'showNetwork=' + (Settings?.showNetwork ?? true),
+            'showBluetooth=' + (Settings?.showBluetooth ?? true),
+            'showClipboard=' + (Settings?.showClipboard ?? true),
+            'showIdleInhibitor=' + (Settings?.showIdleInhibitor ?? true),
+            'showScreenCapture=' + (Settings?.showScreenCapture ?? true),
+            'showDynamicNotch=' + (Settings?.showDynamicNotch ?? true),
             'cornerStyle="' + (Settings?.cornerStyle ?? "continuous-bezier") + '"',
             'notificationCornerStyle="' + (Settings?.notificationCornerStyle ?? "concave") + '"',
             'scoopRadius=' + (Settings?.scoopRadius ?? 16),
-            'widgetRadius=' + (Settings?.widgetRadius ?? 6)
+            'widgetRadius=' + (Settings?.widgetRadius ?? 6),
+            'popupRadius=' + (Settings?.popupRadius ?? 8),
+            'widgetSpacing=' + (Settings?.widgetSpacing ?? 4),
+            'widgetPaddingH=' + (Settings?.widgetPaddingH ?? 8),
+            'widgetPaddingV=' + (Settings?.widgetPaddingV ?? 4),
+            'paddingScale="' + (Settings?.paddingScale ?? "cozy") + '"',
+            'globalRounding=' + (Settings?.globalRounding ?? 8),
+            'cardOpacity=' + (Settings?.cardOpacity ?? 0.95),
+            'surfaceOpacity=' + (Settings?.surfaceOpacity ?? 0.90),
+            'glassmorphismLevel=' + (Settings?.glassmorphismLevel ?? 0.85),
+            'adaptiveTransparency=' + (Settings?.adaptiveTransparency ?? true),
+            'animCurve="' + (Settings?.animCurve ?? "cubic") + '"',
+            'animEasingType="' + (Settings?.animEasingType ?? "out") + '"',
+            'animDurationFast=' + (Settings?.animDurationFast ?? 120),
+            'animDurationNormal=' + (Settings?.animDurationNormal ?? 200),
+            'animDurationSlow=' + (Settings?.animDurationSlow ?? 350),
+            'fontFamily="' + (Settings?.fontFamily ?? "Noto Sans") + '"',
+            'fontScale=' + (Settings?.fontScale ?? 1.0),
+            'matugenMode="' + (Settings?.matugenMode ?? "dark") + '"',
+            'matugenScheme="' + (Settings?.matugenScheme ?? "scheme-tonal-spot") + '"',
+            'customColorsEnabled=' + (Settings?.customColorsEnabled ?? false)
         ];
         let confStr = lines.join("\n") + "\n";
         let targetFile = root.userPresetsDir + "/" + cleanName + ".conf";
+        Quickshell.execDetached(["mkdir", "-p", root.userPresetsDir]);
         Quickshell.execDetached([
             root.writeScript,
             targetFile,
             confStr
         ]);
         root.activePresetName = cleanName;
+        let itemIndex = (root.availablePresets || []).findIndex(p => p && p.id === cleanName);
+        let newItem = {
+            id: cleanName,
+            name: cleanName,
+            path: targetFile,
+            desc: "user custom preset",
+            isBuiltin: false
+        };
+        let updated = (root.availablePresets || []).slice();
+        if (itemIndex >= 0) {
+            updated[itemIndex] = newItem;
+        } else {
+            updated.push(newItem);
+        }
+        root.availablePresets = updated;
         root.refreshPresets();
         return true;
     }

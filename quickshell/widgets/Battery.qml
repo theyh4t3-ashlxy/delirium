@@ -42,12 +42,11 @@ Rectangle {
         anchors.horizontalCenter: container.isVertical ? parent.horizontalCenter : undefined
         spacing: 4
 
-        Text {
+        Icon {
             id: batIcon
             anchors.verticalCenter: parent.verticalCenter
-            text: Theme?.getBatteryIcon ? Theme.getBatteryIcon(container.pct, container.isCharging, !(UPower?.onBattery ?? true), container.isVertical) : (Theme?.iconBatFull ?? "\uE1A5")
-            font.family: Theme?.fontIcon ?? "sans-serif"
-            font.pixelSize: Theme?.fontSizeMd ?? 14
+            source: Theme?.getBatteryIcon ? Theme.getBatteryIcon(container.pct, container.isCharging, !(UPower?.onBattery ?? true), container.isVertical) : (Theme?.iconBatFull ?? "battery-full")
+            size: Theme?.fontSizeMd ?? 14
             color: container.isLow ? Theme.error : Theme.on_surface
         }
 
@@ -58,19 +57,19 @@ Rectangle {
             text: {
                 if (bMouse.containsMouse) {
                     if (container.isCharging) {
-                        return Theme?.getFlavor
-                            ? Theme.getFlavor("battery_charging", Theme.getVibe(Theme?.kaoBolt ? (Theme.kaoBolt + " chuggin watts") : "chuggin watts", "charging (" + container.pct + "%)", "charging (" + container.pct + "%)"))
-                            : ("charging (" + container.pct + "%)");
+                        return Theme?.getStatusFlavor
+                            ? Theme.getStatusFlavor("battery_charging", "charging (" + container.pct + "%)")
+                            : (Theme?.getFlavor ? Theme.getFlavor("battery_charging", "charging (" + container.pct + "%)") : ("charging (" + container.pct + "%)"));
                     }
                     if (container.pct < 15) {
-                        return Theme?.getFlavor
-                            ? Theme.getFlavor("battery_low", Theme.getVibe(Theme?.kaoSad ? (Theme.kaoSad + " feed me") : "feed me", "low (" + container.pct + "%)", "low (" + container.pct + "%)"))
-                            : ("low (" + container.pct + "%)");
+                        return Theme?.getStatusFlavor
+                            ? Theme.getStatusFlavor("battery_low", "battery low (" + container.pct + "%)")
+                            : (Theme?.getFlavor ? Theme.getFlavor("battery_low", "battery low (" + container.pct + "%)") : ("battery low (" + container.pct + "%)"));
                     }
                     if (container.pct >= 95) {
-                        return Theme?.getFlavor
-                            ? Theme.getFlavor("battery_full", Theme.getVibe(Theme?.kaoHappy ? (Theme.kaoHappy + " full") : "full", "full (" + container.pct + "%)", "full (" + container.pct + "%)"))
-                            : ("full (" + container.pct + "%)");
+                        return Theme?.getStatusFlavor
+                            ? Theme.getStatusFlavor("battery_full", "fully charged (" + container.pct + "%)")
+                            : (Theme?.getFlavor ? Theme.getFlavor("battery_full", "fully charged (" + container.pct + "%)") : ("fully charged (" + container.pct + "%)"));
                     }
                 }
                 return container.pct + "%";

@@ -401,12 +401,11 @@ Scope {
                                     visible: status === Image.Ready && dialogState.resolvedActionIcon !== ""
                                 }
 
-                                Text {
+                                Icon {
                                     anchors.centerIn: parent
                                     visible: dialogState.resolvedActionIcon === ""
-                                    text: dialogState.isError ? Theme.iconFlame : Theme.iconShield
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeLg
+                                    source: dialogState.isError ? Theme.iconFlame : Theme.iconShield
+                                    size: Theme.fontSizeLg
                                     color: dialogState.isError ? Theme.error : Theme.primary
                                 }
                             }
@@ -456,10 +455,9 @@ Scope {
                                             Layout.maximumWidth: 225
                                         }
 
-                                        Text {
-                                            text: dialogState.showDetails ? Theme.iconChevronUp : Theme.iconChevronDown
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.fontSizeXs
+                                        Icon {
+                                            source: dialogState.showDetails ? Theme.iconChevronUp : Theme.iconChevronDown
+                                            size: Theme.fontSizeXs
                                             color: (actSubMouse.containsMouse || dialogState.showDetails)
                                                 ? Theme.primary
                                                 : Theme.textSecondary
@@ -500,10 +498,9 @@ Scope {
                                         anchors.centerIn: parent
                                         spacing: 5
 
-                                        Text {
-                                            text: Theme.iconUser
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.fontSizeXs
+                                        Icon {
+                                            source: Theme.iconUser
+                                            size: Theme.fontSizeXs
                                             color: Theme.primary
                                         }
 
@@ -546,11 +543,10 @@ Scope {
                                         : Theme.pillBorder
                                     border.width: 1
 
-                                    Text {
+                                    Icon {
                                         anchors.centerIn: parent
-                                        text: Theme.iconExpand
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeXs
+                                        source: Theme.iconExpand
+                                        size: Theme.fontSizeXs
                                         color: dialogState.peekBehind ? Theme.primary : Theme.textSecondary
                                     }
 
@@ -599,10 +595,9 @@ Scope {
                                 Layout.fillWidth: true
                                 spacing: 8
 
-                                Text {
-                                    text: Theme.iconTerminal
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeSm
+                                Icon {
+                                    source: Theme.iconTerminal
+                                    size: Theme.fontSizeSm
                                     color: Theme.primary
                                 }
 
@@ -630,10 +625,9 @@ Scope {
                                         anchors.centerIn: parent
                                         spacing: 4
 
-                                        Text {
-                                            text: dialogState.copiedKey === "cmd" ? Theme.iconCheck : Theme.iconCopy
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.fontSizeXs
+                                        Icon {
+                                            source: dialogState.copiedKey === "cmd" ? Theme.iconCheck : Theme.iconCopy
+                                            size: Theme.fontSizeXs
                                             color: Theme.primary
                                         }
                                         Text {
@@ -718,10 +712,9 @@ Scope {
                                         anchors.centerIn: parent
                                         spacing: 4
 
-                                        Text {
-                                            text: dialogState.copiedKey === "id" ? Theme.iconCheck : Theme.iconCopy
-                                            font.family: Theme.fontIcon
-                                            font.pixelSize: Theme.fontSizeXs
+                                        Icon {
+                                            source: dialogState.copiedKey === "id" ? Theme.iconCheck : Theme.iconCopy
+                                            size: Theme.fontSizeXs
                                             color: Theme.primary
                                         }
                                         Text {
@@ -783,10 +776,9 @@ Scope {
                             anchors.centerIn: parent
                             spacing: 8
 
-                            Text {
-                                text: Theme.iconShield
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.fontSizeMd
+                            Icon {
+                                source: Theme.iconShield
+                                size: Theme.fontSizeMd
                                 color: Theme.primary
                             }
 
@@ -826,11 +818,10 @@ Scope {
                             anchors.rightMargin: 10
                             spacing: 10
 
-                            Text {
+                            Icon {
                                 id: lockGlyph
-                                text: dialogState.isSubmitting ? Theme.iconRefresh : Theme.iconLock
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.fontSizeMd
+                                source: dialogState.isSubmitting ? Theme.iconRefresh : Theme.iconLock
+                                size: Theme.fontSizeMd
                                 color: dialogState.isError
                                     ? Theme.error
                                     : (pwInput.activeFocus ? Theme.primary : Theme.textSecondary)
@@ -1026,10 +1017,9 @@ Scope {
                                 anchors.centerIn: parent
                                 spacing: 6
 
-                                Text {
-                                    text: dialogState.isSubmitting ? Theme.iconRefresh : Theme.iconCheck
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeSm
+                                Icon {
+                                    source: dialogState.isSubmitting ? Theme.iconRefresh : Theme.iconCheck
+                                    size: Theme.fontSizeSm
                                     color: Theme.on_primary
                                 }
 

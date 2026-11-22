@@ -10,22 +10,24 @@ singleton BrightnessService services/BrightnessService.qml
 singleton ScreenshotService services/ScreenshotService.qml
 singleton ScreenRecService services/ScreenRecService.qml
 singleton TimerService     services/TimerService.qml
+singleton PresetService    services/PresetService.qml
 
 # bar, corners & overlays
 StatusBar                bar/StatusBar.qml
 ScreenCorners            corners/ScreenCorners.qml
 ConcaveCorner            corners/ConcaveCorner.qml
-ConcaveCurves            components/ConcaveCurves.qml
 NotificationToasts       notifications/NotificationToasts.qml
 NotificationCard         notifications/NotificationCard.qml
 OSD                      osd/OSD.qml
 
 # controls
+Icon                     controls/Icon.qml
+BentoBox                 controls/BentoBox.qml
+BentoCard                controls/BentoCard.qml
 IconButton               controls/IconButton.qml
 ToggleSwitch             controls/ToggleSwitch.qml
 PopupPanel               controls/PopupPanel.qml
 FlickList                controls/FlickList.qml
-BarPreview               controls/BarPreview.qml
 ScreenshotActions        controls/ScreenshotActions.qml
 Dropdown                 controls/Dropdown.qml
 Slider                   controls/Slider.qml

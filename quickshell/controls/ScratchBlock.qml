@@ -23,9 +23,9 @@ Item {
     signal removeRequested()
 
     readonly property var blockInfo: PresetService?.getBlockInfo(root.blockId)
-    readonly property color blockColor: root.blockInfo?.color ?? (Theme?.primary ?? "#a8d292")
+    readonly property color blockColor: root.blockInfo?.color ?? Theme.primary
     readonly property string blockName: root.blockInfo?.name ?? root.blockId
-    readonly property string blockIcon: root.blockInfo?.icon ?? (Theme?.iconGrid ?? "\uE9B0")
+    readonly property string blockIcon: root.blockInfo?.icon ?? (Theme?.iconGrid ?? "view-grid")
     readonly property string blockCategory: root.blockInfo?.category ?? "tools"
 
     implicitWidth: 320
@@ -39,12 +39,12 @@ Item {
         radius: Theme?.radiusSm ?? 6
         color: {
             if (root.isDragged) return Qt.rgba(Theme?.surface_container_highest?.r ?? 0.2, Theme?.surface_container_highest?.g ?? 0.2, Theme?.surface_container_highest?.b ?? 0.2, 0.45);
-            if (blockMouse.containsMouse) return Theme?.surface_container_high ?? "#282b25";
-            return Theme?.surface_container ?? "#1d211a";
+            if (blockMouse.containsMouse) return Theme.surface_container_high;
+            return Theme.surface_container;
         }
         border.width: 1
         border.color: {
-            if (root.isDragged) return Theme?.primary ?? "#a8d292";
+            if (root.isDragged) return Theme.primary;
             if (blockMouse.containsMouse) return Qt.rgba(root.blockColor.r, root.blockColor.g, root.blockColor.b, 0.6);
             return Theme?.outline_variant ?? Qt.rgba(1, 1, 1, 0.08);
         }
@@ -114,7 +114,7 @@ Item {
             text: "⠿"
             font.family: Theme?.fontFamily
             font.pixelSize: 13
-            color: Theme?.on_surface_variant ?? "#888888"
+            color: Theme.on_surface_variant
         }
 
         // Category icon badge
@@ -126,11 +126,10 @@ Item {
             border.color: Qt.rgba(root.blockColor.r, root.blockColor.g, root.blockColor.b, 0.35)
             border.width: 1
 
-            Text {
+            Icon {
                 anchors.centerIn: parent
-                text: root.blockIcon
-                font.family: Theme?.fontIcon
-                font.pixelSize: 12
+                source: root.blockIcon
+                size: 14
                 color: root.blockColor
             }
         }
@@ -145,7 +144,7 @@ Item {
                 font.family: Theme?.fontFamily
                 font.pixelSize: 11
                 font.weight: Font.DemiBold
-                color: root.isVisibleInBar ? (Theme?.on_surface ?? "#ffffff") : (Theme?.on_surface_variant ?? "#888888")
+                color: root.isVisibleInBar ? Theme.on_surface : Theme.on_surface_variant
                 elide: Text.ElideRight
                 Layout.fillWidth: true
             }
@@ -154,7 +153,7 @@ Item {
                 text: root.blockCategory
                 font.family: Theme?.fontFamily
                 font.pixelSize: 9
-                color: Theme?.on_surface_variant ?? "#888888"
+                color: Theme.on_surface_variant
             }
         }
 
@@ -169,15 +168,15 @@ Item {
                 Layout.preferredWidth: 22
                 Layout.preferredHeight: 22
                 radius: Theme?.radiusSm ?? 4
-                color: shiftLMouse.containsMouse ? (Theme?.surface_container_highest ?? "#32362f") : (Theme?.surface_container_low ?? "#191d17")
+                color: shiftLMouse.containsMouse ? Theme.surface_container_highest : Theme.surface_container_low
                 border.width: 1
-                border.color: shiftLMouse.containsMouse ? (Theme?.outline_variant ?? "#43483e") : "transparent"
+                border.color: shiftLMouse.containsMouse ? Theme.outline_variant : "transparent"
 
                 Text {
                     anchors.centerIn: parent
                     text: "◀"
                     font.pixelSize: 8
-                    color: Theme?.on_surface ?? "#ffffff"
+                    color: Theme.on_surface
                 }
 
                 MouseArea {
@@ -195,15 +194,15 @@ Item {
                 Layout.preferredWidth: 22
                 Layout.preferredHeight: 22
                 radius: Theme?.radiusSm ?? 4
-                color: upMouse.containsMouse ? (Theme?.surface_container_highest ?? "#32362f") : (Theme?.surface_container_low ?? "#191d17")
+                color: upMouse.containsMouse ? Theme.surface_container_highest : Theme.surface_container_low
                 border.width: 1
-                border.color: upMouse.containsMouse ? (Theme?.outline_variant ?? "#43483e") : "transparent"
+                border.color: upMouse.containsMouse ? Theme.outline_variant : "transparent"
 
                 Text {
                     anchors.centerIn: parent
                     text: "▲"
                     font.pixelSize: 8
-                    color: Theme?.on_surface ?? "#ffffff"
+                    color: Theme.on_surface
                 }
 
                 MouseArea {
@@ -220,15 +219,15 @@ Item {
                 Layout.preferredWidth: 22
                 Layout.preferredHeight: 22
                 radius: Theme?.radiusSm ?? 4
-                color: downMouse.containsMouse ? (Theme?.surface_container_highest ?? "#32362f") : (Theme?.surface_container_low ?? "#191d17")
+                color: downMouse.containsMouse ? Theme.surface_container_highest : Theme.surface_container_low
                 border.width: 1
-                border.color: downMouse.containsMouse ? (Theme?.outline_variant ?? "#43483e") : "transparent"
+                border.color: downMouse.containsMouse ? Theme.outline_variant : "transparent"
 
                 Text {
                     anchors.centerIn: parent
                     text: "▼"
                     font.pixelSize: 8
-                    color: Theme?.on_surface ?? "#ffffff"
+                    color: Theme.on_surface
                 }
 
                 MouseArea {
@@ -246,15 +245,15 @@ Item {
                 Layout.preferredWidth: 22
                 Layout.preferredHeight: 22
                 radius: Theme?.radiusSm ?? 4
-                color: shiftRMouse.containsMouse ? (Theme?.surface_container_highest ?? "#32362f") : (Theme?.surface_container_low ?? "#191d17")
+                color: shiftRMouse.containsMouse ? Theme.surface_container_highest : Theme.surface_container_low
                 border.width: 1
-                border.color: shiftRMouse.containsMouse ? (Theme?.outline_variant ?? "#43483e") : "transparent"
+                border.color: shiftRMouse.containsMouse ? Theme.outline_variant : "transparent"
 
                 Text {
                     anchors.centerIn: parent
                     text: "▶"
                     font.pixelSize: 8
-                    color: Theme?.on_surface ?? "#ffffff"
+                    color: Theme.on_surface
                 }
 
                 MouseArea {
@@ -271,16 +270,15 @@ Item {
                 Layout.preferredWidth: 24
                 Layout.preferredHeight: 24
                 radius: Theme?.radiusSm ?? 4
-                color: eyeMouse.containsMouse ? (Theme?.surface_container_highest ?? "#32362f") : (root.isVisibleInBar ? (Theme?.surface_container_low ?? "#191d17") : Qt.rgba(Theme?.error.r ?? 1, Theme?.error.g ?? 0, Theme?.error.b ?? 0, 0.15))
+                color: eyeMouse.containsMouse ? Theme.surface_container_highest : (root.isVisibleInBar ? Theme.surface_container_low : Theme.error_overlay)
                 border.width: 1
-                border.color: root.isVisibleInBar ? (eyeMouse.containsMouse ? (Theme?.outline_variant ?? "#43483e") : "transparent") : (Theme?.error ?? "#ffb4ab")
+                border.color: root.isVisibleInBar ? (eyeMouse.containsMouse ? Theme.outline_variant : "transparent") : Theme.error
 
-                Text {
+                Icon {
                     anchors.centerIn: parent
-                    text: root.isVisibleInBar ? (Theme?.iconEye ?? "\uE8F4") : (Theme?.iconEyeOff ?? "\uE8F5")
-                    font.family: Theme?.fontIcon
-                    font.pixelSize: 12
-                    color: root.isVisibleInBar ? (Theme?.on_surface ?? "#ffffff") : (Theme?.error ?? "#ffb4ab")
+                    source: root.isVisibleInBar ? (Theme?.iconEye ?? "view-visible") : (Theme?.iconEyeOff ?? "view-hidden")
+                    size: 12
+                    color: root.isVisibleInBar ? Theme.on_surface : Theme.error
                 }
 
                 MouseArea {
@@ -297,16 +295,16 @@ Item {
                 Layout.preferredWidth: 22
                 Layout.preferredHeight: 22
                 radius: Theme?.radiusSm ?? 4
-                color: rmMouse.containsMouse ? (Theme?.error_container ?? "#93000a") : (Theme?.surface_container_low ?? "#191d17")
+                color: rmMouse.containsMouse ? Theme.error_container : Theme.surface_container_low
                 border.width: 1
-                border.color: rmMouse.containsMouse ? (Theme?.error ?? "#ffb4ab") : "transparent"
+                border.color: rmMouse.containsMouse ? Theme.error : "transparent"
 
                 Text {
                     anchors.centerIn: parent
                     text: "✕"
                     font.pixelSize: 9
                     font.weight: Font.Bold
-                    color: rmMouse.containsMouse ? (Theme?.on_error_container ?? "#ffffff") : (Theme?.on_surface_variant ?? "#888888")
+                    color: rmMouse.containsMouse ? Theme.on_error_container : Theme.on_surface_variant
                 }
 
                 MouseArea {

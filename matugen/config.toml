@@ -22,10 +22,6 @@ output_path = "~/.config/quickshell/Theme.qml"
 input_path = "~/.config/matugen/templates/palette.css"
 output_path = "~/.config/quickshell/palette.css"
 
-[templates.zsh]
-input_path = "~/.config/matugen/templates/zsh-colors.zsh"
-output_path = "~/.config/zsh/matugen.zsh"
-
 # dump gtk4 palette into matugen.css (avoiding kde breeze clobbering colors.css)
 [templates.gtk4]
 input_path = "~/.config/matugen/templates/gtk4.css"

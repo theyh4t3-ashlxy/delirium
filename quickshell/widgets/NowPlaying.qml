@@ -190,16 +190,22 @@ Rectangle {
         anchors.centerIn: parent
 
         Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.isPlaying && Theme.iconSet === "kaomoji"
+            text: Theme.kaoJam
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSm
+            color: root.isPlaying ? root.artAccent : Theme.textSecondary
+            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+        }
+
+        Icon {
             id: barIcon
             anchors.verticalCenter: parent.verticalCenter
-            text: root.isPlaying
-                ? (Theme.iconSet === "kaomoji" ? Theme.kaoJam : Theme.iconMusic)
-                : (root.hasTrack ? Theme.iconPause : Theme.iconMusic)
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
-            font.weight: Theme.isTextIconSet ? Theme.fontWeightBold : Theme.fontWeightRegular
+            visible: !(root.isPlaying && Theme.iconSet === "kaomoji")
+            source: root.isPlaying ? Theme.iconMusic : (root.hasTrack ? Theme.iconPause : Theme.iconMusic)
+            size: Theme.fontSizeSm
             color: root.isPlaying ? root.artAccent : Theme.textSecondary
-
             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         }
 
@@ -213,8 +219,8 @@ Rectangle {
                     return (artist + title).toLowerCase();
                 }
                 return npMouse.containsMouse
-                    ? Theme.getFlavor("media_quiet", Theme.getVibe(Theme.kaoShrug + " nothing playing rn", "nothing playing rn", "nothing playing"))
-                    : Theme.getFlavor("media_quiet", Theme.getVibe(Theme.kaoEmpty + " quiet", "quiet", "quiet"));
+                    ? (Theme.getStatusFlavor ? Theme.getStatusFlavor("media_quiet", "nothing playing") : (Theme.getFlavor ? Theme.getFlavor("media_quiet", "nothing playing") : "nothing playing"))
+                    : (Theme.getStatusFlavor ? Theme.getStatusFlavor("media_quiet", "quiet") : (Theme.getFlavor ? Theme.getFlavor("media_quiet", "quiet") : "quiet"));
             }
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSizeSm
@@ -378,11 +384,10 @@ Rectangle {
                             color: Theme.textSecondary
                         }
 
-                        Text {
+                        Icon {
                             visible: root.activeList.length > 1
-                            text: Theme.iconChevronRight
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeXs
+                            source: Theme.iconChevronRight
+                            size: Theme.fontSizeXs
                             color: Theme.textSecondary
                         }
                     }
@@ -515,11 +520,19 @@ Rectangle {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: Theme.iconSet === "kaomoji" ? Theme.kaoMusic : Theme.iconMusic
-                                font.family: Theme.fontIcon
-                                font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
+                                text: Theme.kaoMusic
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeMd
                                 color: root.artAccent
-                                visible: root.coverArtUrl === ""
+                                visible: root.coverArtUrl === "" && Theme.iconSet === "kaomoji"
+                            }
+
+                            Icon {
+                                anchors.centerIn: parent
+                                source: Theme.iconMusic
+                                size: Theme.fontSizeTitle
+                                color: root.artAccent
+                                visible: root.coverArtUrl === "" && Theme.iconSet !== "kaomoji"
                             }
 
                             // Hover play/pause scrim overlay
@@ -528,13 +541,12 @@ Rectangle {
                                 color: Theme.alpha(Theme.scrim, coverMouse.containsMouse ? 0.48 : 0.0)
                                 Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                                Text {
+                                Icon {
                                     anchors.centerIn: parent
                                     opacity: coverMouse.containsMouse ? 1.0 : 0.0
                                     scale: coverMouse.containsMouse ? 1.0 : 0.8
-                                    text: root.isPlaying ? Theme.iconPause : Theme.iconPlay
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeLg
+                                    source: root.isPlaying ? Theme.iconPause : Theme.iconPlay
+                                    size: Theme.fontSizeLg
                                     color: Theme.on_surface
                                     Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
                                     Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animExpressiveEasing } }
@@ -596,7 +608,9 @@ Rectangle {
                             // Flavor subtitle or kaomoji vibe badge
                             Text {
                                 visible: root.isPlaying && ((Settings?.unhingedFlavor ?? false) || Theme.iconSet === "kaomoji")
-                                text: Theme.getFlavor("media_playing", Theme.getVibe(Theme.kaoVibe + " vibing", "", ""))
+                                text: Theme.getStatusFlavor
+                                    ? Theme.getStatusFlavor("media_playing", "now playing")
+                                    : (Theme.getFlavor ? Theme.getFlavor("media_playing", "now playing") : "now playing")
                                 font.family: Theme.fontVibe
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.alpha(Theme.textSecondary, 0.85)
@@ -675,11 +689,10 @@ Rectangle {
                         Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: Theme.iconShuffle
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeSm
+                            source: Theme.iconShuffle
+                            size: Theme.fontSizeSm
                             color: parent.active ? root.artAccent : Theme.textSecondary
                         }
 
@@ -719,12 +732,10 @@ Rectangle {
                         Behavior on radius { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: root.isPlaying ? Theme.iconPause : Theme.iconPlay
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
-                            font.weight: Theme.fontWeightBold
+                            source: root.isPlaying ? Theme.iconPause : Theme.iconPlay
+                            size: Theme.fontSizeLg
                             color: Theme.on_primary
                         }
 
@@ -765,11 +776,10 @@ Rectangle {
                         Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                        Text {
+                        Icon {
                             anchors.centerIn: parent
-                            text: (root.player?.loopState === MprisLoopState.Track) ? Theme.iconRepeatOne : Theme.iconRepeat
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeSm
+                            source: (root.player?.loopState === MprisLoopState.Track) ? Theme.iconRepeatOne : Theme.iconRepeat
+                            size: Theme.fontSizeSm
                             color: parent.active ? root.artAccent : Theme.textSecondary
                         }
 
@@ -803,15 +813,26 @@ Rectangle {
                     spacing: 10
 
                     Text {
-                        text: Theme.getVibe(Theme.kaoSilent, Theme.iconHeadphones, Theme.iconHeadphones)
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXl : Theme.fontSizeTitle
+                        text: Theme.kaoSilent
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeXl
                         color: Theme.textSecondary
                         Layout.alignment: Qt.AlignHCenter
+                        visible: Theme.iconSet === "kaomoji"
+                    }
+
+                    Icon {
+                        source: Theme.iconHeadphones
+                        size: Theme.fontSizeTitle
+                        color: Theme.textSecondary
+                        Layout.alignment: Qt.AlignHCenter
+                        visible: Theme.iconSet !== "kaomoji"
                     }
 
                     Text {
-                        text: Theme.getFlavor("media_quiet", Theme.getVibe("quiet right now", "no players active", "nothing playing"))
+                        text: Theme.getStatusFlavor
+                            ? Theme.getStatusFlavor("media_quiet", "no active players")
+                            : (Theme.getFlavor ? Theme.getFlavor("media_quiet", "no active players") : "no active players")
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSm
                         color: Theme.textSecondary
@@ -844,10 +865,9 @@ Rectangle {
                                 anchors.rightMargin: 10
                                 spacing: 8
 
-                                Text {
-                                    text: root.selectedApp?.icon || Theme.iconMusic
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeSm
+                                Icon {
+                                    source: root.selectedApp?.icon || Theme.iconMusic
+                                    size: Theme.fontSizeSm
                                     color: Theme.primary
                                 }
 
@@ -861,10 +881,9 @@ Rectangle {
                                     elide: Text.ElideRight
                                 }
 
-                                Text {
-                                    text: root.dropdownOpen ? Theme.iconChevronUp : Theme.iconChevronDown
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeXs
+                                Icon {
+                                    source: root.dropdownOpen ? Theme.iconChevronUp : Theme.iconChevronDown
+                                    size: Theme.fontSizeXs
                                     color: Theme.textSecondary
                                 }
                             }
@@ -903,10 +922,9 @@ Rectangle {
                                     color: Theme.on_primary
                                 }
 
-                                Text {
-                                    text: Theme.iconPlay
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeXs
+                                Icon {
+                                    source: Theme.iconPlay
+                                    size: Theme.fontSizeXs
                                     color: Theme.on_primary
                                 }
                             }
@@ -967,10 +985,9 @@ Rectangle {
                                             anchors.rightMargin: 8
                                             spacing: 6
 
-                                            Text {
-                                                text: modelData.icon
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.fontSizeXs
+                                            Icon {
+                                                source: modelData.icon
+                                                size: Theme.fontSizeXs
                                                 color: parent.parent.isSelected ? Theme.primary : Theme.textSecondary
                                             }
 
@@ -984,10 +1001,9 @@ Rectangle {
                                                 elide: Text.ElideRight
                                             }
 
-                                            Text {
-                                                text: Theme.iconCheck
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.fontSizeXs
+                                            Icon {
+                                                source: Theme.iconCheck
+                                                size: Theme.fontSizeXs
                                                 color: Theme.primary
                                                 visible: parent.parent.isSelected
                                             }

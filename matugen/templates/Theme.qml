@@ -8,13 +8,32 @@ Singleton {
     id: root
     readonly property var cfg: (typeof Settings !== "undefined" ? Settings : null)
 
+    property var parsedPalette: ({})
+
+    function parsePalette() {
+        if (!paletteWatcher) return;
+        let text = paletteWatcher.text();
+        if (!text || text.trim() === "") return;
+        let map = {};
+        let re = /(?:@define-color\s+([a-zA-Z0-9_-]+)|--([a-zA-Z0-9_-]+))\s*[:\s]\s*(#[0-9a-fA-F]{3,8})/g;
+        let match;
+        while ((match = re.exec(text)) !== null) {
+            let key = (match[1] || match[2]).replace(/-/g, "_");
+            map[key] = match[3];
+        }
+        parsedPalette = map;
+    }
+
     // watching palette.css like a hawk so we don't have to restart the whole shell
     property var paletteWatcher: FileView {
         path: (Quickshell.env("XDG_CONFIG_HOME") || ((Quickshell.env("HOME") || "") + "/.config")) + "/quickshell/palette.css"
         watchChanges: true
         printErrors: false
-        onFileChanged: reload()
+        onLoaded: root.parsePalette()
+        onFileChanged: root.parsePalette()
     }
+
+    Component.onCompleted: root.parsePalette()
 
     // ticking time bomb so the widgets know when to panic
     SystemClock {
@@ -66,65 +85,65 @@ Singleton {
     // matugen hex tokens + live custom color overrides from QuickSettings
     readonly property bool hasCustomColors: cfg?.customColorsEnabled ?? false
 
-    readonly property color matugenPrimary:            "{{colors.primary.default.hex}}"
+    readonly property color matugenPrimary:            parsedPalette["primary"] ?? "{{colors.primary.default.hex}}"
     readonly property color primary:                   (hasCustomColors && (cfg?.customActive ?? "") !== "") ? cfg.customActive : matugenPrimary
-    readonly property color on_primary:                "{{colors.on_primary.default.hex}}"
-    readonly property color primary_container:         "{{colors.primary_container.default.hex}}"
-    readonly property color on_primary_container:      "{{colors.on_primary_container.default.hex}}"
+    readonly property color on_primary:                parsedPalette["on_primary"] ?? "{{colors.on_primary.default.hex}}"
+    readonly property color primary_container:         parsedPalette["primary_container"] ?? "{{colors.primary_container.default.hex}}"
+    readonly property color on_primary_container:      parsedPalette["on_primary_container"] ?? "{{colors.on_primary_container.default.hex}}"
 
-    readonly property color secondary:                 "{{colors.secondary.default.hex}}"
-    readonly property color on_secondary:              "{{colors.on_secondary.default.hex}}"
-    readonly property color secondary_container:       "{{colors.secondary_container.default.hex}}"
-    readonly property color on_secondary_container:    "{{colors.on_secondary_container.default.hex}}"
+    readonly property color secondary:                 parsedPalette["secondary"] ?? "{{colors.secondary.default.hex}}"
+    readonly property color on_secondary:              parsedPalette["on_secondary"] ?? "{{colors.on_secondary.default.hex}}"
+    readonly property color secondary_container:       parsedPalette["secondary_container"] ?? "{{colors.secondary_container.default.hex}}"
+    readonly property color on_secondary_container:    parsedPalette["on_secondary_container"] ?? "{{colors.on_secondary_container.default.hex}}"
 
-    readonly property color tertiary:                  "{{colors.tertiary.default.hex}}"
-    readonly property color on_tertiary:               "{{colors.on_tertiary.default.hex}}"
-    readonly property color tertiary_container:        "{{colors.tertiary_container.default.hex}}"
-    readonly property color on_tertiary_container:     "{{colors.on_tertiary_container.default.hex}}"
+    readonly property color tertiary:                  parsedPalette["tertiary"] ?? "{{colors.tertiary.default.hex}}"
+    readonly property color on_tertiary:               parsedPalette["on_tertiary"] ?? "{{colors.on_tertiary.default.hex}}"
+    readonly property color tertiary_container:        parsedPalette["tertiary_container"] ?? "{{colors.tertiary_container.default.hex}}"
+    readonly property color on_tertiary_container:     parsedPalette["on_tertiary_container"] ?? "{{colors.on_tertiary_container.default.hex}}"
 
-    readonly property color error:                     "{{colors.error.default.hex}}"
-    readonly property color on_error:                  "{{colors.on_error.default.hex}}"
-    readonly property color error_container:           "{{colors.error_container.default.hex}}"
-    readonly property color on_error_container:        "{{colors.on_error_container.default.hex}}"
+    readonly property color error:                     parsedPalette["error"] ?? "{{colors.error.default.hex}}"
+    readonly property color on_error:                  parsedPalette["on_error"] ?? "{{colors.on_error.default.hex}}"
+    readonly property color error_container:           parsedPalette["error_container"] ?? "{{colors.error_container.default.hex}}"
+    readonly property color on_error_container:        parsedPalette["on_error_container"] ?? "{{colors.on_error_container.default.hex}}"
 
-    readonly property color matugenBg:                 "{{colors.background.default.hex}}"
+    readonly property color matugenBg:                 parsedPalette["background"] ?? "{{colors.background.default.hex}}"
     readonly property color background:                (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : matugenBg
-    readonly property color on_background:             "{{colors.on_background.default.hex}}"
+    readonly property color on_background:             parsedPalette["on_background"] ?? "{{colors.on_background.default.hex}}"
 
-    readonly property color matugenSurface:            "{{colors.surface.default.hex}}"
+    readonly property color matugenSurface:            parsedPalette["surface"] ?? "{{colors.surface.default.hex}}"
     readonly property color surface:                   (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : matugenSurface
-    readonly property color matugenOnSurface:          "{{colors.on_surface.default.hex}}"
+    readonly property color matugenOnSurface:          parsedPalette["on_surface"] ?? "{{colors.on_surface.default.hex}}"
     readonly property color on_surface:                (hasCustomColors && (cfg?.customText ?? "") !== "") ? cfg.customText : matugenOnSurface
-    readonly property color surface_variant:           "{{colors.surface_variant.default.hex}}"
-    readonly property color matugenOnSurfaceVariant:   "{{colors.on_surface_variant.default.hex}}"
+    readonly property color surface_variant:           parsedPalette["surface_variant"] ?? "{{colors.surface_variant.default.hex}}"
+    readonly property color matugenOnSurfaceVariant:   parsedPalette["on_surface_variant"] ?? "{{colors.on_surface_variant.default.hex}}"
     readonly property color on_surface_variant:        (hasCustomColors && (cfg?.customSubtext ?? "") !== "") ? cfg.customSubtext : matugenOnSurfaceVariant
     readonly property color textPrimary:               on_surface
     readonly property color textSecondary:             on_surface_variant
 
-    readonly property color surface_container_lowest:  (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : "{{colors.surface_container_lowest.default.hex}}"
-    readonly property color surface_container_low:     (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : "{{colors.surface_container_low.default.hex}}"
-    readonly property color surface_container:         "{{colors.surface_container.default.hex}}"
-    readonly property color surface_container_high:    (hasCustomColors && (cfg?.customWidgetBg ?? "") !== "") ? cfg.customWidgetBg : "{{colors.surface_container_high.default.hex}}"
-    readonly property color surface_container_highest: "{{colors.surface_container_highest.default.hex}}"
+    readonly property color surface_container_lowest:  (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : (parsedPalette["surface_container_lowest"] ?? "{{colors.surface_container_lowest.default.hex}}")
+    readonly property color surface_container_low:     (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : (parsedPalette["surface_container_low"] ?? "{{colors.surface_container_low.default.hex}}")
+    readonly property color surface_container:         parsedPalette["surface_container"] ?? "{{colors.surface_container.default.hex}}"
+    readonly property color surface_container_high:    (hasCustomColors && (cfg?.customWidgetBg ?? "") !== "") ? cfg.customWidgetBg : (parsedPalette["surface_container_high"] ?? "{{colors.surface_container_high.default.hex}}")
+    readonly property color surface_container_highest: parsedPalette["surface_container_highest"] ?? "{{colors.surface_container_highest.default.hex}}"
 
-    readonly property color surface_dim:               "{{colors.surface_dim.default.hex}}"
-    readonly property color surface_bright:            "{{colors.surface_bright.default.hex}}"
+    readonly property color surface_dim:               parsedPalette["surface_dim"] ?? "{{colors.surface_dim.default.hex}}"
+    readonly property color surface_bright:            parsedPalette["surface_bright"] ?? "{{colors.surface_bright.default.hex}}"
 
-    readonly property color matugenOutline:            "{{colors.outline.default.hex}}"
+    readonly property color matugenOutline:            parsedPalette["outline"] ?? "{{colors.outline.default.hex}}"
     readonly property color outline:                   (hasCustomColors && (cfg?.customBorder ?? "") !== "") ? cfg.customBorder : matugenOutline
-    readonly property color outline_variant:           (hasCustomColors && (cfg?.customBorder ?? "") !== "") ? cfg.customBorder : "{{colors.outline_variant.default.hex}}"
+    readonly property color outline_variant:           (hasCustomColors && (cfg?.customBorder ?? "") !== "") ? cfg.customBorder : (parsedPalette["outline_variant"] ?? "{{colors.outline_variant.default.hex}}")
 
-    readonly property color shadow:                    "{{colors.shadow.default.hex}}"
-    readonly property color scrim:                     "{{colors.scrim.default.hex}}"
+    readonly property color shadow:                    parsedPalette["shadow"] ?? "{{colors.shadow.default.hex}}"
+    readonly property color scrim:                     parsedPalette["scrim"] ?? "{{colors.scrim.default.hex}}"
 
-    readonly property color inverse_surface:           "{{colors.inverse_surface.default.hex}}"
-    readonly property color inverse_on_surface:        "{{colors.inverse_on_surface.default.hex}}"
-    readonly property color inverse_primary:           "{{colors.inverse_primary.default.hex}}"
-    readonly property color source_color:              "{{colors.source_color.default.hex}}"
+    readonly property color inverse_surface:           parsedPalette["inverse_surface"] ?? "{{colors.inverse_surface.default.hex}}"
+    readonly property color inverse_on_surface:        parsedPalette["inverse_on_surface"] ?? "{{colors.inverse_on_surface.default.hex}}"
+    readonly property color inverse_primary:           parsedPalette["inverse_primary"] ?? "{{colors.inverse_primary.default.hex}}"
+    readonly property color source_color:              parsedPalette["source_color"] ?? "{{colors.source_color.default.hex}}"
 
     // automatic light mode detection via surface luminance or explicit Settings flag
     readonly property real surfaceLuminance: (0.2126 * surface.r) + (0.7152 * surface.g) + (0.0722 * surface.b)
-    readonly property bool isLightMode: Boolean(cfg?.lightMode || cfg?.isLight || cfg?.themeMode === "light" || surfaceLuminance > 0.5)
+    readonly property bool isLightMode: Boolean(cfg?.matugenMode === "light" || cfg?.lightMode || cfg?.isLight || cfg?.themeMode === "light" || surfaceLuminance > 0.5)
 
     /*
     math black magic so the engine doesn't combust,
@@ -289,12 +308,18 @@ Singleton {
 
     readonly property int    widgetRadius:          cfg?.widgetRadius ?? 6
     readonly property int    popupRadius:           cfg?.popupRadius ?? 8
+    readonly property int    effectiveCardRadius: {
+        let gr = cfg?.globalRounding ?? 24;
+        let wr = widgetRadius;
+        if (wr > 32) return Math.min(16, Math.max(8, Math.round(gr * 0.6)));
+        return Math.max(6, wr);
+    }
     readonly property int    radiusXs:              4
-    readonly property int    radiusSm:              Math.max(3, Math.round(widgetRadius * 0.75))
-    readonly property int    radiusMd:              Math.max(4, widgetRadius)
-    readonly property int    radiusLg:              Math.max(8, popupRadius)
-    readonly property int    radiusXl:              Math.max(14, Math.round(popupRadius * 1.75))
-    readonly property int    radiusXxl:             Math.max(18, Math.round(popupRadius * 2.0))
+    readonly property int    radiusSm:              Math.min(10, Math.max(3, Math.round(effectiveCardRadius * 0.65)))
+    readonly property int    radiusMd:              Math.min(16, Math.max(4, effectiveCardRadius))
+    readonly property int    radiusLg:              Math.max(8, Math.min(24, popupRadius))
+    readonly property int    radiusXl:              Math.max(14, Math.min(32, Math.round(popupRadius * 1.25)))
+    readonly property int    radiusXxl:             Math.max(18, Math.min(40, Math.round(popupRadius * 1.5)))
     readonly property int    radiusPill:            9999
     readonly property int    radiusFull:            9999
 
@@ -346,7 +371,7 @@ Singleton {
 
         switch (role) {
             case "barBg":
-                if (bs === "regular") return alpha(surface_container_low, 0.95);
+                if (bs === "regular") return surface_container_low;
                 if (bs === "pure-black") return isLightMode ? "#ffffff" : "#000000";
                 if (bs === "glass") return alpha(surface_container_lowest, Math.min(1.0, (isLightMode ? 0.68 : 0.40) + adaptiveAlphaBoost));
                 if (bs === "glass-frost") return alpha(surface_container_lowest, Math.min(1.0, (isLightMode ? 0.78 : 0.55) + adaptiveAlphaBoost));
@@ -367,7 +392,7 @@ Singleton {
                 if (bs === "translucent") return alpha(outline_variant, 0.35);
                 return alpha(outline_variant, 0.50);
             case "widgetBg":
-                if (bs === "regular") return alpha(surface_container_high, isLightMode ? 0.75 : 0.60);
+                if (bs === "regular") return surface_container_high;
                 if (bs === "pure-black") return isLightMode ? "#f2f2f2" : "#0a0a0a";
                 if (bs === "glass") return alpha(surface_container_high, isLightMode ? 0.55 : 0.28);
                 if (bs === "glass-frost") return alpha(surface_container_high, isLightMode ? 0.68 : 0.38);
@@ -411,7 +436,7 @@ Singleton {
                 if (bs === "monochrome") return alpha(outline, 0.40);
                 return alpha(outline_variant, 0.50);
             case "popupBg":
-                if (bs === "regular") return alpha(surface_container_low, 0.96);
+                if (bs === "regular") return surface_container_low;
                 if (bs === "pure-black") return isLightMode ? "#ffffff" : "#000000";
                 if (bs === "glass") return alpha(surface_container_lowest, Math.min(1.0, (isLightMode ? 0.86 : 0.60) + adaptiveAlphaBoost));
                 if (bs === "glass-frost") return alpha(surface_container_lowest, Math.min(1.0, (isLightMode ? 0.92 : 0.75) + adaptiveAlphaBoost));
@@ -433,7 +458,7 @@ Singleton {
                 if (bs === "monochrome") return alpha(outline, 0.45);
                 return alpha(outline_variant, 0.50);
             case "cardBg":
-                if (bs === "regular") return alpha(surface_container_high, isLightMode ? 0.85 : 0.75);
+                if (bs === "regular") return surface_container_high;
                 if (bs === "pure-black") return isLightMode ? "#f7f7f7" : "#080808";
                 if (bs === "glass") return alpha(surface_container_high, isLightMode ? 0.65 : 0.30);
                 if (bs === "glass-frost") return alpha(surface_container_high, isLightMode ? 0.76 : 0.45);
@@ -456,7 +481,7 @@ Singleton {
                 return alpha(outline_variant, 0.40);
             case "pillBg":
                 if (hasCustomColors && (cfg?.customWidgetBg ?? "") !== "") return cfg.customWidgetBg;
-                if (bs === "regular") return alpha(surface_container_high, isLightMode ? 0.78 : 0.65);
+                if (bs === "regular") return surface_container_high;
                 if (bs === "pure-black") return isLightMode ? "#f2f2f2" : "#0a0a0a";
                 if (bs === "glass") return alpha(surface_container_high, isLightMode ? 0.62 : 0.25);
                 if (bs === "glass-frost") return alpha(surface_container_high, isLightMode ? 0.74 : 0.35);
@@ -507,9 +532,9 @@ Singleton {
     readonly property color widgetHover:      getStyleColor("widgetHover", barStyle)
     readonly property color widgetActive:     getStyleColor("widgetActive", barStyle)
     readonly property color widgetBorder:     getStyleColor("widgetBorder", barStyle)
-    readonly property color popupBg:          alpha(getStyleColor("popupBg", barStyle), popupOpacity)
+    readonly property color popupBg:          alpha(getStyleColor("popupBg", barStyle), popupOpacity * surfaceOpacity)
     readonly property color popupBorderColor: getStyleColor("popupBorderColor", barStyle)
-    readonly property color cardBg:           getStyleColor("cardBg", barStyle)
+    readonly property color cardBg:           alpha(getStyleColor("cardBg", barStyle), cardOpacity)
     readonly property color cardBorder:       getStyleColor("cardBorder", barStyle)
     readonly property color pillBg:           getStyleColor("pillBg", barStyle)
     readonly property color pillHover:        getStyleColor("pillHover", barStyle)
@@ -698,441 +723,364 @@ Singleton {
     readonly property int    animEasingExit:        (animCurve === "snappy") ? Easing.InQuad : Easing.InCubic
     readonly property int    animColorEasing:       Easing.OutQuad
 
-    readonly property string userFontDir:           (Quickshell.env("XDG_DATA_HOME") || ((Quickshell.env("HOME") || "") + "/.local/share")) + "/fonts/"
+    // -------------------------------------------------------------------------
+    // Native Icon Resolution Engine (Zero Font Dependencies)
+    // -------------------------------------------------------------------------
+    readonly property string iconSet:               cfg?.iconSet ?? "system"
+    readonly property string fontIcon:              fontFamily
 
-    FontLoader {
-        id: loaderMatRounded
-        source: "file://" + root.userFontDir + "MaterialSymbolsRounded.ttf"
-    }
-    FontLoader {
-        id: loaderMatOutlined
-        source: "file://" + root.userFontDir + "MaterialSymbolsOutlined.ttf"
-    }
-    FontLoader {
-        id: loaderMatSharp
-        source: "file://" + root.userFontDir + "MaterialSymbolsSharp.ttf"
-    }
-    FontLoader {
-        id: loaderFaSolid
-        source: "file://" + root.userFontDir + "FontAwesome6Free-Solid.otf"
-    }
-    FontLoader {
-        id: loaderSegoe
-        source: "file://" + root.userFontDir + "SegoeIcons.ttf"
-    }
+    // Backward compatibility font aliases
+    readonly property string fontMaterialRounded:   fontFamily
+    readonly property string fontMaterialOutlined:  fontFamily
+    readonly property string fontMaterialSharp:     fontFamily
+    readonly property string fontSegoe:             fontFamily
+    readonly property string fontAwesome:           fontFamily
 
-    readonly property string iconSet:               cfg?.iconSet ?? "material"
-    readonly property string fontMaterialRounded:   (loaderMatRounded.status === FontLoader.Ready && loaderMatRounded.name) ? loaderMatRounded.name : "Material Symbols Rounded"
-    readonly property string fontMaterialOutlined:  (loaderMatOutlined.status === FontLoader.Ready && loaderMatOutlined.name) ? loaderMatOutlined.name : "Material Symbols Outlined"
-    readonly property string fontMaterialSharp:     (loaderMatSharp.status === FontLoader.Ready && loaderMatSharp.name) ? loaderMatSharp.name : "Material Symbols Sharp"
-    readonly property string fontSegoe:             (loaderSegoe.status === FontLoader.Ready && loaderSegoe.name) ? loaderSegoe.name : (cfg?.fontWindows ?? "Segoe Fluent Icons")
-    readonly property string fontAwesome:           (loaderFaSolid.status === FontLoader.Ready && loaderFaSolid.name)
-        ? loaderFaSolid.name
-        : (cfg?.fontAwesome ?? "Font Awesome 6 Free")
-
-    readonly property string fontIcon: {
-        if (iconSet === "kaomoji" || iconSet === "text") return fontFamily;
-        if (iconSet === "nerd") return cfg?.fontNerd ?? "JetBrainsMono Nerd Font";
-        if (iconSet === "windows") return fontSegoe;
-        if (iconSet === "awesome") return fontAwesome;
-
-        if (iconSet === "material-outlined" || iconSet === "outlined") return fontMaterialOutlined;
-        if (iconSet === "material-sharp" || iconSet === "sharp") return fontMaterialSharp;
-        if (iconSet === "material-rounded" || iconSet === "rounded") return fontMaterialRounded;
-        return cfg?.fontMaterial ?? fontMaterialRounded;
+    // Resolves a bundled SVG asset from assets/icons/
+    function bundledIconPath(name: string): string {
+        if (!name || name === "") return "";
+        let clean = name.trim();
+        if (clean.startsWith("assets/icons/")) clean = clean.substring("assets/icons/".length);
+        if (clean.endsWith(".svg")) clean = clean.substring(0, clean.length - 4);
+        return Qt.resolvedUrl("assets/icons/" + clean + ".svg").toString();
     }
 
-    readonly property var kaomojiMap: Object.freeze({
-        "arch": "(⌐■_■)", "nix": "(⌐■_■)", "nixos": "(⌐■_■)", "distro": "(⌐■_■)",
-        "appLauncher": "(ﾉ◕ヮ◕)ﾉ", "workspaces": "( ० ० )", "search": "( ⚆_⚆)", "close": "(×_×)",
-        "check": "(•̀ᴗ•́)b", "checkCircle": "(•̀ᴗ•́)b", "settings": "( ˘_˘ )", "gear": "( ˘_˘ )", "save": "(っ˘ω˘ς)",
-        "refresh": "(ノ°▽°)ノ", "trash": "(╯°□°)╯", "clipboard": "(っ•̀ᴗ•́)っ", "tray": "( ˙꒳˙ )", "grid": "( ⊞_⊞ )",
-        "note": "φ(．．)", "edit": "φ(．．)", "coffee": "( -_-)旦~", "clock": "( ˘ω˘ )", "cpu": "(ง•̀_•́)ง",
-        "mem": "( °□° )", "thermo": "(;´Д`)", "eye": "( •_• )", "eyeOff": "( -_- )", "heart": "( ˘ ³˘)♥", "pin": "( ⌖_⌖ )",
-        "download": "(っ´▽`)っ", "folder": "( ˘▾˘ )", "globe": "( ◕‿◕ )", "camera": "( ◉_• )", "crop": "( ¬_¬ )",
-        "screenshot": "( ◉_• )", "volMute": "( ˙×˙ )", "volLow": "( ˙-˙ )", "volMid": "( ᵔ◡ᵔ )", "volHigh": "( ≧∇≦ )",
-        "mic": "( °O° )", "micMute": "( ˙×˙ )", "palette": "( ✧ω✧ )", "headphones": "d( -_- )b", "equalizer": "( ~‾▿‾)~",
-        "batFull": "( ◕‿◕ )", "batHalf": "( ・_・ )", "batQuarter": "( ;´-` )", "batEmpty": "( ×_× )", "batCharge": "( ✧∇✧ )",
-        "batCharging": "( ✧∇✧ )", "sun": "( ☼‿☼ )", "moon": "( ˘ω˘ )zzZ", "brightness": "( ☼‿☼ )", "music": "ヽ(•‿•)ノ♪",
-        "play": "( ▸‿▸ )", "pause": "( ˙-˙ )", "next": "( ⇀‿⇀ )", "prev": "( ↼‿↼ )", "shuffle": "( ~_~ )",
-        "repeat": "( ↻_↻ )", "repeatOne": "( ↻_1 )", "wallhaven": "( ✧_✧ )", "wallpaper": "( ✧_✧ )", "bell": "( °!° )",
-        "bellOutline": "( °!° )", "bellOff": "( -.- )", "ethernet": "( ⌐■_■ )", "wifi": "( •̀ᴗ•́ )و", "wifiHigh": "( •̀ᴗ•́ )و",
-        "wifiMed": "( ・_・ )", "wifiLow": "( ;¬_¬ )", "wifiOff": "( ×_× )", "bluetooth": "( ˘▾˘ )",
-        "bluetoothConnected": "d( •̀ᴗ•́ )b", "bluetoothOff": "( ×_× )", "power": "( ˘_˘ )", "shutdown": "( ˘_˘ )",
-        "lock": "( ⌐■-■ )", "logout": "( ´ ▽ ` )ﾉ", "reboot": "( ノ°▽°)ノ", "suspend": "( -.- )zzZ", "hibernate": "( -.- )zzZ",
-        "chevronRight": ">", "chevronLeft": "<", "chevronDown": "v", "chevronUp": "^", "flame": "(ง •̀_•́)ง",
-        "sparkles": "( ✧ω✧ )", "radio": "( ~˘▾˘)~", "sliders": "( ˘_˘ )", "terminal": "( ¬‿¬ )", "calendar": "( ˘▾˘ )",
-        "history": "( ◔_◔ )", "copy": "(っ•̀ᴗ•́)っ", "externalLink": "( ☞ﾟヮﾟ)☞", "signal": "( •̀ᴗ•́ )", "filter": "( ¬_¬ )",
-        "user": "( •‿• )", "shield": "(ง •̀_•́)ง", "expand": "( ⊙_⊙ )", "collapse": "( >_< )", "keyboard": "φ(•̀ᴗ•́ )"
-    })
+    // Resolves any icon name, semantic key, bundled asset, or direct URL to a valid image source
+    function resolveIconSource(name: string): string {
+        if (!name || name === "") return "";
+        let s = name.trim();
 
-    readonly property var textMap: Object.freeze({
-        "arch": "nix", "nix": "nix", "nixos": "nix", "distro": "nix", "appLauncher": "apps", "workspaces": "ws", "search": "find", "close": "x",
-        "check": "ok", "checkCircle": "ok", "settings": "cfg", "gear": "cfg", "save": "save",
-        "refresh": "reload", "trash": "del", "clipboard": "clip", "tray": "tray", "grid": "grid",
-        "note": "note", "edit": "edit", "coffee": "cafe", "clock": "time", "cpu": "cpu",
-        "mem": "mem", "thermo": "temp", "eye": "show", "eyeOff": "hide", "heart": "fav", "pin": "pin",
-        "download": "down", "folder": "dir", "globe": "web", "camera": "cam", "crop": "crop",
-        "screenshot": "shot", "volMute": "mute", "volLow": "vol-", "volMid": "vol", "volHigh": "vol+",
-        "mic": "mic", "micMute": "no-mic", "palette": "theme", "headphones": "audio", "equalizer": "eq",
-        "batFull": "100%", "batHalf": "50%", "batQuarter": "25%", "batEmpty": "0%", "batCharge": "chg",
-        "batCharging": "chg", "sun": "day", "moon": "night", "brightness": "bright", "music": "music",
-        "play": "play", "pause": "pause", "next": "next", "prev": "prev", "shuffle": "shuf",
-        "repeat": "loop", "repeatOne": "loop1", "wallhaven": "walls", "wallpaper": "wall", "bell": "bell",
-        "bellOutline": "bell", "bellOff": "quiet", "ethernet": "eth", "wifi": "wifi", "wifiHigh": "high",
-        "wifiMed": "med", "wifiLow": "low", "wifiOff": "offline", "bluetooth": "bt",
-        "bluetoothConnected": "bt-on", "bluetoothOff": "bt-off", "power": "power", "shutdown": "power",
-        "lock": "lock", "logout": "logout", "reboot": "reboot", "suspend": "sleep", "hibernate": "hib",
-        "chevronRight": ">", "chevronLeft": "<", "chevronDown": "v", "chevronUp": "^", "flame": "chaos",
-        "sparkles": "magic", "radio": "radio", "sliders": "opts", "terminal": "term", "calendar": "cal",
-        "history": "hist", "copy": "copy", "externalLink": "open", "signal": "sig", "filter": "filter",
-        "user": "user", "shield": "safe", "expand": "max", "collapse": "min", "keyboard": "keys"
-    })
+        // 1. Return already resolved URLs directly
+        if (s.startsWith("image://") || s.startsWith("file://") || s.startsWith("qrc:/") ||
+            s.startsWith("http://") || s.startsWith("https://")) {
+            return s;
+        }
 
-    readonly property var fontAwesomeMap: Object.freeze({
-        "nixos": "\uF17C", "nix": "\uF17C", "arch": "\uF17C", "distro": "\uF17C",
-        "appLauncher": "\uF009", "workspaces": "\uF108", "search": "\uF002", "close": "\uF00D",
-        "check": "\uF00C", "checkCircle": "\uF058", "settings": "\uF013", "gear": "\uF013", "save": "\uF0C7",
-        "refresh": "\uF021", "trash": "\uF2ED", "clipboard": "\uF328", "tray": "\uF01C", "grid": "\uF00A",
-        "note": "\uF249", "edit": "\uF044", "coffee": "\uF0F4", "clock": "\uF017", "cpu": "\uF2DB",
-        "mem": "\uF538", "thermo": "\uF2C7", "eye": "\uF06E", "eyeOff": "\uF070", "heart": "\uF004", "pin": "\uF08D",
-        "download": "\uF019", "folder": "\uF07B", "globe": "\uF0AC", "camera": "\uF030", "crop": "\uF125",
-        "screenshot": "\uF03E", "volMute": "\uF026", "volLow": "\uF027", "volMid": "\uF027", "volHigh": "\uF028",
-        "mic": "\uF130", "micMute": "\uF131", "palette": "\uF53F", "headphones": "\uF025", "equalizer": "\uF1DE",
-        "batFull": "\uF240", "batHalf": "\uF242", "batQuarter": "\uF243", "batEmpty": "\uF244", "batCharge": "\uF0E7",
-        "batCharging": "\uF0E7", "sun": "\uF185", "moon": "\uF186", "brightness": "\uF185", "music": "\uF001",
-        "play": "\uF04B", "pause": "\uF04C", "next": "\uF051", "prev": "\uF048", "shuffle": "\uF074",
-        "repeat": "\uF363", "repeatOne": "\uF365", "wallhaven": "\uF03E", "wallpaper": "\uF03E", "bell": "\uF0F3",
-        "bellOutline": "\uF0F3", "bellOff": "\uF1F6", "ethernet": "\uF796", "wifi": "\uF1EB", "wifiHigh": "\uF1EB",
-        "wifiMed": "\uF6AB", "wifiLow": "\uF6AA", "wifiOff": "\uF6AC", "bluetooth": "\uF293",
-        "bluetoothConnected": "\uF294", "bluetoothOff": "\uF293", "power": "\uF011", "shutdown": "\uF011",
-        "lock": "\uF023", "logout": "\uF2F5", "reboot": "\uF021", "suspend": "\uF186", "hibernate": "\uF236",
-        "chevronRight": "\uF054", "chevronLeft": "\uF053", "chevronDown": "\uF078", "chevronUp": "\uF077",
-        "flame": "\uF06D", "sparkles": "\uE2CA", "radio": "\uF8D7", "sliders": "\uF1DE", "terminal": "\uF120",
-        "calendar": "\uF133", "history": "\uF1DA", "copy": "\uF0C5", "externalLink": "\uF35D", "signal": "\uF012",
-        "filter": "\uF0B0", "user": "\uF007", "shield": "\uF132", "expand": "\uF065", "collapse": "\uF066",
-        "keyboard": "\uF11C"
-    })
+        // 2. Absolute filesystem paths
+        if (s.startsWith("/")) {
+            return "file://" + s;
+        }
 
-    readonly property var nerdMap: Object.freeze({
-        "arch": "\uF303", "nix": "\uF313", "nixos": "\uF313", "distro": "\uF313", "appLauncher": "󰀻", "workspaces": "󱂬", "search": "", "close": "",
-        "check": "", "checkCircle": "", "settings": "", "gear": "", "save": "",
-        "refresh": "", "trash": "", "clipboard": "󰅌", "tray": "󱊖", "grid": "󰕰",
-        "note": "󰏫", "edit": "󰏫", "coffee": "󰛊", "clock": "󰥔", "cpu": "󰍛",
-        "mem": "󰘚", "thermo": "󰔏", "eye": "󰈈", "eyeOff": "󰈉", "heart": "󰋑", "pin": "󰐃",
-        "download": "󰇚", "folder": "󰉋", "globe": "󰖟", "camera": "󰄀", "crop": "󰩨",
-        "screenshot": "󰹑", "volMute": "󰝟", "volLow": "󰕿", "volMid": "󰖀", "volHigh": "󰕾",
-        "mic": "󰍬", "micMute": "󰍭", "palette": "󰏘", "headphones": "󰋋", "equalizer": "󰓃",
-        "batFull": "󰁹", "batHalf": "󰁿", "batQuarter": "󰁼", "batEmpty": "󰂃", "batCharge": "󰢝",
-        "batCharging": "󰢝", "sun": "󰖙", "moon": "󰖔", "brightness": "󰃠", "music": "󰝚",
-        "play": "󰐊", "pause": "󰏤", "next": "󰒭", "prev": "󰒮", "shuffle": "󰒝",
-        "repeat": "󰑖", "repeatOne": "󰑘", "wallhaven": "󰋩", "wallpaper": "󰋩", "bell": "󰂚",
-        "bellOutline": "󰂚", "bellOff": "󰂛", "ethernet": "󰈀", "wifi": "󰤨", "wifiHigh": "󰤨",
-        "wifiMed": "󰤥", "wifiLow": "󰤟", "wifiOff": "󰤮", "bluetooth": "󰂯",
-        "bluetoothConnected": "󰂱", "bluetoothOff": "󰂲", "power": "󰐥", "shutdown": "󰐥",
-        "lock": "󰌾", "logout": "󰍃", "reboot": "󰑓", "suspend": "󰤄", "hibernate": "󰒲",
-        "chevronRight": "", "chevronLeft": "", "chevronDown": "", "chevronUp": "", "flame": "󰈸",
-        "sparkles": "󰛓", "radio": "󰐹", "sliders": "󰒓", "terminal": "󰆍", "calendar": "󰃭",
-        "history": "󰋚", "copy": "󰆏", "externalLink": "󰌹", "signal": "󰖩", "filter": "󰈲",
-        "user": "󰀉", "shield": "󰞌", "expand": "󰊓", "collapse": "󰊔", "keyboard": "󰌌"
-    })
+        // 3. Bundled SVG path references
+        if (s.startsWith("assets/icons/") || s.startsWith("./assets/icons/") || s.endsWith(".svg")) {
+            return bundledIconPath(s);
+        }
 
+        // 4. Bundled specialty icons dictionary
+        const bundledMap = {
+            "distro": "nixos",
+            "nixos": "nixos",
+            "nix": "nixos",
+            "arch": "arch",
+            "coffee": "coffee",
+            "flame": "flame",
+            "sparkles": "sparkles",
+            "pin": "pin",
+            "tray": "tray",
+            "cpu": "cpu",
+            "ram": "ram",
+            "mem": "ram",
+            "thermo": "thermo",
+            "temperature": "thermo",
+            "equalizer": "equalizer",
+            "radio": "radio",
+            "filter": "filter"
+        };
+        if (bundledMap[s]) {
+            return bundledIconPath(bundledMap[s]);
+        }
+
+        // 5. Semantic icon key dictionary mapping to FreeDesktop standard names
+        const semanticMap = {
+            "appLauncher": "view-app-grid",
+            "app-launcher": "view-app-grid",
+            "workspaces": "view-paged",
+            "search": "system-search",
+            "close": "window-close",
+            "check": "object-select-symbolic",
+            "checkCircle": "emblem-ok-symbolic",
+            "settings": "preferences-system",
+            "gear": "preferences-system",
+            "save": "document-save",
+            "refresh": "view-refresh",
+            "trash": "user-trash",
+            "clipboard": "edit-paste",
+            "grid": "view-grid",
+            "note": "accessories-text-editor",
+            "edit": "accessories-text-editor",
+            "clock": "preferences-system-time",
+            "eye": "view-visible",
+            "eyeOff": "view-hidden",
+            "heart": "emblem-favorite",
+            "download": "download",
+            "folder": "folder",
+            "globe": "applications-internet",
+            "camera": "camera-photo",
+            "crop": "transform-crop",
+            "screenshot": "applets-screenshooter",
+            "volMute": "audio-volume-muted",
+            "volLow": "audio-volume-low",
+            "volMid": "audio-volume-medium",
+            "volHigh": "audio-volume-high",
+            "mic": "audio-input-microphone",
+            "micMute": "microphone-sensitivity-muted",
+            "palette": "preferences-desktop-theme",
+            "headphones": "audio-headphones",
+            "batFull": "battery-full",
+            "batHalf": "battery-good",
+            "batQuarter": "battery-low",
+            "batEmpty": "battery-empty",
+            "batCharge": "battery-charging-symbolic",
+            "batCharging": "battery-charging-symbolic",
+            "sun": "weather-clear",
+            "moon": "weather-clear-night",
+            "brightness": "weather-clear",
+            "music": "audio-x-generic",
+            "play": "media-playback-start",
+            "pause": "media-playback-pause",
+            "next": "media-skip-forward",
+            "prev": "media-skip-backward",
+            "shuffle": "media-playlist-shuffle",
+            "repeat": "media-playlist-repeat",
+            "repeatOne": "media-playlist-repeat-song",
+            "wallhaven": "preferences-desktop-wallpaper",
+            "wallpaper": "preferences-desktop-wallpaper",
+            "bell": "preferences-system-notifications",
+            "bellOutline": "preferences-system-notifications",
+            "bellOff": "notifications-disabled",
+            "ethernet": "network-wired",
+            "wifi": "network-wireless",
+            "wifiHigh": "network-wireless-signal-excellent",
+            "wifiMed": "network-wireless-signal-good",
+            "wifiLow": "network-wireless-signal-weak",
+            "wifiOff": "network-wireless-offline",
+            "bluetooth": "bluetooth-active",
+            "bluetoothConnected": "bluetooth-active",
+            "bluetoothOff": "bluetooth-disabled",
+            "power": "system-shutdown",
+            "shutdown": "system-shutdown",
+            "lock": "system-lock-screen",
+            "logout": "system-log-out",
+            "reboot": "system-reboot",
+            "suspend": "system-suspend",
+            "hibernate": "system-suspend-hibernate",
+            "chevronRight": "go-next",
+            "chevronLeft": "go-previous",
+            "chevronDown": "go-down",
+            "chevronUp": "go-up",
+            "sliders": "preferences-other",
+            "terminal": "utilities-terminal",
+            "calendar": "x-office-calendar",
+            "battery": "battery",
+            "volume": "audio-volume-high",
+            "history": "document-open-recent",
+            "copy": "edit-copy",
+            "externalLink": "document-open-remote",
+            "signal": "network-wireless-signal-good",
+            "user": "user-identity",
+            "shield": "security-high",
+            "expand": "view-fullscreen",
+            "collapse": "view-restore",
+            "keyboard": "input-keyboard"
+        };
+        let target = semanticMap[s] || s;
+
+        // 6. FreeDesktop system theme icon resolution via Quickshell
+        if (typeof Quickshell !== "undefined" && Quickshell.iconPath) {
+            let p = Quickshell.iconPath(target);
+            if (p) return p;
+        }
+        return "image://icon/" + target;
+    }
+
+    // Backward compatibility helper for legacy getIcon calls
     function getIcon(mat: string, win: string, fa: string, key: var, kao: var, txt: var): string {
-        if (iconSet === "kaomoji") {
-            if (typeof kao === "string" && kao !== "" && kao !== "undefined") return kao;
-            if (key && kaomojiMap[key]) return kaomojiMap[key];
-            return mat;
-        }
-        if (iconSet === "text") {
-            if (typeof txt === "string" && txt !== "" && txt !== "undefined") return txt;
-            if (key && textMap[key]) return textMap[key];
-            return mat;
-        }
-        if (iconSet === "nerd") {
-            if (key && nerdMap[key]) return nerdMap[key];
-            return "󰋼";
-        }
-        if (iconSet === "windows") return win;
-        if (iconSet === "awesome") {
-            if (key && fontAwesomeMap[key]) return fontAwesomeMap[key];
-            if (typeof fa === "string" && fa !== "") return fa;
-            return "\uF128";
-        }
-        return mat;
+        if (key && typeof key === "string") return resolveIconSource(key);
+        return "";
     }
 
+    // Dynamic Hardware / Status Icon Helpers
     function getBatteryIcon(pct: int, isCharging: bool, isSaver: bool, isVertical: bool): string {
         let p = (pct === undefined || pct === null || isNaN(pct)) ? -1 : Math.max(0, Math.min(100, Math.round(pct)));
-        let lvl = p < 0 ? -1 : Math.min(10, Math.floor(p / 10));
+        if (p < 0) return resolveIconSource(isCharging ? "battery-charging-symbolic" : "battery-symbolic");
 
-        if (iconSet === "kaomoji") {
-            if (lvl < 0) return kaomojiMap.batHalf;
-            if (isCharging) return kaomojiMap.batCharge;
-            if (lvl >= 9) return kaomojiMap.batFull;
-            if (lvl >= 5) return kaomojiMap.batHalf;
-            if (lvl >= 2) return kaomojiMap.batQuarter;
-            return kaomojiMap.batEmpty;
+        let step = Math.min(100, Math.max(0, Math.round(p / 10) * 10));
+        let cand = isCharging
+            ? (step === 100 ? "battery-level-100-charged-symbolic" : "battery-level-" + step + "-charging-symbolic")
+            : "battery-level-" + step + "-symbolic";
+
+        if (typeof Quickshell !== "undefined" && Quickshell.hasThemeIcon && Quickshell.hasThemeIcon(cand)) {
+            return resolveIconSource(cand);
         }
 
-        if (iconSet === "text") {
-            if (isCharging) return "chg";
-            if (lvl < 0) return "bat";
-            return p + "%";
-        }
-
-        if (iconSet === "nerd") {
-            if (lvl < 0) return "󰁹";
-            if (isCharging) {
-                const nerdCharging = ["󰢟", "󰢜", "󰂆", "󰂇", "󰂈", "󰢝", "󰂉", "󰢞", "󰂊", "󰂋", "󰂅"];
-                return nerdCharging[lvl];
-            }
-            const nerdDischarging = ["󰂃", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"];
-            return nerdDischarging[lvl];
-        }
-
-        if (iconSet === "windows") {
-            if (lvl < 0) return isVertical ? "\uF608" : "\uE996";
-            if (isVertical) {
-                if (isCharging) {
-                    const chargingV = ["\uF5FD", "\uF5FE", "\uF5FF", "\uF600", "\uF601", "\uF602", "\uF603", "\uF604", "\uF605", "\uF606", "\uF607"];
-                    return chargingV[lvl];
-                }
-                const dischargingV = ["\uF5F2", "\uF5F3", "\uF5F4", "\uF5F5", "\uF5F6", "\uF5F7", "\uF5F8", "\uF5F9", "\uF5FA", "\uF5FB", "\uF5FC"];
-                return dischargingV[lvl];
-            } else {
-                if (isCharging) {
-                    const chargingH = ["\uE85A", "\uE85B", "\uE85C", "\uE85D", "\uE85E", "\uE85F", "\uE860", "\uE861", "\uE862", "\uE83E", "\uEA93"];
-                    return chargingH[lvl];
-                }
-                if (isSaver) {
-                    const saverH = ["\uE863", "\uE864", "\uE865", "\uE866", "\uE867", "\uE868", "\uE869", "\uE86A", "\uE86B", "\uEA94", "\uEA95"];
-                    return saverH[lvl];
-                }
-                const dischargingH = ["\uE850", "\uE851", "\uE852", "\uE853", "\uE854", "\uE855", "\uE856", "\uE857", "\uE858", "\uE859", "\uE83F"];
-                return dischargingH[lvl];
-            }
-        }
-
-        if (iconSet === "awesome") {
-            if (lvl < 0) return fontAwesomeMap.batEmpty;
-            if (isCharging) return fontAwesomeMap.batCharge;
-            if (lvl >= 9) return fontAwesomeMap.batFull;
-            if (lvl >= 7) return "\uF241";
-            if (lvl >= 5) return fontAwesomeMap.batHalf;
-            if (lvl >= 2) return fontAwesomeMap.batQuarter;
-            return "\uF244";
-        }
-
-        if (lvl < 0) return "\uE1A6";
         if (isCharging) {
-            const matCharging = ["\uF0A2", "\uF0A2", "\uF0A3", "\uF0A3", "\uF0A4", "\uF0A4", "\uF0A5", "\uF0A6", "\uF0A6", "\uF0A7", "\uE1A3"];
-            return matCharging[lvl];
+            if (p >= 90) return resolveIconSource("battery-full-charging-symbolic");
+            if (p >= 50) return resolveIconSource("battery-good-charging-symbolic");
+            if (p >= 20) return resolveIconSource("battery-low-charging-symbolic");
+            return resolveIconSource("battery-empty-charging-symbolic");
+        } else {
+            if (p >= 90) return resolveIconSource("battery-full-symbolic");
+            if (p >= 50) return resolveIconSource("battery-good-symbolic");
+            if (p >= 20) return resolveIconSource("battery-low-symbolic");
+            return resolveIconSource("battery-empty-symbolic");
         }
-        const matDischarging = ["\uEBDC", "\uF09C", "\uF09D", "\uF09D", "\uF09E", "\uF09E", "\uF09F", "\uF0A0", "\uF0A0", "\uF0A1", "\uE1A5"];
-        return matDischarging[lvl];
     }
 
     function getVolumeIcon(volRatio: real, isMuted: bool): string {
         if (isMuted || volRatio === undefined || isNaN(volRatio) || volRatio <= 0.001) {
-            return (iconSet === "kaomoji") ? kaomojiMap.volMute : (iconSet === "text") ? textMap.volMute : (iconSet === "nerd") ? nerdMap.volMute : iconVolMute;
+            return resolveIconSource("audio-volume-muted");
         }
         let pct = Math.round(volRatio * 100);
-        if (iconSet === "kaomoji") {
-            if (pct > 100) return kaoFire;
-            if (pct <= 33) return kaomojiMap.volLow;
-            if (pct <= 66) return kaomojiMap.volMid;
-            return kaomojiMap.volHigh;
-        }
-        if (iconSet === "text") {
-            if (pct > 100) return "max!";
-            if (pct <= 33) return textMap.volLow;
-            if (pct <= 66) return textMap.volMid;
-            return textMap.volHigh;
-        }
-        if (iconSet === "nerd") {
-            if (pct <= 33) return nerdMap.volLow;
-            if (pct <= 66) return nerdMap.volMid;
-            return nerdMap.volHigh;
-        }
-        if (iconSet === "windows") {
-            if (pct <= 33) return "\uE993";
-            if (pct <= 66) return "\uE994";
-            return "\uE995";
-        }
-        if (iconSet === "awesome") {
-            if (pct <= 33) return fontAwesomeMap.volLow;
-            if (pct <= 66) return fontAwesomeMap.volMid;
-            return fontAwesomeMap.volHigh;
-        }
-        if (pct <= 33) return "\uE04E";
-        if (pct <= 66) return "\uE04D";
-        return "\uE050";
+        if (pct > 100) return resolveIconSource("audio-volume-overamplified");
+        if (pct <= 33) return resolveIconSource("audio-volume-low");
+        if (pct <= 66) return resolveIconSource("audio-volume-medium");
+        return resolveIconSource("audio-volume-high");
     }
 
     function getBrightnessIcon(pct: int): string {
         let p = (pct === undefined || isNaN(pct)) ? 50 : pct;
-        if (iconSet === "kaomoji") {
-            if (p <= 20) return kaoSleepy;
-            if (p >= 85) return kaoSparkle;
-            return kaomojiMap.brightness;
+        if (p <= 25) {
+            if (typeof Quickshell !== "undefined" && Quickshell.hasThemeIcon && Quickshell.hasThemeIcon("display-brightness-low-symbolic")) {
+                return resolveIconSource("display-brightness-low-symbolic");
+            }
+            return resolveIconSource("weather-clear-night");
         }
-        if (iconSet === "text") {
-            if (p <= 25) return "dim";
-            if (p >= 85) return "max";
-            return textMap.brightness;
+        if (p <= 70) {
+            if (typeof Quickshell !== "undefined" && Quickshell.hasThemeIcon && Quickshell.hasThemeIcon("display-brightness-medium-symbolic")) {
+                return resolveIconSource("display-brightness-medium-symbolic");
+            }
+            return resolveIconSource("display-brightness-symbolic");
         }
-        if (iconSet === "nerd") {
-            if (p <= 30) return "󰃞";
-            if (p <= 70) return "󰃟";
-            return "󰃠";
+        if (typeof Quickshell !== "undefined" && Quickshell.hasThemeIcon && Quickshell.hasThemeIcon("display-brightness-high-symbolic")) {
+            return resolveIconSource("display-brightness-high-symbolic");
         }
-        return p <= 25 ? iconMoon : iconBrightness;
+        return resolveIconSource("weather-clear");
     }
 
     function getWifiIcon(signalPct: int, isConnected: bool, isEthernet: bool): string {
-        if (isEthernet) return (iconSet === "kaomoji") ? kaomojiMap.ethernet : (iconSet === "text") ? "eth" : (iconSet === "nerd") ? "󰈀" : iconEthernet;
-        if (!isConnected) return (iconSet === "kaomoji") ? kaomojiMap.wifiOff : (iconSet === "text") ? "off" : (iconSet === "nerd") ? "󰤮" : iconWifiOff;
+        if (isEthernet) return resolveIconSource("network-wired");
+        if (!isConnected) return resolveIconSource("network-wireless-offline");
         let sig = (signalPct === undefined || signalPct === null || isNaN(signalPct)) ? 0 : signalPct;
-        if (iconSet === "kaomoji") {
-            if (sig < 35) return kaomojiMap.wifiLow;
-            if (sig < 70) return kaomojiMap.wifiMed;
-            return kaomojiMap.wifiHigh;
-        }
-        if (iconSet === "text") {
-            if (sig < 35) return "low";
-            if (sig < 70) return "med";
-            return "high";
-        }
-        if (iconSet === "nerd") {
-            if (sig < 35) return "󰤟";
-            if (sig < 70) return "󰤥";
-            return "󰤨";
-        }
-        if (iconSet === "windows") {
-            if (sig < 25) return "\uE871";
-            if (sig < 50) return "\uE872";
-            if (sig < 75) return "\uE873";
-            return "\uE874";
-        }
-        if (iconSet === "awesome") {
-            if (sig < 35) return fontAwesomeMap.wifiLow;
-            if (sig < 70) return fontAwesomeMap.wifiMed;
-            return fontAwesomeMap.wifiHigh;
-        }
-        if (sig < 35) return "\uE4CA";
-        if (sig < 70) return "\uE4D9";
-        return "\uE63E";
+        if (sig < 25) return resolveIconSource("network-wireless-signal-weak");
+        if (sig < 50) return resolveIconSource("network-wireless-signal-ok");
+        if (sig < 75) return resolveIconSource("network-wireless-signal-good");
+        return resolveIconSource("network-wireless-signal-excellent");
     }
 
-    readonly property string iconDistro:            getIcon("\uE30A", "\uE71D", "\uF17C", "nixos")
-    readonly property string iconNix:               getIcon("\uE30A", "\uE71D", "\uF17C", "nix")
-    readonly property string iconArch:              getIcon("\uE30A", "\uE71D", "\uF17C", "arch")
-    readonly property string iconAppLauncher:       getIcon("\uE5C3", "\uE71D", "\uF009", "appLauncher")
-    readonly property string iconWorkspaces:        getIcon("\uE1A0", "\uE7C4", "\uF108", "workspaces")
-    readonly property string iconSearch:            getIcon("\uE8B6", "\uE721", "\uF002", "search")
-    readonly property string iconClose:             getIcon("\uE5CD", "\uE711", "\uF00D", "close")
-    readonly property string iconCheck:             getIcon("\uE668", "\uE73E", "\uF00C", "check")
-    readonly property string iconCheckCircle:       getIcon("\uF0BE", "\uF13E", "\uF058", "checkCircle")
-    readonly property string iconSettings:          getIcon("\uE8B8", "\uE713", "\uF013", "settings")
+    // -------------------------------------------------------------------------
+    // 104 Theme Icon Properties
+    // -------------------------------------------------------------------------
+    readonly property string iconDistro:            resolveIconSource("distro")
+    readonly property string iconNix:               resolveIconSource("nix")
+    readonly property string iconArch:              resolveIconSource("arch")
+    readonly property string iconAppLauncher:       resolveIconSource("appLauncher")
+    readonly property string iconWorkspaces:        resolveIconSource("workspaces")
+    readonly property string iconSearch:            resolveIconSource("search")
+    readonly property string iconClose:             resolveIconSource("close")
+    readonly property string iconCheck:             resolveIconSource("check")
+    readonly property string iconCheckCircle:       resolveIconSource("checkCircle")
+    readonly property string iconSettings:          resolveIconSource("settings")
     readonly property string iconGear:              iconSettings
-    readonly property string iconSave:              getIcon("\uE161", "\uE74E", "\uF0C7", "save")
-    readonly property string iconRefresh:           getIcon("\uE5D5", "\uE72C", "\uF021", "refresh")
-    readonly property string iconTrash:             getIcon("\uE92E", "\uE74D", "\uF2ED", "trash")
-    readonly property string iconClipboard:         getIcon("\uE14F", "\uF0E3", "\uF328", "clipboard")
-    readonly property string iconTray:              getIcon("\uE156", "\uE971", "\uF01C", "tray")
-    readonly property string iconGrid:              getIcon("\uE9B0", "\uF0E2", "\uF00A", "grid")
-    readonly property string iconNote:              getIcon("\uE66D", "\uE70F", "\uF249", "note")
+    readonly property string iconSave:              resolveIconSource("save")
+    readonly property string iconRefresh:           resolveIconSource("refresh")
+    readonly property string iconTrash:             resolveIconSource("trash")
+    readonly property string iconClipboard:         resolveIconSource("clipboard")
+    readonly property string iconTray:              resolveIconSource("tray")
+    readonly property string iconGrid:              resolveIconSource("grid")
+    readonly property string iconNote:              resolveIconSource("note")
     readonly property string iconEdit:              iconNote
-    readonly property string iconCoffee:            getIcon("\uEFEF", "\uEC32", "\uF0F4", "coffee")
-    readonly property string iconClock:             getIcon("\uEFD6", "\uE823", "\uF017", "clock")
-    readonly property string iconCpu:               getIcon("\uE322", "\uEEA1", "\uF2DB", "cpu")
-    readonly property string iconMem:               getIcon("\uF7A3", "\uEEA0", "\uF538", "mem")
-    readonly property string iconThermo:            getIcon("\uE846", "\uE9CA", "\uF2C7", "thermo")
-    readonly property string iconEye:               getIcon("\uE8F4", "\uE7B3", "\uF06E", "eye")
-    readonly property string iconEyeOff:            getIcon("\uE8F5", "\uED1A", "\uF070", "eyeOff")
-    readonly property string iconHeart:             getIcon("\uE87E", "\uEB51", "\uF004", "heart")
-    readonly property string iconPin:               getIcon("\uE6AA", "\uE718", "\uF08D", "pin")
-    readonly property string iconDownload:          getIcon("\uF090", "\uE896", "\uF019", "download")
-    readonly property string iconFolder:            getIcon("\uE2C7", "\uE838", "\uF07B", "folder")
-    readonly property string iconGlobe:             getIcon("\uE64C", "\uE774", "\uF0AC", "globe")
-    readonly property string iconCamera:            getIcon("\uE3AF", "\uE722", "\uF030", "camera")
-    readonly property string iconCrop:              getIcon("\uE3BE", "\uE7A8", "\uF125", "crop")
-    readonly property string iconScreenshot:        getIcon("\uF056", "\uE722", "\uF03E", "screenshot")
+    readonly property string iconCoffee:            resolveIconSource("coffee")
+    readonly property string iconClock:             resolveIconSource("clock")
+    readonly property string iconCpu:               resolveIconSource("cpu")
+    readonly property string iconMem:               resolveIconSource("mem")
+    readonly property string iconThermo:            resolveIconSource("thermo")
+    readonly property string iconEye:               resolveIconSource("eye")
+    readonly property string iconEyeOff:            resolveIconSource("eyeOff")
+    readonly property string iconHeart:             resolveIconSource("heart")
+    readonly property string iconPin:               resolveIconSource("pin")
+    readonly property string iconDownload:          resolveIconSource("download")
+    readonly property string iconFolder:            resolveIconSource("folder")
+    readonly property string iconGlobe:             resolveIconSource("globe")
+    readonly property string iconCamera:            resolveIconSource("camera")
+    readonly property string iconCrop:              resolveIconSource("crop")
+    readonly property string iconScreenshot:        resolveIconSource("screenshot")
 
-    readonly property string iconVolMute:           getIcon("\uE04F", "\uE74F", "\uF026", "volMute")
-    readonly property string iconVolLow:            getIcon("\uE04E", "\uE993", "\uF027", "volLow")
-    readonly property string iconVolMid:            getIcon("\uE04D", "\uE994", "\uF027", "volMid")
-    readonly property string iconVolHigh:           getIcon("\uE050", "\uE995", "\uF028", "volHigh")
-    readonly property string iconMic:               getIcon("\uE31D", "\uE720", "\uF130", "mic")
-    readonly property string iconMicMute:           getIcon("\uE02B", "\uF781", "\uF131", "micMute")
-    readonly property string iconPalette:           getIcon("\uE40A", "\uE790", "\uF53F", "palette")
-    readonly property string iconHeadphones:        getIcon("\uF01F", "\uE7F6", "\uF025", "headphones")
-    readonly property string iconEqualizer:         getIcon("\uE01D", "\uE9E9", "\uF1DE", "equalizer")
+    readonly property string iconVolMute:           resolveIconSource("volMute")
+    readonly property string iconVolLow:            resolveIconSource("volLow")
+    readonly property string iconVolMid:            resolveIconSource("volMid")
+    readonly property string iconVolHigh:           resolveIconSource("volHigh")
+    readonly property string iconMic:               resolveIconSource("mic")
+    readonly property string iconMicMute:           resolveIconSource("micMute")
+    readonly property string iconPalette:           resolveIconSource("palette")
+    readonly property string iconHeadphones:        resolveIconSource("headphones")
+    readonly property string iconEqualizer:         resolveIconSource("equalizer")
 
-    readonly property string iconBatFull:           getIcon("\uE1A5", "\uE83F", "\uF240", "batFull")
-    readonly property string iconBatHalf:           getIcon("\uF09E", "\uE855", "\uF242", "batHalf")
-    readonly property string iconBatQuarter:        getIcon("\uF09D", "\uE852", "\uF243", "batQuarter")
-    readonly property string iconBatEmpty:          getIcon("\uEBDC", "\uE850", "\uF244", "batEmpty")
-    readonly property string iconBatCharge:         getIcon("\uE1A3", "\uE83E", "\uF0E7", "batCharge")
+    readonly property string iconBatFull:           resolveIconSource("batFull")
+    readonly property string iconBatHalf:           resolveIconSource("batHalf")
+    readonly property string iconBatQuarter:        resolveIconSource("batQuarter")
+    readonly property string iconBatEmpty:          resolveIconSource("batEmpty")
+    readonly property string iconBatCharge:         resolveIconSource("batCharge")
     readonly property string iconBatCharging:       iconBatCharge
 
-    readonly property string iconSun:               getIcon("\uE518", "\uE706", "\uF185", "sun")
-    readonly property string iconMoon:              getIcon("\uE51C", "\uE708", "\uF186", "moon")
+    readonly property string iconSun:               resolveIconSource("sun")
+    readonly property string iconMoon:              resolveIconSource("moon")
     readonly property string iconBrightness:        iconSun
 
-    readonly property string iconMusic:             getIcon("\uE405", "\uE8D6", "\uF001", "music")
-    readonly property string iconPlay:              getIcon("\uE037", "\uE768", "\uF04B", "play")
-    readonly property string iconPause:             getIcon("\uE034", "\uE769", "\uF04C", "pause")
-    readonly property string iconNext:              getIcon("\uE044", "\uE893", "\uF051", "next")
-    readonly property string iconPrev:              getIcon("\uE045", "\uE892", "\uF048", "prev")
-    readonly property string iconShuffle:           getIcon("\uE043", "\uE8B1", "\uF074", "shuffle")
-    readonly property string iconRepeat:            getIcon("\uE040", "\uE8EE", "\uF363", "repeat")
-    readonly property string iconRepeatOne:         getIcon("\uE041", "\uE8ED", "\uF365", "repeatOne")
+    readonly property string iconMusic:             resolveIconSource("music")
+    readonly property string iconPlay:              resolveIconSource("play")
+    readonly property string iconPause:             resolveIconSource("pause")
+    readonly property string iconNext:              resolveIconSource("next")
+    readonly property string iconPrev:              resolveIconSource("prev")
+    readonly property string iconShuffle:           resolveIconSource("shuffle")
+    readonly property string iconRepeat:            resolveIconSource("repeat")
+    readonly property string iconRepeatOne:         resolveIconSource("repeatOne")
 
-    readonly property string iconWallhaven:         getIcon("\uE1BC", "\uE91B", "\uF03E", "wallhaven")
-    readonly property string iconWallpaper:         getIcon("\uE1BC", "\uE91B", "\uF03E", "wallpaper")
-    readonly property string iconBell:              getIcon("\uE7F5", "\uEA8F", "\uF0F3", "bell")
-    readonly property string iconBellOutline:       getIcon("\uE7F5", "\uEA8F", "\uF0F3", "bellOutline")
-    readonly property string iconBellOff:           getIcon("\uE7F6", "\uEE79", "\uF1F6", "bellOff")
+    readonly property string iconWallhaven:         resolveIconSource("wallhaven")
+    readonly property string iconWallpaper:         resolveIconSource("wallpaper")
+    readonly property string iconBell:              resolveIconSource("bell")
+    readonly property string iconBellOutline:       resolveIconSource("bellOutline")
+    readonly property string iconBellOff:           resolveIconSource("bellOff")
 
-    readonly property string iconEthernet:          getIcon("\uEB2F", "\uE839", "\uF796", "ethernet")
-    readonly property string iconWifi:              getIcon("\uE63E", "\uE701", "\uF1EB", "wifi")
-    readonly property string iconWifiHigh:          getIcon("\uE63E", "\uE874", "\uF1EB", "wifiHigh")
-    readonly property string iconWifiMed:           getIcon("\uE4D9", "\uE873", "\uF6AB", "wifiMed")
-    readonly property string iconWifiLow:           getIcon("\uE4CA", "\uE872", "\uF6AA", "wifiLow")
-    readonly property string iconWifiOff:           getIcon("\uE648", "\uE998", "\uF6AC", "wifiOff")
-    readonly property string iconBluetooth:         getIcon("\uE1A7", "\uE702", "\uF293", "bluetooth")
-    readonly property string iconBluetoothConnected:getIcon("\uE1A8", "\uE702", "\uF294", "bluetoothConnected")
-    readonly property string iconBluetoothOff:      getIcon("\uE1A9", "\uE702", "\uF293", "bluetoothOff")
+    readonly property string iconEthernet:          resolveIconSource("ethernet")
+    readonly property string iconWifi:              resolveIconSource("wifi")
+    readonly property string iconWifiHigh:          resolveIconSource("wifiHigh")
+    readonly property string iconWifiMed:           resolveIconSource("wifiMed")
+    readonly property string iconWifiLow:           resolveIconSource("wifiLow")
+    readonly property string iconWifiOff:           resolveIconSource("wifiOff")
+    readonly property string iconBluetooth:         resolveIconSource("bluetooth")
+    readonly property string iconBluetoothConnected:resolveIconSource("bluetoothConnected")
+    readonly property string iconBluetoothOff:      resolveIconSource("bluetoothOff")
 
-    readonly property string iconPower:             getIcon("\uF8C7", "\uE7E8", "\uF011", "power")
+    readonly property string iconPower:             resolveIconSource("power")
     readonly property string iconShutdown:          iconPower
-    readonly property string iconLock:              getIcon("\uE899", "\uE72E", "\uF023", "lock")
-    readonly property string iconLogout:            getIcon("\uE9BA", "\uF3B1", "\uF2F5", "logout")
-    readonly property string iconReboot:            getIcon("\uF053", "\uE777", "\uF021", "reboot")
-    readonly property string iconSuspend:           getIcon("\uF159", "\uE708", "\uF186", "suspend")
-    readonly property string iconHibernate:         getIcon("\uF236", "\uE9CA", "\uF236", "hibernate")
+    readonly property string iconLock:              resolveIconSource("lock")
+    readonly property string iconLogout:            resolveIconSource("logout")
+    readonly property string iconReboot:            resolveIconSource("reboot")
+    readonly property string iconSuspend:           resolveIconSource("suspend")
+    readonly property string iconHibernate:         resolveIconSource("hibernate")
 
-    readonly property string iconChevronRight:      getIcon("\uE5CC", "\uE974", "\uF054", "chevronRight")
-    readonly property string iconChevronLeft:       getIcon("\uE5CB", "\uE973", "\uF053", "chevronLeft")
-    readonly property string iconChevronDown:       getIcon("\uE5CF", "\uE972", "\uF078", "chevronDown")
-    readonly property string iconChevronUp:         getIcon("\uE5CE", "\uE971", "\uF077", "chevronUp")
-    readonly property string iconFlame:             getIcon("\uEF55", "\uE945", "\uF06D", "flame")
-    readonly property string iconSparkles:          getIcon("\uE65F", "\uE794", "\uE2CA", "sparkles")
-    readonly property string iconRadio:             getIcon("\uE03E", "\uE93E", "\uF8D7", "radio")
-    readonly property string iconSliders:           getIcon("\uE429", "\uE9E9", "\uF1DE", "sliders")
-    readonly property string iconTerminal:          getIcon("\uEB8E", "\uE756", "\uF120", "terminal")
-    readonly property string iconCalendar:          getIcon("\uE935", "\uE787", "\uF133", "calendar")
-    readonly property string iconHistory:           getIcon("\uE8B3", "\uE81C", "\uF1DA", "history")
-    readonly property string iconCopy:              getIcon("\uE14D", "\uE8C8", "\uF0C5", "copy")
-    readonly property string iconExternalLink:      getIcon("\uE89E", "\uE8A7", "\uF35D", "externalLink")
-    readonly property string iconSignal:            getIcon("\uE202", "\uEC3A", "\uF012", "signal")
-    readonly property string iconFilter:            getIcon("\uE152", "\uE71C", "\uF0B0", "filter")
-    readonly property string iconUser:              getIcon("\uF0D3", "\uE77B", "\uF007", "user")
-    readonly property string iconShield:            getIcon("\uE9E0", "\uEA18", "\uF132", "shield")
-    readonly property string iconExpand:            getIcon("\uE5D0", "\uE740", "\uF065", "expand")
-    readonly property string iconCollapse:          getIcon("\uE94D", "\uE73F", "\uF066", "collapse")
-    readonly property string iconKeyboard:          getIcon("\uE30C", "\uEA08", "\uF11C", "keyboard")
+    readonly property string iconChevronRight:      resolveIconSource("chevronRight")
+    readonly property string iconChevronLeft:       resolveIconSource("chevronLeft")
+    readonly property string iconChevronDown:       resolveIconSource("chevronDown")
+    readonly property string iconChevronUp:         resolveIconSource("chevronUp")
+    readonly property string iconFlame:             resolveIconSource("flame")
+    readonly property string iconSparkles:          resolveIconSource("sparkles")
+    readonly property string iconRadio:             resolveIconSource("radio")
+    readonly property string iconSliders:           resolveIconSource("sliders")
+    readonly property string iconTerminal:          resolveIconSource("terminal")
+    readonly property string iconCalendar:          resolveIconSource("calendar")
+    readonly property string iconBattery:           resolveIconSource("battery")
+    readonly property string iconVolume:            resolveIconSource("volume")
+    readonly property string iconHistory:           resolveIconSource("history")
+    readonly property string iconCopy:              resolveIconSource("copy")
+    readonly property string iconExternalLink:      resolveIconSource("externalLink")
+    readonly property string iconSignal:            resolveIconSource("signal")
+    readonly property string iconFilter:            resolveIconSource("filter")
+    readonly property string iconUser:              resolveIconSource("user")
+    readonly property string iconShield:            resolveIconSource("shield")
+    readonly property string iconExpand:            resolveIconSource("expand")
+    readonly property string iconCollapse:          resolveIconSource("collapse")
+    readonly property string iconKeyboard:          resolveIconSource("keyboard")
 
     readonly property string kaoHappy:              "(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧"
     readonly property string kaoSad:                "( ╥ω╥ )"
@@ -1174,184 +1122,206 @@ Singleton {
         return (text ?? "").toLowerCase();
     }
 
-    readonly property var flavorQuotes: Object.freeze({
-        "network_on": [
-            "pinging 1.1.1.1 just to check if the router is mad at me",
-            "\"no matter where you go, everyone's connected.\" — lain",
-            "47 browser tabs open for one tiny nix error",
-            "ssh session hanging because i switched wifi networks",
-            "downloading node_modules (heat death of universe pending)",
-            "git push --force and pray nobody notices",
-            "latency low, packets clean, everything humming along",
-            "copy-pasting a pipewire fix from a 2022 reddit thread",
-            "\"there is no cloud, it's just someone else's computer.\"",
-            "it's always dns. literally always dns",
-            "bgp routes stable, unfortunately",
-            "tailscale tunnel up, homelab reachable from the couch"
-        ],
-        "network_off": [
-            "dns resolution failed: finally, inner peace",
-            "rfc 1149 (ip over avian carriers) standby",
-            "127.0.0.1 is the only safe place left",
-            "offline mode: time to read man pages like it's 1997",
-            "networkmanager gave up and honestly i respect that",
-            "no packets, no masters, pure local computing",
-            "airgapped paranoia protocol activated",
-            "good excuse to finally clean up ~/downloads",
-            "eth0 pretending to be dead so we don't have to answer emails"
-        ],
-        "battery_charging": [
-            "shoving 65 watts into a swollen spicy pillow",
-            "usb-c pd negotiating for its life",
-            "plugged in: cpu governor immediately goes feral",
-            "top-up in progress, grab a coffee too",
-            "electrons aggressively cramming into lithium cages",
-            "charging up before moving back to the couch",
-            "acpi reports state: charging (and warming your lap)",
-            "feeding fresh wall juice straight into the compile job"
-        ],
-        "battery_low": [
-            "running on kernel panic adrenaline and 2% reserve",
-            "where did i leave the usb-c brick...",
-            "two percent left and twenty neovim buffers unsaved",
-            "tlp fighting for its life right now",
-            "one electron tab away from sudden poweroff",
-            "dimming the screen and praying the charger is nearby",
-            "upower daemon is actively drafting a will",
-            "save your work right now, future you will thank you"
-        ],
-        "battery_full": [
-            "100% charged (84% actual battery health, don't look at it)",
-            "topped off and ready to wander away from the desk",
-            "charge threshold holding steady, lithium cells chilling",
-            "unplug me before the desk spontaneously combusts",
-            "bms reports full charge. bms is probably lying",
-            "full battery, clean workspace, zero excuses"
-        ],
-        "media_playing": [
-            "decoding flac just to output it through bluetooth earbuds",
-            "cava bars dancing in a terminal corner for no reason",
-            "soundtrack locked in, flow state engaged",
-            "pipewire graph miraculously not dropping frames today",
-            "spotify eating 1.4gb of ram for a 3-minute song",
-            "\"music is the shorthand of emotion.\" — leo tolstoy",
-            "good headphones + late night terminal session = peak peace",
-            "mpris broadcasting questionable music taste over dbus"
-        ],
-        "media_quiet": [
-            "nothing playing except the gentle hum of case fans",
-            "wireplumber suspended the sink to save 0.1 watts",
-            "quiet room, quiet thoughts, clean focus",
-            "waiting for the inevitable terminal bell beep",
-            "letting the dac enjoy an unpaid lunch break",
-            "\"silence is a source of great strength.\" — lao tzu",
-            "put on a lo-fi album or enjoy the peace and quiet"
-        ],
-        "notes_empty": [
-            "vim buffer empty. brain buffer empty",
-            "todo list cleared. go touch grass or play something",
-            "zero tasks pending, honestly feels illegal",
-            "the markdown file contains 0 bytes. nature is healing",
-            "\"simplicity is prerequisite for reliability.\" — dijkstra",
-            "nothing urgent written down, take a breath",
-            "no lingering chores rattling around in /tmp"
-        ],
-        "notifs_empty": [
-            "zero `@everyone` pings ruining the vibe today",
-            "inbox zero. nobody needs anything from you right now",
-            "dbus is suspiciously quiet, enjoy it while it lasts",
-            "no pings, no alerts, no jira tickets kicking the door down",
-            "notification daemon taking a well-deserved nap",
-            "peace and quiet in local airspace"
-        ],
-        "dnd_on": [
-            "routing all dbus notifications straight to /dev/null",
-            "do not disturb: deep in the dotfiles, send help later",
-            "if you ping me right now i will compile webkit on your router",
-            "\"leave me alone, i know what i'm doing.\" — kimi räikkönen",
-            "focus mode active: world muted, compiler warm",
-            "firewalling port 80 of my personal boundaries",
-            "locked in. notifications can wait till tomorrow"
-        ],
-        "volume_muted": [
-            "muted just in case auto-playing video tries something funny",
-            "sending all pcm streams straight into the void",
-            "muted on discord—wait let me double check the mic icon too",
-            "silence dialed to eleven",
-            "wireplumber ordered to execute total radio silence"
-        ],
-        "volume_high": [
-            "permanent hearing loss speedrun (any%)",
-            "pushing pipewire past 100% because the mix is quiet",
-            "approaching 0dbfs, RIP to your eardrums if a notification hits",
-            "speaker cones begging for humanitarian intervention",
-            "vibing at slightly irresponsible decibels"
-        ],
-        "brightness_high": [
-            "deploying tactical flashbang straight into corneas",
-            "accidentally opened a white webpage at 2am",
-            "pushing 100% luminance just to read dark mode text in sunlight",
-            "burning the status bar permanently into the panel",
-            "bright and crisp, posture check while you're looking"
-        ],
-        "brightness_low": [
-            "cozy late-night dim mode engaged",
-            "saving optical nerves from certain destruction",
-            "saving 0.4 watts on backlight power like a true minimalist",
-            "vampire cave ambience calibrated to perfection",
-            "easy on the eyes, take a break if you're squinting"
-        ],
-        "idle_inhibited": [
-            "caffeine active: we do not sleep until the build finishes",
-            "wayland idle inhibitor holding the screen hostage",
-            "staying awake so the long download doesn't drop",
-            "machine pumped full of virtual espresso",
-            "dpms politely told to mind its own business"
-        ],
-        "idle_normal": [
-            "cpu governor chilling in powersave",
-            "all quiet on the desktop, relax your shoulders",
-            "c-states dropping deep, thermals nice and cool",
-            "system breathing easy, zero runaway processes",
-            "ready for a coffee break whenever you are"
-        ],
+    readonly property var quotes: Object.freeze({
         "system": [
-            "spent 3 hours ricing quickshell to avoid a 10-minute task",
-            "opened a terminal, typed ls, immediately closed it",
-            "hyprland.lua indexing workspaces from 1 like a sociopath",
-            "migrating hyprland.conf to hl.config({}) at 3am",
-            "hyprctl repl is my new favorite calculator",
-            "\"talk is cheap. show me the code.\" — linus torvalds",
-            "\"an idiot admires complexity, a genius admires simplicity.\" — terry davis",
-            "\"do one thing and do it well.\" — douglas mcilroy",
-            "all services green, thermals cool, dotfiles looking clean",
-            "forgetting the tar flags and checking --help for the 500th time",
-            "six terminals open just to show off btop and fastfetch",
-            "nix store eating 80gb of disk space, time to garbage collect",
-            "discord screenshare showing a black window on wayland again",
-            "git commit -m 'fix' followed by git commit -m 'actually fix'",
-            "oom killer quietly sizing up the electron apps",
-            "rewrote my config in hyprland.lua and it actually worked on reload",
-            "\"beware of bugs in the above code; i have only proved it correct.\" — knuth",
-            "hydrated? posture okay? alright, carry on",
-            "running 30 days of uptime out of pure refusal to close my tabs"
+            "\"Talk is cheap. Show me the code.\" — Linus Torvalds",
+            "\"Do one thing and do it well.\" — Douglas McIlroy",
+            "\"Beware of bugs in the above code; I have only proved it correct, not tried it.\" — Donald Knuth",
+            "\"There is no cloud, it's just someone else's computer.\" — Tech Adage",
+            "\"No matter where you go, everyone's connected.\" — Serial Experiments Lain",
+            "\"Unix is simple. It just takes a genius to understand its simplicity.\" — Dennis Ritchie",
+            "\"Simplicity is prerequisite for reliability.\" — Edsger W. Dijkstra",
+            "\"Measuring programming progress by lines of code is like measuring aircraft building progress by weight.\" — Bill Gates",
+            "\"The most important property of a program is whether it accomplishes the intention of its user.\" — C.A.R. Hoare",
+            "\"Premature optimization is the root of all evil.\" — Donald Knuth"
         ],
-        "screenshot": [
-            "grim + slurp: fastest snitch in the west",
-            "copied to wl-clipboard, ready to paste into the chat",
-            "saving receipts for the group chat",
-            "showing off the rice on r/unixporn?",
-            "another png added to ~/pictures/screenshots that you'll never delete",
-            "pixels acquired, framing looks clean",
-            "allocating 40mb of ram for a 12kb screenshot"
+        "philosophy": [
+            "\"Silence is a source of great strength.\" — Lao Tzu",
+            "\"Music is the shorthand of emotion.\" — Leo Tolstoy",
+            "\"We suffer more often in imagination than in reality.\" — Seneca",
+            "\"Waste no more time arguing what a good man should be. Be one.\" — Marcus Aurelius",
+            "\"The unexamined life is not worth living.\" — Socrates",
+            "\"He who has a why to live can bear almost any how.\" — Friedrich Nietzsche",
+            "\"It is not that we have a short time to live, but that we waste a lot of it.\" — Seneca",
+            "\"The impediment to action advances action. What stands in the way becomes the way.\" — Marcus Aurelius",
+            "\"Knowing yourself is the beginning of all wisdom.\" — Aristotle"
+        ],
+        "focus": [
+            "\"Leave me alone, I know what I'm doing.\" — Kimi Räikkönen",
+            "\"Deep work is the ability to focus without distraction on a cognitively demanding task.\" — Cal Newport",
+            "\"Concentration is the secret of strength.\" — Ralph Waldo Emerson",
+            "\"The successful warrior is the average man, with laser-like focus.\" — Bruce Lee",
+            "\"Order your soul. Reduce your wants.\" — Augustine",
+            "\"It is during our darkest moments that we must focus to see the light.\" — Aristotle",
+            "\"Do not dwell in the past, do not dream of the future, concentrate the mind on the present moment.\" — Buddha"
+        ],
+        "simplicity": [
+            "\"Simplicity is prerequisite for reliability.\" — Edsger W. Dijkstra",
+            "\"An idiot admires complexity, a genius admires simplicity.\" — Terry Davis",
+            "\"Simplicity is the ultimate sophistication.\" — Leonardo da Vinci",
+            "\"Perfection is achieved not when there is nothing more to add, but when there is nothing left to take away.\" — Antoine de Saint-Exupéry",
+            "\"Make it simple, but significant.\" — Don Draper",
+            "\"Truth is ever to be found in simplicity, and not in the multiplicity and confusion of things.\" — Isaac Newton",
+            "\"Fools ignore complexity. Pragmatists suffer it. Some can avoid it. Geniuses remove it.\" — Alan Perlis"
         ]
     })
 
+    readonly property var statusFlavor: Object.freeze({
+        "network_on": [
+            "latency low, packets clean, link stable",
+            "tailscale tunnel connected • homelab reachable",
+            "bgp and routing tables nominal",
+            "wifi link established • packet flow healthy",
+            "gigabit link active • zero dropped frames",
+            "dns resolved and upstream responsive",
+            "local gateway responsive • 1.1.1.1 reachable"
+        ],
+        "network_off": [
+            "offline mode • reading local man pages",
+            "pure local computing • radio interfaces down",
+            "airgapped mode active • zero external egress",
+            "network interfaces disconnected",
+            "127.0.0.1 is the only safe place left",
+            "ethernet and wifi down • working locally"
+        ],
+        "battery_charging": [
+            "usb-c power delivery active • charging cells",
+            "plugged in • performance governor active",
+            "fast charging active • battery replenishing",
+            "external power connected • thermals nominal",
+            "feeding clean wall juice into the system",
+            "acpi state: charging • battery warming",
+            "charge level rising • power brick negotiated"
+        ],
+        "battery_low": [
+            "battery low • connect charger soon",
+            "power reserve dropping below threshold",
+            "dimming backlight to preserve remaining run time",
+            "tlp powersave mode active • conserve battery",
+            "save open buffers • charger recommended",
+            "battery at critical level • running on reserve"
+        ],
+        "battery_full": [
+            "battery fully charged • cells balanced",
+            "charge cycle complete • ready for unplugged use",
+            "charge threshold held • battery at 100%",
+            "power adapter connected • battery healthy and full",
+            "full battery • thermals cool and nominal"
+        ],
+        "media_playing": [
+            "audio stream active • pipewire graph running",
+            "soundtrack locked in • flow state engaged",
+            "lossless stream playing smoothly",
+            "mpris session active • headphones connected",
+            "playback active • pipewire latency clean"
+        ],
+        "media_quiet": [
+            "audio graph idle • no active playback",
+            "wireplumber suspended sinks to conserve power",
+            "quiet room • no audio streams active",
+            "dac idle • zero background noise",
+            "silence maintained • ready for audio"
+        ],
+        "notes_empty": [
+            "task list clear • all items completed",
+            "scratchpad empty • ready for notes",
+            "zero pending items • workspace organized",
+            "all notes archived • clean slate",
+            "buffer empty • no tasks remaining"
+        ],
+        "notifs_empty": [
+            "notification tray clear • zero unread pings",
+            "inbox zero • no pending alerts",
+            "dbus notification daemon quiet",
+            "distraction-free desktop • zero unread toasts",
+            "all notifications dismissed"
+        ],
+        "dnd_on": [
+            "do not disturb active • notifications silenced",
+            "focus mode engaged • routing pings to dev null",
+            "world muted • deep work in progress",
+            "quiet hours active • alerts suppressed",
+            "notification daemon holding toasts until unmuted"
+        ],
+        "volume_muted": [
+            "audio output muted • silence enforced",
+            "master volume muted • hardware mute active",
+            "pipewire sink muted • zero audio output",
+            "output muted • tap volume key to restore"
+        ],
+        "volume_high": [
+            "volume output high • mind your hearing",
+            "preamp volume past nominal threshold",
+            "high output level active on current sink",
+            "audio output level near peak dynamic range"
+        ],
+        "brightness_high": [
+            "backlight at high luminance",
+            "peak display brightness active",
+            "high contrast backlight for ambient lighting",
+            "panel backlight set to maximum visibility"
+        ],
+        "brightness_low": [
+            "dim mode engaged • comfortable for low light",
+            "low backlight active • reducing eye strain",
+            "minimal display luminance active",
+            "night mode brightness • preserving dark adaptation"
+        ],
+        "idle_inhibited": [
+            "idle inhibitor active • display will stay awake",
+            "system keep-awake engaged for active tasks",
+            "wayland idle protocol inhibited",
+            "sleep timers suspended during active task"
+        ],
+        "idle_normal": [
+            "idle timer active • power management nominal",
+            "cpu idling • thermals cool and quiet",
+            "system in normal power-saving state",
+            "display sleep timer running normally"
+        ],
+        "system": [
+            "all services green • dotfiles running smooth",
+            "layer-shell desktop running responsive and clean",
+            "hyprland ipc responsive • compositor synced",
+            "system thermals nominal • memory clean",
+            "zero errors in system journal • uptime steady",
+            "desktop environment stable and focused"
+        ],
+        "screenshot": [
+            "screen region captured to clipboard",
+            "native wayland capture completed",
+            "pixels acquired • ready to share",
+            "framebuffer capture saved and ready",
+            "screenshot saved to ~/pictures/screenshots"
+        ]
+    })
+
+    // Backward-compatible alias for existing callers accessing Theme.flavorQuotes directly
+    readonly property var flavorQuotes: statusFlavor
+
+    // F02: Dedicated quote helper for attributed quotes (system, philosophy, focus, simplicity)
+    function getQuote(category: string, fallback: string): string {
+        let cat = category || "system";
+        let pool = quotes[cat] ?? quotes["system"];
+        if (!pool || pool.length === 0) return fallback ?? "";
+        let totalMinutes = clock.hours * 60 + clock.minutes;
+        return pool[totalMinutes % pool.length] ?? fallback ?? "";
+    }
+
+    // F02: Dedicated contextual hardware / desktop status helper
+    function getStatusFlavor(category: string, fallback: string): string {
+        if (!cfg?.unhingedFlavor) return (fallback ?? "").toLowerCase();
+        let list = statusFlavor[category];
+        if (!list || list.length === 0) return (fallback ?? "").toLowerCase();
+        let totalMinutes = clock.hours * 60 + clock.minutes;
+        return (list[totalMinutes % list.length] ?? fallback ?? "").toLowerCase();
+    }
+
+    // F02: Backward-compatible adapter for all existing call sites
     function getFlavor(category: string, fallback: string): string {
         if (!cfg?.unhingedFlavor) return (fallback ?? "").toLowerCase();
-        let list = flavorQuotes[category];
+        let list = statusFlavor[category] ?? quotes[category];
         if (!list || list.length === 0) return (fallback ?? "").toLowerCase();
-
         let totalMinutes = clock.hours * 60 + clock.minutes;
         return (list[totalMinutes % list.length] ?? fallback ?? "").toLowerCase();
     }

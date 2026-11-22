@@ -198,7 +198,7 @@ PanelWindow {
         id: bmp
         property int points: 50
         property real flash: 0
-        property alias icon: bmpIcon.text
+        property string icon: ""
 
         width: 52
         height: 52
@@ -228,11 +228,11 @@ PanelWindow {
         Column {
             anchors.centerIn: parent
             spacing: 1
-            Text {
+            Icon {
                 id: bmpIcon
                 anchors.horizontalCenter: parent.horizontalCenter
-                font.family: Theme.fontIcon
-                font.pixelSize: 14
+                source: bmp.icon
+                size: 14
                 color: Theme.primary
             }
             Text {
@@ -251,7 +251,7 @@ PanelWindow {
         property int slot: 0
         readonly property int homeX: root.isVertical ? 10 : 10 + slot * 135
         readonly property int homeY: root.isVertical ? 10 + slot * 96 : 10
-        property alias icon: pcIcon.text
+        property string icon: ""
         property alias title: pcTitle.text
         property color accentColor: Theme.primary
 
@@ -299,10 +299,10 @@ PanelWindow {
             anchors.centerIn: parent
             spacing: 3
 
-            Text {
+            Icon {
                 id: pcIcon
-                font.family: Theme.fontIcon
-                font.pixelSize: 18
+                source: pcRoot.icon
+                size: 18
                 color: pcRoot.accentColor
                 Layout.alignment: Qt.AlignHCenter
             }
@@ -407,8 +407,14 @@ PanelWindow {
                     Layout.fillWidth: true
                     spacing: 8
 
+                    Icon {
+                        source: Theme.iconSparkles
+                        size: Theme.fontSizeSm
+                        color: Theme.primary
+                    }
+
                     Text {
-                        text: "󰑮 physics & momentum playground"
+                        text: "physics & momentum playground"
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSm
                         font.weight: Font.Bold
@@ -508,9 +514,9 @@ PanelWindow {
                         Repeater {
                             id: bumperRepeater
                             model: [
-                                { u: 0.24, d: 0.42, points: 25, icon: "󰓠" },
-                                { u: 0.50, d: 0.28, points: 100, icon: "󰓦" },
-                                { u: 0.76, d: 0.42, points: 50, icon: "󰓡" }
+                                { u: 0.24, d: 0.42, points: 25, icon: Theme.iconSparkles },
+                                { u: 0.50, d: 0.28, points: 100, icon: Theme.iconFlame },
+                                { u: 0.76, d: 0.42, points: 50, icon: Theme.iconHeart }
                             ]
                             delegate: Bumper {
                                 required property var modelData
@@ -608,11 +614,10 @@ PanelWindow {
                                 wake();
                             }
 
-                            Text {
+                            Icon {
                                 anchors.centerIn: parent
-                                text: "󰮯"
-                                font.family: Theme.fontIcon
-                                font.pixelSize: 12
+                                source: Theme.iconDistro
+                                size: 12
                                 color: Theme.on_primary
                             }
 
@@ -763,7 +768,7 @@ PanelWindow {
                         PhysicsCard {
                             id: dragCard1
                             slot: 0
-                            icon: "󰁕"
+                            icon: Theme.iconRefresh
                             title: "flick momentum"
                             accentColor: Theme.primary
                         }
@@ -771,7 +776,7 @@ PanelWindow {
                         PhysicsCard {
                             id: dragCard2
                             slot: 1
-                            icon: "󰈈"
+                            icon: Theme.iconEye
                             title: "freedom card"
                             accentColor: Theme.warn
                         }

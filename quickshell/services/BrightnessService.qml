@@ -65,6 +65,10 @@ Scope {
         Quickshell.execDetached(["brightnessctl", "set", clamped + "%"]);
     }
 
+    function setBrightness(pct) {
+        setBrightnessPercent(pct);
+    }
+
     function step(delta: int): void {
         let next = Math.max(1, Math.min(100, root.percent + delta));
         setBrightnessPercent(next);

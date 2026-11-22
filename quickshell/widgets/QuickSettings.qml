@@ -50,7 +50,12 @@ Rectangle {
     readonly property string userHome: Quickshell.env("HOME") || ""
     readonly property string cacheDir: Quickshell.env("XDG_CACHE_HOME") || (userHome + "/.cache")
     readonly property string configDir: Quickshell.env("XDG_CONFIG_HOME") || (userHome + "/.config")
-    readonly property string lockStatePath: configDir + "/quickshell/lockscreen/state"
+    readonly property string stateDir: {
+        let xdgState = Quickshell.env("XDG_STATE_HOME");
+        if (xdgState && xdgState.trim() !== "") return xdgState.trim() + "/quickshell";
+        return userHome ? (userHome + "/.local/state/quickshell") : "/tmp/quickshell-state";
+    }
+    readonly property string lockStatePath: stateDir + "/lockscreen/state"
 
     // synced with ~/.config/quickshell/lockscreen/state so we don't nuke the lockscreen keys
     property var lockCfg: ({
@@ -337,11 +342,10 @@ Rectangle {
                 border.color: Theme.alpha(Theme.primary, 0.35)
                 border.width: 1
 
-                Text {
+                Icon {
                     anchors.centerIn: parent
-                    text: catHdr.icon
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeXs
+                    source: catHdr.icon
+                    size: Theme.fontSizeXs
                     color: Theme.primary
                 }
             }
@@ -445,11 +449,10 @@ Rectangle {
 
             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-            Text {
+            Icon {
                 anchors.centerIn: parent
-                text: trRoot.icon
-                font.family: Theme.fontIcon
-                font.pixelSize: Theme.fontSizeXs
+                source: trRoot.icon
+                size: Theme.fontSizeXs
                 color: trRoot.checked ? Theme.primary : Theme.textSecondary
             }
         }
@@ -911,11 +914,10 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 6
 
-        Text {
+        Icon {
             anchors.verticalCenter: parent.verticalCenter
-            text: Theme.iconSettings
-            font.family: Theme.fontIcon
-            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
+            source: Theme.iconSettings
+            size: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
             color: popup.open || qsMouse.containsMouse ? Theme.primary : Theme.textPrimary
 
             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -1038,11 +1040,10 @@ Rectangle {
                     border.color: Theme.alpha(Theme.primary, 0.35)
                     border.width: 1
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: Theme.iconSettings
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                        source: Theme.iconSettings
+                        size: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                         color: Theme.primary
                     }
                 }
@@ -1082,11 +1083,10 @@ Rectangle {
                         anchors.centerIn: parent
                         spacing: 4
 
-                        Text {
+                        Icon {
                             visible: !Theme.isTextIconSet
-                            text: Theme.iconCheck
-                            font.family: Theme.fontIcon
-                            font.pixelSize: Theme.fontSizeXs
+                            source: Theme.iconCheck
+                            size: Theme.fontSizeXs
                             color: Theme.primary
                         }
 
@@ -1165,11 +1165,10 @@ Rectangle {
                                 anchors.centerIn: parent
                                 spacing: 6
 
-                                Text {
+                                Icon {
                                     visible: !Theme.isTextIconSet
-                                    text: modelData.icon
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: Theme.fontSizeSm
+                                    source: modelData.icon
+                                    size: Theme.fontSizeSm
                                     color: isSelected ? Theme.primary : Theme.textSecondary
                                 }
 
@@ -1238,11 +1237,10 @@ Rectangle {
                                     border.color: Theme.alpha(Theme.primary, 0.4)
                                     border.width: 1
 
-                                    Text {
+                                    Icon {
                                         anchors.centerIn: parent
-                                        text: Theme.iconSparkles
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
+                                        source: Theme.iconSparkles
+                                        size: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                         color: Settings.showBarStudio ? Theme.on_primary : Theme.primary
                                     }
                                 }
@@ -1523,6 +1521,166 @@ Rectangle {
                                 onMoved: (val) => Settings.notchFlareRadius = val
                             }
                         }
+
+                        CategoryHeader {
+                            title: "bar modules visibility"
+                            subtitle: "toggle individual widget components on or off across the status bar"
+                            icon: Theme.iconGrid
+                        }
+
+                        SettingCard {
+                            ToggleRow {
+                                icon: Theme.iconGrid
+                                title: "workspaces"
+                                subtitle: "virtual desktop workspace switcher"
+                                checked: Settings.showWorkspaces
+                                onToggled: { Settings.showWorkspaces = !Settings.showWorkspaces; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconSparkles
+                                title: "layout switcher"
+                                subtitle: "hyprland window tiling layout toggle"
+                                checked: Settings.showLayoutSwitcher
+                                onToggled: { Settings.showLayoutSwitcher = !Settings.showLayoutSwitcher; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconTerminal
+                                title: "active window title"
+                                subtitle: "current active application and window class title"
+                                checked: Settings.showWindowTitle
+                                onToggled: { Settings.showWindowTitle = !Settings.showWindowTitle; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconClock
+                                title: "clock & date"
+                                subtitle: "status bar time capsule and calendar popup"
+                                checked: Settings.showClock
+                                onToggled: { Settings.showClock = !Settings.showClock; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconCalendar
+                                title: "bar date label"
+                                subtitle: "display date beside clock in status bar"
+                                checked: Settings.showBarDate
+                                onToggled: { Settings.showBarDate = !Settings.showBarDate; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconBattery || "battery"
+                                title: "battery telemetry"
+                                subtitle: "power level, charging status, and battery telemetry"
+                                checked: Settings.showBattery
+                                onToggled: { Settings.showBattery = !Settings.showBattery; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconExpand
+                                title: "system tray"
+                                subtitle: "status notifier item (sni) tray icons"
+                                checked: Settings.showSystemTray
+                                onToggled: { Settings.showSystemTray = !Settings.showSystemTray; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconVolume || "audio-volume-high"
+                                title: "volume & audio"
+                                subtitle: "pipewire audio sink and microphone control"
+                                checked: Settings.showVolume
+                                onToggled: { Settings.showVolume = !Settings.showVolume; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconPlay
+                                title: "media player"
+                                subtitle: "mpris now playing media widget and visualizer"
+                                checked: Settings.showMedia
+                                onToggled: { Settings.showMedia = !Settings.showMedia; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconBell
+                                title: "notifications center"
+                                subtitle: "notification badge, toast manager, and history log"
+                                checked: Settings.showNotifications
+                                onToggled: { Settings.showNotifications = !Settings.showNotifications; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconSearch
+                                title: "app launcher"
+                                subtitle: "application search, web query, and math solver trigger"
+                                checked: Settings.showLauncher
+                                onToggled: { Settings.showLauncher = !Settings.showLauncher; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconPower
+                                title: "power & session menu"
+                                subtitle: "lock, suspend, reboot, and power off controls"
+                                checked: Settings.showPowerMenu
+                                onToggled: { Settings.showPowerMenu = !Settings.showPowerMenu; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconWifi
+                                title: "network status"
+                                subtitle: "wifi and ethernet connectivity monitor"
+                                checked: Settings.showNetwork
+                                onToggled: { Settings.showNetwork = !Settings.showNetwork; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconBluetooth
+                                title: "bluetooth"
+                                subtitle: "bluetooth pairing and connected device status"
+                                checked: Settings.showBluetooth
+                                onToggled: { Settings.showBluetooth = !Settings.showBluetooth; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconCopy
+                                title: "clipboard manager"
+                                subtitle: "copy history and snippet picker"
+                                checked: Settings.showClipboard
+                                onToggled: { Settings.showClipboard = !Settings.showClipboard; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconEye
+                                title: "idle inhibitor"
+                                subtitle: "keep display awake and prevent auto-sleep"
+                                checked: Settings.showIdleInhibitor
+                                onToggled: { Settings.showIdleInhibitor = !Settings.showIdleInhibitor; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconCamera
+                                title: "screen capture & recorder"
+                                subtitle: "region screenshot and screen recording tool"
+                                checked: Settings.showScreenCapture
+                                onToggled: { Settings.showScreenCapture = !Settings.showScreenCapture; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconSparkles
+                                title: "bar studio module button"
+                                subtitle: "show direct bar studio designer icon in the status bar"
+                                checked: Settings.showBarStudio
+                                onToggled: { Settings.showBarStudio = !Settings.showBarStudio; root.saveSettings(); }
+                            }
+                            RowDivider {}
+                            ToggleRow {
+                                icon: Theme.iconSliders
+                                title: "motion sandbox"
+                                subtitle: "animation physics testing lab module"
+                                checked: Settings.showMotionSandbox
+                                onToggled: { Settings.showMotionSandbox = !Settings.showMotionSandbox; root.saveSettings(); }
+                            }
+                        }
                     }
                 }
                 TabScrollTrack { target: flickLayout }
@@ -1546,6 +1704,31 @@ Rectangle {
                         id: styleCol
                         width: parent.width
                         spacing: Theme.popupSpacing
+
+                        CategoryHeader {
+                            title: "theme mode & appearance"
+                            subtitle: "switch between light and dark theme modes"
+                            icon: Theme.iconPalette
+                        }
+
+                        SettingCard {
+                            ChoiceGrid {
+                                columns: 2
+                                title: "theme mode"
+                                model: [
+                                    { label: "dark mode", value: "dark" },
+                                    { label: "light mode", value: "light" }
+                                ]
+                                currentValue: Settings.matugenMode
+                                onSelected: (val) => {
+                                    Settings.matugenMode = val;
+                                    if (typeof WallpaperService !== "undefined" && WallpaperService?.setMode) {
+                                        WallpaperService.setMode(val);
+                                    }
+                                    root.saveSettings();
+                                }
+                            }
+                        }
 
                         CategoryHeader {
                             title: "surface & material"
@@ -1667,6 +1850,145 @@ Rectangle {
                                     swatchColor: Settings.customWidgetBg !== "" ? Settings.customWidgetBg : Theme.pillBg
                                     onClicked: colorStudioModal.open("customWidgetBg", "widget & pill color", "surface color for bar pills", Settings.customWidgetBg, Theme.pillBg)
                                 }
+                            }
+                        }
+
+                        CategoryHeader {
+                            title: "granular style & glassmorphism"
+                            subtitle: "fine-tune surface opacity, glass blur, bento spacing, and padding"
+                            icon: Theme.iconSliders
+                        }
+
+                        SettingCard {
+                            SliderRow {
+                                title: "card opacity"
+                                from: 0.30
+                                to: 1.00
+                                stepSize: 0.05
+                                value: Settings.cardOpacity ?? 0.95
+                                formatter: (v) => Math.round(v * 100) + "%"
+                                onMoved: (val) => Settings.cardOpacity = val
+                            }
+
+                            RowDivider {}
+
+                            SliderRow {
+                                title: "surface opacity"
+                                from: 0.30
+                                to: 1.00
+                                stepSize: 0.05
+                                value: Settings.surfaceOpacity ?? 0.90
+                                formatter: (v) => Math.round(v * 100) + "%"
+                                onMoved: (val) => Settings.surfaceOpacity = val
+                            }
+
+                            RowDivider {}
+
+                            SliderRow {
+                                title: "glassmorphism level"
+                                from: 0.00
+                                to: 1.00
+                                stepSize: 0.05
+                                value: Settings.glassmorphismLevel ?? 0.85
+                                formatter: (v) => Math.round(v * 100) + "%"
+                                onMoved: (val) => Settings.glassmorphismLevel = val
+                            }
+
+                            RowDivider {}
+
+                            SliderRow {
+                                title: "bento capsule gap"
+                                from: 0
+                                to: 24
+                                stepSize: 1
+                                value: Settings.bentoGap ?? 8
+                                formatter: (v) => Math.round(v) + " px"
+                                onMoved: (val) => Settings.bentoGap = Math.round(val)
+                            }
+
+                            RowDivider {}
+
+                            SliderRow {
+                                title: "widget vertical padding"
+                                from: 0
+                                to: 16
+                                stepSize: 1
+                                value: Settings.widgetPaddingV ?? 4
+                                formatter: (v) => Math.round(v) + " px"
+                                onMoved: (val) => Settings.widgetPaddingV = Math.round(val)
+                            }
+                        }
+
+                        CategoryHeader {
+                            title: "motion & animation physics"
+                            subtitle: "customize animation speed, easing curves, and duration"
+                            icon: Theme.iconSliders
+                        }
+
+                        SettingCard {
+                            ChoiceGrid {
+                                columns: 3
+                                title: "animation easing curve"
+                                model: [
+                                    { label: "cubic", value: "cubic" },
+                                    { label: "quad", value: "quad" },
+                                    { label: "quart", value: "quart" },
+                                    { label: "expo", value: "expo" },
+                                    { label: "back", value: "back" },
+                                    { label: "linear", value: "linear" }
+                                ]
+                                currentValue: Settings.animCurve ?? "cubic"
+                                onSelected: (val) => Settings.animCurve = val
+                            }
+
+                            RowDivider {}
+
+                            ChoiceGrid {
+                                columns: 3
+                                title: "easing direction"
+                                model: [
+                                    { label: "out", value: "out" },
+                                    { label: "in-out", value: "in-out" },
+                                    { label: "in", value: "in" }
+                                ]
+                                currentValue: Settings.animEasingType ?? "out"
+                                onSelected: (val) => Settings.animEasingType = val
+                            }
+
+                            RowDivider {}
+
+                            SliderRow {
+                                title: "fast animation duration"
+                                from: 50
+                                to: 300
+                                stepSize: 10
+                                value: Settings.animDurationFast ?? 120
+                                formatter: (v) => Math.round(v) + " ms"
+                                onMoved: (val) => Settings.animDurationFast = Math.round(val)
+                            }
+
+                            RowDivider {}
+
+                            SliderRow {
+                                title: "normal animation duration"
+                                from: 100
+                                to: 600
+                                stepSize: 20
+                                value: Settings.animDurationNormal ?? 200
+                                formatter: (v) => Math.round(v) + " ms"
+                                onMoved: (val) => Settings.animDurationNormal = Math.round(val)
+                            }
+
+                            RowDivider {}
+
+                            SliderRow {
+                                title: "slow animation duration"
+                                from: 200
+                                to: 1000
+                                stepSize: 50
+                                value: Settings.animDurationSlow ?? 350
+                                formatter: (v) => Math.round(v) + " ms"
+                                onMoved: (val) => Settings.animDurationSlow = Math.round(val)
                             }
                         }
 
@@ -1957,10 +2279,9 @@ Rectangle {
                                     anchors.margins: 8
                                     spacing: 8
 
-                                    Text {
-                                        text: Theme.iconSearch
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeSm
+                                    Icon {
+                                        source: Theme.iconSearch
+                                        size: Theme.fontSizeSm
                                         color: fontSearchInput.activeFocus ? Theme.primary : Theme.textSecondary
                                     }
 
@@ -2050,12 +2371,11 @@ Rectangle {
                                                 elide: Text.ElideRight
                                             }
 
-                                            // keep iconCheck in Theme.fontIcon so random system fonts don't render it as a box
-                                            Text {
+                                            // use Icon for iconCheck so random system fonts do not render it as a box
+                                            Icon {
                                                 visible: isCurrent && !Theme.isTextIconSet
-                                                text: Theme.iconCheck
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.fontSizeXs
+                                                source: Theme.iconCheck
+                                                size: Theme.fontSizeXs
                                                 color: Theme.primary
                                             }
 
@@ -2125,11 +2445,10 @@ Rectangle {
                                     radius: Theme.radiusMd
                                     color: Theme.primary_overlay
 
-                                    Text {
+                                    Icon {
                                         anchors.centerIn: parent
-                                        text: Theme.iconLock
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeMd
+                                        source: Theme.iconLock
+                                        size: Theme.fontSizeMd
                                         color: Theme.primary
                                     }
                                 }
@@ -2226,11 +2545,13 @@ Rectangle {
                             ChoiceRow {
                                 title: "lock screen quote source"
                                 model: [
+                                    { label: "smart", value: "smart" },
+                                    { label: "quotes", value: "quotes" },
+                                    { label: "status", value: "status" },
                                     { label: "hyprctl", value: "hyprland" },
-                                    { label: "unhinged", value: "unhinged" },
                                     { label: "hidden", value: "off" }
                                 ]
-                                currentValue: root.lockCfg.quoteMode ?? "hyprland"
+                                currentValue: (root.lockCfg.quoteMode === "unhinged" ? "status" : root.lockCfg.quoteMode) ?? "smart"
                                 onSelected: (val) => root.updateLockCfg("quoteMode", val)
                             }
 
@@ -2490,8 +2811,8 @@ Rectangle {
                             RowDivider {}
                             ToggleRow {
                                 icon: Theme.iconFlame
-                                title: "unhinged flavor text"
-                                subtitle: "chaotic system status quips & personality"
+                                title: "status flavor text"
+                                subtitle: "contextual system status quips & hints"
                                 checked: Settings.unhingedFlavor
                                 onToggled: {
                                     Settings.unhingedFlavor = !Settings.unhingedFlavor;
@@ -2569,11 +2890,10 @@ Rectangle {
                                         RowLayout {
                                             anchors.centerIn: parent
                                             spacing: 6
-                                            Text {
+                                            Icon {
                                                 visible: !Theme.isTextIconSet
-                                                text: modelData.icon
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.fontSizeSm
+                                                source: modelData.icon
+                                                size: Theme.fontSizeSm
                                                 color: scQuickM.pressed ? Theme.on_primary : Theme.primary
                                             }
                                             Text {
@@ -2818,11 +3138,10 @@ Rectangle {
                                                 radius: Theme.radiusSm
                                                 color: root.activeShell === modelData.id ? Theme.primary : Theme.widgetBg
 
-                                                Text {
+                                                Icon {
                                                     anchors.centerIn: parent
-                                                    text: modelData.icon
-                                                    font.family: Theme.fontIcon
-                                                    font.pixelSize: Theme.fontSizeSm
+                                                    source: modelData.icon
+                                                    size: Theme.fontSizeSm
                                                     color: root.activeShell === modelData.id ? Theme.on_primary : Theme.textSecondary
                                                 }
                                             }
@@ -2898,10 +3217,9 @@ Rectangle {
                                     anchors.centerIn: parent
                                     spacing: 8
 
-                                    Text {
-                                        text: Theme.iconRefresh
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeSm
+                                    Icon {
+                                        source: Theme.iconRefresh
+                                        size: Theme.fontSizeSm
                                         color: Theme.primary
                                     }
 
@@ -2967,10 +3285,9 @@ Rectangle {
                                             anchors.rightMargin: 8
                                             spacing: 8
 
-                                            Text {
-                                                text: Theme.iconWifi
-                                                font.family: Theme.fontIcon
-                                                font.pixelSize: Theme.fontSizeXs
+                                            Icon {
+                                                source: Theme.iconWifi
+                                                size: Theme.fontSizeXs
                                                 color: Theme.primary
                                             }
 
@@ -3035,10 +3352,9 @@ Rectangle {
                                     anchors.margins: 10
                                     spacing: 12
 
-                                    Text {
-                                        text: Theme.iconFlame
-                                        font.family: Theme.fontIcon
-                                        font.pixelSize: Theme.fontSizeMd
+                                    Icon {
+                                        source: Theme.iconFlame
+                                        size: Theme.fontSizeMd
                                         color: Theme.error
                                     }
 
@@ -3110,10 +3426,9 @@ Rectangle {
                 Layout.fillWidth: true
                 spacing: 6
 
-                Text {
-                    text: Theme.iconCheck
-                    font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeXs
+                Icon {
+                    source: Theme.iconCheck
+                    size: Theme.fontSizeXs
                     color: Theme.primary
                 }
 
@@ -3166,11 +3481,10 @@ Rectangle {
                     border.color: Theme.error
                     border.width: 1
 
-                    Text {
+                    Icon {
                         anchors.centerIn: parent
-                        text: Theme.iconFlame
-                        font.family: Theme.fontIcon
-                        font.pixelSize: Theme.fontSizeXl
+                        source: Theme.iconFlame
+                        size: Theme.fontSizeXl
                         color: Theme.error
                     }
                 }
