@@ -54,6 +54,11 @@ QuickNotes               widgets/QuickNotes.qml
 LockScreen               lockscreen/LockScreen.qml
 LockStudioDrawer         lockscreen/LockStudioDrawer.qml
 LockPowerDock            lockscreen/LockPowerDock.qml
+LockSessionPill          lockscreen/LockSessionPill.qml
+LockStatusBar            lockscreen/LockStatusBar.qml
+LockClockCard            lockscreen/LockClockCard.qml
+LockMediaCard            lockscreen/LockMediaCard.qml
+LockAuthCard             lockscreen/LockAuthCard.qml
 ScreenshotOverlay        widgets/ScreenshotOverlay.qml
 BarStudio                widgets/BarStudio.qml
 MotionSandbox            widgets/MotionSandbox.qml
