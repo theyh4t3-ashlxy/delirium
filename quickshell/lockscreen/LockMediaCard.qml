@@ -9,22 +9,22 @@ import Quickshell.Services.Mpris
 ClippingRectangle {
     id: mediaBlock
 
-    required property var lockRoot
-    required property var surface
-    required property var centerStage
-    property var lockPeakMonitor: null
+    property var root: null
+    property var lockSurface: null
+    property var stage: null
+    property var peakMonitor: null
 
                             width: parent.width
-                            y: centerStage.blockY("media")
+                            y: stage.blockY("media")
                             implicitHeight: mediaCardCol.implicitHeight + 24
                             height: implicitHeight
-                            radius: lockRoot.uiRadiusLg
-                            color: Theme.blend(lockRoot.uiCardBg, surface.artAccent, surface.playerIsPlaying ? 0.14 : 0.04)
-                            border.color: surface.playerIsPlaying ? Theme.alpha(surface.artAccent, 0.45) : lockRoot.uiCardBorder
+                            radius: root.uiRadiusLg
+                            color: Theme.blend(root.uiCardBg, lockSurface.artAccent, lockSurface.playerIsPlaying ? 0.14 : 0.04)
+                            border.color: lockSurface.playerIsPlaying ? Theme.alpha(lockSurface.artAccent, 0.45) : root.uiCardBorder
                             border.width: 1
-                            visible: lockRoot.showMediaCard
-                                && surface.activePlayer !== null
-                                && ((surface.activePlayer?.trackTitle ?? "") !== "" || surface.playerIsPlaying)
+                            visible: root.showMediaCard
+                                && lockSurface.activePlayer !== null
+                                && ((lockSurface.activePlayer?.trackTitle ?? "") !== "" || lockSurface.playerIsPlaying)
 
                             Behavior on y { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
                             Behavior on color { ColorAnimation { duration: Theme.animSlow; easing.type: Theme.animColorEasing } }
@@ -34,16 +34,16 @@ ClippingRectangle {
                                 anchors.fill: parent
                                 acceptedButtons: Qt.NoButton
                                 onWheel: (wheel) => {
-                                    if (surface.activePlayer && (surface.activePlayer.volumeSupported ?? true)) {
+                                    if (lockSurface.activePlayer && (lockSurface.activePlayer.volumeSupported ?? true)) {
                                         let delta = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
-                                        let cur = (surface.activePlayer.volume !== undefined && !isNaN(surface.activePlayer.volume))
-                                            ? surface.activePlayer.volume
+                                        let cur = (lockSurface.activePlayer.volume !== undefined && !isNaN(lockSurface.activePlayer.volume))
+                                            ? lockSurface.activePlayer.volume
                                             : 1.0;
                                         let next = Math.max(0.0, Math.min(1.0, cur + delta));
-                                        surface.activePlayer.volume = next;
-                                        surface.showVolumeToast("vol " + Math.round(next * 100) + "%");
+                                        lockSurface.activePlayer.volume = next;
+                                        lockSurface.showVolumeToast("vol " + Math.round(next * 100) + "%");
                                     } else {
-                                        surface.adjustSystemVolume(wheel.angleDelta.y > 0 ? 0.05 : -0.05);
+                                        lockSurface.adjustSystemVolume(wheel.angleDelta.y > 0 ? 0.05 : -0.05);
                                     }
                                 }
                             }
@@ -56,8 +56,8 @@ ClippingRectangle {
                                 anchors.rightMargin: 8
                                 height: 42
                                 spacing: 3
-                                visible: lockRoot.showMediaVisualizer
-                                opacity: surface.playerIsPlaying ? (lockRoot.isLight ? 0.28 : 0.22) : 0.06
+                                visible: root.showMediaVisualizer
+                                opacity: lockSurface.playerIsPlaying ? (root.isLight ? 0.28 : 0.22) : 0.06
 
                                 Behavior on opacity { NumberAnimation { duration: Theme.animNormal } }
 
@@ -75,18 +75,18 @@ ClippingRectangle {
                                         }
 
                                         readonly property real chPeak: {
-                                            let pList = (lockPeakMonitor.peaks && lockPeakMonitor.peaks.length > 0) ? lockPeakMonitor.peaks : [];
+                                            let pList = (peakMonitor?.peaks && peakMonitor.peaks.length > 0) ? peakMonitor.peaks : [];
                                             if (pList.length >= 2) {
                                                 let mix = index / 23.0;
                                                 return (pList[0] * (1.0 - mix)) + (pList[1] * mix);
                                             }
-                                            return lockPeakMonitor.peak ?? 0;
+                                            return peakMonitor?.peak ?? 0;
                                         }
 
                                         height: {
-                                            if (!surface.playerIsPlaying) return 3;
+                                            if (!lockSurface.playerIsPlaying) return 3;
                                             let p = chPeak;
-                                            let ripple = Math.sin((index * 0.65) + lockRoot.wavePhase) * 0.3 + Math.cos((index * 1.2) - lockRoot.wavePhase * 0.7) * 0.2;
+                                            let ripple = Math.sin((index * 0.65) + root.wavePhase) * 0.3 + Math.cos((index * 1.2) - root.wavePhase * 0.7) * 0.2;
                                             if (p > 0.008) {
                                                 let target = (p * env * 36) + (Math.abs(ripple) * 12 * Math.min(1.0, p * 3.5));
                                                 return Math.max(3, Math.min(40, Math.round(target)));
@@ -94,7 +94,7 @@ ClippingRectangle {
                                             return Math.max(3, Math.round(3 + Math.abs(ripple) * 5));
                                         }
 
-                                        color: chPeak > 0.55 ? Theme.tertiary : surface.artAccent
+                                        color: chPeak > 0.55 ? Theme.tertiary : lockSurface.artAccent
 
                                         Behavior on height {
                                             NumberAnimation { duration: 75; easing.type: Theme.animColorEasing }
@@ -118,14 +118,14 @@ ClippingRectangle {
                                     ClippingRectangle {
                                         Layout.preferredWidth: 56
                                         Layout.preferredHeight: 56
-                                        radius: lockRoot.uiRadiusMd
-                                        color: lockRoot.uiWidgetBg
-                                        border.color: lockRoot.uiCardBorder
+                                        radius: root.uiRadiusMd
+                                        color: root.uiWidgetBg
+                                        border.color: root.uiCardBorder
                                         border.width: 1
 
                                         Image {
                                             anchors.fill: parent
-                                            source: surface.coverArtUrl
+                                            source: lockSurface.coverArtUrl
                                             fillMode: Image.PreserveAspectCrop
                                             asynchronous: true
                                             visible: status === Image.Ready && source != ""
@@ -136,8 +136,8 @@ ClippingRectangle {
                                             text: Theme.iconSet === "kaomoji" ? Theme.kaoMusic : Theme.iconMusic
                                             font.family: Theme.fontIcon
                                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
-                                            color: surface.artAccent
-                                            visible: surface.coverArtUrl === ""
+                                            color: lockSurface.artAccent
+                                            visible: lockSurface.coverArtUrl === ""
                                         }
                                     }
 
@@ -151,54 +151,54 @@ ClippingRectangle {
                                             spacing: 6
 
                                             Text {
-                                                text: lockRoot.fmtText(surface.activePlayer?.trackTitle || "Unknown Track")
+                                                text: root.fmtText(lockSurface.activePlayer?.trackTitle || "Unknown Track")
                                                 font.family: Theme.fontDisplay
                                                 font.pixelSize: Theme.fontSizeSm
                                                 font.weight: Theme.fontWeightBold
-                                                color: lockRoot.uiTextPrimary
+                                                color: root.uiTextPrimary
                                                 Layout.fillWidth: true
                                                 elide: Text.ElideRight
                                             }
 
                                             Rectangle {
-                                                visible: surface.volumeHudVisible || surface.playerList.length > 1
+                                                visible: lockSurface.volumeHudVisible || lockSurface.playerList.length > 1
                                                 height: 20
                                                 implicitWidth: mediaBadgeTxt.implicitWidth + 12
-                                                radius: lockRoot.uiRadiusPill
-                                                color: surface.volumeHudVisible ? lockRoot.uiAccentOverlay : lockRoot.uiPillBg
-                                                border.color: Theme.alpha(surface.artAccent, 0.45)
+                                                radius: root.uiRadiusPill
+                                                color: lockSurface.volumeHudVisible ? root.uiAccentOverlay : root.uiPillBg
+                                                border.color: Theme.alpha(lockSurface.artAccent, 0.45)
                                                 border.width: 1
 
                                                 Text {
                                                     id: mediaBadgeTxt
                                                     anchors.centerIn: parent
-                                                    text: surface.volumeHudVisible
-                                                        ? surface.volumeHudLabel
-                                                        : lockRoot.fmtText((surface.activePlayer?.identity || "player") + " " + (surface.currentPlayerIdx + 1) + "/" + surface.playerList.length)
+                                                    text: lockSurface.volumeHudVisible
+                                                        ? lockSurface.volumeHudLabel
+                                                        : root.fmtText((lockSurface.activePlayer?.identity || "player") + " " + (lockSurface.currentPlayerIdx + 1) + "/" + lockSurface.playerList.length)
                                                     font.family: Theme.fontMono
                                                     font.pixelSize: Theme.fontSizeXs
                                                     font.weight: Theme.fontWeightBold
-                                                    color: surface.artAccent
+                                                    color: lockSurface.artAccent
                                                 }
 
                                                 MouseArea {
                                                     anchors.fill: parent
-                                                    enabled: surface.playerList.length > 1
+                                                    enabled: lockSurface.playerList.length > 1
                                                     cursorShape: Qt.PointingHandCursor
                                                     onClicked: {
-                                                        lockRoot.manualPlayerIndex = (surface.currentPlayerIdx + 1) % surface.playerList.length;
-                                                        surface.claimSurfaceFocus();
+                                                        root.manualPlayerIndex = (lockSurface.currentPlayerIdx + 1) % lockSurface.playerList.length;
+                                                        lockSurface.claimSurfaceFocus();
                                                     }
                                                 }
                                             }
                                         }
 
                                         Text {
-                                            text: lockRoot.fmtText(surface.activePlayer?.trackArtist || "Unknown Artist")
+                                            text: root.fmtText(lockSurface.activePlayer?.trackArtist || "Unknown Artist")
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightDemiBold
-                                            color: surface.artAccent
+                                            color: lockSurface.artAccent
                                             Layout.fillWidth: true
                                             elide: Text.ElideRight
                                             Behavior on color { ColorAnimation { duration: Theme.animNormal; easing.type: Theme.animColorEasing } }
@@ -209,22 +209,22 @@ ClippingRectangle {
                                         icon: Theme.iconPrev
                                         iconSize: Theme.fontSizeSm
                                         tooltip: "previous"
-                                        enabled: surface.activePlayer?.canGoPrevious ?? false
+                                        enabled: lockSurface.activePlayer?.canGoPrevious ?? false
                                         onClicked: {
-                                            surface.activePlayer?.previous();
-                                            surface.claimSurfaceFocus();
+                                            lockSurface.activePlayer?.previous();
+                                            lockSurface.claimSurfaceFocus();
                                         }
                                     }
 
                                     Rectangle {
-                                        width: surface.playerIsPlaying ? 44 : 36
+                                        width: lockSurface.playerIsPlaying ? 44 : 36
                                         height: 36
-                                        radius: surface.playerIsPlaying ? lockRoot.uiRadiusMd : lockRoot.uiRadiusPill
+                                        radius: lockSurface.playerIsPlaying ? root.uiRadiusMd : root.uiRadiusPill
                                         color: lockPlayMouse.pressed
-                                            ? Theme.statePress(surface.artAccent, lockRoot.uiOnAccent)
+                                            ? Theme.statePress(lockSurface.artAccent, root.uiOnAccent)
                                             : (lockPlayMouse.containsMouse
-                                                ? Theme.stateHover(surface.artAccent, lockRoot.uiOnAccent)
-                                                : surface.artAccent)
+                                                ? Theme.stateHover(lockSurface.artAccent, root.uiOnAccent)
+                                                : lockSurface.artAccent)
 
                                         Behavior on width { NumberAnimation { duration: Theme.expressiveFast; easing.type: Theme.animExpressiveEasing } }
                                         Behavior on radius { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
@@ -232,11 +232,11 @@ ClippingRectangle {
 
                                         Text {
                                             anchors.centerIn: parent
-                                            text: surface.playerIsPlaying ? Theme.iconPause : Theme.iconPlay
+                                            text: lockSurface.playerIsPlaying ? Theme.iconPause : Theme.iconPlay
                                             font.family: Theme.fontIcon
                                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                             font.weight: Theme.fontWeightBold
-                                            color: lockRoot.uiOnAccent
+                                            color: root.uiOnAccent
                                         }
 
                                         MouseArea {
@@ -245,8 +245,8 @@ ClippingRectangle {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                surface.activePlayer?.togglePlaying();
-                                                surface.claimSurfaceFocus();
+                                                lockSurface.activePlayer?.togglePlaying();
+                                                lockSurface.claimSurfaceFocus();
                                             }
                                         }
                                     }
@@ -255,10 +255,10 @@ ClippingRectangle {
                                         icon: Theme.iconNext
                                         iconSize: Theme.fontSizeSm
                                         tooltip: "next"
-                                        enabled: surface.activePlayer?.canGoNext ?? false
+                                        enabled: lockSurface.activePlayer?.canGoNext ?? false
                                         onClicked: {
-                                            surface.activePlayer?.next();
-                                            surface.claimSurfaceFocus();
+                                            lockSurface.activePlayer?.next();
+                                            lockSurface.claimSurfaceFocus();
                                         }
                                     }
                                 }
@@ -266,13 +266,13 @@ ClippingRectangle {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 8
-                                    visible: lockRoot.showMediaVisualizer && (surface.activePlayer?.length ?? 0) > 0
+                                    visible: root.showMediaVisualizer && (lockSurface.activePlayer?.length ?? 0) > 0
 
                                     Text {
-                                        text: lockRoot.formatTime(surface.trackPosition)
+                                        text: root.formatTime(lockSurface.trackPosition)
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontSizeXs
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
 
                                     Item {
@@ -280,17 +280,17 @@ ClippingRectangle {
                                         Layout.preferredHeight: 14
 
                                         readonly property real progRatio: {
-                                            let len = surface.activePlayer?.length ?? 0;
+                                            let len = lockSurface.activePlayer?.length ?? 0;
                                             if (len <= 0) return 0;
-                                            return Math.max(0.0, Math.min(1.0, surface.trackPosition / len));
+                                            return Math.max(0.0, Math.min(1.0, lockSurface.trackPosition / len));
                                         }
 
                                         function seekToMouse(mx: real) {
-                                            let len = surface.activePlayer?.length ?? 0;
-                                            if (len > 0 && surface.activePlayer) {
+                                            let len = lockSurface.activePlayer?.length ?? 0;
+                                            if (len > 0 && lockSurface.activePlayer) {
                                                 let pos = Math.max(0, Math.min(len, (mx / Math.max(1, width)) * len));
-                                                surface.trackPosition = pos;
-                                                surface.activePlayer.position = pos;
+                                                lockSurface.trackPosition = pos;
+                                                lockSurface.activePlayer.position = pos;
                                             }
                                         }
 
@@ -299,8 +299,8 @@ ClippingRectangle {
                                             anchors.right: parent.right
                                             anchors.verticalCenter: parent.verticalCenter
                                             height: seekMouse.pressed ? 9 : (seekMouse.containsMouse ? 7 : 5)
-                                            radius: lockRoot.uiRadiusPill
-                                            color: Theme.alpha(lockRoot.uiTextPrimary, lockRoot.isLight ? 0.16 : 0.14)
+                                            radius: root.uiRadiusPill
+                                            color: Theme.alpha(root.uiTextPrimary, root.isLight ? 0.16 : 0.14)
 
                                             Behavior on height { NumberAnimation { duration: Theme.animFast } }
 
@@ -309,8 +309,8 @@ ClippingRectangle {
                                                 anchors.top: parent.top
                                                 anchors.bottom: parent.bottom
                                                 width: parent.width * parent.parent.progRatio
-                                                radius: lockRoot.uiRadiusPill
-                                                color: surface.artAccent
+                                                radius: root.uiRadiusPill
+                                                color: lockSurface.artAccent
                                             }
                                         }
 
@@ -318,21 +318,21 @@ ClippingRectangle {
                                             id: seekMouse
                                             anchors.fill: parent
                                             hoverEnabled: true
-                                            enabled: (surface.activePlayer?.canSeek ?? true) && (surface.activePlayer?.length ?? 0) > 0
+                                            enabled: (lockSurface.activePlayer?.canSeek ?? true) && (lockSurface.activePlayer?.length ?? 0) > 0
                                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                             onPressed: (mouse) => parent.seekToMouse(mouse.x)
                                             onPositionChanged: (mouse) => {
                                                 if (pressed) parent.seekToMouse(mouse.x);
                                             }
-                                            onReleased: surface.claimSurfaceFocus()
+                                            onReleased: lockSurface.claimSurfaceFocus()
                                         }
                                     }
 
                                     Text {
-                                        text: lockRoot.formatTime(surface.activePlayer?.length ?? 0)
+                                        text: root.formatTime(lockSurface.activePlayer?.length ?? 0)
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontSizeXs
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
                                 }
                             }

@@ -8,11 +8,12 @@ import "../controls"
 Rectangle {
     id: optionsCard
 
-    required property var lockRoot
-    required property var surface
-    property var statusBar: null
-    property var pwInput: null
-    property var surpriseBurstAnim: null
+    property var root: null
+    property var lockSurface: null
+    property var statusBarItem: null
+    property var burstAnim: null
+
+    readonly property bool hasInputFocus: (typeof customQuoteInput !== "undefined" && customQuoteInput && customQuoteInput.activeFocus) ? true : false
 
                 component OptChip: Rectangle {
                     id: cRoot
@@ -23,14 +24,14 @@ Rectangle {
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: 28
-                    radius: selected ? lockRoot.uiRadiusMd : lockRoot.uiRadiusPill
-                    opacity: lockRoot.studioLocked ? 0.55 : 1.0
+                    radius: selected ? root.uiRadiusMd : root.uiRadiusPill
+                    opacity: root.studioLocked ? 0.55 : 1.0
                     color: selected
-                        ? lockRoot.uiAccentOverlay
-                        : (cMouse.pressed ? lockRoot.uiWidgetActive : (cMouse.containsMouse ? lockRoot.uiWidgetHover : lockRoot.uiWidgetBg))
+                        ? root.uiAccentOverlay
+                        : (cMouse.pressed ? root.uiWidgetActive : (cMouse.containsMouse ? root.uiWidgetHover : root.uiWidgetBg))
                     border.color: selected
-                        ? Theme.alpha(lockRoot.uiAccent, 0.65)
-                        : (cMouse.containsMouse ? Theme.alpha(lockRoot.uiAccent, 0.35) : lockRoot.uiWidgetBorder)
+                        ? Theme.alpha(root.uiAccent, 0.65)
+                        : (cMouse.containsMouse ? Theme.alpha(root.uiAccent, 0.35) : root.uiWidgetBorder)
                     border.width: 1
 
                     Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
@@ -46,15 +47,15 @@ Rectangle {
                             text: cRoot.icon
                             font.family: Theme.fontIcon
                             font.pixelSize: Theme.fontSizeXs
-                            color: cRoot.selected ? lockRoot.uiAccent : lockRoot.uiTextSecondary
+                            color: cRoot.selected ? root.uiAccent : root.uiTextSecondary
                         }
 
                         Text {
-                            text: lockRoot.fmtText(cRoot.label)
+                            text: root.fmtText(cRoot.label)
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: cRoot.selected ? Theme.fontWeightBold : Theme.fontWeightMedium
-                            color: cRoot.selected ? lockRoot.uiAccent : lockRoot.uiTextSecondary
+                            color: cRoot.selected ? root.uiAccent : root.uiTextSecondary
                         }
                     }
 
@@ -62,11 +63,11 @@ Rectangle {
                         id: cMouse
                         anchors.fill: parent
                         hoverEnabled: true
-                        enabled: !lockRoot.studioLocked
+                        enabled: !root.studioLocked
                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                         onClicked: {
                             cRoot.clicked();
-                            surface.claimSurfaceFocus();
+                            lockSurface.claimSurfaceFocus();
                         }
                     }
                 }
@@ -84,12 +85,12 @@ Rectangle {
 
                     Layout.fillWidth: true
                     spacing: 5
-                    opacity: lockRoot.studioLocked ? 0.55 : 1.0
+                    opacity: root.studioLocked ? 0.55 : 1.0
 
                     readonly property real ratio: Math.max(0.0, Math.min(1.0, (value - from) / Math.max(0.0001, to - from)))
 
                     function setFromRatio(r: real) {
-                        if (lockRoot.studioLocked) return;
+                        if (root.studioLocked) return;
                         let clamped = Math.max(0.0, Math.min(1.0, r));
                         let raw = from + clamped * (to - from);
                         if (stepSize > 0) {
@@ -108,24 +109,24 @@ Rectangle {
                             text: sRoot.icon
                             font.family: Theme.fontIcon
                             font.pixelSize: Theme.fontSizeXs
-                            color: sMouse.pressed || sMouse.containsMouse ? lockRoot.uiAccent : lockRoot.uiTextSecondary
+                            color: sMouse.pressed || sMouse.containsMouse ? root.uiAccent : root.uiTextSecondary
                         }
 
                         Text {
-                            text: lockRoot.fmtText(sRoot.label)
+                            text: root.fmtText(sRoot.label)
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Theme.fontWeightDemiBold
-                            color: lockRoot.uiTextSecondary
+                            color: root.uiTextSecondary
                             Layout.fillWidth: true
                         }
 
                         Rectangle {
                             height: 18
                             implicitWidth: valTxt.implicitWidth + 10
-                            radius: lockRoot.uiRadiusPill
-                            color: sMouse.pressed ? lockRoot.uiAccentOverlay : lockRoot.uiWidgetBg
-                            border.color: sMouse.pressed ? Theme.alpha(lockRoot.uiAccent, 0.5) : lockRoot.uiWidgetBorder
+                            radius: root.uiRadiusPill
+                            color: sMouse.pressed ? root.uiAccentOverlay : root.uiWidgetBg
+                            border.color: sMouse.pressed ? Theme.alpha(root.uiAccent, 0.5) : root.uiWidgetBorder
                             border.width: 1
 
                             Text {
@@ -135,7 +136,7 @@ Rectangle {
                                 font.family: Theme.fontMono
                                 font.pixelSize: Theme.fontSizeXs
                                 font.weight: Theme.fontWeightBold
-                                color: lockRoot.uiAccent
+                                color: root.uiAccent
                             }
                         }
                     }
@@ -149,9 +150,9 @@ Rectangle {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             height: sMouse.pressed ? 14 : (sMouse.containsMouse ? 12 : 8)
-                            radius: lockRoot.uiRadiusPill
-                            color: lockRoot.uiWidgetBg
-                            border.color: sMouse.containsMouse ? Theme.alpha(lockRoot.uiAccent, 0.35) : lockRoot.uiWidgetBorder
+                            radius: root.uiRadiusPill
+                            color: root.uiWidgetBg
+                            border.color: sMouse.containsMouse ? Theme.alpha(root.uiAccent, 0.35) : root.uiWidgetBorder
                             border.width: 1
 
                             Behavior on height { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
@@ -162,10 +163,10 @@ Rectangle {
                                 anchors.top: parent.top
                                 anchors.bottom: parent.bottom
                                 width: Math.max(parent.height, parent.width * sRoot.ratio)
-                                radius: lockRoot.uiRadiusPill
+                                radius: root.uiRadiusPill
                                 color: sMouse.pressed
-                                    ? Theme.statePress(lockRoot.uiAccent, lockRoot.uiOnAccent)
-                                    : (sMouse.containsMouse ? Theme.stateHover(lockRoot.uiAccent, lockRoot.uiOnAccent) : lockRoot.uiAccent)
+                                    ? Theme.statePress(root.uiAccent, root.uiOnAccent)
+                                    : (sMouse.containsMouse ? Theme.stateHover(root.uiAccent, root.uiOnAccent) : root.uiAccent)
 
                                 Behavior on color { ColorAnimation { duration: Theme.animFast } }
                             }
@@ -174,8 +175,8 @@ Rectangle {
                         Rectangle {
                             width: sMouse.pressed ? 6 : 4
                             height: sMouse.pressed ? 20 : (sMouse.containsMouse ? 18 : 14)
-                            radius: lockRoot.uiRadiusPill
-                            color: lockRoot.uiTextPrimary
+                            radius: root.uiRadiusPill
+                            color: root.uiTextPrimary
                             anchors.verticalCenter: parent.verticalCenter
                             x: Math.max(0, Math.min(parent.width - width, (parent.width * sRoot.ratio) - (width / 2)))
 
@@ -187,13 +188,13 @@ Rectangle {
                             id: sMouse
                             anchors.fill: parent
                             hoverEnabled: true
-                            enabled: !lockRoot.studioLocked
+                            enabled: !root.studioLocked
                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                             onPressed: (mouse) => sRoot.setFromRatio(mouse.x / width)
                             onPositionChanged: (mouse) => {
                                 if (pressed) sRoot.setFromRatio(mouse.x / width);
                             }
-                            onReleased: surface.claimSurfaceFocus()
+                            onReleased: lockSurface.claimSurfaceFocus()
                             onWheel: (wheel) => {
                                 let dir = wheel.angleDelta.y > 0 ? 1 : -1;
                                 let next = Math.max(sRoot.from, Math.min(sRoot.to, sRoot.value + (dir * sRoot.stepSize)));
@@ -212,9 +213,9 @@ Rectangle {
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: 32
-                    radius: lockRoot.uiRadiusSm
-                    opacity: lockRoot.studioLocked ? 0.55 : 1.0
-                    color: rowMouse.containsMouse ? lockRoot.uiWidgetHover : "transparent"
+                    radius: root.uiRadiusSm
+                    opacity: root.studioLocked ? 0.55 : 1.0
+                    color: rowMouse.containsMouse ? root.uiWidgetHover : "transparent"
 
                     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
@@ -228,15 +229,15 @@ Rectangle {
                             text: tRow.icon
                             font.family: Theme.fontIcon
                             font.pixelSize: Theme.fontSizeMd
-                            color: tRow.checked ? lockRoot.uiAccent : lockRoot.uiTextSecondary
+                            color: tRow.checked ? root.uiAccent : root.uiTextSecondary
                             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                         }
 
                         Text {
-                            text: lockRoot.fmtText(tRow.label)
+                            text: root.fmtText(tRow.label)
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXs
-                            color: lockRoot.uiTextPrimary
+                            color: root.uiTextPrimary
                             Layout.fillWidth: true
                             elide: Text.ElideRight
                         }
@@ -258,27 +259,27 @@ Rectangle {
                         id: rowMouse
                         anchors.fill: parent
                         hoverEnabled: true
-                        enabled: !lockRoot.studioLocked
+                        enabled: !root.studioLocked
                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                         onClicked: {
                             tRow.toggled();
-                            surface.claimSurfaceFocus();
+                            lockSurface.claimSurfaceFocus();
                         }
                     }
                 }
 
-                        anchors.top: statusBar ? statusBar.bottom : parent.top
-                        anchors.right: statusBar ? statusBar.right : parent.right
+                        anchors.top: statusBarItem ? statusBarItem.bottom : parent.top
+                        anchors.right: statusBarItem ? statusBarItem.right : parent.right
                         anchors.topMargin: 10
                         width: 380
                         height: Math.min(parent.height - 110, optionsLayout.implicitHeight + (Theme.popupPadding * 2))
-                        radius: lockRoot.uiRadiusLg
-                        color: lockRoot.uiPopupBg
-                        border.color: lockRoot.uiPopupBorder
+                        radius: root.uiRadiusLg
+                        color: root.uiPopupBg
+                        border.color: root.uiPopupBorder
                         border.width: Theme.popupBorderWidth
-                        visible: opacity > 0.01 && !lockRoot.zenMode
-                        opacity: surface.optionsOpen ? 1.0 : 0.0
-                        scale: surface.optionsOpen ? 1.0 : 0.95
+                        visible: opacity > 0.01 && !root.zenMode
+                        opacity: lockSurface.optionsOpen ? 1.0 : 0.0
+                        scale: lockSurface.optionsOpen ? 1.0 : 0.95
                         transformOrigin: Item.TopRight
                         clip: true
                         z: 100
@@ -313,38 +314,38 @@ Rectangle {
                                         text: Theme.iconSliders
                                         font.family: Theme.fontIcon
                                         font.pixelSize: Theme.fontSizeMd
-                                        color: lockRoot.uiAccent
+                                        color: root.uiAccent
                                     }
 
                                     Text {
-                                        text: lockRoot.fmtText("lock screen studio")
+                                        text: root.fmtText("lock screen studio")
                                         font.family: Theme.fontDisplay
                                         font.pixelSize: Theme.fontSizeMd
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiTextPrimary
+                                        color: root.uiTextPrimary
                                         Layout.fillWidth: true
                                     }
 
                                     IconButton {
-                                        icon: lockRoot.studioLocked ? Theme.iconLock : Theme.iconShield
+                                        icon: root.studioLocked ? Theme.iconLock : Theme.iconShield
                                         iconSize: Theme.fontSizeXs
-                                        highlighted: lockRoot.studioLocked
-                                        tooltip: lockRoot.studioLocked ? "unlock studio controls" : "lock studio controls"
+                                        highlighted: root.studioLocked
+                                        tooltip: root.studioLocked ? "unlock studio controls" : "lock studio controls"
                                         onClicked: {
-                                            lockRoot.studioLocked = !lockRoot.studioLocked;
-                                            lockRoot.flushStateToDisk();
-                                            surface.claimSurfaceFocus();
+                                            root.studioLocked = !root.studioLocked;
+                                            root.flushStateToDisk();
+                                            lockSurface.claimSurfaceFocus();
                                         }
                                     }
 
                                     IconButton {
                                         icon: Theme.iconRefresh
                                         iconSize: Theme.fontSizeXs
-                                        enabled: !lockRoot.studioLocked
+                                        enabled: !root.studioLocked
                                         tooltip: "reset defaults"
                                         onClicked: {
-                                            lockRoot.resetDefaults();
-                                            surface.claimSurfaceFocus();
+                                            root.resetDefaults();
+                                            lockSurface.claimSurfaceFocus();
                                         }
                                     }
 
@@ -353,8 +354,8 @@ Rectangle {
                                         iconSize: Theme.fontSizeXs
                                         tooltip: "close"
                                         onClicked: {
-                                            surface.optionsOpen = false;
-                                            if (pwInput) pwInput.forceActiveFocus(); else surface.claimSurfaceFocus();;
+                                            lockSurface.optionsOpen = false;
+                                            if (lockSurface?.claimSurfaceFocus) lockSurface.claimSurfaceFocus();
                                         }
                                     }
                                 }
@@ -362,13 +363,13 @@ Rectangle {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 36
-                                    opacity: lockRoot.studioLocked ? 0.5 : 1.0
-                                    radius: surpriseMouse.pressed ? lockRoot.uiRadiusPill : lockRoot.uiRadiusMd
+                                    opacity: root.studioLocked ? 0.5 : 1.0
+                                    radius: surpriseMouse.pressed ? root.uiRadiusPill : root.uiRadiusMd
                                     color: surpriseMouse.pressed
-                                        ? Theme.statePress(lockRoot.uiAccent, lockRoot.uiOnAccent)
+                                        ? Theme.statePress(root.uiAccent, root.uiOnAccent)
                                         : (surpriseMouse.containsMouse
-                                            ? Theme.stateHover(lockRoot.uiAccent, lockRoot.uiOnAccent)
-                                            : lockRoot.uiAccent)
+                                            ? Theme.stateHover(root.uiAccent, root.uiOnAccent)
+                                            : root.uiAccent)
 
                                     Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
                                     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -381,15 +382,15 @@ Rectangle {
                                             text: Theme.iconSparkles
                                             font.family: Theme.fontIcon
                                             font.pixelSize: Theme.fontSizeMd
-                                            color: lockRoot.uiOnAccent
+                                            color: root.uiOnAccent
                                         }
 
                                         Text {
-                                            text: lockRoot.fmtText("surprise me! (roll layout & vibe)")
+                                            text: root.fmtText("surprise me! (roll layout & vibe)")
                                             font.family: Theme.fontDisplay
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightBold
-                                            color: lockRoot.uiOnAccent
+                                            color: root.uiOnAccent
                                         }
                                     }
 
@@ -397,12 +398,12 @@ Rectangle {
                                         id: surpriseMouse
                                         anchors.fill: parent
                                         hoverEnabled: true
-                                        enabled: !lockRoot.studioLocked
+                                        enabled: !root.studioLocked
                                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                                         onClicked: {
-                                            surpriseBurstAnim.restart();
-                                            lockRoot.surpriseMe();
-                                            surface.claimSurfaceFocus();
+                                            burstAnim.restart();
+                                            root.surpriseMe();
+                                            lockSurface.claimSurfaceFocus();
                                         }
                                     }
                                 }
@@ -422,8 +423,8 @@ Rectangle {
                                             required property var modelData
                                             label: modelData.label
                                             icon: modelData.icon
-                                            selected: lockRoot.studioTab === modelData.id
-                                            onClicked: lockRoot.studioTab = modelData.id
+                                            selected: root.studioTab === modelData.id
+                                            onClicked: root.studioTab = modelData.id
                                         }
                                     }
                                 }
@@ -431,21 +432,21 @@ Rectangle {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     height: Theme.popupDividerHeight
-                                    color: lockRoot.uiWidgetBorder
+                                    color: root.uiWidgetBorder
                                 }
 
                                 // tab 1: presets, position, stack order, stage width, corner shape
                                 ColumnLayout {
-                                    visible: lockRoot.studioTab === "layout"
+                                    visible: root.studioTab === "layout"
                                     Layout.fillWidth: true
                                     spacing: 8
 
                                     Text {
-                                        text: lockRoot.fmtText("quick presets")
+                                        text: root.fmtText("quick presets")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
 
                                     RowLayout {
@@ -459,8 +460,8 @@ Rectangle {
                                                 label: modelData
                                                 selected: false
                                                 onClicked: {
-                                                    surpriseBurstAnim.restart();
-                                                    lockRoot.applyPreset(modelData);
+                                                    burstAnim.restart();
+                                                    root.applyPreset(modelData);
                                                 }
                                             }
                                         }
@@ -469,19 +470,19 @@ Rectangle {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Text {
-                                            text: lockRoot.fmtText("screen position")
+                                            text: root.fmtText("screen position")
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightDemiBold
-                                            color: lockRoot.uiTextSecondary
+                                            color: root.uiTextSecondary
                                             Layout.fillWidth: true
                                         }
                                         Text {
-                                            visible: lockRoot.layoutPosition === "custom"
-                                            text: Math.round(lockRoot.customNormX * 100) + "% , " + Math.round(lockRoot.customNormY * 100) + "%"
+                                            visible: root.layoutPosition === "custom"
+                                            text: Math.round(root.customNormX * 100) + "% , " + Math.round(root.customNormY * 100) + "%"
                                             font.family: Theme.fontMono
                                             font.pixelSize: Theme.fontSizeXs
-                                            color: lockRoot.uiAccent
+                                            color: root.uiAccent
                                         }
                                     }
 
@@ -494,21 +495,21 @@ Rectangle {
                                             delegate: OptChip {
                                                 required property string modelData
                                                 label: modelData
-                                                selected: lockRoot.layoutPosition === modelData
+                                                selected: root.layoutPosition === modelData
                                                 onClicked: {
-                                                    lockRoot.layoutPosition = modelData;
-                                                    lockRoot.saveSandbox();
+                                                    root.layoutPosition = modelData;
+                                                    root.saveSandbox();
                                                 }
                                             }
                                         }
                                     }
 
                                     Text {
-                                        text: lockRoot.fmtText("block stack order")
+                                        text: root.fmtText("block stack order")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
 
                                     RowLayout {
@@ -525,21 +526,21 @@ Rectangle {
                                             delegate: OptChip {
                                                 required property var modelData
                                                 label: modelData.lbl
-                                                selected: lockRoot.stackOrder === modelData.ord
+                                                selected: root.stackOrder === modelData.ord
                                                 onClicked: {
-                                                    lockRoot.stackOrder = modelData.ord;
-                                                    lockRoot.saveSandbox();
+                                                    root.stackOrder = modelData.ord;
+                                                    root.saveSandbox();
                                                 }
                                             }
                                         }
                                     }
 
                                     Text {
-                                        text: lockRoot.fmtText("corner shape style")
+                                        text: root.fmtText("corner shape style")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
 
                                     RowLayout {
@@ -551,10 +552,10 @@ Rectangle {
                                             delegate: OptChip {
                                                 required property string modelData
                                                 label: modelData
-                                                selected: lockRoot.shapePreset === modelData
+                                                selected: root.shapePreset === modelData
                                                 onClicked: {
-                                                    lockRoot.shapePreset = modelData;
-                                                    lockRoot.saveSandbox();
+                                                    root.shapePreset = modelData;
+                                                    root.saveSandbox();
                                                 }
                                             }
                                         }
@@ -566,34 +567,34 @@ Rectangle {
                                         from: 340
                                         to: 620
                                         stepSize: 8
-                                        value: lockRoot.stageWidth
-                                        displayText: Math.round(lockRoot.stageWidth) + "px"
+                                        value: root.stageWidth
+                                        displayText: Math.round(root.stageWidth) + "px"
                                         onMoved: (v) => {
-                                            lockRoot.stageWidth = Math.round(v);
-                                            lockRoot.saveSandbox();
+                                            root.stageWidth = Math.round(v);
+                                            root.saveSandbox();
                                         }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconGrid
                                         label: "free drag mode (snap guides + arrow keys)"
-                                        checked: lockRoot.freeDragMode
-                                        onToggled: lockRoot.freeDragMode = !lockRoot.freeDragMode
+                                        checked: root.freeDragMode
+                                        onToggled: root.freeDragMode = !root.freeDragMode
                                     }
                                 }
 
                                 // tab 2: clock design, date format, text casing, password mask
                                 ColumnLayout {
-                                    visible: lockRoot.studioTab === "clock"
+                                    visible: root.studioTab === "clock"
                                     Layout.fillWidth: true
                                     spacing: 8
 
                                     Text {
-                                        text: lockRoot.fmtText("clock architecture")
+                                        text: root.fmtText("clock architecture")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
 
                                     RowLayout {
@@ -605,10 +606,10 @@ Rectangle {
                                             delegate: OptChip {
                                                 required property string modelData
                                                 label: modelData
-                                                selected: lockRoot.clockStyle === modelData
+                                                selected: root.clockStyle === modelData
                                                 onClicked: {
-                                                    lockRoot.clockStyle = modelData;
-                                                    lockRoot.saveSandbox();
+                                                    root.clockStyle = modelData;
+                                                    root.saveSandbox();
                                                 }
                                             }
                                         }
@@ -623,10 +624,10 @@ Rectangle {
                                             delegate: OptChip {
                                                 required property string modelData
                                                 label: modelData
-                                                selected: lockRoot.clockStyle === modelData
+                                                selected: root.clockStyle === modelData
                                                 onClicked: {
-                                                    lockRoot.clockStyle = modelData;
-                                                    lockRoot.saveSandbox();
+                                                    root.clockStyle = modelData;
+                                                    root.saveSandbox();
                                                 }
                                             }
                                         }
@@ -638,63 +639,63 @@ Rectangle {
 
                                         OptChip {
                                             label: "12-hour"
-                                            selected: !lockRoot.effectiveClock24h
+                                            selected: !root.effectiveClock24h
                                             onClicked: {
-                                                lockRoot.sandboxClock24h = false;
-                                                lockRoot.saveSandbox();
+                                                root.sandboxClock24h = false;
+                                                root.saveSandbox();
                                             }
                                         }
                                         OptChip {
                                             label: "24-hour"
-                                            selected: lockRoot.effectiveClock24h
+                                            selected: root.effectiveClock24h
                                             onClicked: {
-                                                lockRoot.sandboxClock24h = true;
-                                                lockRoot.saveSandbox();
+                                                root.sandboxClock24h = true;
+                                                root.saveSandbox();
                                             }
                                         }
                                         OptChip {
                                             label: "seconds"
-                                            selected: lockRoot.effectiveShowSeconds
+                                            selected: root.effectiveShowSeconds
                                             onClicked: {
-                                                lockRoot.showSeconds = !lockRoot.showSeconds;
-                                                lockRoot.saveSandbox();
+                                                root.showSeconds = !root.showSeconds;
+                                                root.saveSandbox();
                                             }
                                         }
                                     }
 
                                     RowLayout {
-                                        visible: lockRoot.effectiveShowSeconds
+                                        visible: root.effectiveShowSeconds
                                         Layout.fillWidth: true
                                         spacing: 5
 
                                         OptChip {
                                             label: "pill"
-                                            selected: lockRoot.secondsStyle === "badge"
-                                            onClicked: { lockRoot.secondsStyle = "badge"; lockRoot.saveSandbox(); }
+                                            selected: root.secondsStyle === "badge"
+                                            onClicked: { root.secondsStyle = "badge"; root.saveSandbox(); }
                                         }
                                         OptChip {
                                             label: "split"
-                                            selected: lockRoot.secondsStyle === "supersub"
-                                            onClicked: { lockRoot.secondsStyle = "supersub"; lockRoot.saveSandbox(); }
+                                            selected: root.secondsStyle === "supersub"
+                                            onClicked: { root.secondsStyle = "supersub"; root.saveSandbox(); }
                                         }
                                         OptChip {
                                             label: "bar"
-                                            selected: lockRoot.secondsStyle === "tower"
-                                            onClicked: { lockRoot.secondsStyle = "tower"; lockRoot.saveSandbox(); }
+                                            selected: root.secondsStyle === "tower"
+                                            onClicked: { root.secondsStyle = "tower"; root.saveSandbox(); }
                                         }
                                         OptChip {
                                             label: "inline"
-                                            selected: lockRoot.secondsStyle === "inline"
-                                            onClicked: { lockRoot.secondsStyle = "inline"; lockRoot.saveSandbox(); }
+                                            selected: root.secondsStyle === "inline"
+                                            onClicked: { root.secondsStyle = "inline"; root.saveSandbox(); }
                                         }
                                     }
 
                                     Text {
-                                        text: lockRoot.fmtText("date format")
+                                        text: root.fmtText("date format")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
 
                                     RowLayout {
@@ -712,21 +713,21 @@ Rectangle {
                                             delegate: OptChip {
                                                 required property var modelData
                                                 label: modelData.lbl
-                                                selected: lockRoot.dateFormat === modelData.fmt
+                                                selected: root.dateFormat === modelData.fmt
                                                 onClicked: {
-                                                    lockRoot.dateFormat = modelData.fmt;
-                                                    lockRoot.saveSandbox();
+                                                    root.dateFormat = modelData.fmt;
+                                                    root.saveSandbox();
                                                 }
                                             }
                                         }
                                     }
 
                                     Text {
-                                        text: lockRoot.fmtText("text casing (follow user preference)")
+                                        text: root.fmtText("text casing (follow user preference)")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
 
                                     RowLayout {
@@ -742,10 +743,10 @@ Rectangle {
                                             delegate: OptChip {
                                                 required property var modelData
                                                 label: modelData.lbl
-                                                selected: lockRoot.textCase === modelData.id
+                                                selected: root.textCase === modelData.id
                                                 onClicked: {
-                                                    lockRoot.textCase = modelData.id;
-                                                    lockRoot.saveSandbox();
+                                                    root.textCase = modelData.id;
+                                                    root.saveSandbox();
                                                 }
                                             }
                                         }
@@ -757,47 +758,47 @@ Rectangle {
                                         from: 0.70
                                         to: 1.50
                                         stepSize: 0.03
-                                        value: lockRoot.clockScale
-                                        displayText: Math.round(lockRoot.clockScale * 100) + "%"
+                                        value: root.clockScale
+                                        displayText: Math.round(root.clockScale * 100) + "%"
                                         onMoved: (v) => {
-                                            lockRoot.clockScale = v;
-                                            lockRoot.saveSandbox();
+                                            root.clockScale = v;
+                                            root.saveSandbox();
                                         }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconCalendar
                                         label: "place date above clock"
-                                        checked: lockRoot.dateAboveClock
+                                        checked: root.dateAboveClock
                                         onToggled: {
-                                            lockRoot.dateAboveClock = !lockRoot.dateAboveClock;
-                                            lockRoot.saveSandbox();
+                                            root.dateAboveClock = !root.dateAboveClock;
+                                            root.saveSandbox();
                                         }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconClock
                                         label: "sync clock format across rice"
-                                        checked: lockRoot.syncClockGlobal
+                                        checked: root.syncClockGlobal
                                         onToggled: {
-                                            lockRoot.syncClockGlobal = !lockRoot.syncClockGlobal;
-                                            lockRoot.saveSandbox();
+                                            root.syncClockGlobal = !root.syncClockGlobal;
+                                            root.saveSandbox();
                                         }
                                     }
                                 }
 
                                 // tab 3: theme mode, atmosphere, custom quote, password mask
                                 ColumnLayout {
-                                    visible: lockRoot.studioTab === "vibe"
+                                    visible: root.studioTab === "vibe"
                                     Layout.fillWidth: true
                                     spacing: 8
 
                                     Text {
-                                        text: lockRoot.fmtText("theme mode (" + (lockRoot.isLight ? "light" : "dark") + ")")
+                                        text: root.fmtText("theme mode (" + (root.isLight ? "light" : "dark") + ")")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
 
                                     RowLayout {
@@ -807,34 +808,34 @@ Rectangle {
                                         OptChip {
                                             label: "auto"
                                             icon: Theme.iconSparkles
-                                            selected: lockRoot.backdropMode === "auto"
-                                            onClicked: { lockRoot.backdropMode = "auto"; lockRoot.saveSandbox(); }
+                                            selected: root.backdropMode === "auto"
+                                            onClicked: { root.backdropMode = "auto"; root.saveSandbox(); }
                                         }
                                         OptChip {
                                             label: "dark"
                                             icon: Theme.iconMoon
-                                            selected: lockRoot.backdropMode === "dark"
-                                            onClicked: { lockRoot.backdropMode = "dark"; lockRoot.saveSandbox(); }
+                                            selected: root.backdropMode === "dark"
+                                            onClicked: { root.backdropMode = "dark"; root.saveSandbox(); }
                                         }
                                         OptChip {
                                             label: "light"
                                             icon: Theme.iconSun
-                                            selected: lockRoot.backdropMode === "light"
-                                            onClicked: { lockRoot.backdropMode = "light"; lockRoot.saveSandbox(); }
+                                            selected: root.backdropMode === "light"
+                                            onClicked: { root.backdropMode = "light"; root.saveSandbox(); }
                                         }
                                     }
 
                                     SandboxSlider {
-                                        label: lockRoot.isLight ? "frost wash intensity" : "backdrop dim"
-                                        icon: lockRoot.isLight ? Theme.iconSun : Theme.iconMoon
+                                        label: root.isLight ? "frost wash intensity" : "backdrop dim"
+                                        icon: root.isLight ? Theme.iconSun : Theme.iconMoon
                                         from: 0.05
                                         to: 0.95
                                         stepSize: 0.02
-                                        value: lockRoot.scrimDim
-                                        displayText: Math.round(lockRoot.scrimDim * 100) + "%"
+                                        value: root.scrimDim
+                                        displayText: Math.round(root.scrimDim * 100) + "%"
                                         onMoved: (v) => {
-                                            lockRoot.scrimDim = v;
-                                            lockRoot.saveSandbox();
+                                            root.scrimDim = v;
+                                            root.saveSandbox();
                                         }
                                     }
 
@@ -844,11 +845,11 @@ Rectangle {
                                         from: -0.35
                                         to: 0.35
                                         stepSize: 0.05
-                                        value: lockRoot.cardOpacityBoost
-                                        displayText: (lockRoot.cardOpacityBoost >= 0 ? "+" : "") + Math.round(lockRoot.cardOpacityBoost * 100) + "%"
+                                        value: root.cardOpacityBoost
+                                        displayText: (root.cardOpacityBoost >= 0 ? "+" : "") + Math.round(root.cardOpacityBoost * 100) + "%"
                                         onMoved: (v) => {
-                                            lockRoot.cardOpacityBoost = v;
-                                            lockRoot.saveSandbox();
+                                            root.cardOpacityBoost = v;
+                                            root.saveSandbox();
                                         }
                                     }
 
@@ -858,11 +859,11 @@ Rectangle {
                                         from: 0.0
                                         to: 0.85
                                         stepSize: 0.05
-                                        value: lockRoot.vignetteStrength
-                                        displayText: Math.round(lockRoot.vignetteStrength * 100) + "%"
+                                        value: root.vignetteStrength
+                                        displayText: Math.round(root.vignetteStrength * 100) + "%"
                                         onMoved: (v) => {
-                                            lockRoot.vignetteStrength = v;
-                                            lockRoot.saveSandbox();
+                                            root.vignetteStrength = v;
+                                            root.saveSandbox();
                                         }
                                     }
 
@@ -872,20 +873,20 @@ Rectangle {
                                         from: 1.00
                                         to: 1.18
                                         stepSize: 0.01
-                                        value: lockRoot.focusZoom
-                                        displayText: Math.round((lockRoot.focusZoom - 1.0) * 100) + "%"
+                                        value: root.focusZoom
+                                        displayText: Math.round((root.focusZoom - 1.0) * 100) + "%"
                                         onMoved: (v) => {
-                                            lockRoot.focusZoom = v;
-                                            lockRoot.saveSandbox();
+                                            root.focusZoom = v;
+                                            root.saveSandbox();
                                         }
                                     }
 
                                     Text {
-                                        text: lockRoot.fmtText("password mask character")
+                                        text: root.fmtText("password mask character")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
 
                                     RowLayout {
@@ -903,10 +904,10 @@ Rectangle {
                                             delegate: OptChip {
                                                 required property var modelData
                                                 label: modelData.lbl
-                                                selected: lockRoot.pwMaskChar === modelData.ch
+                                                selected: root.pwMaskChar === modelData.ch
                                                 onClicked: {
-                                                    lockRoot.pwMaskChar = modelData.ch;
-                                                    lockRoot.saveSandbox();
+                                                    root.pwMaskChar = modelData.ch;
+                                                    root.saveSandbox();
                                                 }
                                             }
                                         }
@@ -915,19 +916,19 @@ Rectangle {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Text {
-                                            text: lockRoot.fmtText("quote / greeting source")
+                                            text: root.fmtText("quote / greeting source")
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightDemiBold
-                                            color: lockRoot.uiTextSecondary
+                                            color: root.uiTextSecondary
                                             Layout.fillWidth: true
                                         }
                                         IconButton {
                                             icon: Theme.iconRefresh
                                             iconSize: Theme.fontSizeXs
                                             tooltip: "roll new quote"
-                                            visible: lockRoot.quoteMode !== "off" && lockRoot.quoteMode !== "custom"
-                                            onClicked: lockRoot.refreshQuotes()
+                                            visible: root.quoteMode !== "off" && root.quoteMode !== "custom"
+                                            onClicked: root.refreshQuotes()
                                         }
                                     }
 
@@ -940,11 +941,11 @@ Rectangle {
                                             delegate: OptChip {
                                                 required property string modelData
                                                 label: modelData
-                                                selected: lockRoot.quoteMode === modelData
+                                                selected: root.quoteMode === modelData
                                                 onClicked: {
-                                                    lockRoot.quoteMode = modelData;
-                                                    lockRoot.refreshQuotes();
-                                                    lockRoot.saveSandbox();
+                                                    root.quoteMode = modelData;
+                                                    root.refreshQuotes();
+                                                    root.saveSandbox();
                                                 }
                                             }
                                         }
@@ -952,12 +953,12 @@ Rectangle {
 
                                     // custom quote input box when quoteMode === "custom"
                                     Rectangle {
-                                        visible: lockRoot.quoteMode === "custom"
+                                        visible: root.quoteMode === "custom"
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 34
-                                        radius: lockRoot.uiRadiusMd
-                                        color: lockRoot.uiWidgetBg
-                                        border.color: customQuoteInput.activeFocus ? lockRoot.uiAccent : lockRoot.uiWidgetBorder
+                                        radius: root.uiRadiusMd
+                                        color: root.uiWidgetBg
+                                        border.color: customQuoteInput.activeFocus ? root.uiAccent : root.uiWidgetBorder
                                         border.width: 1
 
                                         TextInput {
@@ -966,28 +967,28 @@ Rectangle {
                                             anchors.leftMargin: 10
                                             anchors.rightMargin: 10
                                             verticalAlignment: TextInput.AlignVCenter
-                                            text: lockRoot.customQuoteText
+                                            text: root.customQuoteText
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSizeXs
-                                            color: lockRoot.uiTextPrimary
+                                            color: root.uiTextPrimary
                                             clip: true
                                             onTextEdited: {
-                                                lockRoot.customQuoteText = text;
-                                                lockRoot.saveSandbox();
+                                                root.customQuoteText = text;
+                                                root.saveSandbox();
                                             }
-                                            onAccepted: if (pwInput) pwInput.forceActiveFocus(); else surface.claimSurfaceFocus();
+                                            onAccepted: if (lockSurface?.claimSurfaceFocus) lockSurface.claimSurfaceFocus();
                                         }
                                     }
 
                                     Rectangle {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: Theme.popupActionHeight + 2
-                                        radius: lockRoot.uiRadiusMd
-                                        opacity: lockRoot.studioLocked ? 0.5 : 1.0
+                                        radius: root.uiRadiusMd
+                                        opacity: root.studioLocked ? 0.5 : 1.0
                                         color: shuffleMouse.pressed
-                                            ? lockRoot.uiWidgetActive
-                                            : (shuffleMouse.containsMouse ? lockRoot.uiWidgetHover : lockRoot.uiWidgetBg)
-                                        border.color: shuffleMouse.containsMouse ? Theme.alpha(lockRoot.uiAccent, 0.55) : lockRoot.uiWidgetBorder
+                                            ? root.uiWidgetActive
+                                            : (shuffleMouse.containsMouse ? root.uiWidgetHover : root.uiWidgetBg)
+                                        border.color: shuffleMouse.containsMouse ? Theme.alpha(root.uiAccent, 0.55) : root.uiWidgetBorder
                                         border.width: 1
 
                                         RowLayout {
@@ -1000,14 +1001,14 @@ Rectangle {
                                                 text: Theme.iconShuffle
                                                 font.family: Theme.fontIcon
                                                 font.pixelSize: Theme.fontSizeMd
-                                                color: lockRoot.uiAccent
+                                                color: root.uiAccent
                                             }
                                             Text {
-                                                text: lockRoot.fmtText("shuffle lock wallpaper")
+                                                text: root.fmtText("shuffle lock wallpaper")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSizeXs
                                                 font.weight: Theme.fontWeightDemiBold
-                                                color: lockRoot.uiTextPrimary
+                                                color: root.uiTextPrimary
                                                 Layout.fillWidth: true
                                             }
                                         }
@@ -1016,16 +1017,16 @@ Rectangle {
                                             id: shuffleMouse
                                             anchors.fill: parent
                                             hoverEnabled: true
-                                            enabled: !lockRoot.studioLocked
+                                            enabled: !root.studioLocked
                                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                                             onClicked: {
-                                                let nextWp = lockRoot.pickRandomWallpaperInMemory();
+                                                let nextWp = root.pickRandomWallpaperInMemory();
                                                 if (nextWp && nextWp !== "") {
-                                                    lockRoot.wallpaperSync = false;
-                                                    lockRoot.localWallpaperOverride = nextWp;
-                                                    lockRoot.saveSandbox();
+                                                    root.wallpaperSync = false;
+                                                    root.localWallpaperOverride = nextWp;
+                                                    root.saveSandbox();
                                                 }
-                                                surface.claimSurfaceFocus();
+                                                lockSurface.claimSurfaceFocus();
                                             }
                                         }
                                     }
@@ -1033,117 +1034,117 @@ Rectangle {
 
                                 // tab 4: modular widget visibility (nothing forced!)
                                 ColumnLayout {
-                                    visible: lockRoot.studioTab === "widgets"
+                                    visible: root.studioTab === "widgets"
                                     Layout.fillWidth: true
                                     spacing: 2
 
                                     SandboxToggleRow {
                                         icon: Theme.iconClock
                                         label: "show clock readout"
-                                        checked: lockRoot.showClock
-                                        onToggled: { lockRoot.showClock = !lockRoot.showClock; lockRoot.saveSandbox(); }
+                                        checked: root.showClock
+                                        onToggled: { root.showClock = !root.showClock; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconCalendar
                                         label: "show date label"
-                                        checked: lockRoot.showDate
-                                        onToggled: { lockRoot.showDate = !lockRoot.showDate; lockRoot.saveSandbox(); }
+                                        checked: root.showDate
+                                        onToggled: { root.showDate = !root.showDate; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
-                                        icon: lockRoot.showMediaCard ? Theme.iconMusic : Theme.iconEyeOff
+                                        icon: root.showMediaCard ? Theme.iconMusic : Theme.iconEyeOff
                                         label: "show now playing media card"
-                                        checked: lockRoot.showMediaCard
-                                        onToggled: { lockRoot.showMediaCard = !lockRoot.showMediaCard; lockRoot.saveSandbox(); }
+                                        checked: root.showMediaCard
+                                        onToggled: { root.showMediaCard = !root.showMediaCard; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconEqualizer
                                         label: "media spectrum & seekbar"
-                                        checked: lockRoot.showMediaVisualizer
-                                        onToggled: { lockRoot.showMediaVisualizer = !lockRoot.showMediaVisualizer; lockRoot.saveSandbox(); }
+                                        checked: root.showMediaVisualizer
+                                        onToggled: { root.showMediaVisualizer = !root.showMediaVisualizer; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
-                                        icon: lockRoot.showUserPill ? Theme.iconUser : Theme.iconEyeOff
+                                        icon: root.showUserPill ? Theme.iconUser : Theme.iconEyeOff
                                         label: "show top-left user & timer pill"
-                                        checked: lockRoot.showUserPill
-                                        onToggled: { lockRoot.showUserPill = !lockRoot.showUserPill; lockRoot.saveSandbox(); }
+                                        checked: root.showUserPill
+                                        onToggled: { root.showUserPill = !root.showUserPill; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconSliders
                                         label: "show top-right status bar (hover corner if off)"
-                                        checked: lockRoot.showStatusBar
-                                        onToggled: { lockRoot.showStatusBar = !lockRoot.showStatusBar; lockRoot.saveSandbox(); }
+                                        checked: root.showStatusBar
+                                        onToggled: { root.showStatusBar = !root.showStatusBar; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconVolHigh
                                         label: "show system volume in top bar"
-                                        checked: lockRoot.showSystemVol
-                                        onToggled: { lockRoot.showSystemVol = !lockRoot.showSystemVol; lockRoot.saveSandbox(); }
+                                        checked: root.showSystemVol
+                                        onToggled: { root.showSystemVol = !root.showSystemVol; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconPower
                                         label: "show bottom power dock"
-                                        checked: lockRoot.showPowerDock
-                                        onToggled: { lockRoot.showPowerDock = !lockRoot.showPowerDock; lockRoot.saveSandbox(); }
+                                        checked: root.showPowerDock
+                                        onToggled: { root.showPowerDock = !root.showPowerDock; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconShield
                                         label: "2-step confirmation on power buttons"
-                                        checked: lockRoot.confirmPowerActions
-                                        onToggled: { lockRoot.confirmPowerActions = !lockRoot.confirmPowerActions; lockRoot.saveSandbox(); }
+                                        checked: root.confirmPowerActions
+                                        onToggled: { root.confirmPowerActions = !root.confirmPowerActions; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconLogout
                                         label: "include logout button in power dock"
-                                        checked: lockRoot.allowLogoutOnLock
-                                        onToggled: { lockRoot.allowLogoutOnLock = !lockRoot.allowLogoutOnLock; lockRoot.saveSandbox(); }
+                                        checked: root.allowLogoutOnLock
+                                        onToggled: { root.allowLogoutOnLock = !root.allowLogoutOnLock; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconSparkles
                                         label: "ambient audio-reactive glow orbs"
-                                        checked: lockRoot.ambientOrbs
-                                        onToggled: { lockRoot.ambientOrbs = !lockRoot.ambientOrbs; lockRoot.saveSandbox(); }
+                                        checked: root.ambientOrbs
+                                        onToggled: { root.ambientOrbs = !root.ambientOrbs; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconMusic
                                         label: "album art backdrop when playing"
-                                        checked: lockRoot.albumArtBackdrop
-                                        onToggled: { lockRoot.albumArtBackdrop = !lockRoot.albumArtBackdrop; lockRoot.saveSandbox(); }
+                                        checked: root.albumArtBackdrop
+                                        onToggled: { root.albumArtBackdrop = !root.albumArtBackdrop; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconWallpaper
                                         label: "sync wallpaper with desktop"
-                                        checked: lockRoot.wallpaperSync
+                                        checked: root.wallpaperSync
                                         onToggled: {
-                                            lockRoot.wallpaperSync = !lockRoot.wallpaperSync;
-                                            if (lockRoot.wallpaperSync) lockRoot.localWallpaperOverride = "";
-                                            lockRoot.saveSandbox();
+                                            root.wallpaperSync = !root.wallpaperSync;
+                                            if (root.wallpaperSync) root.localWallpaperOverride = "";
+                                            root.saveSandbox();
                                         }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconCrop
                                         label: "show concave screen corners"
-                                        checked: lockRoot.showScreenCorners
-                                        onToggled: { lockRoot.showScreenCorners = !lockRoot.showScreenCorners; lockRoot.saveSandbox(); }
+                                        checked: root.showScreenCorners
+                                        onToggled: { root.showScreenCorners = !root.showScreenCorners; root.saveSandbox(); }
                                     }
 
                                     SandboxToggleRow {
                                         icon: Theme.iconMoon
                                         label: "auto-zen screensaver after 30s idle"
-                                        checked: lockRoot.autoZenIdle
-                                        onToggled: { lockRoot.autoZenIdle = !lockRoot.autoZenIdle; lockRoot.saveSandbox(); }
+                                        checked: root.autoZenIdle
+                                        onToggled: { root.autoZenIdle = !root.autoZenIdle; root.saveSandbox(); }
                                     }
                                 }
                             }

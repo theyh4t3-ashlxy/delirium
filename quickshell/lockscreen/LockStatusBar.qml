@@ -9,23 +9,28 @@ import Quickshell.Services.UPower
 Rectangle {
     id: statusBar
 
-    required property var lockRoot
-    required property var surface
-    property var cornerRevealHover: null
-    property var surpriseBurstAnim: null
+    property var root: null
+    property var lockSurface: null
+    property var cornerHover: null
+    property var burstAnim: null
 
     anchors.top: parent.top
     anchors.right: parent.right
     anchors.margins: 32
-    anchors.topMargin: (surface.entered && !lockRoot.zenMode) ? 32 : 12
-    opacity: (surface.entered && !lockRoot.zenMode && (lockRoot.showStatusBar || surface.optionsOpen || (cornerRevealHover && cornerRevealHover.containsMouse) || barHoverDetect.containsMouse)) ? 1.0 : 0.0
+    anchors.topMargin: (lockSurface?.entered && !root?.zenMode) ? 32 : 12
+    opacity: (lockSurface?.entered && !root?.zenMode && (
+        (root?.showStatusBar ?? true)
+        || lockSurface?.optionsOpen
+        || (cornerHover && cornerHover.containsMouse)
+        || barHoverDetect.containsMouse
+    )) ? 1.0 : 0.0
     visible: opacity > 0.01
     height: 36
     implicitWidth: statusRow.implicitWidth + 22
-    radius: lockRoot.uiRadiusPill
-    color: surface.optionsOpen ? lockRoot.uiWidgetActive : lockRoot.uiPillBg
-    border.color: surface.optionsOpen ? Theme.alpha(lockRoot.uiAccent, 0.55) : lockRoot.uiPillBorder
-    border.width: (surface.optionsOpen || lockRoot.uiPillBorder.a > 0) ? 1 : 0
+    radius: root?.uiRadiusPill ?? Theme.radiusSm
+    color: lockSurface?.optionsOpen ? (root?.uiWidgetActive ?? Theme.surface) : (root?.uiPillBg ?? Theme.surface)
+    border.color: lockSurface?.optionsOpen ? Theme.alpha(root?.uiAccent ?? Theme.accent, 0.55) : (root?.uiPillBorder ?? "transparent")
+    border.width: (lockSurface?.optionsOpen || (root?.uiPillBorder?.a ?? 0) > 0) ? 1 : 0
 
     Behavior on anchors.topMargin { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
     Behavior on opacity { NumberAnimation { duration: Theme.animNormal } }
@@ -45,12 +50,12 @@ Rectangle {
         spacing: 12
 
         Rectangle {
-            visible: lockRoot.kbLayoutShort !== ""
+            visible: (root?.kbLayoutShort ?? "") !== ""
             height: 22
             implicitWidth: kbRow.implicitWidth + 12
-            radius: lockRoot.uiRadiusPill
-            color: kbMouse.containsMouse ? lockRoot.uiWidgetHover : lockRoot.uiWidgetBg
-            border.color: lockRoot.uiWidgetBorder
+            radius: root?.uiRadiusPill ?? Theme.radiusSm
+            color: kbMouse.containsMouse ? (root?.uiWidgetHover ?? Theme.surface) : (root?.uiWidgetBg ?? Theme.surface)
+            border.color: root?.uiWidgetBorder ?? "transparent"
             border.width: 1
 
             RowLayout {
@@ -62,14 +67,14 @@ Rectangle {
                     text: Theme.iconKeyboard
                     font.family: Theme.fontIcon
                     font.pixelSize: Theme.fontSizeXs
-                    color: lockRoot.uiAccent
+                    color: root?.uiAccent ?? Theme.accent
                 }
                 Text {
-                    text: lockRoot.fmtText(lockRoot.kbLayoutShort)
+                    text: root ? root.fmtText(root.kbLayoutShort) : ""
                     font.family: Theme.fontMono
                     font.pixelSize: Theme.fontSizeXs
                     font.weight: Theme.fontWeightBold
-                    color: lockRoot.uiTextPrimary
+                    color: root?.uiTextPrimary ?? Theme.on_surface
                 }
             }
 
@@ -79,19 +84,19 @@ Rectangle {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    lockRoot.switchKeyboardLayout();
-                    surface.claimSurfaceFocus();
+                    if (root?.switchKeyboardLayout) root.switchKeyboardLayout();
+                    if (lockSurface?.claimSurfaceFocus) lockSurface.claimSurfaceFocus();
                 }
             }
         }
 
         Item {
-            visible: lockRoot.showSystemVol && lockRoot.defaultSink !== null
+            visible: (root?.showSystemVol ?? true) && (root?.defaultSink !== null && root?.defaultSink !== undefined)
             implicitWidth: sysVolRow.implicitWidth
             implicitHeight: sysVolRow.implicitHeight
 
-            readonly property real sinkVol: lockRoot.defaultSink?.audio?.volume ?? 0.0
-            readonly property bool sinkMuted: lockRoot.defaultSink?.audio?.muted ?? false
+            readonly property real sinkVol: root?.defaultSink?.audio?.volume ?? 0.0
+            readonly property bool sinkMuted: root?.defaultSink?.audio?.muted ?? false
 
             RowLayout {
                 id: sysVolRow
@@ -101,85 +106,60 @@ Rectangle {
                 Text {
                     text: Theme.getVolumeIcon(parent.parent.sinkVol, parent.parent.sinkMuted)
                     font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeMd
-                    color: parent.parent.sinkMuted ? Theme.error : lockRoot.uiAccent
+                    font.pixelSize: Theme.fontSizeSm
+                    color: parent.parent.sinkMuted ? Theme.error : (root?.uiAccent ?? Theme.accent)
                 }
 
                 Text {
-                    text: lockRoot.fmtText(parent.parent.sinkMuted ? "mute" : (Math.round(parent.parent.sinkVol * 100) + "%"))
+                    text: parent.parent.sinkMuted ? "muted" : (Math.round(parent.parent.sinkVol * 100) + "%")
                     font.family: Theme.fontMono
                     font.pixelSize: Theme.fontSizeXs
                     font.weight: Theme.fontWeightMedium
-                    color: lockRoot.uiTextPrimary
+                    color: root?.uiTextPrimary ?? Theme.on_surface
                 }
             }
 
             MouseArea {
+                id: sysVolMouse
                 anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    surface.toggleSystemMute();
-                    surface.claimSurfaceFocus();
-                }
+                hoverEnabled: true
+                acceptedButtons: Qt.NoButton
                 onWheel: (wheel) => {
-                    surface.adjustSystemVolume(wheel.angleDelta.y > 0 ? 0.05 : -0.05);
+                    if (lockSurface?.adjustSystemVolume) {
+                        lockSurface.adjustSystemVolume(wheel.angleDelta.y > 0 ? 0.05 : -0.05);
+                    }
                 }
-            }
-        }
-
-        RowLayout {
-            spacing: 6
-            Text {
-                text: Theme.getWifiIcon(
-                    (typeof NetworkService !== "undefined" ? NetworkService?.signalStrength : 100) ?? 100,
-                    (typeof NetworkService !== "undefined" ? NetworkService?.isConnected : false) ?? false,
-                    (typeof NetworkService !== "undefined" ? NetworkService?.isWiredConnected : false) ?? false
-                )
-                font.family: Theme.fontIcon
-                font.pixelSize: Theme.fontSizeMd
-                color: ((typeof NetworkService !== "undefined" && NetworkService?.isConnected) ?? false) ? lockRoot.uiAccent : lockRoot.uiTextSecondary
-            }
-            Text {
-                text: lockRoot.fmtText(((typeof NetworkService !== "undefined" && NetworkService?.isWiredConnected) ?? false)
-                    ? "wired"
-                    : ((typeof NetworkService !== "undefined" ? NetworkService?.activeSsid : "") || (((typeof NetworkService !== "undefined" && NetworkService?.isConnected) ?? false) ? "online" : "offline"))
-                )
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeXs
-                font.weight: Theme.fontWeightMedium
-                color: lockRoot.uiTextPrimary
             }
         }
 
         Item {
             visible: UPower.displayDevice?.isPresent ?? false
-            implicitWidth: batStatusRow.implicitWidth
-            implicitHeight: batStatusRow.implicitHeight
+            implicitWidth: batRow.implicitWidth
+            implicitHeight: batRow.implicitHeight
 
-            readonly property int batPct: {
-                let p = UPower.displayDevice?.percentage ?? 1.0;
-                return Math.min(100, Math.max(0, Math.round(p * 100)));
-            }
-            readonly property bool isCharging: UPower.displayDevice?.state === UPowerDeviceState.Charging
-            readonly property string etaStr: lockRoot.formatBatteryEta()
+            readonly property real batPct: (UPower.displayDevice?.percentage ?? 0) * 100
+            readonly property int batState: UPower.displayDevice?.state ?? 0
+            readonly property bool isCharging: batState === UPowerDeviceState.Charging || batState === UPowerDeviceState.FullyCharged
+            readonly property bool isLow: batPct <= 20 && !isCharging
 
             RowLayout {
-                id: batStatusRow
+                id: batRow
                 anchors.centerIn: parent
-                spacing: 6
+                spacing: 5
 
                 Text {
-                    text: Theme.getBatteryIcon(parent.parent.batPct, parent.parent.isCharging, !(UPower?.onBattery ?? true), false)
+                    text: Theme.getBatteryIcon(Math.round(parent.parent.batPct), parent.parent.isCharging)
                     font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeMd
-                    color: parent.parent.isCharging ? lockRoot.uiAccent : (parent.parent.batPct <= 20 ? Theme.error : lockRoot.uiTextPrimary)
+                    font.pixelSize: Theme.fontSizeSm
+                    color: parent.parent.isLow ? Theme.error : (parent.parent.isCharging ? Theme.success : (root?.uiAccent ?? Theme.accent))
                 }
+
                 Text {
-                    text: parent.parent.batPct + "%" + (batHover.containsMouse && parent.parent.etaStr !== "" ? (" (" + parent.parent.etaStr + ")") : "")
+                    text: Math.round(parent.parent.batPct) + "%"
                     font.family: Theme.fontMono
                     font.pixelSize: Theme.fontSizeXs
                     font.weight: Theme.fontWeightMedium
-                    color: lockRoot.uiTextPrimary
+                    color: root?.uiTextPrimary ?? Theme.on_surface
                 }
             }
 
@@ -191,13 +171,15 @@ Rectangle {
         }
 
         IconButton {
-            icon: lockRoot.isLight ? Theme.iconSun : Theme.iconMoon
+            icon: (root?.isLight ?? false) ? Theme.iconSun : Theme.iconMoon
             iconSize: Theme.fontSizeSm
-            tooltip: lockRoot.isLight ? "switch to dark mode" : "switch to light mode"
+            tooltip: (root?.isLight ?? false) ? "switch to dark mode" : "switch to light mode"
             onClicked: {
-                lockRoot.backdropMode = lockRoot.isLight ? "dark" : "light";
-                lockRoot.saveSandbox();
-                surface.claimSurfaceFocus();
+                if (root) {
+                    root.backdropMode = root.isLight ? "dark" : "light";
+                    if (root.saveSandbox) root.saveSandbox();
+                }
+                if (lockSurface?.claimSurfaceFocus) lockSurface.claimSurfaceFocus();
             }
         }
 
@@ -206,21 +188,21 @@ Rectangle {
             iconSize: Theme.fontSizeSm
             tooltip: "zen screensaver mode (tab)"
             onClicked: {
-                surface.optionsOpen = false;
-                lockRoot.zenMode = true;
-                surface.claimSurfaceFocus();
+                if (lockSurface) lockSurface.optionsOpen = false;
+                if (root) root.zenMode = true;
+                if (lockSurface?.claimSurfaceFocus) lockSurface.claimSurfaceFocus();
             }
         }
 
         IconButton {
             icon: Theme.iconSparkles
             iconSize: Theme.fontSizeSm
-            tooltip: lockRoot.studioLocked ? "studio is locked" : "surprise me! (randomize)"
-            enabled: !lockRoot.studioLocked
+            tooltip: (root?.studioLocked ?? false) ? "studio is locked" : "surprise me! (randomize)"
+            enabled: !(root?.studioLocked ?? false)
             onClicked: {
-                if (surpriseBurstAnim) surpriseBurstAnim.restart();
-                lockRoot.surpriseMe();
-                surface.claimSurfaceFocus();
+                if (burstAnim) burstAnim.restart();
+                if (root?.surpriseMe) root.surpriseMe();
+                if (lockSurface?.claimSurfaceFocus) lockSurface.claimSurfaceFocus();
             }
         }
 
@@ -228,10 +210,10 @@ Rectangle {
             icon: Theme.iconSliders
             iconSize: Theme.fontSizeSm
             tooltip: "lock screen studio"
-            highlighted: surface.optionsOpen
+            highlighted: lockSurface?.optionsOpen ?? false
             onClicked: {
-                surface.optionsOpen = !surface.optionsOpen;
-                surface.claimSurfaceFocus();
+                if (lockSurface) lockSurface.optionsOpen = !lockSurface.optionsOpen;
+                if (lockSurface?.claimSurfaceFocus) lockSurface.claimSurfaceFocus();
             }
         }
     }

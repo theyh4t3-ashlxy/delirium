@@ -7,69 +7,69 @@ import Quickshell
 ColumnLayout {
     id: clockBlock
 
-    required property var lockRoot
-    required property var surface
-    required property var centerStage
+    property var root: null
+    property var lockSurface: null
+    property var stage: null
 
-    visible: lockRoot.showClock || lockRoot.showDate || lockRoot.activeQuoteText !== ""
+    visible: root.showClock || root.showDate || root.activeQuoteText !== ""
     width: parent.width
-                            y: centerStage.blockY("clock")
+                            y: stage.blockY("clock")
                             spacing: 6
 
                             Behavior on y { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
 
-                            readonly property int baseClockPx: Math.round((lockRoot.clockStyle === "minimal" ? 56 : 86) * Theme.fontScale * lockRoot.clockScale)
-                            readonly property int rawHours: lockRoot.currentTime.getHours()
-                            readonly property int displayHourNum: lockRoot.effectiveClock24h ? rawHours : ((rawHours % 12) || 12)
-                            readonly property int displayMinNum: lockRoot.currentTime.getMinutes()
-                            readonly property int displaySecNum: lockRoot.currentTime.getSeconds()
+                            readonly property int baseClockPx: Math.round((root.clockStyle === "minimal" ? 56 : 86) * Theme.fontScale * root.clockScale)
+                            readonly property int rawHours: root.currentTime.getHours()
+                            readonly property int displayHourNum: root.effectiveClock24h ? rawHours : ((rawHours % 12) || 12)
+                            readonly property int displayMinNum: root.currentTime.getMinutes()
+                            readonly property int displaySecNum: root.currentTime.getSeconds()
 
                             readonly property string mainHoursText: (displayHourNum < 10 ? "0" : "") + displayHourNum
                             readonly property string mainMinutesText: (displayMinNum < 10 ? "0" : "") + displayMinNum
                             readonly property string secondsDigits: (displaySecNum < 10 ? "0" : "") + displaySecNum
-                            readonly property string amPmText: lockRoot.fmtText(rawHours >= 12 ? "PM" : "AM")
-                            readonly property string formattedDateText: lockRoot.fmtText(Qt.formatDateTime(lockRoot.currentTime, lockRoot.dateFormat))
+                            readonly property string amPmText: root.fmtText(rawHours >= 12 ? "PM" : "AM")
+                            readonly property string formattedDateText: root.fmtText(Qt.formatDateTime(root.currentTime, root.dateFormat))
 
                             Text {
-                                visible: lockRoot.showDate && lockRoot.dateAboveClock && lockRoot.clockStyle !== "editorial"
+                                visible: root.showDate && root.dateAboveClock && root.clockStyle !== "editorial"
                                 text: clockBlock.formattedDateText
                                 font.family: Theme.fontDisplay
                                 font.pixelSize: Theme.fontSizeMd
                                 font.weight: Theme.fontWeightDemiBold
-                                color: lockRoot.uiAccent
+                                color: root.uiAccent
                                 Layout.alignment: Qt.AlignHCenter
                             }
 
                             // style 1 & 2: inline or minimal clock
                             RowLayout {
-                                visible: lockRoot.showClock && (lockRoot.clockStyle === "inline" || lockRoot.clockStyle === "minimal")
+                                visible: root.showClock && (root.clockStyle === "inline" || root.clockStyle === "minimal")
                                 Layout.alignment: Qt.AlignHCenter
                                 spacing: 10
 
                                 Text {
                                     text: {
                                         let hm = clockBlock.mainHoursText + ":" + clockBlock.mainMinutesText;
-                                        if (lockRoot.effectiveShowSeconds && lockRoot.secondsStyle === "inline") {
-                                            return hm + ":" + clockBlock.secondsDigits + (!lockRoot.effectiveClock24h ? (" " + clockBlock.amPmText) : "");
+                                        if (root.effectiveShowSeconds && root.secondsStyle === "inline") {
+                                            return hm + ":" + clockBlock.secondsDigits + (!root.effectiveClock24h ? (" " + clockBlock.amPmText) : "");
                                         }
-                                        if (!lockRoot.effectiveShowSeconds && !lockRoot.effectiveClock24h) {
+                                        if (!root.effectiveShowSeconds && !root.effectiveClock24h) {
                                             return hm + " " + clockBlock.amPmText;
                                         }
                                         return hm;
                                     }
                                     font.family: Theme.fontDisplay
-                                    font.pixelSize: (lockRoot.effectiveShowSeconds && lockRoot.secondsStyle === "inline")
+                                    font.pixelSize: (root.effectiveShowSeconds && root.secondsStyle === "inline")
                                         ? Math.round(clockBlock.baseClockPx * 0.76)
                                         : clockBlock.baseClockPx
-                                    font.weight: lockRoot.clockStyle === "minimal" ? Theme.fontWeightDemiBold : Theme.fontWeightBold
-                                    color: lockRoot.uiTextPrimary
+                                    font.weight: root.clockStyle === "minimal" ? Theme.fontWeightDemiBold : Theme.fontWeightBold
+                                    color: root.uiTextPrimary
                                     Layout.alignment: Qt.AlignVCenter
 
                                     Behavior on font.pixelSize { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
                                 }
 
                                 ColumnLayout {
-                                    visible: lockRoot.effectiveShowSeconds && lockRoot.secondsStyle === "badge"
+                                    visible: root.effectiveShowSeconds && root.secondsStyle === "badge"
                                     Layout.alignment: Qt.AlignVCenter
                                     spacing: 4
 
@@ -77,9 +77,9 @@ ColumnLayout {
                                         readonly property int badgeFontPx: Math.max(18, Math.round(clockBlock.baseClockPx * 0.38))
                                         height: badgeFontPx + 14
                                         implicitWidth: secBadgeTxt.implicitWidth + 20
-                                        radius: lockRoot.uiRadiusMd
-                                        color: lockRoot.uiAccentOverlay
-                                        border.color: Theme.alpha(lockRoot.uiAccent, 0.55)
+                                        radius: root.uiRadiusMd
+                                        color: root.uiAccentOverlay
+                                        border.color: Theme.alpha(root.uiAccent, 0.55)
                                         border.width: 1
 
                                         Text {
@@ -89,23 +89,23 @@ ColumnLayout {
                                             font.family: Theme.fontMono
                                             font.pixelSize: parent.badgeFontPx
                                             font.weight: Theme.fontWeightBold
-                                            color: lockRoot.uiAccent
+                                            color: root.uiAccent
                                         }
                                     }
 
                                     Text {
-                                        visible: !lockRoot.effectiveClock24h
+                                        visible: !root.effectiveClock24h
                                         text: clockBlock.amPmText
                                         font.family: Theme.fontMono
                                         font.pixelSize: Math.max(11, Math.round(clockBlock.baseClockPx * 0.18))
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                         Layout.alignment: Qt.AlignHCenter
                                     }
                                 }
 
                                 ColumnLayout {
-                                    visible: lockRoot.effectiveShowSeconds && lockRoot.secondsStyle === "supersub"
+                                    visible: root.effectiveShowSeconds && root.secondsStyle === "supersub"
                                     Layout.alignment: Qt.AlignVCenter
                                     spacing: -2
 
@@ -114,23 +114,23 @@ ColumnLayout {
                                         font.family: Theme.fontDisplay
                                         font.pixelSize: Math.max(20, Math.round(clockBlock.baseClockPx * 0.44))
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiAccent
+                                        color: root.uiAccent
                                     }
 
                                     Text {
-                                        visible: !lockRoot.effectiveClock24h
+                                        visible: !root.effectiveClock24h
                                         text: clockBlock.amPmText
                                         font.family: Theme.fontMono
                                         font.pixelSize: Math.max(12, Math.round(clockBlock.baseClockPx * 0.22))
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
                                 }
                             }
 
                             // style 3: stacked m3 expressive clock
                             RowLayout {
-                                visible: lockRoot.showClock && lockRoot.clockStyle === "stacked"
+                                visible: root.showClock && root.clockStyle === "stacked"
                                 Layout.alignment: Qt.AlignHCenter
                                 spacing: 14
 
@@ -140,26 +140,26 @@ ColumnLayout {
                                     Text {
                                         text: clockBlock.mainHoursText
                                         font.family: Theme.fontDisplay
-                                        font.pixelSize: Math.round(92 * Theme.fontScale * lockRoot.clockScale)
+                                        font.pixelSize: Math.round(92 * Theme.fontScale * root.clockScale)
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiTextPrimary
+                                        color: root.uiTextPrimary
                                         Layout.alignment: Qt.AlignHCenter
                                     }
 
                                     Text {
                                         text: clockBlock.mainMinutesText
                                         font.family: Theme.fontDisplay
-                                        font.pixelSize: Math.round(92 * Theme.fontScale * lockRoot.clockScale)
+                                        font.pixelSize: Math.round(92 * Theme.fontScale * root.clockScale)
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiAccent
+                                        color: root.uiAccent
                                         Layout.alignment: Qt.AlignHCenter
                                     }
 
                                     Text {
-                                        visible: lockRoot.effectiveShowSeconds && lockRoot.secondsStyle === "tower"
+                                        visible: root.effectiveShowSeconds && root.secondsStyle === "tower"
                                         text: clockBlock.secondsDigits
                                         font.family: Theme.fontDisplay
-                                        font.pixelSize: Math.round(92 * Theme.fontScale * lockRoot.clockScale)
+                                        font.pixelSize: Math.round(92 * Theme.fontScale * root.clockScale)
                                         font.weight: Theme.fontWeightBold
                                         color: Theme.tertiary
                                         Layout.alignment: Qt.AlignHCenter
@@ -167,18 +167,18 @@ ColumnLayout {
                                 }
 
                                 ColumnLayout {
-                                    visible: (lockRoot.effectiveShowSeconds && lockRoot.secondsStyle !== "tower") || !lockRoot.effectiveClock24h
+                                    visible: (root.effectiveShowSeconds && root.secondsStyle !== "tower") || !root.effectiveClock24h
                                     Layout.alignment: Qt.AlignVCenter
                                     spacing: 8
 
                                     Rectangle {
-                                        visible: !lockRoot.effectiveClock24h
-                                        readonly property int amPx: Math.max(14, Math.round(22 * Theme.fontScale * lockRoot.clockScale))
+                                        visible: !root.effectiveClock24h
+                                        readonly property int amPx: Math.max(14, Math.round(22 * Theme.fontScale * root.clockScale))
                                         height: amPx + 14
                                         implicitWidth: stackAmTxt.implicitWidth + 18
-                                        radius: lockRoot.uiRadiusMd
-                                        color: lockRoot.uiPillBg
-                                        border.color: lockRoot.uiPillBorder
+                                        radius: root.uiRadiusMd
+                                        color: root.uiPillBg
+                                        border.color: root.uiPillBorder
                                         border.width: 1
 
                                         Text {
@@ -188,18 +188,18 @@ ColumnLayout {
                                             font.family: Theme.fontMono
                                             font.pixelSize: parent.amPx
                                             font.weight: Theme.fontWeightBold
-                                            color: lockRoot.uiTextSecondary
+                                            color: root.uiTextSecondary
                                         }
                                     }
 
                                     Rectangle {
-                                        visible: lockRoot.effectiveShowSeconds && lockRoot.secondsStyle !== "tower"
-                                        readonly property int secPx: Math.max(22, Math.round(38 * Theme.fontScale * lockRoot.clockScale))
+                                        visible: root.effectiveShowSeconds && root.secondsStyle !== "tower"
+                                        readonly property int secPx: Math.max(22, Math.round(38 * Theme.fontScale * root.clockScale))
                                         height: secPx + 18
                                         implicitWidth: stackSecTxt.implicitWidth + 22
-                                        radius: lockRoot.uiRadiusLg
-                                        color: lockRoot.uiAccentOverlay
-                                        border.color: Theme.alpha(lockRoot.uiAccent, 0.55)
+                                        radius: root.uiRadiusLg
+                                        color: root.uiAccentOverlay
+                                        border.color: Theme.alpha(root.uiAccent, 0.55)
                                         border.width: 1
 
                                         Text {
@@ -209,7 +209,7 @@ ColumnLayout {
                                             font.family: Theme.fontMono
                                             font.pixelSize: parent.secPx
                                             font.weight: Theme.fontWeightBold
-                                            color: lockRoot.uiAccent
+                                            color: root.uiAccent
                                         }
                                     }
                                 }
@@ -217,19 +217,19 @@ ColumnLayout {
 
                             // style 4: "split" twin squircle flip-cards
                             RowLayout {
-                                visible: lockRoot.showClock && lockRoot.clockStyle === "split"
+                                visible: root.showClock && root.clockStyle === "split"
                                 Layout.alignment: Qt.AlignHCenter
                                 spacing: 10
 
-                                readonly property int cardSize: Math.round(108 * Theme.fontScale * lockRoot.clockScale)
-                                readonly property int digitPx: Math.round(62 * Theme.fontScale * lockRoot.clockScale)
+                                readonly property int cardSize: Math.round(108 * Theme.fontScale * root.clockScale)
+                                readonly property int digitPx: Math.round(62 * Theme.fontScale * root.clockScale)
 
                                 Rectangle {
                                     width: parent.cardSize
                                     height: parent.cardSize
-                                    radius: lockRoot.uiRadiusXl
-                                    color: lockRoot.uiCardBg
-                                    border.color: Theme.alpha(lockRoot.uiAccent, 0.35)
+                                    radius: root.uiRadiusXl
+                                    color: root.uiCardBg
+                                    border.color: Theme.alpha(root.uiAccent, 0.35)
                                     border.width: 1
 
                                     Text {
@@ -238,11 +238,11 @@ ColumnLayout {
                                         font.family: Theme.fontDisplay
                                         font.pixelSize: parent.parent.digitPx
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiTextPrimary
+                                        color: root.uiTextPrimary
                                     }
 
                                     Text {
-                                        visible: !lockRoot.effectiveClock24h
+                                        visible: !root.effectiveClock24h
                                         anchors.bottom: parent.bottom
                                         anchors.right: parent.right
                                         anchors.margins: 8
@@ -250,7 +250,7 @@ ColumnLayout {
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiAccent
+                                        color: root.uiAccent
                                     }
                                 }
 
@@ -259,13 +259,13 @@ ColumnLayout {
                                     Layout.alignment: Qt.AlignVCenter
                                     Rectangle {
                                         width: 8; height: 8; radius: 4
-                                        color: lockRoot.uiAccent
+                                        color: root.uiAccent
                                         opacity: (clockBlock.displaySecNum % 2 === 0) ? 1.0 : 0.35
                                         Behavior on opacity { NumberAnimation { duration: 250 } }
                                     }
                                     Rectangle {
                                         width: 8; height: 8; radius: 4
-                                        color: lockRoot.uiAccent
+                                        color: root.uiAccent
                                         opacity: (clockBlock.displaySecNum % 2 === 0) ? 1.0 : 0.35
                                         Behavior on opacity { NumberAnimation { duration: 250 } }
                                     }
@@ -274,9 +274,9 @@ ColumnLayout {
                                 Rectangle {
                                     width: parent.cardSize
                                     height: parent.cardSize
-                                    radius: lockRoot.uiRadiusXl
-                                    color: Theme.blend(lockRoot.uiCardBg, lockRoot.uiAccent, 0.14)
-                                    border.color: Theme.alpha(lockRoot.uiAccent, 0.55)
+                                    radius: root.uiRadiusXl
+                                    color: Theme.blend(root.uiCardBg, root.uiAccent, 0.14)
+                                    border.color: Theme.alpha(root.uiAccent, 0.55)
                                     border.width: 1
 
                                     Text {
@@ -285,11 +285,11 @@ ColumnLayout {
                                         font.family: Theme.fontDisplay
                                         font.pixelSize: parent.parent.digitPx
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiAccent
+                                        color: root.uiAccent
                                     }
 
                                     Text {
-                                        visible: lockRoot.effectiveShowSeconds
+                                        visible: root.effectiveShowSeconds
                                         anchors.bottom: parent.bottom
                                         anchors.right: parent.right
                                         anchors.margins: 8
@@ -297,50 +297,50 @@ ColumnLayout {
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                     }
                                 }
                             }
 
                             // style 5: "typo" word clock
                             ColumnLayout {
-                                visible: lockRoot.showClock && lockRoot.clockStyle === "typo"
+                                visible: root.showClock && root.clockStyle === "typo"
                                 Layout.alignment: Qt.AlignHCenter
                                 spacing: -6
 
                                 Text {
-                                    text: lockRoot.numberToWords(clockBlock.displayHourNum)
+                                    text: root.numberToWords(clockBlock.displayHourNum)
                                     font.family: Theme.fontDisplay
-                                    font.pixelSize: Math.round(56 * Theme.fontScale * lockRoot.clockScale)
+                                    font.pixelSize: Math.round(56 * Theme.fontScale * root.clockScale)
                                     font.weight: Theme.fontWeightBold
-                                    color: lockRoot.uiTextPrimary
+                                    color: root.uiTextPrimary
                                     Layout.alignment: Qt.AlignHCenter
                                 }
 
                                 Text {
                                     text: clockBlock.displayMinNum === 0
-                                        ? lockRoot.fmtText("o'clock")
+                                        ? root.fmtText("o'clock")
                                         : (clockBlock.displayMinNum < 10
-                                            ? (lockRoot.fmtText("oh ") + lockRoot.numberToWords(clockBlock.displayMinNum))
-                                            : lockRoot.numberToWords(clockBlock.displayMinNum))
+                                            ? (root.fmtText("oh ") + root.numberToWords(clockBlock.displayMinNum))
+                                            : root.numberToWords(clockBlock.displayMinNum))
                                     font.family: Theme.fontDisplay
-                                    font.pixelSize: Math.round(48 * Theme.fontScale * lockRoot.clockScale)
+                                    font.pixelSize: Math.round(48 * Theme.fontScale * root.clockScale)
                                     font.italic: true
                                     font.weight: Theme.fontWeightDemiBold
-                                    color: lockRoot.uiAccent
+                                    color: root.uiAccent
                                     Layout.alignment: Qt.AlignHCenter
                                 }
                             }
 
                             // style 6: "digital" terminal monospace readout
                             Rectangle {
-                                visible: lockRoot.showClock && lockRoot.clockStyle === "digital"
+                                visible: root.showClock && root.clockStyle === "digital"
                                 Layout.alignment: Qt.AlignHCenter
                                 implicitWidth: digRow.implicitWidth + 36
                                 implicitHeight: digRow.implicitHeight + 24
-                                radius: lockRoot.uiRadiusLg
-                                color: lockRoot.uiCardBg
-                                border.color: Theme.alpha(lockRoot.uiAccent, 0.55)
+                                radius: root.uiRadiusLg
+                                color: root.uiCardBg
+                                border.color: Theme.alpha(root.uiAccent, 0.55)
                                 border.width: 1
 
                                 RowLayout {
@@ -349,20 +349,20 @@ ColumnLayout {
                                     spacing: 6
 
                                     Text {
-                                        text: clockBlock.mainHoursText + ":" + clockBlock.mainMinutesText + (lockRoot.effectiveShowSeconds ? (":" + clockBlock.secondsDigits) : "")
+                                        text: clockBlock.mainHoursText + ":" + clockBlock.mainMinutesText + (root.effectiveShowSeconds ? (":" + clockBlock.secondsDigits) : "")
                                         font.family: Theme.fontMono
-                                        font.pixelSize: Math.round(54 * Theme.fontScale * lockRoot.clockScale)
+                                        font.pixelSize: Math.round(54 * Theme.fontScale * root.clockScale)
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiAccent
+                                        color: root.uiAccent
                                     }
 
                                     Text {
-                                        visible: !lockRoot.effectiveClock24h
+                                        visible: !root.effectiveClock24h
                                         text: clockBlock.amPmText
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontSizeSm
                                         font.weight: Theme.fontWeightBold
-                                        color: lockRoot.uiTextSecondary
+                                        color: root.uiTextSecondary
                                         Layout.alignment: Qt.AlignBottom
                                         Layout.bottomMargin: 8
                                     }
@@ -371,16 +371,16 @@ ColumnLayout {
 
                             // style 7: "editorial" magazine weekday banner + time pill
                             ColumnLayout {
-                                visible: lockRoot.showClock && lockRoot.clockStyle === "editorial"
+                                visible: root.showClock && root.clockStyle === "editorial"
                                 Layout.alignment: Qt.AlignHCenter
                                 spacing: 6
 
                                 Text {
-                                    text: lockRoot.fmtText(Qt.formatDateTime(lockRoot.currentTime, "dddd"))
+                                    text: root.fmtText(Qt.formatDateTime(root.currentTime, "dddd"))
                                     font.family: Theme.fontDisplay
-                                    font.pixelSize: Math.round(58 * Theme.fontScale * lockRoot.clockScale)
+                                    font.pixelSize: Math.round(58 * Theme.fontScale * root.clockScale)
                                     font.weight: Theme.fontWeightBold
-                                    color: lockRoot.uiTextPrimary
+                                    color: root.uiTextPrimary
                                     Layout.alignment: Qt.AlignHCenter
                                 }
 
@@ -391,39 +391,39 @@ ColumnLayout {
                                     Rectangle {
                                         height: 34
                                         implicitWidth: edTimeTxt.implicitWidth + 24
-                                        radius: lockRoot.uiRadiusPill
-                                        color: lockRoot.uiAccent
+                                        radius: root.uiRadiusPill
+                                        color: root.uiAccent
 
                                         Text {
                                             id: edTimeTxt
                                             anchors.centerIn: parent
                                             text: clockBlock.mainHoursText + ":" + clockBlock.mainMinutesText
-                                                + (lockRoot.effectiveShowSeconds ? (":" + clockBlock.secondsDigits) : "")
-                                                + (!lockRoot.effectiveClock24h ? (" " + clockBlock.amPmText) : "")
+                                                + (root.effectiveShowSeconds ? (":" + clockBlock.secondsDigits) : "")
+                                                + (!root.effectiveClock24h ? (" " + clockBlock.amPmText) : "")
                                             font.family: Theme.fontMono
                                             font.pixelSize: Theme.fontSizeMd
                                             font.weight: Theme.fontWeightBold
-                                            color: lockRoot.uiOnAccent
+                                            color: root.uiOnAccent
                                         }
                                     }
 
                                     Rectangle {
-                                        visible: lockRoot.showDate
+                                        visible: root.showDate
                                         height: 34
                                         implicitWidth: edDateTxt.implicitWidth + 24
-                                        radius: lockRoot.uiRadiusPill
-                                        color: lockRoot.uiPillBg
-                                        border.color: lockRoot.uiPillBorder
+                                        radius: root.uiRadiusPill
+                                        color: root.uiPillBg
+                                        border.color: root.uiPillBorder
                                         border.width: 1
 
                                         Text {
                                             id: edDateTxt
                                             anchors.centerIn: parent
-                                            text: lockRoot.fmtText(Qt.formatDateTime(lockRoot.currentTime, "MMMM d, yyyy"))
+                                            text: root.fmtText(Qt.formatDateTime(root.currentTime, "MMMM d, yyyy"))
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSizeSm
                                             font.weight: Theme.fontWeightDemiBold
-                                            color: lockRoot.uiTextPrimary
+                                            color: root.uiTextPrimary
                                         }
                                     }
                                 }
@@ -431,16 +431,16 @@ ColumnLayout {
 
                             // 60-second animated bar when secondsStyle === "tower"
                             RowLayout {
-                                visible: lockRoot.showClock && lockRoot.clockStyle !== "stacked" && lockRoot.clockStyle !== "editorial" && lockRoot.effectiveShowSeconds && (lockRoot.secondsStyle === "tower" || lockRoot.clockStyle === "typo")
+                                visible: root.showClock && root.clockStyle !== "stacked" && root.clockStyle !== "editorial" && root.effectiveShowSeconds && (root.secondsStyle === "tower" || root.clockStyle === "typo")
                                 Layout.alignment: Qt.AlignHCenter
                                 spacing: 10
 
                                 Rectangle {
                                     width: 150
                                     height: 8
-                                    radius: lockRoot.uiRadiusPill
-                                    color: lockRoot.uiPillBg
-                                    border.color: lockRoot.uiPillBorder
+                                    radius: root.uiRadiusPill
+                                    color: root.uiPillBg
+                                    border.color: root.uiPillBorder
                                     border.width: 1
 
                                     Rectangle {
@@ -448,43 +448,43 @@ ColumnLayout {
                                         anchors.top: parent.top
                                         anchors.bottom: parent.bottom
                                         width: Math.max(parent.height, parent.width * ((clockBlock.displaySecNum + 1) / 60.0))
-                                        radius: lockRoot.uiRadiusPill
-                                        color: lockRoot.uiAccent
+                                        radius: root.uiRadiusPill
+                                        color: root.uiAccent
 
                                         Behavior on width { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
                                     }
                                 }
 
                                 Text {
-                                    text: clockBlock.secondsDigits + "s" + (!lockRoot.effectiveClock24h ? (" • " + clockBlock.amPmText) : "")
+                                    text: clockBlock.secondsDigits + "s" + (!root.effectiveClock24h ? (" • " + clockBlock.amPmText) : "")
                                     font.family: Theme.fontMono
-                                    font.pixelSize: Math.max(12, Math.round(Theme.fontSizeSm * lockRoot.clockScale))
+                                    font.pixelSize: Math.max(12, Math.round(Theme.fontSizeSm * root.clockScale))
                                     font.weight: Theme.fontWeightBold
-                                    color: lockRoot.uiAccent
+                                    color: root.uiAccent
                                 }
                             }
 
                             Text {
-                                visible: lockRoot.showDate && !lockRoot.dateAboveClock && lockRoot.clockStyle !== "editorial"
+                                visible: root.showDate && !root.dateAboveClock && root.clockStyle !== "editorial"
                                 text: clockBlock.formattedDateText
                                 font.family: Theme.fontDisplay
                                 font.pixelSize: Theme.fontSizeMd
                                 font.weight: Theme.fontWeightDemiBold
-                                color: lockRoot.uiAccent
+                                color: root.uiAccent
                                 Layout.alignment: Qt.AlignHCenter
                             }
 
                             // quote pill
                             Rectangle {
-                                visible: lockRoot.activeQuoteText !== ""
+                                visible: root.activeQuoteText !== ""
                                 Layout.alignment: Qt.AlignHCenter
                                 Layout.topMargin: 4
-                                Layout.maximumWidth: centerStage.width - 16
-                                implicitWidth: Math.min(centerStage.width - 16, quoteTxt.implicitWidth + 24)
+                                Layout.maximumWidth: stage.width - 16
+                                implicitWidth: Math.min(stage.width - 16, quoteTxt.implicitWidth + 24)
                                 implicitHeight: quoteTxt.implicitHeight + 12
-                                radius: lockRoot.uiRadiusPill
-                                color: quoteMouse.containsMouse ? lockRoot.uiPillHover : "transparent"
-                                border.color: quoteMouse.containsMouse ? lockRoot.uiPillBorder : "transparent"
+                                radius: root.uiRadiusPill
+                                color: quoteMouse.containsMouse ? root.uiPillHover : "transparent"
+                                border.color: quoteMouse.containsMouse ? root.uiPillBorder : "transparent"
                                 border.width: 1
 
                                 Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -492,12 +492,12 @@ ColumnLayout {
                                 Text {
                                     id: quoteTxt
                                     anchors.centerIn: parent
-                                    width: Math.min(centerStage.width - 40, implicitWidth)
-                                    text: "\"" + lockRoot.activeQuoteText + "\""
+                                    width: Math.min(stage.width - 40, implicitWidth)
+                                    text: "\"" + root.activeQuoteText + "\""
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeXs
                                     font.italic: true
-                                    color: quoteMouse.containsMouse ? lockRoot.uiTextPrimary : lockRoot.uiTextSecondary
+                                    color: quoteMouse.containsMouse ? root.uiTextPrimary : root.uiTextSecondary
                                     horizontalAlignment: Text.AlignHCenter
                                     wrapMode: Text.WordWrap
                                 }
@@ -508,8 +508,8 @@ ColumnLayout {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        lockRoot.refreshQuotes();
-                                        surface.claimSurfaceFocus();
+                                        root.refreshQuotes();
+                                        lockSurface.claimSurfaceFocus();
                                     }
                                 }
                             }

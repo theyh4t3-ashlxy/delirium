@@ -7,15 +7,15 @@ import Quickshell
 ColumnLayout {
     id: passwordBlock
 
-    required property var lockRoot
-    required property var surface
-    required property var centerStage
+    property var root: null
+    property var lockSurface: null
+    property var stage: null
 
     property alias pwInput: pwInput
 
-                            y: centerStage.blockY("password")
+                            y: stage.blockY("password")
                             spacing: 8
-                            opacity: lockRoot.zenMode ? 0.0 : 1.0
+                            opacity: root.zenMode ? 0.0 : 1.0
 
                             Behavior on y { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
                             Behavior on opacity { NumberAnimation { duration: Theme.animNormal } }
@@ -24,16 +24,16 @@ ColumnLayout {
                                 id: pwContainer
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 50
-                                radius: lockRoot.uiRadiusPill
-                                color: pwInput.activeFocus ? lockRoot.uiPillHover : lockRoot.uiPillBg
-                                border.color: lockRoot.authFailed
+                                radius: root.uiRadiusPill
+                                color: pwInput.activeFocus ? root.uiPillHover : root.uiPillBg
+                                border.color: root.authFailed
                                     ? Theme.error
-                                    : (lockRoot.capsLockActive && lockRoot.sharedPassword.length > 0
+                                    : (root.capsLockActive && root.sharedPassword.length > 0
                                         ? Theme.warn
-                                        : (lockRoot.sharedPassword.length > 0
-                                            ? lockRoot.uiAccent
-                                            : (pwInput.activeFocus ? Theme.alpha(lockRoot.uiAccent, 0.65) : lockRoot.uiPillBorder)))
-                                border.width: (pwInput.activeFocus || lockRoot.authFailed || lockRoot.capsLockActive) ? 2 : 1
+                                        : (root.sharedPassword.length > 0
+                                            ? root.uiAccent
+                                            : (pwInput.activeFocus ? Theme.alpha(root.uiAccent, 0.65) : root.uiPillBorder)))
+                                border.width: (pwInput.activeFocus || root.authFailed || root.capsLockActive) ? 2 : 1
 
                                 Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                                 Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -56,7 +56,7 @@ ColumnLayout {
                                 }
 
                                 Connections {
-                                    target: lockRoot
+                                    target: root
                                     function onTriggerShake() {
                                         shakeAnim.restart();
                                     }
@@ -64,8 +64,8 @@ ColumnLayout {
                                         if (pwInput.text !== "") pwInput.text = "";
                                     }
                                     function onSharedPasswordChanged() {
-                                        if (pwInput.text !== lockRoot.sharedPassword) {
-                                            pwInput.text = lockRoot.sharedPassword;
+                                        if (pwInput.text !== root.sharedPassword) {
+                                            pwInput.text = root.sharedPassword;
                                         }
                                     }
                                 }
@@ -78,17 +78,17 @@ ColumnLayout {
 
                                     Text {
                                         id: lockGlyph
-                                        text: lockRoot.isChecking ? Theme.iconRefresh : Theme.iconLock
+                                        text: root.isChecking ? Theme.iconRefresh : Theme.iconLock
                                         font.family: Theme.fontIcon
                                         font.pixelSize: Theme.fontSizeMd
-                                        color: lockRoot.authFailed
+                                        color: root.authFailed
                                             ? Theme.error
-                                            : (pwInput.activeFocus ? lockRoot.uiAccent : lockRoot.uiTextSecondary)
+                                            : (pwInput.activeFocus ? root.uiAccent : root.uiTextSecondary)
 
                                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                                         RotationAnimator on rotation {
-                                            running: lockRoot.isChecking
+                                            running: root.isChecking
                                             loops: Animation.Infinite
                                             from: 0
                                             to: 360
@@ -101,115 +101,112 @@ ColumnLayout {
                                         Layout.fillWidth: true
                                         Layout.fillHeight: true
                                         verticalAlignment: TextInput.AlignVCenter
-                                        echoMode: lockRoot.revealPassword
+                                        echoMode: root.revealPassword
                                             ? TextInput.Normal
-                                            : (lockRoot.pwMaskChar === "none" ? TextInput.NoEcho : TextInput.Password)
+                                            : (root.pwMaskChar === "none" ? TextInput.NoEcho : TextInput.Password)
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontSizeMd
-                                        color: lockRoot.uiTextPrimary
-                                        selectionColor: lockRoot.uiAccentOverlay
-                                        selectedTextColor: lockRoot.uiTextPrimary
-                                        readOnly: lockRoot.isChecking
-                                        passwordCharacter: (lockRoot.pwMaskChar !== "" && lockRoot.pwMaskChar !== "none") ? lockRoot.pwMaskChar : "•"
+                                        color: root.uiTextPrimary
+                                        selectionColor: root.uiAccentOverlay
+                                        selectedTextColor: root.uiTextPrimary
+                                        readOnly: root.isChecking
+                                        passwordCharacter: (root.pwMaskChar !== "" && root.pwMaskChar !== "none") ? root.pwMaskChar : "•"
                                         passwordMaskDelay: 0
                                         clip: true
 
                                         Text {
                                             anchors.fill: parent
                                             verticalAlignment: Text.AlignVCenter
-                                            text: lockRoot.fmtText(
-                                                lockRoot.isChecking
+                                            text: root.fmtText(
+                                                root.isChecking
                                                     ? "verifying..."
-                                                    : (lockRoot.pwMaskChar === "none" && lockRoot.sharedPassword.length > 0
-                                                        ? (lockRoot.sharedPassword.length + " chars typed (stealth)...")
+                                                    : (root.pwMaskChar === "none" && root.sharedPassword.length > 0
+                                                        ? (root.sharedPassword.length + " chars typed (stealth)...")
                                                         : "enter password to unlock...")
                                             )
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSizeSm
-                                            color: lockRoot.pwMaskChar === "none" && lockRoot.sharedPassword.length > 0
-                                                ? lockRoot.uiAccent
-                                                : lockRoot.uiTextDisabled
-                                            visible: pwInput.text.length === 0 || (lockRoot.pwMaskChar === "none" && !lockRoot.revealPassword)
+                                            color: root.pwMaskChar === "none" && root.sharedPassword.length > 0
+                                                ? root.uiAccent
+                                                : root.uiTextDisabled
+                                            visible: pwInput.text.length === 0 || (root.pwMaskChar === "none" && !root.revealPassword)
                                         }
 
                                         onTextEdited: {
-                                            surface.wakeFromZen();
-                                            lockRoot.sharedPassword = pwInput.text;
-                                            if (lockRoot.authFailed) lockRoot.authFailed = false;
+                                            lockSurface.wakeFromZen();
+                                            root.sharedPassword = pwInput.text;
+                                            if (root.authFailed) root.authFailed = false;
                                             keyPulseAnim.restart();
                                         }
 
                                         Keys.onPressed: (event) => {
-                                            surface.wakeFromZen();
+                                            lockSurface.wakeFromZen();
                                             if (event.key === Qt.Key_CapsLock) {
-                                                kbPollDelayTimer.restart();
-                                            } else if (event.key === Qt.Key_Tab && pwInput.text.length === 0 && !surface.optionsOpen) {
-                                                lockRoot.zenMode = !lockRoot.zenMode;
+                                                if (root?.pollKeyboardState) root.pollKeyboardState();
+                                            } else if (event.key === Qt.Key_Tab && pwInput.text.length === 0 && !lockSurface.optionsOpen) {
+                                                root.zenMode = !root.zenMode;
                                                 event.accepted = true;
-                                            } else if (lockRoot.freeDragMode && pwInput.text.length === 0) {
+                                            } else if (root.freeDragMode && pwInput.text.length === 0) {
                                                 let step = (event.modifiers & Qt.ShiftModifier) ? 0.04 : 0.01;
                                                 if (event.key === Qt.Key_Left) {
-                                                    lockRoot.customNormX = Math.max(0.02, lockRoot.customNormX - step);
-                                                    lockRoot.layoutPosition = "custom";
-                                                    lockRoot.saveSandbox();
+                                                    root.customNormX = Math.max(0.02, root.customNormX - step);
+                                                    root.layoutPosition = "custom";
+                                                    root.saveSandbox();
                                                     event.accepted = true;
                                                 } else if (event.key === Qt.Key_Right) {
-                                                    lockRoot.customNormX = Math.min(0.98, lockRoot.customNormX + step);
-                                                    lockRoot.layoutPosition = "custom";
-                                                    lockRoot.saveSandbox();
+                                                    root.customNormX = Math.min(0.98, root.customNormX + step);
+                                                    root.layoutPosition = "custom";
+                                                    root.saveSandbox();
                                                     event.accepted = true;
                                                 } else if (event.key === Qt.Key_Up) {
-                                                    lockRoot.customNormY = Math.max(0.05, lockRoot.customNormY - step);
-                                                    lockRoot.layoutPosition = "custom";
-                                                    lockRoot.saveSandbox();
+                                                    root.customNormY = Math.max(0.05, root.customNormY - step);
+                                                    root.layoutPosition = "custom";
+                                                    root.saveSandbox();
                                                     event.accepted = true;
                                                 } else if (event.key === Qt.Key_Down) {
-                                                    lockRoot.customNormY = Math.min(0.95, lockRoot.customNormY + step);
-                                                    lockRoot.layoutPosition = "custom";
-                                                    lockRoot.saveSandbox();
+                                                    root.customNormY = Math.min(0.95, root.customNormY + step);
+                                                    root.layoutPosition = "custom";
+                                                    root.saveSandbox();
                                                     event.accepted = true;
                                                 }
                                             }
                                         }
 
                                         Keys.onEscapePressed: {
-                                            if (lockRoot.zenMode) {
-                                                lockRoot.zenMode = false;
-                                            } else if (surface.optionsOpen) {
-                                                surface.optionsOpen = false;
-                                            } else if (lockRoot.isChecking && pam.active) {
-                                                pam.abort();
-                                                pamSafetyTimeout.stop();
-                                                lockRoot.isChecking = false;
-                                                lockRoot.pamFeedback = "cancelled";
+                                            if (root.zenMode) {
+                                                root.zenMode = false;
+                                            } else if (lockSurface.optionsOpen) {
+                                                lockSurface.optionsOpen = false;
+                                            } else if (root?.isChecking) {
+                                                if (root.cancelAuth) root.cancelAuth();
                                             } else {
-                                                lockRoot.sharedPassword = "";
-                                                lockRoot.revealPassword = false;
-                                                lockRoot.authFailed = false;
+                                                root.sharedPassword = "";
+                                                root.revealPassword = false;
+                                                root.authFailed = false;
                                                 pwInput.text = "";
                                             }
                                         }
 
                                         onAccepted: {
-                                            const p = pwInput.text !== "" ? pwInput.text : lockRoot.sharedPassword;
-                                            lockRoot.sharedPassword = "";
+                                            const p = pwInput.text !== "" ? pwInput.text : root.sharedPassword;
+                                            root.sharedPassword = "";
                                             pwInput.text = "";
-                                            lockRoot.tryUnlock(p);
+                                            root.tryUnlock(p);
                                         }
 
                                         Connections {
-                                            target: lockRoot
+                                            target: root
                                             function onLockedChanged() {
-                                                if (lockRoot.locked) {
+                                                if (root.locked) {
                                                     pwInput.text = "";
-                                                    if (lockRoot.activeSurface === null || lockRoot.activeSurface === surface) {
-                                                        lockRoot.activeSurface = surface;
+                                                    if (root.activeSurface === null || root.activeSurface === lockSurface) {
+                                                        root.activeSurface = lockSurface;
                                                         pwInput.forceActiveFocus();
                                                     }
                                                 }
                                             }
                                             function onIsCheckingChanged() {
-                                                if (!lockRoot.isChecking && lockRoot.locked && lockRoot.activeSurface === surface) {
+                                                if (!root.isChecking && root.locked && root.activeSurface === lockSurface) {
                                                     pwInput.forceActiveFocus();
                                                 }
                                             }
@@ -217,10 +214,10 @@ ColumnLayout {
                                     }
 
                                     Rectangle {
-                                        visible: lockRoot.capsLockActive
+                                        visible: root.capsLockActive
                                         height: 22
                                         implicitWidth: capsTxt.implicitWidth + 10
-                                        radius: lockRoot.uiRadiusPill
+                                        radius: root.uiRadiusPill
                                         color: Theme.warn_overlay
                                         border.color: Theme.alpha(Theme.warn, 0.65)
                                         border.width: 1
@@ -228,7 +225,7 @@ ColumnLayout {
                                         Text {
                                             id: capsTxt
                                             anchors.centerIn: parent
-                                            text: lockRoot.fmtText("caps")
+                                            text: root.fmtText("caps")
                                             font.family: Theme.fontMono
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightBold
@@ -240,39 +237,39 @@ ColumnLayout {
                                         icon: Theme.iconClose
                                         tooltip: "clear"
                                         iconSize: Theme.fontSizeXs
-                                        visible: lockRoot.sharedPassword.length > 0 && !lockRoot.isChecking
+                                        visible: root.sharedPassword.length > 0 && !root.isChecking
                                         onClicked: {
-                                            lockRoot.sharedPassword = "";
-                                            lockRoot.revealPassword = false;
-                                            lockRoot.authFailed = false;
+                                            root.sharedPassword = "";
+                                            root.revealPassword = false;
+                                            root.authFailed = false;
                                             pwInput.text = "";
                                             pwInput.forceActiveFocus();
                                         }
                                     }
 
                                     IconButton {
-                                        icon: lockRoot.revealPassword ? Theme.iconEyeOff : Theme.iconEye
-                                        tooltip: lockRoot.revealPassword ? "hide password" : "show password"
+                                        icon: root.revealPassword ? Theme.iconEyeOff : Theme.iconEye
+                                        tooltip: root.revealPassword ? "hide password" : "show password"
                                         iconSize: Theme.fontSizeSm
-                                        visible: lockRoot.sharedPassword.length > 0 && !lockRoot.isChecking
+                                        visible: root.sharedPassword.length > 0 && !root.isChecking
                                         onClicked: {
-                                            lockRoot.revealPassword = !lockRoot.revealPassword;
+                                            root.revealPassword = !root.revealPassword;
                                             pwInput.forceActiveFocus();
                                         }
                                     }
 
                                     Rectangle {
-                                        readonly property bool canSubmit: lockRoot.sharedPassword.length > 0 && !lockRoot.isChecking
+                                        readonly property bool canSubmit: root.sharedPassword.length > 0 && !root.isChecking
                                         width: canSubmit ? 38 : 0
                                         height: 34
                                         opacity: canSubmit ? 1.0 : 0.0
                                         visible: width > 0
-                                        radius: lockRoot.uiRadiusPill
+                                        radius: root.uiRadiusPill
                                         color: submitMouse.pressed
-                                            ? Theme.statePress(lockRoot.uiAccent, lockRoot.uiOnAccent)
+                                            ? Theme.statePress(root.uiAccent, root.uiOnAccent)
                                             : (submitMouse.containsMouse
-                                                ? Theme.stateHover(lockRoot.uiAccent, lockRoot.uiOnAccent)
-                                                : lockRoot.uiAccent)
+                                                ? Theme.stateHover(root.uiAccent, root.uiOnAccent)
+                                                : root.uiAccent)
 
                                         Behavior on width { NumberAnimation { duration: Theme.expressiveFast; easing.type: Theme.animExpressiveEasing } }
                                         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
@@ -284,7 +281,7 @@ ColumnLayout {
                                             font.family: Theme.fontIcon
                                             font.pixelSize: Theme.fontSizeSm
                                             font.weight: Theme.fontWeightBold
-                                            color: lockRoot.uiOnAccent
+                                            color: root.uiOnAccent
                                         }
 
                                         MouseArea {
@@ -293,10 +290,10 @@ ColumnLayout {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                const p = pwInput.text !== "" ? pwInput.text : lockRoot.sharedPassword;
-                                                lockRoot.sharedPassword = "";
+                                                const p = pwInput.text !== "" ? pwInput.text : root.sharedPassword;
+                                                root.sharedPassword = "";
                                                 pwInput.text = "";
-                                                lockRoot.tryUnlock(p);
+                                                root.tryUnlock(p);
                                             }
                                         }
                                     }
@@ -309,24 +306,24 @@ ColumnLayout {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: lockRoot.fmtText(
-                                        lockRoot.pamFeedback !== ""
-                                            ? lockRoot.pamFeedback
-                                            : (lockRoot.isChecking
+                                    text: root.fmtText(
+                                        root.pamFeedback !== ""
+                                            ? root.pamFeedback
+                                            : (root.isChecking
                                                 ? "authenticating..."
-                                                : (lockRoot.authFailed
-                                                    ? (lockRoot.faillockTripped
+                                                : (root.authFailed
+                                                    ? (root.faillockTripped
                                                         ? "account locked by pam_faillock (run 'faillock --reset' in tty)"
                                                         : "incorrect password, try again")
-                                                    : (lockRoot.capsLockActive ? "caps lock is on" : "")))
+                                                    : (root.capsLockActive ? "caps lock is on" : "")))
                                     )
                                     opacity: text !== "" ? 1.0 : 0.0
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightMedium
-                                    color: (lockRoot.authFailed || lockRoot.pamFeedbackIsError)
+                                    color: (root.authFailed || root.pamFeedbackIsError)
                                         ? Theme.error
-                                        : (lockRoot.capsLockActive ? Theme.warn : lockRoot.uiTextSecondary)
+                                        : (root.capsLockActive ? Theme.warn : root.uiTextSecondary)
 
                                     Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
                                 }

@@ -964,6 +964,9 @@ Scope {
         function isLocked(): bool {
             return lockRoot.locked;
         }
+        function unlock(): void {
+            lockRoot.locked = false;
+        }
     }
 
     /*
@@ -1069,6 +1072,23 @@ Scope {
         }
     }
 
+    function cancelAuth() {
+        if (pam.active) pam.abort();
+        pamSafetyTimeout.stop();
+        isChecking = false;
+        pamRespondedThisTurn = false;
+        pendingPassword = "";
+        pamFeedback = "cancelled";
+    }
+
+    function resetAuthState() {
+        cancelAuth();
+        sharedPassword = "";
+        revealPassword = false;
+        authFailed = false;
+        clearAllInputs();
+    }
+
     Timer {
         id: shakeTimer
         interval: 3200
@@ -1087,7 +1107,6 @@ Scope {
         surface: Component {
             WlSessionLockSurface {
                 id: surface
-                readonly property var pwInput: passwordBlock?.pwInput
                 color: lockRoot.uiSurfaceBase
 
                 property string pendingPowerAction: ""
@@ -1104,7 +1123,7 @@ Scope {
                     entered = true;
                     if (lockRoot.activeSurface === null) {
                         lockRoot.activeSurface = surface;
-                        pwInput.forceActiveFocus();
+                        claimSurfaceFocus();
                     }
                 }
 
@@ -1118,8 +1137,9 @@ Scope {
                     if (lockRoot.activeSurface !== surface) {
                         lockRoot.activeSurface = surface;
                     }
-                    if (!customQuoteInput.activeFocus && !pwInput.activeFocus) {
-                        pwInput.forceActiveFocus();
+                    if (optionsCard?.hasInputFocus) return;
+                    if (passwordBlock?.pwInput && !passwordBlock.pwInput.activeFocus) {
+                        passwordBlock.pwInput.forceActiveFocus();
                     }
                 }
 
@@ -1230,7 +1250,7 @@ Scope {
                     clip: true
 
                     focus: true
-                    Keys.forwardTo: [pwInput]
+                    Keys.forwardTo: (passwordBlock && passwordBlock.pwInput) ? [passwordBlock.pwInput] : []
 
                     readonly property bool isDeepFocused: lockRoot.sharedPassword.length > 0 || surface.optionsOpen || lockRoot.isChecking
 
@@ -1248,7 +1268,7 @@ Scope {
                             surface.wakeFromZen();
                             surface.optionsOpen = false;
                             surface.pendingPowerAction = "";
-                            pwInput.forceActiveFocus();
+                            surface.claimSurfaceFocus();
                         }
                     }
 
@@ -1338,6 +1358,7 @@ Scope {
 
                     // vignette framing
                     Rectangle {
+                        id: vigRect
                         anchors.fill: parent
                         visible: lockRoot.vignetteStrength > 0.01
                         opacity: lockRoot.vignetteStrength
@@ -1347,10 +1368,10 @@ Scope {
                             : Theme.shadow
 
                         gradient: Gradient {
-                            GradientStop { position: 0.0; color: Theme.alpha(parent.vigColor, lockRoot.isLight ? 0.65 : 0.75) }
+                            GradientStop { position: 0.0; color: Theme.alpha(vigRect.vigColor, lockRoot.isLight ? 0.65 : 0.75) }
                             GradientStop { position: 0.22; color: "transparent" }
                             GradientStop { position: 0.78; color: "transparent" }
-                            GradientStop { position: 1.0; color: Theme.alpha(parent.vigColor, lockRoot.isLight ? 0.75 : 0.85) }
+                            GradientStop { position: 1.0; color: Theme.alpha(vigRect.vigColor, lockRoot.isLight ? 0.75 : 0.85) }
                         }
                     }
 
@@ -1372,12 +1393,19 @@ Scope {
                         color: Theme.alpha(lockRoot.uiAccent, 0.55)
                     }
 
-                    // top-left user session, lock duration, and security status pill (modularized)
+                    // top-left user session pill (modularized)
                     LockSessionPill {
-                        lockRoot: lockRoot
-                        surface: surface
-                        sessionLock: sessionLock
+                        root: lockRoot
+                        lockSurface: surface
+                        lock: sessionLock
                     }
+
+                    SequentialAnimation {
+                        id: surpriseBurstAnim
+                        NumberAnimation { target: surface; property: "stageBurstScale"; from: 1.0; to: 0.95; duration: 85; easing.type: Easing.OutQuad }
+                        NumberAnimation { target: surface; property: "stageBurstScale"; from: 0.95; to: 1.0; duration: 250; easing.type: Easing.OutBack }
+                    }
+
                     // subtle corner hover zone so if the user hides statusBar, they can still open the studio!
                     MouseArea {
                         id: cornerRevealHover
@@ -1393,20 +1421,19 @@ Scope {
                     // top-right hardware & studio bar (modularized)
                     LockStatusBar {
                         id: statusBar
-                        lockRoot: lockRoot
-                        surface: surface
-                        cornerRevealHover: cornerRevealHover
-                        surpriseBurstAnim: surpriseBurstAnim
+                        root: lockRoot
+                        lockSurface: surface
+                        cornerHover: cornerRevealHover
+                        burstAnim: surpriseBurstAnim
                     }
-                    // tabbed lock screen studio drawer
+
                     // tabbed lock screen studio drawer (modularized)
                     LockStudioDrawer {
                         id: optionsCard
-                        lockRoot: lockRoot
-                        surface: surface
-                        statusBar: statusBar
-                        pwInput: pwInput
-                        surpriseBurstAnim: surpriseBurstAnim
+                        root: lockRoot
+                        lockSurface: surface
+                        statusBarItem: statusBar
+                        burstAnim: surpriseBurstAnim
                     }
 
                     // main movable & reorderable stage
@@ -1486,11 +1513,7 @@ Scope {
                         Behavior on scale { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
                         Behavior on opacity { NumberAnimation { duration: Theme.animNormal } }
 
-                        SequentialAnimation {
-                            id: surpriseBurstAnim
-                            NumberAnimation { target: surface; property: "stageBurstScale"; from: 1.0; to: 0.95; duration: 85; easing.type: Easing.OutQuad }
-                            NumberAnimation { target: surface; property: "stageBurstScale"; from: 0.95; to: 1.0; duration: 250; easing.type: Easing.OutBack }
-                        }
+
 
                         Rectangle {
                             anchors.fill: parent
@@ -1586,33 +1609,33 @@ Scope {
                         // clock, date & quote block (modularized)
                         LockClockCard {
                             id: clockBlock
-                            lockRoot: lockRoot
-                            surface: surface
-                            centerStage: centerStage
+                            root: lockRoot
+                            lockSurface: surface
+                            stage: centerStage
                         }
 
-                        // mpris media player card + visualizer (modularized)
+                        // media player card with live waveforms (modularized)
                         LockMediaCard {
                             id: mediaBlock
-                            lockRoot: lockRoot
-                            surface: surface
-                            centerStage: centerStage
-                            lockPeakMonitor: lockPeakMonitor
+                            root: lockRoot
+                            lockSurface: surface
+                            stage: centerStage
+                            peakMonitor: lockPeakMonitor
                         }
 
-                        // password & pam authentication card (modularized)
+                        // password input pill (modularized)
                         LockAuthCard {
                             id: passwordBlock
-                            lockRoot: lockRoot
-                            surface: surface
-                            centerStage: centerStage
+                            root: lockRoot
+                            lockSurface: surface
+                            stage: centerStage
                         }
                     }
 
                     // bottom power dock (modularized)
                     LockPowerDock {
-                        lockRoot: lockRoot
-                        surface: surface
+                        root: lockRoot
+                        lockSurface: surface
                     }
 
                     // concave screen corners

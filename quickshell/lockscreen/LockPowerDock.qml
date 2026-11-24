@@ -7,14 +7,14 @@ import Quickshell
 RowLayout {
     id: dockRoot
 
-    required property var lockRoot
-    required property var surface
+    property var root: null
+    property var lockSurface: null
 
     anchors.bottom: parent.bottom
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.margins: 36
-    anchors.bottomMargin: (surface.entered && !lockRoot.zenMode && lockRoot.showPowerDock) ? 36 : 12
-    opacity: (surface.entered && !lockRoot.zenMode && lockRoot.showPowerDock) ? 1.0 : 0.0
+    anchors.bottomMargin: (lockSurface?.entered && !root?.zenMode && root?.showPowerDock) ? 36 : 12
+    opacity: (lockSurface?.entered && !root?.zenMode && root?.showPowerDock) ? 1.0 : 0.0
     visible: opacity > 0.01
     spacing: 12
 
@@ -28,18 +28,18 @@ RowLayout {
         property string label: ""
         property var command: []
 
-        readonly property bool isArmed: surface.pendingPowerAction === pRoot.actionId
+        readonly property bool isArmed: lockSurface?.pendingPowerAction === pRoot.actionId
 
         height: 40
         implicitWidth: isArmed ? (pRow.implicitWidth + 28) : 40
-        radius: isArmed ? lockRoot.uiRadiusMd : lockRoot.uiRadiusPill
+        radius: isArmed ? root?.uiRadiusMd : root?.uiRadiusPill
         color: isArmed
             ? (pMouse.pressed ? Theme.statePress(Theme.error, Theme.on_error) : Theme.error)
-            : (pMouse.pressed ? lockRoot.uiWidgetActive : (pMouse.containsMouse ? lockRoot.uiPillHover : lockRoot.uiPillBg))
+            : (pMouse.pressed ? root?.uiWidgetActive : (pMouse.containsMouse ? root?.uiPillHover : root?.uiPillBg))
         border.color: isArmed
             ? Theme.error
-            : (pMouse.containsMouse ? Theme.alpha(lockRoot.uiAccent, 0.55) : lockRoot.uiPillBorder)
-        border.width: (isArmed || pMouse.containsMouse || lockRoot.uiPillBorder.a > 0) ? 1 : 0
+            : (pMouse.containsMouse ? Theme.alpha(root?.uiAccent, 0.55) : root?.uiPillBorder)
+        border.width: (isArmed || pMouse.containsMouse || (root?.uiPillBorder?.a ?? 0) > 0) ? 1 : 0
 
         Behavior on implicitWidth { NumberAnimation { duration: Theme.expressiveFast; easing.type: Theme.animExpressiveEasing } }
         Behavior on radius { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
@@ -55,12 +55,12 @@ RowLayout {
                 text: pRoot.isArmed ? Theme.iconFlame : pRoot.icon
                 font.family: Theme.fontIcon
                 font.pixelSize: Theme.fontSizeMd
-                color: pRoot.isArmed ? Theme.on_error : (pMouse.containsMouse ? lockRoot.uiAccent : lockRoot.uiTextPrimary)
+                color: pRoot.isArmed ? Theme.on_error : (pMouse.containsMouse ? root?.uiAccent : root?.uiTextPrimary)
             }
 
             Text {
                 visible: pRoot.isArmed
-                text: lockRoot.fmtText("confirm " + pRoot.label + "?")
+                text: root ? root.fmtText("confirm " + pRoot.label + "?") : ("confirm " + pRoot.label + "?")
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeXs
                 font.weight: Theme.fontWeightBold
@@ -73,7 +73,9 @@ RowLayout {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: surface.requestPowerAction(pRoot.actionId, pRoot.command)
+            onClicked: {
+                if (lockSurface) lockSurface.requestPowerAction(pRoot.actionId, pRoot.command);
+            }
         }
     }
 
@@ -99,7 +101,7 @@ RowLayout {
     }
 
     PowerPill {
-        visible: lockRoot.allowLogoutOnLock
+        visible: root?.allowLogoutOnLock ?? true
         actionId: "logout"
         icon: Theme.iconLogout
         label: "log out"
