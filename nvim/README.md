@@ -6,14 +6,22 @@ exit with `:qa!` or rip the power supply out of the wall. there is no middle gro
 
 powered by `lazy.nvim`. instantaneous startup times, zero plugin bloat, intelligent lsp auto-completion, treesitter ast parsing, and dynamically injected material 3 palette tokens from matugen so your syntax highlights match whatever wallpaper is currently glued to your display server.
 
+## get your bearings
+
+lost? type `:Help` or `:Cheatsheet` to open the ijkl guide modal. it floats centered over your buffer, closes with `q` or `Esc`, and scrolls with `i`/`k` or `Ctrl-u`/`Ctrl-d`. the guide is also wired to `<leader>?` if the binding is free. built-in neovim docs are still at `:help` (lowercase) as god intended.
+
 ## the ijkl heresy & the arrow key shame engine
-we don't use `hjkl`. `hjkl` was invented on an adm-3a terminal in 1976 because the arrows were painted onto the keys. this is 2026. 
+we don't use `hjkl`. `hjkl` was invented on an adm-3a terminal in 1976 because the arrows were painted onto the keys. this is 2026.
 
 here, modal navigation is remapped to `ijkl`:
 - `i` = up
 - `k` = down
 - `j` = left
 - `l` = right
+- `I` / `K` = jump 5 lines up / down
+- `J` / `L` = jump to start / end of line
+
+`h` and `a` take over insert mode duties that `i` vacated: `h` inserts before the cursor, `H` inserts at start of line.
 
 ### `roast.lua`: psychological warfare on arrow key users
 if you coward out and reach for the arrow cluster in the bottom right corner of your keyboard, `roast.lua` intercepts the keystroke and triggers a high-priority notify warning mocking your tactile incompetence:
@@ -21,7 +29,22 @@ if you coward out and reach for the arrow cluster in the bottom right corner of 
 > *"you spent four hours configuring dotfiles just to navigate like it's windows notepad. tragic."*  
 > *"every time you press an arrow key, another bloated electron app gets spawned. stop."*
 
-toggle your suffering on or off with `:RoastToggle`.
+toggle your suffering on or off with `:RoastToggle` or `<leader>rt`.
+
+## quick reference
+
+| keys | what it does |
+|---|---|
+| `:Help` / `:Cheatsheet` | open the ijkl guide modal |
+| `<leader>?` | toggle the guide |
+| `:RoastToggle` / `<leader>rt` | toggle arrow key roast mode |
+| `<leader>e` | toggle neo-tree sidebar |
+| `<leader>sv` / `<leader>sh` | split vertically / horizontally |
+| `<leader>sx` | close current split |
+| `Alt-i/k/j/l` | move between splits |
+| `<leader>mr` | toggle markdown render |
+| `<leader>mp` | open markdown browser preview |
+| `<leader>j` | join line with the next |
 
 ## the armory
 - `init.lua`: the bootstrap orchestrator. clones `lazy.nvim` if missing and mounts the modular lua spec tree.
@@ -30,8 +53,12 @@ toggle your suffering on or off with `:RoastToggle`.
   - `keybinds.lua`: home-row ijkl navigation, split management, buffer hopping, and quick save bindings.
   - `options.lua`: sensible editor defaults, relative line numbers, 4-space indentation, and persistent undofiles.
   - `lsp-keymaps.lua`: code actions, hover diagnostics, definition jumps, and refactor hooks.
-  - `roast.lua`: arrow key detection and custom warning toasts.
-  - `cheatsheet.lua`: instant in-editor modal cheat sheet.
+  - `roast.lua`: arrow key detection and custom warning toasts. toggle with `:RoastToggle`.
+  - `cheatsheet.lua`: floating modal guide. open with `:Help`, `:Cheatsheet`, or `<leader>?`.
+  - `statusline.lua`: lightweight custom statusline fallback for when lualine isn't loaded.
+  - `theme.lua`: matugen material 3 palette token injection — rerun after `wp` to sync syntax highlights to your wallpaper.
+  - `colors.lua`: color utility helpers used by the theme layer.
+  - `lazy.lua`: lazy.nvim bootstrap and plugin spec loader.
 - `lua/plugins/`:
   - `lsp/lsp.lua`: native language server protocols with diagnostic signs.
   - `nvim-cmp.lua`: asynchronous completion engine with snippet expansion.
@@ -42,3 +69,4 @@ toggle your suffering on or off with `:RoastToggle`.
   - `which-key.lua`: popup guide reminding you what key combinations exist before you guess.
   - `gitsigns.lua`: inline git blame, diff hunks, and staging.
   - `autopairs.lua`: automatic bracket closure so you don't forget closing parentheses.
+  - `color.lua`: color picker and highlight utilities.
