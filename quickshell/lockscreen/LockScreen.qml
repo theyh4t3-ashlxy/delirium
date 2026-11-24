@@ -1607,8 +1607,8 @@ Scope {
                             surface: surface
                             centerStage: centerStage
                         }
+                    }
 
-                    // bottom power dock
                     // bottom power dock (modularized)
                     LockPowerDock {
                         lockRoot: lockRoot

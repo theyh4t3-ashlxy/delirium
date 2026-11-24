@@ -11,9 +11,8 @@ ColumnLayout {
     required property var surface
     required property var centerStage
 
-                            id: clockBlock
-                            visible: lockRoot.showClock || lockRoot.showDate || lockRoot.activeQuoteText !== ""
-                            width: parent.width
+    visible: lockRoot.showClock || lockRoot.showDate || lockRoot.activeQuoteText !== ""
+    width: parent.width
                             y: centerStage.blockY("clock")
                             spacing: 6
 

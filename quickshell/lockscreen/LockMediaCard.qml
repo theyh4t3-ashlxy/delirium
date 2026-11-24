@@ -337,10 +337,3 @@ ClippingRectangle {
                                 }
                             }
                         }
-
-                        /*
-                        password input pill:
-                        stays visible: true even in zenMode (only opacity: 0) and uses readOnly instead of enabled: false
-                        so pwInput never drops activeFocus or eats your first character!
-                        */
-                        ColumnLayout {
