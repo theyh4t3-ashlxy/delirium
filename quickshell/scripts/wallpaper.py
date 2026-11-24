@@ -94,7 +94,12 @@ DEFAULT_SETTINGS = {
     "awwwTransitionFps": 60,
     "awwwFilter": "Lanczos3",
     "awwwResize": "crop",
+    "awwwCropGravity": "center",
+    "awwwFillColor": "auto",
     "awwwTransitionPos": "center",
+    "awwwTransitionBezier": ".54,0,.34,.99",
+    "awwwTransitionWave": "20,20",
+    "awwwInvertY": False,
     "mpvPanscan": 1.0,
     "mpvAudio": False,
     "wallhavenApiKey": "",
@@ -155,19 +160,18 @@ def load_settings() -> dict:
       if key in {
           "awwwTransitionAngle",
           "awwwTransitionStep",
-          "awwwTransitionDuration",
           "awwwTransitionFps",
       }:
         try:
           settings[key] = int(val)
         except ValueError:
           pass
-      elif key == "mpvPanscan":
+      elif key in {"mpvPanscan", "awwwTransitionDuration"}:
         try:
           settings[key] = float(val)
         except ValueError:
           pass
-      elif key == "mpvAudio":
+      elif key in {"mpvAudio", "awwwInvertY"}:
         settings[key] = val.lower() in ("true", "1", "yes")
       else:
         settings[key] = val
@@ -725,6 +729,29 @@ def ensure_symlinks_valid():
       update_wallpaper_symlinks(resolved)
 
 
+def resolve_fill_color(raw_color: str) -> str:
+  raw = (raw_color or "auto").strip()
+  if not raw or raw.lower() == "auto":
+    palette_css = XDG_CONFIG_HOME / "quickshell" / "palette.css"
+    try:
+      if palette_css.is_file():
+        m = re.search(
+            r"--background\s*:\s*(#[0-9a-fA-F]{6})\b",
+            palette_css.read_text(encoding="utf-8"),
+        )
+        if m:
+          return m.group(1).lstrip("#").lower() + "ff"
+    except Exception:
+      pass
+    return "000000ff"
+  cleaned = raw.lstrip("#").lower()
+  if re.fullmatch(r"[0-9a-f]{6}", cleaned):
+    return cleaned + "ff"
+  if re.fullmatch(r"[0-9a-f]{8}", cleaned):
+    return cleaned
+  return "000000ff"
+
+
 def parse_wallpaper_args(raw_args: list) -> dict:
   cfg = load_settings()
   opts = {
@@ -742,6 +769,11 @@ def parse_wallpaper_args(raw_args: list) -> dict:
       "mpv_audio": "true" if cfg.get("mpvAudio", False) else "false",
       "resize": str(cfg.get("awwwResize", "crop")),
       "transition_pos": str(cfg.get("awwwTransitionPos", "center")),
+      "crop_gravity": str(cfg.get("awwwCropGravity", "center")),
+      "fill_color": str(cfg.get("awwwFillColor", "auto")),
+      "bezier": str(cfg.get("awwwTransitionBezier", ".54,0,.34,.99")),
+      "wave": str(cfg.get("awwwTransitionWave", "20,20")),
+      "invert_y": "true" if cfg.get("awwwInvertY", False) else "false",
   }
 
   pos_keys = [
@@ -759,6 +791,11 @@ def parse_wallpaper_args(raw_args: list) -> dict:
       "mpv_audio",
       "resize",
       "transition_pos",
+      "crop_gravity",
+      "fill_color",
+      "bezier",
+      "wave",
+      "invert_y",
   ]
 
   explicit_flags = set()
@@ -827,6 +864,30 @@ def parse_wallpaper_args(raw_args: list) -> dict:
       opts["transition_pos"] = str(raw_args[idx + 1]).strip()
       explicit_flags.add("transition_pos")
       idx += 2
+    elif arg in ("--crop-gravity", "--gravity", "-g") and idx + 1 < len(raw_args):
+      opts["crop_gravity"] = str(raw_args[idx + 1]).strip()
+      explicit_flags.add("crop_gravity")
+      idx += 2
+    elif arg in ("--fill-color", "--fill") and idx + 1 < len(raw_args):
+      opts["fill_color"] = str(raw_args[idx + 1]).strip()
+      explicit_flags.add("fill_color")
+      idx += 2
+    elif arg in ("--transition-bezier", "--bezier") and idx + 1 < len(raw_args):
+      opts["bezier"] = str(raw_args[idx + 1]).strip()
+      explicit_flags.add("bezier")
+      idx += 2
+    elif arg in ("--transition-wave", "--wave") and idx + 1 < len(raw_args):
+      opts["wave"] = str(raw_args[idx + 1]).strip()
+      explicit_flags.add("wave")
+      idx += 2
+    elif arg in ("--invert-y",):
+      opts["invert_y"] = "true"
+      explicit_flags.add("invert_y")
+      idx += 1
+    elif arg in ("--no-invert-y",):
+      opts["invert_y"] = "false"
+      explicit_flags.add("invert_y")
+      idx += 1
     elif not arg.startswith("-"):
       while pos_idx < len(pos_keys) and pos_keys[pos_idx] in explicit_flags:
         pos_idx += 1
@@ -879,6 +940,33 @@ def set_wallpaper(raw_args) -> bool:
   filt = opts["filt"] if opts["filt"] in valid_filters else "Lanczos3"
   valid_resizes = {"crop", "fit", "stretch", "no"}
   resize = opts["resize"] if opts["resize"] in valid_resizes else "crop"
+  valid_gravities = {
+      "top-left", "top", "top-right",
+      "left", "center", "right",
+      "bottom-left", "bottom", "bottom-right",
+  }
+  crop_gravity = (
+      opts["crop_gravity"]
+      if opts["crop_gravity"] in valid_gravities
+      else "center"
+  )
+  fill_color = resolve_fill_color(opts.get("fill_color", "auto"))
+
+  raw_bezier = str(opts.get("bezier", ".54,0,.34,.99")).replace(" ", "")
+  bezier = (
+      raw_bezier
+      if re.fullmatch(
+          r"-?\d*(?:\.\d+)?,-?\d*(?:\.\d+)?,-?\d*(?:\.\d+)?,-?\d*(?:\.\d+)?",
+          raw_bezier,
+      )
+      else ".54,0,.34,.99"
+  )
+
+  raw_wave = str(opts.get("wave", "20,20")).replace(" ", "")
+  wave = (
+      raw_wave if re.fullmatch(r"\d+,\d+", raw_wave) else "20,20"
+  )
+  invert_y = str(opts.get("invert_y", "false")).lower() in ("true", "1", "yes")
 
   pos_map = {
       "center": "center",
@@ -968,8 +1056,12 @@ def set_wallpaper(raw_args) -> bool:
     if opts["target_mon"] not in {"all", "*", ""}:
       awww_cmd.extend(["-o", opts["target_mon"]])
 
-    if resize == "no":
-      awww_cmd.append("--no-resize")
+    if resize == "crop":
+      awww_cmd.extend(["--resize", "crop", "--crop-gravity", crop_gravity])
+    elif resize == "no":
+      awww_cmd.extend(["--no-resize", "--fill-color", fill_color])
+    elif resize == "fit":
+      awww_cmd.extend(["--resize", "fit", "--fill-color", fill_color])
     else:
       awww_cmd.extend(["--resize", resize])
 
@@ -987,10 +1079,16 @@ def set_wallpaper(raw_args) -> bool:
         filt,
     ])
 
+    if transition not in {"none", "simple"}:
+      awww_cmd.extend(["--transition-bezier", bezier])
     if transition in {"wipe", "wave"}:
       awww_cmd.extend(["--transition-angle", str(opts["angle"])])
+    if transition == "wave":
+      awww_cmd.extend(["--transition-wave", wave])
     if transition in {"grow", "outer"}:
       awww_cmd.extend(["--transition-pos", pos])
+      if invert_y:
+        awww_cmd.append("--invert-y")
 
     matugen_target = (
         str(CURR_WALL_STATIC.resolve())
@@ -1485,6 +1583,8 @@ def print_help():
   wp color <#hex>              apply solid color theme
   wp scan                      rescan folders & rebuild saved_wp
   wp download <url>            download image/video and apply
+  wp pause | unpause | toggle  pause/resume animated gif playback in awww
+  wp clear-cache               clear awww daemon image cache
   wp stop                      stop running live video wallpapers (mpvpaper)
   wp get                       print current wallpaper path
 """)
@@ -1529,6 +1629,29 @@ def main():
       "color": lambda: set_color(args),
       "download": lambda: download(args),
       "batch-download": lambda: batch_download(args),
+      "pause": lambda: (
+          ensure_awww_daemon(),
+          subprocess.run(["awww", "pause"], stderr=subprocess.DEVNULL),
+          log_ok("paused awww animation"),
+          True,
+      )[3],
+      "unpause": lambda: (
+          ensure_awww_daemon(),
+          subprocess.run(["awww", "unpause"], stderr=subprocess.DEVNULL),
+          log_ok("resumed awww animation"),
+          True,
+      )[3],
+      "awww-toggle": lambda: (
+          ensure_awww_daemon(),
+          subprocess.run(["awww", "toggle"], stderr=subprocess.DEVNULL),
+          log_ok("toggled awww playback"),
+          True,
+      )[3],
+      "clear-cache": lambda: (
+          subprocess.run(["awww", "clear-cache"], stderr=subprocess.DEVNULL),
+          log_ok("cleared awww cache"),
+          True,
+      )[2],
       "stop": lambda: (
           kill_mpvpaper(),
           log_ok("stopped live wallpapers"),

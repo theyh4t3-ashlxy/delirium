@@ -19,18 +19,17 @@ Rectangle {
     property string activeMode: typeof ScreenshotService !== "undefined" ? (ScreenshotService?.activeMode ?? "region") : "region"
     property string currentQuote: Theme.getFlavor ? Theme.getFlavor("screenshot", "snitch mode: engaged") : "snitch mode: engaged"
 
-    // pick a fresh quote from Theme.flavorQuotes.screenshot on each open when unhingedFlavor is enabled
+    // pick a fresh quote or chaotic action on each open respecting flavorMode
     function randomizeQuote() {
-        if (!(Settings?.unhingedFlavor ?? false)) {
+        let mode = Settings?.flavorMode ?? "actions";
+        if (mode === "off") {
             currentQuote = "snitch mode: engaged";
             return;
         }
-        let pool = Theme.flavorQuotes?.screenshot;
-        if (pool && pool.length > 0) {
-            let idx = Math.floor(Math.random() * pool.length);
-            currentQuote = pool[idx];
+        if (Theme.rollFlavor) {
+            currentQuote = Theme.rollFlavor("screenshot", mode, currentQuote, "snitch mode: engaged");
         } else if (Theme.getFlavor) {
-            currentQuote = Theme.getFlavor("screenshot", "snitch mode: engaged");
+            currentQuote = Theme.getFlavor("screenshot", "snitch mode: engaged", mode);
         }
     }
 
@@ -81,6 +80,7 @@ Rectangle {
             Text {
                 text: btnRoot.icon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.fontSizeSm
                 color: btnMouse.pressed
                     ? (btnRoot.isDanger ? (Theme.on_error ?? "#ffffff") : Theme.on_primary)
@@ -92,7 +92,7 @@ Rectangle {
                 text: btnRoot.label
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeXs
-                font.weight: btnRoot.selected ? Font.Bold : Font.Medium
+                font.weight: btnRoot.selected ? Theme.fontWeightBold : Theme.fontWeightMedium
                 color: btnRoot.fgColor
             }
         }
@@ -127,7 +127,7 @@ Rectangle {
     // top tab that sits flush on the main pill so ConcaveCurves form a seamless scoop
     Item {
         id: headerTab
-        visible: Boolean(Settings?.unhingedFlavor) || root.isRecordMode
+        visible: (Settings?.flavorMode ?? "actions") !== "off" || root.isRecordMode
         anchors.bottom: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         height: 24
@@ -153,6 +153,7 @@ Rectangle {
             Text {
                 text: root.isRecordMode ? Theme.iconCamera : Theme.kaoWink
                 font.family: root.isRecordMode ? Theme.fontIcon : Theme.fontFamily
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.fontSizeXs
                 color: root.isRecordMode ? (Theme.error ?? "#ff5449") : Theme.primary
             }

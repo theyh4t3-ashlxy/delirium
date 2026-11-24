@@ -30,6 +30,7 @@ Rectangle {
         text: root.icon
         font.family: Theme.fontIcon
         font.pixelSize: root.iconSize
+        font.variableAxes: Theme.iconAxes
         color: root.iconColor
         anchors.centerIn: parent
     }

@@ -142,6 +142,7 @@ PopupPanel {
                 visible: pPill.icon !== ""
                 text: pPill.icon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.fontSizeXs
                 color: pPill.isCurrent ? Theme.primary : Theme.textSecondary
             }
@@ -188,6 +189,7 @@ PopupPanel {
                     anchors.centerIn: parent
                     text: Theme.getBatteryIcon(root.pct, root.isCharging, root.isSaver, false)
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.fontSizeLg
                     color: root.batAccent
                 }
@@ -419,6 +421,7 @@ PopupPanel {
                             Text {
                                 text: modelData.icon
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.primary
                             }
@@ -516,6 +519,7 @@ PopupPanel {
                 Text {
                     text: root.showDiagnostics ? Theme.iconChevronUp : Theme.iconChevronDown
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.primary
                 }
@@ -576,6 +580,7 @@ PopupPanel {
                         Text {
                             text: Theme.iconTerminal
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeSm
                             color: Theme.primary
                         }
@@ -618,6 +623,7 @@ PopupPanel {
                         Text {
                             text: Theme.iconCpu
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeSm
                             color: Theme.primary
                         }

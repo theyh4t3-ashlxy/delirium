@@ -23,14 +23,14 @@ Rectangle {
         return Math.max(root.pillSize, notifRow.implicitWidth + 20);
     }
     implicitHeight: root.pillSize
-    radius: Theme.radiusPill
+    radius: Theme.barWidgetRadius
     color: popup.open
         ? Theme.widgetActive
-        : (notifMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+        : (notifMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
     border.color: root.isDnd
         ? Theme.alpha(Theme.tertiary, 0.7)
-        : (popup.open ? Theme.alpha(Theme.primary, 0.55) : Theme.pillBorder)
-    border.width: (root.isDnd || popup.open || Theme.pillBorder.a > 0) ? 1 : 0
+        : (popup.open ? Theme.alpha(Theme.primary, 0.55) : Theme.barPillBorder)
+    border.width: (root.isDnd || popup.open || Theme.barPillBorder.a > 0) ? 1 : 0
 
     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
     Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -75,6 +75,7 @@ Rectangle {
                 ? Theme.iconBellOff
                 : (root.notifCount > 0 ? Theme.iconBell : Theme.iconBellOutline)
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
             font.weight: Theme.isTextIconSet ? Theme.fontWeightBold : Theme.fontWeightRegular
             color: root.isDnd
@@ -97,6 +98,11 @@ Rectangle {
 
     // update coordinates without accidentally forcing popup.open = true on hover
     function syncAnchor() {
+        if (!root.visible || (root.width <= 0 && root.height <= 0)) {
+            popup.targetRelativeX = 0;
+            popup.targetRelativeY = 0;
+            return;
+        }
         let pt = root.mapToItem(null, 0, 0);
         if (Theme.isVertical) {
             popup.targetRelativeY = pt ? (pt.y + (root.height / 2)) : ((popup.screen?.height ?? 1080) / 2);
@@ -208,6 +214,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: root.isDnd ? Theme.iconBellOff : Theme.iconBell
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeMd
                         color: root.isDnd ? Theme.tertiary : Theme.primary
                     }
@@ -260,6 +267,7 @@ Rectangle {
                         Text {
                             text: root.isDnd ? Theme.iconBellOff : Theme.iconBell
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeXs
                             color: root.isDnd ? Theme.tertiary : Theme.textSecondary
                         }
@@ -328,6 +336,13 @@ Rectangle {
                         readonly property bool isCritical: modelData?.urgency === NotificationUrgency.Critical
                         readonly property color cardAccent: isCritical ? Theme.error : Theme.primary
                         readonly property string resolvedIcon: root.resolveNotifIcon(modelData)
+                        readonly property string previewImageUri: {
+                            let img = modelData?.image;
+                            if (!img || typeof img !== "string") return "";
+                            if (img.startsWith("image://") || img.startsWith("file://")) return img;
+                            if (img.startsWith("/")) return "file://" + img;
+                            return "";
+                        }
 
                         width: notifListView.width
                         // avoid anchors.fill on col so wrapped text never causes a QML binding loop
@@ -351,8 +366,12 @@ Rectangle {
                             hoverEnabled: true
                             acceptedButtons: Qt.MiddleButton
                             onClicked: (mouse) => {
-                                if (mouse.button === Qt.MiddleButton && notifCard.modelData?.dismiss) {
-                                    notifCard.modelData.dismiss();
+                                if (mouse.button === Qt.MiddleButton) {
+                                    if (NotificationService?.dismiss && notifCard.modelData?.id !== undefined) {
+                                        NotificationService.dismiss(notifCard.modelData.id);
+                                    } else if (notifCard.modelData?.dismiss) {
+                                        notifCard.modelData.dismiss();
+                                    }
                                 }
                             }
                         }
@@ -400,6 +419,7 @@ Rectangle {
                                         anchors.centerIn: parent
                                         width: 16
                                         height: 16
+                                        implicitSize: 16
                                         source: notifCard.resolvedIcon
                                         visible: source !== "" && status !== Image.Error
                                     }
@@ -409,6 +429,7 @@ Rectangle {
                                         visible: !notifIconImg.visible
                                         text: notifCard.isCritical ? Theme.iconFlame : Theme.iconBell
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         color: notifCard.cardAccent
                                     }
@@ -449,7 +470,11 @@ Rectangle {
                                     iconSize: Theme.fontSizeXs
                                     tooltip: "dismiss"
                                     onClicked: {
-                                        if (notifCard.modelData?.dismiss) notifCard.modelData.dismiss();
+                                        if (NotificationService?.dismiss && notifCard.modelData?.id !== undefined) {
+                                            NotificationService.dismiss(notifCard.modelData.id);
+                                        } else if (notifCard.modelData?.dismiss) {
+                                            notifCard.modelData.dismiss();
+                                        }
                                     }
                                 }
                             }
@@ -474,6 +499,24 @@ Rectangle {
                                 Layout.fillWidth: true
                                 wrapMode: Text.Wrap
                                 visible: text !== ""
+                            }
+
+                            ClippingRectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 112
+                                radius: Theme.radiusSm
+                                color: Theme.widgetBg
+                                border.color: Theme.widgetBorder
+                                border.width: 1
+                                visible: notifCard.previewImageUri !== "" && notifPreviewImg.status !== Image.Error
+
+                                Image {
+                                    id: notifPreviewImg
+                                    anchors.fill: parent
+                                    source: notifCard.previewImageUri
+                                    fillMode: Image.PreserveAspectCrop
+                                    asynchronous: true
+                                }
                             }
 
                             RowLayout {
@@ -584,6 +627,7 @@ Rectangle {
                                     ? Theme.iconBellOff
                                     : (Theme.iconSet === "kaomoji" ? Theme.kaoSleepy : Theme.iconBellOutline)
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
                                 color: root.isDnd ? Theme.tertiary : Theme.primary
                             }
@@ -620,6 +664,7 @@ Rectangle {
                 Text {
                     text: root.isDnd ? Theme.iconBellOff : Theme.iconCheck
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.fontSizeXs
                     color: root.isDnd ? Theme.tertiary : Theme.primary
                 }

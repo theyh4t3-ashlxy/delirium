@@ -38,23 +38,24 @@ Rectangle {
     implicitWidth: {
         if (Theme.isVertical) return Theme.barHeight - 8;
         if (root.isRecording || countdownTimer.running) return recRow.implicitWidth + 20;
-        return (cMouse.containsMouse || popup.open) ? (iconRow.implicitWidth + 22) : (Theme.barHeight - 8);
+        if (Theme.isTextIconSet) return iconRow.implicitWidth + 20;
+        return Theme.barHeight - 8;
     }
     implicitHeight: Theme.barHeight - 8
-    radius: Theme.radiusPill
+    radius: Theme.barWidgetRadius
 
     color: {
         if (cMouse.pressed) return Theme.widgetActive;
         if (root.isRecording) return Theme.error_overlay;
         if (countdownTimer.running) return Theme.warn_overlay;
         if (popup.open) return Theme.primary_overlay;
-        if (cMouse.containsMouse) return Theme.pillHover;
-        return Theme.pillBg;
+        if (cMouse.containsMouse) return Theme.barPillHover;
+        return Theme.barPillBg;
     }
     border.color: {
         if (root.isRecording) return Theme.error;
         if (countdownTimer.running) return Theme.warn;
-        return Theme.pillBorder;
+        return popup.open ? Theme.primary : Theme.barPillBorder;
     }
     border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     clip: true
@@ -167,6 +168,7 @@ Rectangle {
                 Layout.alignment: Qt.AlignHCenter
                 text: tileRoot.icon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeMd
                 color: {
                     if (tileMouse.pressed) return tileRoot.accentRed ? Theme.on_error : Theme.on_primary;
@@ -222,6 +224,7 @@ Rectangle {
                 visible: chipRoot.icon !== "" && !Theme.isTextIconSet
                 text: chipRoot.icon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.fontSizeXs
                 color: chipRoot.selected ? Theme.primary : Theme.on_surface_variant
             }
@@ -255,6 +258,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: Theme.iconCamera
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
             color: popup.open || cMouse.containsMouse ? Theme.primary : Theme.on_surface
 
@@ -268,7 +272,7 @@ Rectangle {
             font.pixelSize: Theme.fontSizeSm
             font.weight: Font.Medium
             color: Theme.on_surface
-            visible: !Theme.isVertical && (cMouse.containsMouse || popup.open)
+            visible: !Theme.isVertical && Theme.isTextIconSet
         }
     }
 
@@ -306,6 +310,13 @@ Rectangle {
         }
     }
 
+    HoverFlyoutHandler {
+        id: captureHoverHandler
+        popup: popup
+        mouseArea: cMouse
+        updatePos: () => root.syncAnchor()
+    }
+
     MouseArea {
         id: cMouse
         anchors.fill: parent
@@ -333,8 +344,7 @@ Rectangle {
             if (root.isRecording) {
                 ScreenRecService?.stopRecording();
             } else {
-                root.syncAnchor();
-                popup.open = !popup.open;
+                captureHoverHandler.handlePillClick();
             }
         }
     }
@@ -388,6 +398,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: Theme.iconCamera
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                         color: root.isRecording ? Theme.error : Theme.primary
                     }
@@ -467,6 +478,7 @@ Rectangle {
                         Text {
                             text: Theme.iconScreenshot
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                             color: Theme.primary
                         }
@@ -589,6 +601,7 @@ Rectangle {
                         Text {
                             text: Theme.iconPlay
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                             color: root.isRecording ? Theme.error : Theme.primary
                         }

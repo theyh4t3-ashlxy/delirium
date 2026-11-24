@@ -493,10 +493,10 @@ ColumnLayout {
                                     id: quoteTxt
                                     anchors.centerIn: parent
                                     width: Math.min(stage.width - 40, implicitWidth)
-                                    text: "\"" + root.activeQuoteText + "\""
+                                    text: root.activeQuoteText
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.italic: true
+                                    font.italic: root.quoteMode === "quotes" || root.quoteMode === "custom"
                                     color: quoteMouse.containsMouse ? root.uiTextPrimary : root.uiTextSecondary
                                     horizontalAlignment: Text.AlignHCenter
                                     wrapMode: Text.WordWrap
@@ -514,5 +514,3 @@ ColumnLayout {
                                 }
                             }
                         }
-
-                        // mpris media player card + visualizer

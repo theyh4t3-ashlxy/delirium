@@ -13,8 +13,13 @@ QtObject {
     property string currentWallpaperPath: Settings?.currentWallpaper || ""
     property string targetMonitor: "all"
     property var wallpaperList: []
+    property bool awwwPaused: false
+    property bool mpvActive: false
+    property var monitorWallpapers: ({})
+    property bool isBusy: false
 
     signal wallpapersUpdated()
+    signal commandFinished(bool success)
 
     readonly property string userHome: Quickshell.env("HOME") || ""
     readonly property string stateDir: {
@@ -42,18 +47,58 @@ QtObject {
     // run scan/set through a tracked Process so we always reload saved_wp when python finishes
     property Process wpProc: Process {
         running: false
-        onExited: {
+        onRunningChanged: service.isBusy = Boolean(running || scanProc.running)
+        onExited: (exitCode) => {
+            service.isBusy = Boolean(running || scanProc.running);
             service.savedWpFile.reload();
             service.parseSavedWp();
+            service.queryAwwwState();
+            service.commandFinished(exitCode === 0);
         }
     }
 
     property Process scanProc: Process {
         command: ["python3", service.scriptPath, "scan"]
         running: false
+        onRunningChanged: service.isBusy = Boolean(wpProc.running || running)
         onExited: {
+            service.isBusy = Boolean(wpProc.running || running);
             service.savedWpFile.reload();
             service.parseSavedWp();
+        }
+    }
+
+    property Process awwwQueryProc: Process {
+        command: ["awww", "query", "--json"]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let raw = (text || "").trim();
+                if (!raw) return;
+                try {
+                    let parsed = JSON.parse(raw);
+                    let monMap = {};
+                    for (let ns in parsed) {
+                        let arr = parsed[ns];
+                        if (!Array.isArray(arr)) continue;
+                        for (let i = 0; i < arr.length; i++) {
+                            let item = arr[i];
+                            if (item && item.name && item.displaying && item.displaying.image) {
+                                monMap[item.name] = item.displaying.image;
+                            }
+                        }
+                    }
+                    service.monitorWallpapers = monMap;
+                } catch (e) {}
+            }
+        }
+    }
+
+    property Process mpvCheckProc: Process {
+        command: ["pgrep", "-x", "mpvpaper"]
+        running: false
+        onExited: (exitCode) => {
+            service.mpvActive = (exitCode === 0);
         }
     }
 
@@ -207,7 +252,56 @@ QtObject {
         let audio = Settings?.mpvAudio ? "true" : "false";
         let resize = Settings?.awwwResize ?? "crop";
         let pos = Settings?.awwwTransitionPos ?? "center";
-        return [tType, tAngle, tStep, tDur, tFps, tFilter, mode, scheme, mon, panscan, audio, resize, pos];
+        let gravity = Settings?.awwwCropGravity ?? "center";
+        let fill = Settings?.awwwFillColor ?? "auto";
+        let bezier = Settings?.awwwTransitionBezier ?? ".54,0,.34,.99";
+        let wave = Settings?.awwwTransitionWave ?? "20,20";
+        let invY = Settings?.awwwInvertY ? "true" : "false";
+        return [tType, tAngle, tStep, tDur, tFps, tFilter, mode, scheme, mon, panscan, audio, resize, pos, gravity, fill, bezier, wave, invY];
+    }
+
+    function getTransitionFlags(monitor) {
+        let mon = monitor || targetMonitor || "all";
+        return [
+            "--transition", Settings?.awwwTransitionType ?? "wipe",
+            "--angle", "" + (Settings?.awwwTransitionAngle ?? 30),
+            "--step", "" + (Settings?.awwwTransitionStep ?? 90),
+            "--duration", "" + (Settings?.awwwTransitionDuration ?? 3),
+            "--fps", "" + (Settings?.awwwTransitionFps ?? 60),
+            "--filter", Settings?.awwwFilter ?? "Lanczos3",
+            "--mode", currentMode ?? "dark",
+            "--scheme", currentSchemeType ?? "scheme-tonal-spot",
+            "--monitor", mon,
+            "--panscan", "" + (Settings?.mpvPanscan ?? 1.0),
+            (Settings?.mpvAudio ? "--audio" : "--no-audio"),
+            "--resize", Settings?.awwwResize ?? "crop",
+            "--pos", Settings?.awwwTransitionPos ?? "center",
+            "--crop-gravity", Settings?.awwwCropGravity ?? "center",
+            "--fill-color", Settings?.awwwFillColor ?? "auto",
+            "--bezier", Settings?.awwwTransitionBezier ?? ".54,0,.34,.99",
+            "--wave", Settings?.awwwTransitionWave ?? "20,20",
+            (Settings?.awwwInvertY ? "--invert-y" : "--no-invert-y")
+        ];
+    }
+
+    function queryAwwwState() {
+        if (!awwwQueryProc.running) awwwQueryProc.running = true;
+        if (!mpvCheckProc.running) mpvCheckProc.running = true;
+    }
+
+    function toggleAwwwPause() {
+        let next = !awwwPaused;
+        awwwPaused = next;
+        runWpCmd([next ? "pause" : "unpause"]);
+    }
+
+    function clearAwwwCache() {
+        runWpCmd(["clear-cache"]);
+    }
+
+    function stopLiveWallpaper() {
+        mpvActive = false;
+        runWpCmd(["stop"]);
     }
 
     function scanLocalWallpapers() {
@@ -218,16 +312,19 @@ QtObject {
     function applyLocalWallpaper(filePath, monitor) {
         currentWallpaperPath = filePath;
         if (Settings) Settings.currentWallpaper = filePath;
-        runWpCmd(["set", filePath, ...getTransitionArgs(monitor)]);
+        awwwPaused = false;
+        runWpCmd(["set", filePath, ...getTransitionFlags(monitor)]);
     }
 
     function applyRandomWallpaper(category, monitor) {
         let cat = category ?? "all";
-        runWpCmd(["random", cat, ...getTransitionArgs(monitor)]);
+        awwwPaused = false;
+        runWpCmd(["random", cat, ...getTransitionFlags(monitor)]);
     }
 
     function setWallpaper(url, monitor) {
-        runWpCmd(["download", url, ...getTransitionArgs(monitor)]);
+        awwwPaused = false;
+        runWpCmd(["download", url, ...getTransitionFlags(monitor)]);
     }
 
     function batchDownload(urls) {
@@ -244,11 +341,13 @@ QtObject {
     function reapplyTheme() {
         let mode = currentMode ?? "dark";
         let scheme = currentSchemeType ?? "scheme-tonal-spot";
-        runWpCmd(["reapply", mode, scheme]);
+        awwwPaused = false;
+        runWpCmd(["reapply", mode, scheme, ...getTransitionFlags()]);
     }
 
     Component.onCompleted: {
         parseSavedWp();
         scanLocalWallpapers();
+        queryAwwwState();
     }
 }

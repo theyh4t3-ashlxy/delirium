@@ -41,9 +41,7 @@ PopupPanel {
     }
 
     function formatTime(totalSec) {
-        let m = Math.floor(totalSec / 60);
-        let s = totalSec % 60;
-        return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+        return Theme.formatTime(totalSec, true);
     }
 
     content: ColumnLayout {
@@ -58,6 +56,7 @@ PopupPanel {
             Text {
                 text: Theme.iconCoffee
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.fontSizeLg
                 color: !IdleService.enabled ? Theme.primary : Theme.on_surface_variant
             }
@@ -212,6 +211,7 @@ PopupPanel {
                     Text {
                         text: Theme.iconEyeOff
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeSm
                         color: Theme.on_surface
                     }
@@ -249,6 +249,7 @@ PopupPanel {
                     Text {
                         text: Theme.iconLock
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeSm
                         color: Theme.on_surface
                     }

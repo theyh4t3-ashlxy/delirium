@@ -13,10 +13,10 @@ Rectangle {
 
     implicitWidth: Theme.isVertical ? (Theme.barHeight - 8) : (noteRow.implicitWidth + 20)
     implicitHeight: Theme.barHeight - 8
-    radius: Theme.radiusPill
-    color: popup.open ? Theme.primary_overlay : (nMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-    border.color: Theme.pillBorder
-    border.width: Theme.pillBorder === "transparent" ? 0 : 1
+    radius: Theme.barWidgetRadius
+    color: popup.open ? Theme.primary_overlay : (nMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
+    border.color: popup.open ? Theme.primary : Theme.barPillBorder
+    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     visible: Settings.showQuickNotes
 
     Behavior on color { ColorAnimation { duration: Theme.animFast } }
@@ -513,6 +513,7 @@ Rectangle {
                 visible: mChip.icon !== ""
                 text: mChip.icon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: 10
                 color: mChip.danger ? (Theme.error ?? "#ff5449") : (mChip.selected ? Theme.primary : Theme.on_surface_variant)
             }
@@ -544,6 +545,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: root.activeTab === "tasks" ? Theme.iconCheck : Theme.iconNote
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.fontSizeSm
             color: popup.open || nMouse.containsMouse ? Theme.primary : Theme.on_surface
 
@@ -704,6 +706,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: root.activeTab === "tasks" ? Theme.iconCheck : Theme.iconNote
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeLg
                         color: Theme.primary
                     }
@@ -826,6 +829,7 @@ Rectangle {
                                 Text {
                                     text: modelData.icon
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     color: isSelected ? Theme.primary : Theme.on_surface_variant
                                 }
@@ -940,8 +944,9 @@ Rectangle {
                                                 anchors.centerIn: parent
                                                 text: Theme.iconClose
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: 8
-                                                color: delTabMouse.containsMouse ? "#ffffff" : Theme.primary
+                                                color: delTabMouse.containsMouse ? Theme.on_error : Theme.primary
                                             }
 
                                             MouseArea {
@@ -1014,6 +1019,7 @@ Rectangle {
                                 Text {
                                     text: Theme.iconEdit
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     color: titleInput.activeFocus ? Theme.primary : Theme.on_surface_variant
                                 }
@@ -1561,6 +1567,7 @@ Rectangle {
                                         anchors.centerIn: parent
                                         text: Theme.iconCheck
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: 11
                                         color: Theme.on_primary
                                         visible: taskCard.done

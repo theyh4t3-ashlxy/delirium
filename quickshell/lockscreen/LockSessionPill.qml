@@ -36,6 +36,7 @@ Rectangle {
         Text {
             text: lock?.secure ? (Theme.iconDistro ?? Theme.iconUser) : Theme.iconShield
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.fontSizeMd
             color: root?.uiAccent ?? Theme.accent
         }

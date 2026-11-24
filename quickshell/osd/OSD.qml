@@ -323,6 +323,7 @@ PanelWindow {
                     anchors.centerIn: parent
                     text: osdRoot.osdIcon
                     font.family: osdRoot.isKaomoji ? Theme.fontFamily : Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: osdRoot.isKaomoji ? Theme.fontSizeXs : Theme.fontSizeLg
                     font.weight: osdRoot.isKaomoji ? Font.Bold : Font.Normal
                     color: osdRoot.activeColor
@@ -357,7 +358,7 @@ PanelWindow {
                         text: osdRoot.osdType
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSm
-                        font.weight: Font.Bold
+                        font.weight: Theme.fontWeightBold
                         color: osdRoot.isOverAmp ? Theme.warn : Theme.on_surface
                     }
 
@@ -380,7 +381,7 @@ PanelWindow {
                         text: osdRoot.osdLabel
                         font.family: Theme.fontMono
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
+                        font.weight: Theme.fontWeightBold
                         color: osdRoot.activeColor
                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                     }

@@ -30,7 +30,7 @@ Item {
         if (typeof Theme !== "undefined") {
             if ((Theme?.isCyberNeon ?? false) || (Theme?.isAccentGlow ?? false)) return Theme.alpha(Theme.primary, 0.85);
             if (Theme?.isGlass ?? false) return Theme?.glassHighlight ?? Qt.rgba(1, 1, 1, 0.22);
-            if (Theme?.isPureBlack ?? false) return "#222222";
+            if (Theme?.isPureBlack ?? false) return Theme.barBorderColor;
         }
         return "transparent";
     }

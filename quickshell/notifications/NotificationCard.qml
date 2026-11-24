@@ -1,8 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Shapes
 import ".."
 import "../controls"
-import "../corners"
 import Quickshell
 import Quickshell.Widgets
 
@@ -53,159 +53,338 @@ Rectangle {
     Layout.preferredHeight: implicitHeight
 
     readonly property real defaultRadius: Theme?.popupRadius ?? Theme?.radiusMd ?? 14
+    readonly property string cornerStyle: Settings?.cornerStyle ?? "cubic"
+    readonly property real tension: {
+        if (cornerStyle === "squircle") return 0.72;
+        if (cornerStyle === "continuous-bezier" || cornerStyle === "g2") return 0.58;
+        if (cornerStyle === "flared") return 0.38;
+        return Settings?.scoopTension ?? 0.55228475;
+    }
+    readonly property real hullS: root.scoopR
+    readonly property real hullR: Math.min(root.defaultRadius, Math.min(root.width, root.height) * 0.4)
+    readonly property real hullK: root.tension
+
     radius: !isConcave ? defaultRadius : 0
-    topLeftRadius: !isConcave ? defaultRadius : (isEdgeRight || isEdgeBottom ? defaultRadius : 0)
-    bottomLeftRadius: !isConcave ? defaultRadius : (isEdgeRight || isEdgeTop ? defaultRadius : 0)
-    topRightRadius: !isConcave ? defaultRadius : (isEdgeLeft || isEdgeBottom ? defaultRadius : 0)
-    bottomRightRadius: !isConcave ? defaultRadius : (isEdgeLeft || isEdgeTop ? defaultRadius : 0)
-    color: cardBg
-    border.color: cardBorderColor
-    border.width: cardBorderWidth
+    color: isConcave ? "transparent" : cardBg
+    border.color: isConcave ? "transparent" : cardBorderColor
+    border.width: isConcave ? 0 : cardBorderWidth
     clip: false
 
-    // concave flares melting the card into the screen bezel
-    ConcaveCorner {
+    // unified concave hull + seamless border open along the docked screen bezel edge
+    Shape {
+        id: hullRight
+        anchors.fill: parent
         visible: root.isConcave && root.isEdgeRight
-        width: root.scoopR
-        height: root.scoopR
-        x: root.width - width
-        y: -height + 1
-        radius: root.scoopR
-        radiusX: root.scoopR
-        radiusY: root.scoopR
-        fillColor: root.cardBg
-        cornerStyle: Settings?.cornerStyle ?? "continuous-bezier"
-        flipX: true
-        flipY: true
-        showBorder: root.cardBorderWidth > 0
-        borderWidth: root.cardBorderWidth
-        borderColor: root.cardBorderColor
+        preferredRendererType: Shape.CurveRenderer
+        z: -1
+
+        readonly property real w: root.width
+        readonly property real h: root.height
+        readonly property real s: root.hullS
+        readonly property real r: root.hullR
+        readonly property real k: root.hullK
+
+        ShapePath {
+            fillColor: root.cardBg
+            strokeColor: "transparent"
+            strokeWidth: 0
+
+            startX: hullRight.w; startY: -hullRight.s
+            PathCubic {
+                x: hullRight.w - hullRight.s; y: 0
+                control1X: hullRight.w; control1Y: -hullRight.s * (1.0 - hullRight.k)
+                control2X: hullRight.w - hullRight.s * (1.0 - hullRight.k); control2Y: 0
+            }
+            PathLine { x: hullRight.r; y: 0 }
+            PathCubic {
+                x: 0; y: hullRight.r
+                control1X: hullRight.r * (1.0 - hullRight.k); control1Y: 0
+                control2X: 0; control2Y: hullRight.r * (1.0 - hullRight.k)
+            }
+            PathLine { x: 0; y: hullRight.h - hullRight.r }
+            PathCubic {
+                x: hullRight.r; y: hullRight.h
+                control1X: 0; control1Y: hullRight.h - hullRight.r * (1.0 - hullRight.k)
+                control2X: hullRight.r * (1.0 - hullRight.k); control2Y: hullRight.h
+            }
+            PathLine { x: hullRight.w - hullRight.s; y: hullRight.h }
+            PathCubic {
+                x: hullRight.w; y: hullRight.h + hullRight.s
+                control1X: hullRight.w - hullRight.s * (1.0 - hullRight.k); control1Y: hullRight.h
+                control2X: hullRight.w; control2Y: hullRight.h + hullRight.s * (1.0 - hullRight.k)
+            }
+            PathLine { x: hullRight.w; y: -hullRight.s }
+        }
+
+        ShapePath {
+            fillColor: "transparent"
+            strokeColor: root.cardBorderWidth > 0 ? root.cardBorderColor : "transparent"
+            strokeWidth: root.cardBorderWidth
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+
+            startX: hullRight.w; startY: -hullRight.s
+            PathCubic {
+                x: hullRight.w - hullRight.s; y: 0
+                control1X: hullRight.w; control1Y: -hullRight.s * (1.0 - hullRight.k)
+                control2X: hullRight.w - hullRight.s * (1.0 - hullRight.k); control2Y: 0
+            }
+            PathLine { x: hullRight.r; y: 0 }
+            PathCubic {
+                x: 0; y: hullRight.r
+                control1X: hullRight.r * (1.0 - hullRight.k); control1Y: 0
+                control2X: 0; control2Y: hullRight.r * (1.0 - hullRight.k)
+            }
+            PathLine { x: 0; y: hullRight.h - hullRight.r }
+            PathCubic {
+                x: hullRight.r; y: hullRight.h
+                control1X: 0; control1Y: hullRight.h - hullRight.r * (1.0 - hullRight.k)
+                control2X: hullRight.r * (1.0 - hullRight.k); control2Y: hullRight.h
+            }
+            PathLine { x: hullRight.w - hullRight.s; y: hullRight.h }
+            PathCubic {
+                x: hullRight.w; y: hullRight.h + hullRight.s
+                control1X: hullRight.w - hullRight.s * (1.0 - hullRight.k); control1Y: hullRight.h
+                control2X: hullRight.w; control2Y: hullRight.h + hullRight.s * (1.0 - hullRight.k)
+            }
+        }
     }
 
-    ConcaveCorner {
-        visible: root.isConcave && root.isEdgeRight
-        width: root.scoopR
-        height: root.scoopR
-        x: root.width - width
-        y: root.height - 1
-        radius: root.scoopR
-        radiusX: root.scoopR
-        radiusY: root.scoopR
-        fillColor: root.cardBg
-        cornerStyle: Settings?.cornerStyle ?? "continuous-bezier"
-        flipX: true
-        flipY: false
-        showBorder: root.cardBorderWidth > 0
-        borderWidth: root.cardBorderWidth
-        borderColor: root.cardBorderColor
-    }
-
-    ConcaveCorner {
+    Shape {
+        id: hullLeft
+        anchors.fill: parent
         visible: root.isConcave && root.isEdgeLeft
-        width: root.scoopR
-        height: root.scoopR
-        x: 0
-        y: -height + 1
-        radius: root.scoopR
-        radiusX: root.scoopR
-        radiusY: root.scoopR
-        fillColor: root.cardBg
-        cornerStyle: Settings?.cornerStyle ?? "continuous-bezier"
-        flipX: false
-        flipY: true
-        showBorder: root.cardBorderWidth > 0
-        borderWidth: root.cardBorderWidth
-        borderColor: root.cardBorderColor
+        preferredRendererType: Shape.CurveRenderer
+        z: -1
+
+        readonly property real w: root.width
+        readonly property real h: root.height
+        readonly property real s: root.hullS
+        readonly property real r: root.hullR
+        readonly property real k: root.hullK
+
+        ShapePath {
+            fillColor: root.cardBg
+            strokeColor: "transparent"
+            strokeWidth: 0
+
+            startX: 0; startY: -hullLeft.s
+            PathCubic {
+                x: hullLeft.s; y: 0
+                control1X: 0; control1Y: -hullLeft.s * (1.0 - hullLeft.k)
+                control2X: hullLeft.s * (1.0 - hullLeft.k); control2Y: 0
+            }
+            PathLine { x: hullLeft.w - hullLeft.r; y: 0 }
+            PathCubic {
+                x: hullLeft.w; y: hullLeft.r
+                control1X: hullLeft.w - hullLeft.r * (1.0 - hullLeft.k); control1Y: 0
+                control2X: hullLeft.w; control2Y: hullLeft.r * (1.0 - hullLeft.k)
+            }
+            PathLine { x: hullLeft.w; y: hullLeft.h - hullLeft.r }
+            PathCubic {
+                x: hullLeft.w - hullLeft.r; y: hullLeft.h
+                control1X: hullLeft.w; control1Y: hullLeft.h - hullLeft.r * (1.0 - hullLeft.k)
+                control2X: hullLeft.w - hullLeft.r * (1.0 - hullLeft.k); control2Y: hullLeft.h
+            }
+            PathLine { x: hullLeft.s; y: hullLeft.h }
+            PathCubic {
+                x: 0; y: hullLeft.h + hullLeft.s
+                control1X: hullLeft.s * (1.0 - hullLeft.k); control1Y: hullLeft.h
+                control2X: 0; control2Y: hullLeft.h + hullLeft.s * (1.0 - hullLeft.k)
+            }
+            PathLine { x: 0; y: -hullLeft.s }
+        }
+
+        ShapePath {
+            fillColor: "transparent"
+            strokeColor: root.cardBorderWidth > 0 ? root.cardBorderColor : "transparent"
+            strokeWidth: root.cardBorderWidth
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+
+            startX: 0; startY: -hullLeft.s
+            PathCubic {
+                x: hullLeft.s; y: 0
+                control1X: 0; control1Y: -hullLeft.s * (1.0 - hullLeft.k)
+                control2X: hullLeft.s * (1.0 - hullLeft.k); control2Y: 0
+            }
+            PathLine { x: hullLeft.w - hullLeft.r; y: 0 }
+            PathCubic {
+                x: hullLeft.w; y: hullLeft.r
+                control1X: hullLeft.w - hullLeft.r * (1.0 - hullLeft.k); control1Y: 0
+                control2X: hullLeft.w; control2Y: hullLeft.r * (1.0 - hullLeft.k)
+            }
+            PathLine { x: hullLeft.w; y: hullLeft.h - hullLeft.r }
+            PathCubic {
+                x: hullLeft.w - hullLeft.r; y: hullLeft.h
+                control1X: hullLeft.w; control1Y: hullLeft.h - hullLeft.r * (1.0 - hullLeft.k)
+                control2X: hullLeft.w - hullLeft.r * (1.0 - hullLeft.k); control2Y: hullLeft.h
+            }
+            PathLine { x: hullLeft.s; y: hullLeft.h }
+            PathCubic {
+                x: 0; y: hullLeft.h + hullLeft.s
+                control1X: hullLeft.s * (1.0 - hullLeft.k); control1Y: hullLeft.h
+                control2X: 0; control2Y: hullLeft.h + hullLeft.s * (1.0 - hullLeft.k)
+            }
+        }
     }
 
-    ConcaveCorner {
-        visible: root.isConcave && root.isEdgeLeft
-        width: root.scoopR
-        height: root.scoopR
-        x: 0
-        y: root.height - 1
-        radius: root.scoopR
-        radiusX: root.scoopR
-        radiusY: root.scoopR
-        fillColor: root.cardBg
-        cornerStyle: Settings?.cornerStyle ?? "continuous-bezier"
-        flipX: false
-        flipY: false
-        showBorder: root.cardBorderWidth > 0
-        borderWidth: root.cardBorderWidth
-        borderColor: root.cardBorderColor
-    }
-
-    ConcaveCorner {
+    Shape {
+        id: hullTop
+        anchors.fill: parent
         visible: root.isConcave && root.isEdgeTop
-        width: root.scoopR
-        height: root.scoopR
-        x: -width + 1
-        y: 0
-        radius: root.scoopR
-        radiusX: root.scoopR
-        radiusY: root.scoopR
-        fillColor: root.cardBg
-        cornerStyle: Settings?.cornerStyle ?? "continuous-bezier"
-        flipX: true
-        flipY: false
-        showBorder: root.cardBorderWidth > 0
-        borderWidth: root.cardBorderWidth
-        borderColor: root.cardBorderColor
+        preferredRendererType: Shape.CurveRenderer
+        z: -1
+
+        readonly property real w: root.width
+        readonly property real h: root.height
+        readonly property real s: root.hullS
+        readonly property real r: root.hullR
+        readonly property real k: root.hullK
+
+        ShapePath {
+            fillColor: root.cardBg
+            strokeColor: "transparent"
+            strokeWidth: 0
+
+            startX: -hullTop.s; startY: 0
+            PathCubic {
+                x: 0; y: hullTop.s
+                control1X: -hullTop.s * (1.0 - hullTop.k); control1Y: 0
+                control2X: 0; control2Y: hullTop.s * (1.0 - hullTop.k)
+            }
+            PathLine { x: 0; y: hullTop.h - hullTop.r }
+            PathCubic {
+                x: hullTop.r; y: hullTop.h
+                control1X: 0; control1Y: hullTop.h - hullTop.r * (1.0 - hullTop.k)
+                control2X: hullTop.r * (1.0 - hullTop.k); control2Y: hullTop.h
+            }
+            PathLine { x: hullTop.w - hullTop.r; y: hullTop.h }
+            PathCubic {
+                x: hullTop.w; y: hullTop.h - hullTop.r
+                control1X: hullTop.w - hullTop.r * (1.0 - hullTop.k); control1Y: hullTop.h
+                control2X: hullTop.w; control2Y: hullTop.h - hullTop.r * (1.0 - hullTop.k)
+            }
+            PathLine { x: hullTop.w; y: hullTop.s }
+            PathCubic {
+                x: hullTop.w + hullTop.s; y: 0
+                control1X: hullTop.w; control1Y: hullTop.s * (1.0 - hullTop.k)
+                control2X: hullTop.w + hullTop.s * (1.0 - hullTop.k); control2Y: 0
+            }
+            PathLine { x: -hullTop.s; y: 0 }
+        }
+
+        ShapePath {
+            fillColor: "transparent"
+            strokeColor: root.cardBorderWidth > 0 ? root.cardBorderColor : "transparent"
+            strokeWidth: root.cardBorderWidth
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+
+            startX: -hullTop.s; startY: 0
+            PathCubic {
+                x: 0; y: hullTop.s
+                control1X: -hullTop.s * (1.0 - hullTop.k); control1Y: 0
+                control2X: 0; control2Y: hullTop.s * (1.0 - hullTop.k)
+            }
+            PathLine { x: 0; y: hullTop.h - hullTop.r }
+            PathCubic {
+                x: hullTop.r; y: hullTop.h
+                control1X: 0; control1Y: hullTop.h - hullTop.r * (1.0 - hullTop.k)
+                control2X: hullTop.r * (1.0 - hullTop.k); control2Y: hullTop.h
+            }
+            PathLine { x: hullTop.w - hullTop.r; y: hullTop.h }
+            PathCubic {
+                x: hullTop.w; y: hullTop.h - hullTop.r
+                control1X: hullTop.w - hullTop.r * (1.0 - hullTop.k); control1Y: hullTop.h
+                control2X: hullTop.w; control2Y: hullTop.h - hullTop.r * (1.0 - hullTop.k)
+            }
+            PathLine { x: hullTop.w; y: hullTop.s }
+            PathCubic {
+                x: hullTop.w + hullTop.s; y: 0
+                control1X: hullTop.w; control1Y: hullTop.s * (1.0 - hullTop.k)
+                control2X: hullTop.w + hullTop.s * (1.0 - hullTop.k); control2Y: 0
+            }
+        }
     }
 
-    ConcaveCorner {
-        visible: root.isConcave && root.isEdgeTop
-        width: root.scoopR
-        height: root.scoopR
-        x: root.width - 1
-        y: 0
-        radius: root.scoopR
-        radiusX: root.scoopR
-        radiusY: root.scoopR
-        fillColor: root.cardBg
-        cornerStyle: Settings?.cornerStyle ?? "continuous-bezier"
-        flipX: false
-        flipY: false
-        showBorder: root.cardBorderWidth > 0
-        borderWidth: root.cardBorderWidth
-        borderColor: root.cardBorderColor
-    }
-
-    ConcaveCorner {
+    Shape {
+        id: hullBottom
+        anchors.fill: parent
         visible: root.isConcave && root.isEdgeBottom
-        width: root.scoopR
-        height: root.scoopR
-        x: -width + 1
-        y: root.height - height
-        radius: root.scoopR
-        radiusX: root.scoopR
-        radiusY: root.scoopR
-        fillColor: root.cardBg
-        cornerStyle: Settings?.cornerStyle ?? "continuous-bezier"
-        flipX: true
-        flipY: true
-        showBorder: root.cardBorderWidth > 0
-        borderWidth: root.cardBorderWidth
-        borderColor: root.cardBorderColor
-    }
+        preferredRendererType: Shape.CurveRenderer
+        z: -1
 
-    ConcaveCorner {
-        visible: root.isConcave && root.isEdgeBottom
-        width: root.scoopR
-        height: root.scoopR
-        x: root.width - 1
-        y: root.height - height
-        radius: root.scoopR
-        radiusX: root.scoopR
-        radiusY: root.scoopR
-        fillColor: root.cardBg
-        cornerStyle: Settings?.cornerStyle ?? "continuous-bezier"
-        flipX: false
-        flipY: true
-        showBorder: root.cardBorderWidth > 0
-        borderWidth: root.cardBorderWidth
-        borderColor: root.cardBorderColor
+        readonly property real w: root.width
+        readonly property real h: root.height
+        readonly property real s: root.hullS
+        readonly property real r: root.hullR
+        readonly property real k: root.hullK
+
+        ShapePath {
+            fillColor: root.cardBg
+            strokeColor: "transparent"
+            strokeWidth: 0
+
+            startX: -hullBottom.s; startY: hullBottom.h
+            PathCubic {
+                x: 0; y: hullBottom.h - hullBottom.s
+                control1X: -hullBottom.s * (1.0 - hullBottom.k); control1Y: hullBottom.h
+                control2X: 0; control2Y: hullBottom.h - hullBottom.s * (1.0 - hullBottom.k)
+            }
+            PathLine { x: 0; y: hullBottom.r }
+            PathCubic {
+                x: hullBottom.r; y: 0
+                control1X: 0; control1Y: hullBottom.r * (1.0 - hullBottom.k)
+                control2X: hullBottom.r * (1.0 - hullBottom.k); control2Y: 0
+            }
+            PathLine { x: hullBottom.w - hullBottom.r; y: 0 }
+            PathCubic {
+                x: hullBottom.w; y: hullBottom.r
+                control1X: hullBottom.w - hullBottom.r * (1.0 - hullBottom.k); control1Y: 0
+                control2X: hullBottom.w; control2Y: hullBottom.r * (1.0 - hullBottom.k)
+            }
+            PathLine { x: hullBottom.w; y: hullBottom.h - hullBottom.s }
+            PathCubic {
+                x: hullBottom.w + hullBottom.s; y: hullBottom.h
+                control1X: hullBottom.w; control1Y: hullBottom.h - hullBottom.s * (1.0 - hullBottom.k)
+                control2X: hullBottom.w + hullBottom.s * (1.0 - hullBottom.k); control2Y: hullBottom.h
+            }
+            PathLine { x: -hullBottom.s; y: hullBottom.h }
+        }
+
+        ShapePath {
+            fillColor: "transparent"
+            strokeColor: root.cardBorderWidth > 0 ? root.cardBorderColor : "transparent"
+            strokeWidth: root.cardBorderWidth
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+
+            startX: -hullBottom.s; startY: hullBottom.h
+            PathCubic {
+                x: 0; y: hullBottom.h - hullBottom.s
+                control1X: -hullBottom.s * (1.0 - hullBottom.k); control1Y: hullBottom.h
+                control2X: 0; control2Y: hullBottom.h - hullBottom.s * (1.0 - hullBottom.k)
+            }
+            PathLine { x: 0; y: hullBottom.r }
+            PathCubic {
+                x: hullBottom.r; y: 0
+                control1X: 0; control1Y: hullBottom.r * (1.0 - hullBottom.k)
+                control2X: hullBottom.r * (1.0 - hullBottom.k); control2Y: 0
+            }
+            PathLine { x: hullBottom.w - hullBottom.r; y: 0 }
+            PathCubic {
+                x: hullBottom.w; y: hullBottom.r
+                control1X: hullBottom.w - hullBottom.r * (1.0 - hullBottom.k); control1Y: 0
+                control2X: hullBottom.w; control2Y: hullBottom.r * (1.0 - hullBottom.k)
+            }
+            PathLine { x: hullBottom.w; y: hullBottom.h - hullBottom.s }
+            PathCubic {
+                x: hullBottom.w + hullBottom.s; y: hullBottom.h
+                control1X: hullBottom.w; control1Y: hullBottom.h - hullBottom.s * (1.0 - hullBottom.k)
+                control2X: hullBottom.w + hullBottom.s * (1.0 - hullBottom.k); control2Y: hullBottom.h
+            }
+        }
     }
 
     // check theme icon existence first so qt doesn't cry about missing qrc paths
@@ -237,6 +416,13 @@ Rectangle {
     property real slideOffsetY: (notif?._entered) ? 0 : root.ingressOffsetY
     property real cardOpacity: (notif?._entered) ? 1.0 : 0.0
     property bool _userDismissed: false
+    property bool _closing: false
+
+    onNotifChanged: {
+        if (notif && !root._closing && notif._elapsedMs === 0) {
+            root.elapsedMs = 0;
+        }
+    }
 
     transform: Translate {
         x: root.slideOffsetX
@@ -312,12 +498,18 @@ Rectangle {
     }
 
     function closeToast(permanent: bool) {
+        if (root._closing) return;
+        root._closing = true;
         root._userDismissed = permanent;
         progressTimer.stop();
         exitAnim.restart();
     }
 
-    readonly property bool isHovered: cardMouse.containsMouse
+    HoverHandler {
+        id: cardHover
+    }
+
+    readonly property bool isHovered: cardHover.hovered
     onIsHoveredChanged: {
         if (!isHovered) _lastTick = Date.now();
     }
@@ -330,7 +522,7 @@ Rectangle {
         id: progressTimer
         interval: 30
         repeat: true
-        running: root.timeoutMs > 0 && !root.isHovered
+        running: root.timeoutMs > 0 && !root.isHovered && !root._closing
         onTriggered: {
             let now = Date.now();
             if (root._lastTick > 0) {
@@ -389,6 +581,7 @@ Rectangle {
                     anchors.centerIn: parent
                     width: 16
                     height: 16
+                    implicitSize: 16
                     source: root.resolvedIcon
                     visible: root.resolvedIcon !== "" && notifIconImg.status !== Image.Error
                 }
@@ -396,8 +589,9 @@ Rectangle {
                 Text {
                     anchors.centerIn: parent
                     visible: !notifIconImg.visible
-                    text: root.isCritical ? Theme.iconFlame : (Theme?.iconBell ?? "󰂚")
+                    text: root.isCritical ? Theme.iconFlame : (Theme?.iconBell ?? "\uE7F5")
                     font.family: Theme?.fontIcon ?? Theme?.fontMono
+                    font.variableAxes: Theme?.iconAxes ?? ({})
                     font.pixelSize: Theme?.fontSizeXs ?? 12
                     color: root.accentColor
                 }
@@ -434,7 +628,7 @@ Rectangle {
             }
 
             IconButton {
-                icon: Theme?.iconClose ?? "󰅖"
+                icon: Theme?.iconClose ?? "\uE5CD"
                 iconSize: Theme?.fontSizeXs ?? 11
                 Layout.preferredWidth: 22
                 Layout.preferredHeight: 22
@@ -541,10 +735,11 @@ Rectangle {
 
     Rectangle {
         anchors.bottom: parent.bottom
+        anchors.bottomMargin: 4
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: root.isConcave ? (root.scoopR + 4) : 0
-        anchors.rightMargin: root.isConcave ? (root.scoopR + 4) : 0
+        anchors.leftMargin: (root.isConcave && root.isEdgeLeft) ? (root.scoopR + 6) : 12
+        anchors.rightMargin: (root.isConcave && root.isEdgeRight) ? (root.scoopR + 6) : 12
         height: 3
         radius: 1.5
         color: Theme?.pillBg ?? "#2a2a3c"

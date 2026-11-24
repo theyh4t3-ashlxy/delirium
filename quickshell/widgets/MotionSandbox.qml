@@ -232,6 +232,7 @@ PanelWindow {
                 id: bmpIcon
                 anchors.horizontalCenter: parent.horizontalCenter
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: 14
                 color: Theme.primary
             }
@@ -302,6 +303,7 @@ PanelWindow {
             Text {
                 id: pcIcon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: 18
                 color: pcRoot.accentColor
                 Layout.alignment: Qt.AlignHCenter
@@ -408,7 +410,7 @@ PanelWindow {
                     spacing: 8
 
                     Text {
-                        text: "󰑮 physics & momentum playground"
+                        text: "physics & momentum playground"
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSm
                         font.weight: Font.Bold
@@ -508,9 +510,9 @@ PanelWindow {
                         Repeater {
                             id: bumperRepeater
                             model: [
-                                { u: 0.24, d: 0.42, points: 25, icon: "󰓠" },
-                                { u: 0.50, d: 0.28, points: 100, icon: "󰓦" },
-                                { u: 0.76, d: 0.42, points: 50, icon: "󰓡" }
+                                { u: 0.24, d: 0.42, points: 25, icon: Theme.iconSparkles },
+                                { u: 0.50, d: 0.28, points: 100, icon: Theme.iconFlame },
+                                { u: 0.76, d: 0.42, points: 50, icon: Theme.iconShield }
                             ]
                             delegate: Bumper {
                                 required property var modelData
@@ -610,8 +612,9 @@ PanelWindow {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: "󰮯"
+                                text: Theme.iconDistro
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: 12
                                 color: Theme.on_primary
                             }
@@ -763,7 +766,7 @@ PanelWindow {
                         PhysicsCard {
                             id: dragCard1
                             slot: 0
-                            icon: "󰁕"
+                            icon: Theme.iconRefresh
                             title: "flick momentum"
                             accentColor: Theme.primary
                         }
@@ -771,7 +774,7 @@ PanelWindow {
                         PhysicsCard {
                             id: dragCard2
                             slot: 1
-                            icon: "󰈈"
+                            icon: Theme.iconExpand
                             title: "freedom card"
                             accentColor: Theme.warn
                         }

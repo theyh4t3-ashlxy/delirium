@@ -130,6 +130,7 @@ Item {
                 anchors.centerIn: parent
                 text: root.blockIcon
                 font.family: Theme?.fontIcon
+                font.variableAxes: Theme?.iconAxes ?? ({})
                 font.pixelSize: 12
                 color: root.blockColor
             }
@@ -279,6 +280,7 @@ Item {
                     anchors.centerIn: parent
                     text: root.isVisibleInBar ? (Theme?.iconEye ?? "\uE8F4") : (Theme?.iconEyeOff ?? "\uE8F5")
                     font.family: Theme?.fontIcon
+                    font.variableAxes: Theme?.iconAxes ?? ({})
                     font.pixelSize: 12
                     color: root.isVisibleInBar ? (Theme?.on_surface ?? "#ffffff") : (Theme?.error ?? "#ffb4ab")
                 }

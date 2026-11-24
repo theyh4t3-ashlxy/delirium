@@ -14,12 +14,12 @@ Rectangle {
 
     implicitWidth: (Theme?.isVertical ?? false) ? ((Theme?.barHeight ?? 48) - 8) : (pwrRow.implicitWidth + 24)
     implicitHeight: (Theme?.barHeight ?? 48) - 8
-    radius: Theme.radiusPill
+    radius: Theme.barWidgetRadius
     color: popup.open
         ? Theme.error_overlay
-        : (pwrMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-    border.color: popup.open ? Theme.error : Theme.pillBorder
-    border.width: (popup.open || (Theme?.pillBorder ?? "transparent") !== "transparent") ? 1 : 0
+        : (pwrMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
+    border.color: popup.open ? Theme.error : Theme.barPillBorder
+    border.width: (popup.open || Theme.barPillBorderWidth > 0) ? 1 : 0
 
     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
     Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -31,8 +31,9 @@ Rectangle {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: Theme.iconPower ?? "󰐥"
+            text: Theme.iconPower ?? "\uF8C7"
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.fontSizeMd
             color: popup.open ? Theme.error : Theme.on_surface
         }
@@ -166,8 +167,9 @@ Rectangle {
 
                     Text {
                         anchors.centerIn: parent
-                        text: Theme.iconPower ?? "󰐥"
+                        text: Theme.iconPower ?? "\uF8C7"
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeMd
                         color: Theme.error
                     }
@@ -228,7 +230,7 @@ Rectangle {
                             key: "lock",
                             label: "lock",
                             sub: "",
-                            icon: Theme.iconLock ?? "󰌾",
+                            icon: Theme.iconLock ?? "\uE899",
                             span: 1,
                             confirm: false,
                             role: "primary"
@@ -237,7 +239,7 @@ Rectangle {
                             key: "suspend",
                             label: "sleep",
                             sub: "",
-                            icon: Theme.iconSuspend ?? "󰤄",
+                            icon: Theme.iconSuspend ?? "\uF159",
                             span: 1,
                             confirm: false,
                             role: "primary"
@@ -246,7 +248,7 @@ Rectangle {
                             key: "logout",
                             label: "log out",
                             sub: "",
-                            icon: Theme.iconLogout ?? "󰍃",
+                            icon: Theme.iconLogout ?? "\uE9BA",
                             span: 1,
                             // confirm logout too so one slip of the mouse doesn't vaporize unsaved work
                             confirm: true,
@@ -256,7 +258,7 @@ Rectangle {
                             key: "reboot",
                             label: "restart",
                             sub: "",
-                            icon: Theme.iconReboot ?? "󰑐",
+                            icon: Theme.iconReboot ?? "\uF053",
                             span: 1,
                             confirm: true,
                             role: "warn"
@@ -265,7 +267,7 @@ Rectangle {
                             key: "poweroff",
                             label: "shut down",
                             sub: Theme.getVibe(Theme.kaoSleepy + " goodnight", "power off machine", "power off machine"),
-                            icon: Theme.iconPower ?? "󰐥",
+                            icon: Theme.iconPower ?? "\uF8C7",
                             span: 2,
                             confirm: true,
                             role: "error"
@@ -316,6 +318,7 @@ Rectangle {
                             Text {
                                 text: actionCard.modelData.icon
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.fontSizeTitle
                                 color: actionCard.isConfirming ? actionCard.confirmFg : actionCard.accentColor
                                 Layout.alignment: Qt.AlignHCenter
@@ -342,6 +345,7 @@ Rectangle {
                             Text {
                                 text: actionCard.modelData.icon
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.fontSizeTitle + 2
                                 color: actionCard.isConfirming ? actionCard.confirmFg : actionCard.accentColor
                             }

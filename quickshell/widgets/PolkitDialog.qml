@@ -406,6 +406,7 @@ Scope {
                                     visible: dialogState.resolvedActionIcon === ""
                                     text: dialogState.isError ? Theme.iconFlame : Theme.iconShield
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeLg
                                     color: dialogState.isError ? Theme.error : Theme.primary
                                 }
@@ -459,6 +460,7 @@ Scope {
                                         Text {
                                             text: dialogState.showDetails ? Theme.iconChevronUp : Theme.iconChevronDown
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.fontSizeXs
                                             color: (actSubMouse.containsMouse || dialogState.showDetails)
                                                 ? Theme.primary
@@ -503,6 +505,7 @@ Scope {
                                         Text {
                                             text: Theme.iconUser
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.primary
                                         }
@@ -550,6 +553,7 @@ Scope {
                                         anchors.centerIn: parent
                                         text: Theme.iconExpand
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         color: dialogState.peekBehind ? Theme.primary : Theme.textSecondary
                                     }
@@ -602,6 +606,7 @@ Scope {
                                 Text {
                                     text: Theme.iconTerminal
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     color: Theme.primary
                                 }
@@ -633,6 +638,7 @@ Scope {
                                         Text {
                                             text: dialogState.copiedKey === "cmd" ? Theme.iconCheck : Theme.iconCopy
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.primary
                                         }
@@ -721,6 +727,7 @@ Scope {
                                         Text {
                                             text: dialogState.copiedKey === "id" ? Theme.iconCheck : Theme.iconCopy
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.primary
                                         }
@@ -786,6 +793,7 @@ Scope {
                             Text {
                                 text: Theme.iconShield
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.fontSizeMd
                                 color: Theme.primary
                             }
@@ -830,6 +838,7 @@ Scope {
                                 id: lockGlyph
                                 text: dialogState.isSubmitting ? Theme.iconRefresh : Theme.iconLock
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.fontSizeMd
                                 color: dialogState.isError
                                     ? Theme.error
@@ -1029,6 +1038,7 @@ Scope {
                                 Text {
                                     text: dialogState.isSubmitting ? Theme.iconRefresh : Theme.iconCheck
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     color: Theme.on_primary
                                 }

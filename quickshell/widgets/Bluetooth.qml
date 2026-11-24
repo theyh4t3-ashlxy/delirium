@@ -56,15 +56,15 @@ Rectangle {
         return Theme.barHeight - 8;
     }
     implicitHeight: Theme.barHeight - 8
-    radius: Theme.radiusPill
+    radius: Theme.barWidgetRadius
 
     color: {
         if (btMouse.pressed) return Theme.widgetActive;
         if (popup.open) return Theme.primary_overlay;
-        if (btMouse.containsMouse) return Theme.pillHover;
-        return Theme.pillBg;
+        if (btMouse.containsMouse) return Theme.barPillHover;
+        return Theme.barPillBg;
     }
-    border.color: popup.open ? Theme.primary : Theme.pillBorder
+    border.color: popup.open ? Theme.primary : Theme.barPillBorder
     border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     clip: true
 
@@ -119,6 +119,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: root.isPowered ? (root.hasConnectedDevice ? Theme.iconBluetoothConnected : Theme.iconBluetooth) : Theme.iconBluetoothOff
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
             color: !root.isPowered ? Theme.on_surface_variant : (root.hasConnectedDevice || popup.open || btMouse.containsMouse ? Theme.primary : Theme.on_surface)
 
@@ -213,6 +214,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: root.isPowered ? (root.hasConnectedDevice ? Theme.iconBluetoothConnected : Theme.iconBluetooth) : Theme.iconBluetoothOff
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                         color: root.isPowered ? Theme.primary : Theme.on_surface_variant
                     }
@@ -305,6 +307,7 @@ Rectangle {
                         Text {
                             text: Theme.iconBluetooth
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                             color: Theme.primary
                         }
@@ -339,6 +342,7 @@ Rectangle {
                                     visible: !Theme.isTextIconSet
                                     text: Theme.iconRefresh
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     color: root.isDiscovering ? Theme.primary : Theme.on_surface_variant
                                 }
@@ -432,6 +436,7 @@ Rectangle {
                                                 anchors.centerIn: parent
                                                 text: root.getDeviceIcon(modelData)
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                                 color: modelData.connected ? Theme.primary : Theme.on_surface_variant
                                             }
@@ -524,6 +529,7 @@ Rectangle {
                                                 anchors.centerIn: parent
                                                 text: Theme.iconTrash
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: forgetMouse.containsMouse ? Theme.error : Theme.on_surface_variant
                                             }
@@ -567,6 +573,7 @@ Rectangle {
                                     anchors.centerIn: parent
                                     text: !root.isPowered ? Theme.iconBluetoothOff : Theme.iconBluetooth
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
                                     color: Theme.on_surface_variant
                                 }

@@ -32,13 +32,13 @@ RowLayout {
 
         height: 40
         implicitWidth: isArmed ? (pRow.implicitWidth + 28) : 40
-        radius: isArmed ? root?.uiRadiusMd : root?.uiRadiusPill
+        radius: isArmed ? (root?.uiRadiusMd ?? Theme.radiusMd) : (root?.uiRadiusPill ?? Theme.radiusPill)
         color: isArmed
             ? (pMouse.pressed ? Theme.statePress(Theme.error, Theme.on_error) : Theme.error)
-            : (pMouse.pressed ? root?.uiWidgetActive : (pMouse.containsMouse ? root?.uiPillHover : root?.uiPillBg))
+            : (pMouse.pressed ? (root?.uiWidgetActive ?? Theme.widgetActive) : (pMouse.containsMouse ? (root?.uiPillHover ?? Theme.pillHover) : (root?.uiPillBg ?? Theme.pillBg)))
         border.color: isArmed
             ? Theme.error
-            : (pMouse.containsMouse ? Theme.alpha(root?.uiAccent, 0.55) : root?.uiPillBorder)
+            : (pMouse.containsMouse ? Theme.alpha(root?.uiAccent ?? Theme.accent, 0.55) : (root?.uiPillBorder ?? "transparent"))
         border.width: (isArmed || pMouse.containsMouse || (root?.uiPillBorder?.a ?? 0) > 0) ? 1 : 0
 
         Behavior on implicitWidth { NumberAnimation { duration: Theme.expressiveFast; easing.type: Theme.animExpressiveEasing } }
@@ -54,8 +54,9 @@ RowLayout {
             Text {
                 text: pRoot.isArmed ? Theme.iconFlame : pRoot.icon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.fontSizeMd
-                color: pRoot.isArmed ? Theme.on_error : (pMouse.containsMouse ? root?.uiAccent : root?.uiTextPrimary)
+                color: pRoot.isArmed ? Theme.on_error : (pMouse.containsMouse ? (root?.uiAccent ?? Theme.accent) : (root?.uiTextPrimary ?? Theme.on_surface))
             }
 
             Text {

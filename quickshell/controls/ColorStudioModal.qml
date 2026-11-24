@@ -265,6 +265,7 @@ Item {
                             anchors.centerIn: parent
                             text: root.copiedToast ? "✓" : (Theme.iconClipboard ?? "📋")
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeSm
                             color: root.lit > 55 ? "#111111" : "#ffffff"
                         }
@@ -339,6 +340,7 @@ Item {
                         anchors.centerIn: parent
                         text: Theme.iconSparkles ?? "👁"
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeMd
                         color: Theme.primary
                     }

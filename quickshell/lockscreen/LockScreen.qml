@@ -88,7 +88,8 @@ Scope {
     property int autoSubmitTargetLen: 0
 
     // user-controlled vibe & quotes
-    property string quoteMode: "smart"         // "smart" | "hyprland" | "unhinged" | "custom" | "off"
+    property string quoteMode: "smart"         // "smart" | "hyprland" | "quotes" | "actions" | "custom" | "off"
+    onQuoteModeChanged: refreshQuotes()
     property string customQuoteText: "welcome back"
     property string backdropMode: "auto"       // "auto" | "dark" | "light"
     property string pamService: "login"
@@ -168,7 +169,7 @@ Scope {
         let darkened = Qt.rgba(Theme.primary.r * 0.62, Theme.primary.g * 0.62, Theme.primary.b * 0.62, 1.0);
         return Theme.blend(darkened, Theme.on_primary_container, 0.35);
     }
-    readonly property color uiOnAccent: isLight ? "#ffffff" : Theme.on_primary
+    readonly property color uiOnAccent: !isLight || matugenIsLight ? Theme.on_primary : "#ffffff"
     readonly property color uiAccentOverlay: Theme.alpha(uiAccent, isLight ? 0.16 : 0.18)
 
     readonly property color uiSurfaceBase: {
@@ -447,7 +448,8 @@ Scope {
                 case "customNormY": lockRoot.customNormY = parseClamped(v, 0.0, 1.0, 0.5); break;
                 case "clockScale": lockRoot.clockScale = parseClamped(v, 0.65, 1.65, 1.0); break;
                 case "quoteMode":
-                    if (["smart", "hyprland", "unhinged", "custom", "off"].includes(v)) lockRoot.quoteMode = v;
+                    if (v === "unhinged") lockRoot.quoteMode = "actions";
+                    else if (["smart", "hyprland", "quotes", "actions", "custom", "off"].includes(v)) lockRoot.quoteMode = v;
                     break;
                 case "customQuoteText": lockRoot.customQuoteText = v; break;
                 case "backdropMode":
@@ -597,7 +599,7 @@ Scope {
             "clock,password,media",
             "media,clock,password"
         ];
-        const qModes = ["smart", "hyprland", "unhinged"];
+        const qModes = ["smart", "hyprland", "quotes", "actions"];
 
         lockRoot.clockStyle = cStyles[Math.floor(Math.random() * cStyles.length)];
         lockRoot.secondsStyle = sStyles[Math.floor(Math.random() * sStyles.length)];
@@ -747,6 +749,10 @@ Scope {
         if (!kbPollProc.running) kbPollProc.running = true;
     }
 
+    function scheduleKeyboardPoll() {
+        kbPollDelayTimer.restart();
+    }
+
     function switchKeyboardLayout() {
         Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", "next"]);
         kbPollDelayTimer.restart();
@@ -777,23 +783,31 @@ Scope {
 
     function refreshQuotes() {
         if (!splashProc.running) splashProc.running = true;
-        let cat = lockRoot.quoteMode === "smart" ? pickSmartCategory() : "system";
-        let pool = Theme.flavorQuotes?.[cat] ?? Theme.flavorQuotes?.system;
-        if (pool && pool.length > 0) {
-            let idx = Math.floor(Math.random() * pool.length);
-            lockRoot.rolledQuote = pool[idx] || "";
-        } else if (Theme.getFlavor) {
-            lockRoot.rolledQuote = Theme.getFlavor(cat, "") || "";
+        let mode = lockRoot.quoteMode;
+        if (mode === "off" || mode === "custom" || mode === "hyprland") return;
+
+        let cat = (mode === "smart" || mode === "quotes") ? pickSmartCategory() : "system";
+        let srcMode = (mode === "quotes") ? "quotes" : "actions";
+        if (Theme.rollFlavor) {
+            lockRoot.rolledQuote = Theme.rollFlavor(cat, srcMode, lockRoot.rolledQuote, "");
+        } else {
+            let pool = Theme.getFlavorPool ? Theme.getFlavorPool(srcMode, cat) : (Theme.flavorQuotes?.[cat] ?? Theme.flavorQuotes?.system);
+            if (pool && pool.length > 0) {
+                let idx = Math.floor(Math.random() * pool.length);
+                lockRoot.rolledQuote = pool[idx] || "";
+            } else if (Theme.getFlavor) {
+                lockRoot.rolledQuote = Theme.getFlavor(cat, "", srcMode) || "";
+            }
         }
     }
 
     readonly property string activeQuoteText: {
         if (lockRoot.quoteMode === "off") return "";
         if (lockRoot.quoteMode === "custom") return fmtText(lockRoot.customQuoteText);
-        if (lockRoot.quoteMode === "unhinged" || lockRoot.quoteMode === "smart") {
-            return fmtText(lockRoot.rolledQuote || lockRoot.hyprSplash);
+        if (lockRoot.quoteMode === "hyprland") {
+            return fmtText(lockRoot.hyprSplash || Theme.hyprSplash);
         }
-        return fmtText(lockRoot.hyprSplash || lockRoot.rolledQuote);
+        return fmtText(lockRoot.rolledQuote || lockRoot.hyprSplash);
     }
 
     function numberToWords(n: int): string {
@@ -811,18 +825,11 @@ Scope {
     }
 
     function fixCoverUrl(url): string {
-        if (!url || typeof url !== "string") return "";
-        let cleaned = url.trim();
-        if (cleaned.startsWith("/")) return "file://" + cleaned;
-        return cleaned;
+        return Theme.fixCoverUrl(url);
     }
 
     function formatTime(seconds): string {
-        if (seconds === undefined || seconds === null || isNaN(seconds) || seconds < 0) return "0:00";
-        let sec = Math.floor(seconds);
-        let m = Math.floor(sec / 60);
-        let s = sec % 60;
-        return m + ":" + (s < 10 ? "0" : "") + s;
+        return Theme.formatTime(seconds);
     }
 
     function formatBatteryEta(): string {
@@ -1222,7 +1229,7 @@ Scope {
                 Connections {
                     target: surface.activePlayer
                     function onPositionChanged() {
-                        if (!seekMouse.pressed) {
+                        if (!(mediaBlock?.isSeeking ?? false)) {
                             surface.trackPosition = surface.activePlayer?.position ?? 0;
                         }
                     }
@@ -1234,7 +1241,7 @@ Scope {
 
                 Timer {
                     interval: 500
-                    running: lockRoot.locked && surface.playerIsPlaying && lockRoot.showMediaCard && !lockRoot.zenMode && !seekMouse.pressed
+                    running: lockRoot.locked && surface.playerIsPlaying && lockRoot.showMediaCard && !lockRoot.zenMode && !(mediaBlock?.isSeeking ?? false)
                     repeat: true
                     onTriggered: {
                         if (surface.activePlayer) {
@@ -1546,6 +1553,7 @@ Scope {
                                 Text {
                                     text: Theme.iconGrid
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     color: stageDragMouse.pressed ? lockRoot.uiOnAccent : lockRoot.uiAccent
                                 }

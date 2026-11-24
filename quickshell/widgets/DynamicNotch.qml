@@ -17,7 +17,7 @@ Rectangle {
     // ── Concave Flare & Bezel Attachment ──────────────────────────────────
     readonly property bool isBarFloating: Settings?.barFloating ?? false
     readonly property bool isBarBottom: Settings?.barPosition === "bottom"
-    readonly property bool isFlared: (Settings?.dynamicNotchFlared ?? true) && !(Theme?.isVertical ?? false) && !isBarFloating
+    readonly property bool isFlared: (Settings?.dynamicNotchFlared ?? true) && !(Theme?.isVertical ?? false) && !isBarFloating && !(Theme?.isBarGroupedSurface ?? false)
     readonly property int flareRadius: Settings?.notchFlareRadius ?? 16
 
     // ── Time & Calendar Properties ─────────────────────────────────────────
@@ -115,15 +115,15 @@ Rectangle {
     height: isFlared ? ((Theme?.barHeight ?? 32) - 2) : implicitHeight
     y: isFlared ? (isBarBottom ? 2 : - Math.round(((Theme?.barHeight ?? 32) - implicitHeight) / 2)) : 0
 
-    radius: isFlared ? 0 : (Theme?.radiusPill ?? 999)
-    topLeftRadius: isFlared ? (isBarBottom ? (Theme.radiusMd > 4 ? Theme.radiusMd : 12) : 0) : (Theme?.radiusPill ?? 999)
-    topRightRadius: isFlared ? (isBarBottom ? (Theme.radiusMd > 4 ? Theme.radiusMd : 12) : 0) : (Theme?.radiusPill ?? 999)
-    bottomLeftRadius: isFlared ? (!isBarBottom ? (Theme.radiusMd > 4 ? Theme.radiusMd : 12) : 0) : (Theme?.radiusPill ?? 999)
-    bottomRightRadius: isFlared ? (!isBarBottom ? (Theme.radiusMd > 4 ? Theme.radiusMd : 12) : 0) : (Theme?.radiusPill ?? 999)
+    radius: isFlared ? 0 : (Theme?.barWidgetRadius ?? 999)
+    topLeftRadius: isFlared ? (isBarBottom ? (Theme.radiusMd > 4 ? Theme.radiusMd : 12) : 0) : (Theme?.barWidgetRadius ?? 999)
+    topRightRadius: isFlared ? (isBarBottom ? (Theme.radiusMd > 4 ? Theme.radiusMd : 12) : 0) : (Theme?.barWidgetRadius ?? 999)
+    bottomLeftRadius: isFlared ? (!isBarBottom ? (Theme.radiusMd > 4 ? Theme.radiusMd : 12) : 0) : (Theme?.barWidgetRadius ?? 999)
+    bottomRightRadius: isFlared ? (!isBarBottom ? (Theme.radiusMd > 4 ? Theme.radiusMd : 12) : 0) : (Theme?.barWidgetRadius ?? 999)
 
-    color: notchPopup.open ? Theme.primary_overlay : (notchMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-    border.color: (Theme?.isCyberNeon ?? false) ? Theme.primary : (Theme?.pillBorder ?? "transparent")
-    border.width: ((Theme?.isCyberNeon ?? false) || ((Theme?.pillBorder ?? "transparent") !== "transparent")) ? 1 : 0
+    color: notchPopup.open ? Theme.primary_overlay : (notchMouse.containsMouse ? (Theme?.barPillHover ?? Theme.pillHover) : (isFlared ? Theme.pillBg : (Theme?.barPillBg ?? Theme.pillBg)))
+    border.color: ((Theme?.isBarPills ?? true) && (Theme?.isCyberNeon ?? false)) ? Theme.primary : (notchPopup.open ? Theme.primary : (Theme?.barPillBorder ?? "transparent"))
+    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     clip: false
 
     Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120 } }
@@ -222,6 +222,7 @@ Rectangle {
                     return Theme?.iconMusic ?? "\uE405";
                 }
                 font.family: Theme?.fontIcon ?? "sans-serif"
+                font.variableAxes: Theme?.iconAxes ?? ({})
                 font.pixelSize: Theme?.fontSizeSm ?? 12
                 color: notchPopup.open ? Theme.primary : Theme.on_surface_variant
             }
@@ -275,6 +276,7 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 text: (typeof TimerService !== "undefined" && TimerService?.stopwatchRunning) ? (Theme?.iconClock ?? "\uEFD6") : (Theme?.iconBell ?? "\uE7F5")
                 font.family: Theme?.fontIcon ?? "sans-serif"
+                font.variableAxes: Theme?.iconAxes ?? ({})
                 font.pixelSize: Theme?.fontSizeSm ?? 12
                 color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService.timerRemaining <= 30) ? Theme.error : Theme.primary
             }
@@ -308,6 +310,7 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 text: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.iconPause ?? "\uE034") : (Theme?.iconPlay ?? "\uE037")
                 font.family: Theme?.fontIcon ?? "sans-serif"
+                font.variableAxes: Theme?.iconAxes ?? ({})
                 font.pixelSize: Theme?.fontSizeSm ?? 12
                 color: Theme.primary
                 MouseArea {
@@ -418,6 +421,7 @@ Rectangle {
                         Text {
                             text: Theme?.iconCalendar ?? "\uE935"
                             font.family: Theme?.fontIcon ?? "sans-serif"
+                            font.variableAxes: Theme?.iconAxes ?? ({})
                             font.pixelSize: Theme?.fontSizeSm ?? 12
                             color: notchPopup.activeTab === "calendar" ? Theme.on_primary : Theme.on_surface
                         }
@@ -450,6 +454,7 @@ Rectangle {
                         Text {
                             text: Theme?.iconClock ?? "\uEFD6"
                             font.family: Theme?.fontIcon ?? "sans-serif"
+                            font.variableAxes: Theme?.iconAxes ?? ({})
                             font.pixelSize: Theme?.fontSizeSm ?? 12
                             color: notchPopup.activeTab === "timer" ? Theme.on_primary : Theme.on_surface
                         }
@@ -519,6 +524,7 @@ Rectangle {
                         Text {
                             text: Theme?.iconCalendar ?? "\uE935"
                             font.family: Theme?.fontIcon ?? "sans-serif"
+                            font.variableAxes: Theme?.iconAxes ?? ({})
                             font.pixelSize: 20
                             color: Theme.primary
                             Layout.alignment: Qt.AlignRight
@@ -562,7 +568,7 @@ Rectangle {
                     }
 
                     IconButton {
-                        icon: Theme?.iconClock ?? "󰅐"
+                        icon: Theme?.iconClock ?? "\uEFD6"
                         iconSize: Theme?.fontSizeSm ?? 12
                         tooltip: "jump to today"
                         onClicked: {
@@ -786,6 +792,7 @@ Rectangle {
                                     Text {
                                         text: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.iconPause ?? "\uE034") : (Theme?.iconPlay ?? "\uE037")
                                         font.family: Theme?.fontIcon ?? "sans-serif"
+                                        font.variableAxes: Theme?.iconAxes ?? ({})
                                         font.pixelSize: Theme?.fontSizeSm ?? 12
                                         color: Theme.on_primary
                                     }

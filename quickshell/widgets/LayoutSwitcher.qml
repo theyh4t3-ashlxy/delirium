@@ -45,7 +45,7 @@ Rectangle {
             id: "monocle",
             title: "monocle layout",
             badge: "deck stack",
-            icon: "󰊓",
+            icon: "▣",
             desc: "stretches the focused window across the workspace and stacks the rest behind it."
         }
     ]
@@ -57,12 +57,12 @@ Rectangle {
             : Math.max(34, pillRow.implicitWidth + 14);
     }
     implicitHeight: (Theme?.isVertical ?? false) ? Math.max(36, pillCol.implicitHeight + 12) : ((Theme?.barHeight ?? 32) - 8)
-    radius: Theme?.radiusPill ?? 999
+    radius: Theme?.barWidgetRadius ?? 999
     color: popup.open
         ? (Theme?.primary_overlay ?? "#33ffffff")
-        : (lMouse.containsMouse ? (Theme?.pillHover ?? "#22ffffff") : (Theme?.pillBg ?? "#11ffffff"))
-    border.color: (Theme?.isCyberNeon ?? false) ? (Theme?.primary ?? "#00ffff") : (Theme?.pillBorder ?? "transparent")
-    border.width: ((Theme?.isCyberNeon ?? false) || ((Theme?.pillBorder ?? "transparent") !== "transparent")) ? 1 : 0
+        : (lMouse.containsMouse ? (Theme?.barPillHover ?? "#22ffffff") : (Theme?.barPillBg ?? "transparent"))
+    border.color: ((Theme?.isBarPills ?? true) && (Theme?.isCyberNeon ?? false)) ? (Theme?.primary ?? "#00ffff") : (popup.open ? (Theme?.primary ?? "#00ffff") : (Theme?.barPillBorder ?? "transparent"))
+    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     visible: Settings?.showLayoutSwitcher ?? true
 
     Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
@@ -94,8 +94,8 @@ Rectangle {
         if (l === "dwindle") return "⊞";
         if (l === "master") return "◫";
         if (l === "scrolling") return "↔";
-        if (l === "monocle") return "󰊓";
-        return "";
+        if (l === "monocle") return "▣";
+        return "{}";
     }
 
     function getLayoutLabel(layout: string): string {
@@ -450,6 +450,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: Theme?.iconClose ?? "✕"
                         font.family: Theme?.fontIcon ?? "sans-serif"
+                        font.variableAxes: Theme?.iconAxes ?? ({})
                         font.pixelSize: Theme?.fontSizeSm ?? 11
                         color: Theme.on_surface_variant
                     }
@@ -553,6 +554,7 @@ Rectangle {
                                         visible: layoutCard.isCurrent
                                         text: Theme?.iconCheck ?? "✓"
                                         font.family: Theme?.fontIcon ?? "sans-serif"
+                                        font.variableAxes: Theme?.iconAxes ?? ({})
                                         font.pixelSize: Theme?.fontSizeSm ?? 12
                                         font.weight: Theme?.fontWeightBold ?? Font.Bold
                                         color: Theme.primary
@@ -608,7 +610,7 @@ Rectangle {
                                 spacing: 8
 
                                 Text {
-                                    text: ""
+                                    text: "{}"
                                     font.family: Theme?.fontMono ?? "monospace"
                                     font.pixelSize: Theme?.fontSizeMd ?? 13
                                     font.weight: Theme?.fontWeightBold ?? Font.Bold
@@ -648,6 +650,7 @@ Rectangle {
                                     visible: customCard.isCustomActive
                                     text: Theme?.iconCheck ?? "✓"
                                     font.family: Theme?.fontIcon ?? "sans-serif"
+                                    font.variableAxes: Theme?.iconAxes ?? ({})
                                     font.pixelSize: Theme?.fontSizeSm ?? 12
                                     font.weight: Theme?.fontWeightBold ?? Font.Bold
                                     color: Theme.primary

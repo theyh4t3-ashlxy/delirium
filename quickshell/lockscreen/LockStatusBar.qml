@@ -66,6 +66,7 @@ Rectangle {
                 Text {
                     text: Theme.iconKeyboard
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.fontSizeXs
                     color: root?.uiAccent ?? Theme.accent
                 }
@@ -106,12 +107,13 @@ Rectangle {
                 Text {
                     text: Theme.getVolumeIcon(parent.parent.sinkVol, parent.parent.sinkMuted)
                     font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeSm
+                    font.variableAxes: Theme.iconAxes
+                    font.pixelSize: Theme.fontSizeMd
                     color: parent.parent.sinkMuted ? Theme.error : (root?.uiAccent ?? Theme.accent)
                 }
 
                 Text {
-                    text: parent.parent.sinkMuted ? "muted" : (Math.round(parent.parent.sinkVol * 100) + "%")
+                    text: root ? root.fmtText(parent.parent.sinkMuted ? "mute" : (Math.round(parent.parent.sinkVol * 100) + "%")) : (parent.parent.sinkMuted ? "mute" : (Math.round(parent.parent.sinkVol * 100) + "%"))
                     font.family: Theme.fontMono
                     font.pixelSize: Theme.fontSizeXs
                     font.weight: Theme.fontWeightMedium
@@ -123,7 +125,11 @@ Rectangle {
                 id: sysVolMouse
                 anchors.fill: parent
                 hoverEnabled: true
-                acceptedButtons: Qt.NoButton
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    if (lockSurface?.toggleSystemMute) lockSurface.toggleSystemMute();
+                    if (lockSurface?.claimSurfaceFocus) lockSurface.claimSurfaceFocus();
+                }
                 onWheel: (wheel) => {
                     if (lockSurface?.adjustSystemVolume) {
                         lockSurface.adjustSystemVolume(wheel.angleDelta.y > 0 ? 0.05 : -0.05);
@@ -132,15 +138,48 @@ Rectangle {
             }
         }
 
+        RowLayout {
+            spacing: 6
+
+            Text {
+                text: Theme.getWifiIcon(
+                    (typeof NetworkService !== "undefined" ? NetworkService?.signalStrength : 100) ?? 100,
+                    (typeof NetworkService !== "undefined" ? NetworkService?.isConnected : false) ?? false,
+                    (typeof NetworkService !== "undefined" ? NetworkService?.isWiredConnected : false) ?? false
+                )
+                font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
+                font.pixelSize: Theme.fontSizeMd
+                color: ((typeof NetworkService !== "undefined" && NetworkService?.isConnected) ?? false)
+                    ? (root?.uiAccent ?? Theme.accent)
+                    : (root?.uiTextSecondary ?? Theme.on_surface_variant)
+            }
+
+            Text {
+                property string rawNetLabel: ((typeof NetworkService !== "undefined" && NetworkService?.isWiredConnected) ?? false)
+                    ? "wired"
+                    : ((typeof NetworkService !== "undefined" ? NetworkService?.activeSsid : "") || (((typeof NetworkService !== "undefined" && NetworkService?.isConnected) ?? false) ? "online" : "offline"))
+                text: root ? root.fmtText(rawNetLabel) : rawNetLabel
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeXs
+                font.weight: Theme.fontWeightMedium
+                color: root?.uiTextPrimary ?? Theme.on_surface
+            }
+        }
+
         Item {
             visible: UPower.displayDevice?.isPresent ?? false
             implicitWidth: batRow.implicitWidth
             implicitHeight: batRow.implicitHeight
 
-            readonly property real batPct: (UPower.displayDevice?.percentage ?? 0) * 100
+            readonly property int batPct: {
+                let p = UPower.displayDevice?.percentage ?? 1.0;
+                return Math.min(100, Math.max(0, Math.round(p * 100)));
+            }
             readonly property int batState: UPower.displayDevice?.state ?? 0
             readonly property bool isCharging: batState === UPowerDeviceState.Charging || batState === UPowerDeviceState.FullyCharged
             readonly property bool isLow: batPct <= 20 && !isCharging
+            readonly property string etaStr: root ? root.formatBatteryEta() : ""
 
             RowLayout {
                 id: batRow
@@ -148,14 +187,15 @@ Rectangle {
                 spacing: 5
 
                 Text {
-                    text: Theme.getBatteryIcon(Math.round(parent.parent.batPct), parent.parent.isCharging)
+                    text: Theme.getBatteryIcon(parent.parent.batPct, parent.parent.isCharging, !(UPower?.onBattery ?? true), false)
                     font.family: Theme.fontIcon
-                    font.pixelSize: Theme.fontSizeSm
-                    color: parent.parent.isLow ? Theme.error : (parent.parent.isCharging ? Theme.success : (root?.uiAccent ?? Theme.accent))
+                    font.variableAxes: Theme.iconAxes
+                    font.pixelSize: Theme.fontSizeMd
+                    color: parent.parent.isLow ? Theme.error : (parent.parent.isCharging ? (root?.uiAccent ?? Theme.accent) : (root?.uiTextPrimary ?? Theme.on_surface))
                 }
 
                 Text {
-                    text: Math.round(parent.parent.batPct) + "%"
+                    text: parent.parent.batPct + "%" + (batHover.containsMouse && parent.parent.etaStr !== "" ? (" (" + parent.parent.etaStr + ")") : "")
                     font.family: Theme.fontMono
                     font.pixelSize: Theme.fontSizeXs
                     font.weight: Theme.fontWeightMedium
@@ -173,6 +213,7 @@ Rectangle {
         IconButton {
             icon: (root?.isLight ?? false) ? Theme.iconSun : Theme.iconMoon
             iconSize: Theme.fontSizeSm
+            iconColor: root?.uiTextPrimary ?? Theme.on_surface
             tooltip: (root?.isLight ?? false) ? "switch to dark mode" : "switch to light mode"
             onClicked: {
                 if (root) {
@@ -186,6 +227,7 @@ Rectangle {
         IconButton {
             icon: Theme.iconEyeOff
             iconSize: Theme.fontSizeSm
+            iconColor: root?.uiTextPrimary ?? Theme.on_surface
             tooltip: "zen screensaver mode (tab)"
             onClicked: {
                 if (lockSurface) lockSurface.optionsOpen = false;
@@ -197,6 +239,7 @@ Rectangle {
         IconButton {
             icon: Theme.iconSparkles
             iconSize: Theme.fontSizeSm
+            iconColor: root?.uiTextPrimary ?? Theme.on_surface
             tooltip: (root?.studioLocked ?? false) ? "studio is locked" : "surprise me! (randomize)"
             enabled: !(root?.studioLocked ?? false)
             onClicked: {
@@ -209,6 +252,7 @@ Rectangle {
         IconButton {
             icon: Theme.iconSliders
             iconSize: Theme.fontSizeSm
+            iconColor: root?.uiTextPrimary ?? Theme.on_surface
             tooltip: "lock screen studio"
             highlighted: lockSurface?.optionsOpen ?? false
             onClicked: {

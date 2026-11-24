@@ -25,10 +25,10 @@ Rectangle {
 
     implicitWidth: isVertical ? ((Theme?.barHeight ?? 48) - 8) : (contentRow.implicitWidth + 16)
     implicitHeight: (Theme?.barHeight ?? 48) - 8
-    radius: Theme?.radiusPill ?? 999
-    color: isLow ? Theme.error_overlay : (bMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-    border.color: isLow ? Theme.error : (Theme?.pillBorder ?? "transparent")
-    border.width: (isLow || (Theme?.pillBorder ?? "transparent") !== "transparent") ? 1 : 0
+    radius: Theme?.barWidgetRadius ?? 999
+    color: isLow ? Theme.error_overlay : (bMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
+    border.color: isLow ? Theme.error : (Theme?.barPillBorder ?? "transparent")
+    border.width: (isLow || (Theme?.barPillBorderWidth ?? 0) > 0) ? 1 : 0
 
     Behavior on color { ColorAnimation { duration: Theme.animFast ?? 150 } }
     Behavior on border.color { ColorAnimation { duration: Theme.animFast ?? 150 } }
@@ -47,6 +47,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: Theme?.getBatteryIcon ? Theme.getBatteryIcon(container.pct, container.isCharging, !(UPower?.onBattery ?? true), container.isVertical) : (Theme?.iconBatFull ?? "\uE1A5")
             font.family: Theme?.fontIcon ?? "sans-serif"
+            font.variableAxes: Theme?.iconAxes ?? ({})
             font.pixelSize: Theme?.fontSizeMd ?? 14
             color: container.isLow ? Theme.error : Theme.on_surface
         }
@@ -77,7 +78,7 @@ Rectangle {
             }
             font.family: Theme?.fontFamily ?? "sans-serif"
             font.pixelSize: Theme?.fontSizeXs ?? 10
-            font.weight: Font.Medium
+            font.weight: Theme?.fontWeightMedium ?? Font.Medium
             color: container.isLow ? Theme.error : Theme.on_surface
         }
     }

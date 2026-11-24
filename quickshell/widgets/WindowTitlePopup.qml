@@ -103,6 +103,7 @@ PopupPanel {
                     anchors.centerIn: parent
                     text: root.activeTop ? (Theme.iconTerminal ?? "") : (Theme.iconDistro ?? Theme.iconArch ?? "desktop")
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.fontSizeMd
                     color: Theme.primary
                     visible: !popupAppIcon.visible
@@ -282,6 +283,7 @@ PopupPanel {
                             visible: !Theme.isTextIconSet
                             text: actionBtn.modelData.icon
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeSm
                             color: actionBtn.fgColor
                         }

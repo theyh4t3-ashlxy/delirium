@@ -17,12 +17,12 @@ Rectangle {
         ? Theme.barHeight - 8
         : (volIcon.implicitWidth + 24 + ((vMouse.containsMouse || popup.open) ? (volText.implicitWidth + 6) : 0))
     implicitHeight: Theme.barHeight - 8
-    radius: Theme.radiusPill
+    radius: Theme.barWidgetRadius
     color: popup.open
         ? Theme.primary_overlay
-        : (volRoot.muted ? Theme.widgetBg : (vMouse.containsMouse ? Theme.pillHover : Theme.pillBg))
-    border.color: Theme.pillBorder
-    border.width: Theme.pillBorder === "transparent" ? 0 : 1
+        : (volRoot.muted ? (Theme.isBarPills ? Theme.widgetBg : Theme.alpha(Theme.on_surface, 0.08)) : (vMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg))
+    border.color: popup.open ? Theme.primary : Theme.barPillBorder
+    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
 
     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
     Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -78,6 +78,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: Theme.getVolumeIcon(volRoot.vol, volRoot.muted)
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.fontSizeMd
             color: popup.open
                 ? Theme.primary
@@ -593,6 +594,7 @@ Rectangle {
                                             visible: !sIcon.visible
                                             text: streamCard.streamMuted ? Theme.iconVolMute : Theme.iconMusic
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.fontSizeSm
                                             color: streamCard.streamMuted ? Theme.on_surface_disabled : Theme.primary
                                         }
@@ -781,6 +783,7 @@ Rectangle {
                                             ? Theme.iconCheckCircle
                                             : (volRoot.showInputs ? Theme.iconMic : Theme.iconHeadphones)
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeSm
                                         color: devDelegate.isCurrent ? Theme.primary : Theme.on_surface_variant
                                     }

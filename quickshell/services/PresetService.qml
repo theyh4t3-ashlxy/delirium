@@ -39,16 +39,67 @@ QtObject {
         return "#a8d292";
     }
 
+    function resolveBlockIcon(iconOrKey, blockId) {
+        if (typeof Theme === "undefined" || !Theme) return "\uE9B0";
+        const table = {
+            workspaces: Theme.iconWorkspaces,
+            layout: Theme.iconGrid,
+            grid: Theme.iconGrid,
+            windowTitle: Theme.iconSparkles,
+            sparkles: Theme.iconSparkles,
+            clock: Theme.iconClock,
+            dynamicNotch: Theme.iconSparkles,
+            quickSettings: Theme.iconSettings,
+            settings: Theme.iconSettings,
+            battery: Theme.iconBatFull,
+            batFull: Theme.iconBatFull,
+            network: Theme.iconWifi,
+            wifi: Theme.iconWifi,
+            bluetooth: Theme.iconBluetooth,
+            volume: Theme.iconVolHigh,
+            volHigh: Theme.iconVolHigh,
+            media: Theme.iconMusic,
+            music: Theme.iconMusic,
+            clipboard: Theme.iconClipboard,
+            quickNotes: Theme.iconEdit,
+            edit: Theme.iconEdit,
+            idleInhibitor: Theme.iconCoffee,
+            coffee: Theme.iconCoffee,
+            notifications: Theme.iconBell,
+            bell: Theme.iconBell,
+            systemTray: Theme.iconTray,
+            tray: Theme.iconTray,
+            powerMenu: Theme.iconPower,
+            power: Theme.iconPower,
+            launcher: Theme.iconDistro,
+            distro: Theme.iconDistro,
+            wallpaper: Theme.iconWallpaper,
+            screenCapture: Theme.iconCamera,
+            camera: Theme.iconCamera
+        };
+        return table[iconOrKey] ?? table[blockId] ?? iconOrKey ?? Theme.iconGrid;
+    }
+
     function getBlockInfo(blockId) {
         if (!blockId) return null;
         let b = root.blockMap[blockId];
-        if (b) return b;
+        if (b) {
+            return {
+                id: b.id,
+                type: b.type,
+                category: b.category,
+                name: b.name,
+                icon: resolveBlockIcon(b.icon, b.id),
+                desc: b.desc,
+                color: b.color
+            };
+        }
         return {
             id: blockId,
             type: "widget",
             category: "tools",
             name: blockId,
-            icon: Theme?.iconGrid ?? "\uE9B0",
+            icon: resolveBlockIcon("", blockId),
             desc: "custom widget",
             color: root.getCategoryColor("tools")
         };
@@ -171,12 +222,20 @@ QtObject {
         printErrors: false
     }
 
+    property FileView tactilePresetFile: FileView {
+        path: root.presetsDir + "/tactile.conf"
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
+
     function getPresetData(presetId) {
         try {
             let t = "";
             if (presetId === "default") t = defaultPresetFile.text();
             else if (presetId === "minimal") t = minimalPresetFile.text();
             else if (presetId === "island") t = islandPresetFile.text();
+            else if (presetId === "tactile") t = tactilePresetFile.text();
 
             if (t && t.trim() !== "") {
                 if (t.trim().startsWith("{")) {
@@ -192,9 +251,10 @@ QtObject {
 
     function refreshPresets() {
         root.availablePresets = [
-            { id: "default", name: "default", desc: "standard balanced bar", isBuiltin: true },
-            { id: "minimal", name: "minimal", desc: "clean floating dock", isBuiltin: true },
-            { id: "island",  name: "island",  desc: "dynamic notch centered", isBuiltin: true }
+            { id: "default", name: "default",  desc: "docked grouped clusters",  isBuiltin: true },
+            { id: "island",  name: "clusters", desc: "floating glass clusters",  isBuiltin: true },
+            { id: "tactile", name: "tactile",  desc: "underline hardware dock",  isBuiltin: true },
+            { id: "minimal", name: "minimal",  desc: "borderless ghost hud",     isBuiltin: true }
         ];
     }
 
@@ -215,7 +275,14 @@ QtObject {
         if (presetData.barFloating !== undefined) Settings.barFloating = Boolean(presetData.barFloating);
         if (presetData.barMargin !== undefined) Settings.barMargin = Number(presetData.barMargin);
         if (presetData.barHeight !== undefined) Settings.barHeight = Number(presetData.barHeight);
+        if (presetData.barRadius !== undefined) Settings.barRadius = Number(presetData.barRadius);
         if (presetData.barStyle !== undefined) Settings.barStyle = presetData.barStyle;
+        if (presetData.barGrouping !== undefined) Settings.barGrouping = presetData.barGrouping;
+        if (presetData.barWidgetChrome !== undefined) Settings.barWidgetChrome = presetData.barWidgetChrome;
+        if (presetData.barDividers !== undefined) Settings.barDividers = presetData.barDividers;
+        if (presetData.barIslandMode !== undefined) Settings.barIslandMode = Boolean(presetData.barIslandMode);
+        if (presetData.bentoGap !== undefined) Settings.bentoGap = Number(presetData.bentoGap);
+        if (presetData.bentoHoverLift !== undefined) Settings.bentoHoverLift = Boolean(presetData.bentoHoverLift);
         if (presetData.barModulesLeft !== undefined) Settings.barModulesLeft = presetData.barModulesLeft;
         if (presetData.barModulesCenter !== undefined) Settings.barModulesCenter = presetData.barModulesCenter;
         if (presetData.barModulesRight !== undefined) Settings.barModulesRight = presetData.barModulesRight;
@@ -223,6 +290,11 @@ QtObject {
         if (presetData.notificationCornerStyle !== undefined) Settings.notificationCornerStyle = presetData.notificationCornerStyle;
         if (presetData.scoopRadius !== undefined) Settings.scoopRadius = Number(presetData.scoopRadius);
         if (presetData.widgetRadius !== undefined) Settings.widgetRadius = Number(presetData.widgetRadius);
+        if (presetData.widgetSpacing !== undefined) Settings.widgetSpacing = Number(presetData.widgetSpacing);
+        if (presetData.widgetPaddingH !== undefined) Settings.widgetPaddingH = Number(presetData.widgetPaddingH);
+        if (presetData.paddingScale !== undefined) Settings.paddingScale = presetData.paddingScale;
+        if (presetData.dynamicNotchFlared !== undefined) Settings.dynamicNotchFlared = Boolean(presetData.dynamicNotchFlared);
+        if (presetData.flavorMode !== undefined) Settings.flavorMode = presetData.flavorMode;
 
         // Nested JSON backward compatibility
         if (presetData.bar) {
@@ -257,15 +329,27 @@ QtObject {
             'barPosition="' + (Settings?.barPosition ?? "top") + '"',
             'barFloating=' + (Settings?.barFloating ?? false),
             'barMargin=' + (Settings?.barMargin ?? 0),
-            'barHeight=' + (Settings?.barHeight ?? 32),
+            'barHeight=' + (Settings?.barHeight ?? 34),
+            'barRadius=' + (Settings?.barRadius ?? 0),
             'barStyle="' + (Settings?.barStyle ?? "regular") + '"',
+            'barGrouping="' + (Settings?.barGrouping ?? "clusters") + '"',
+            'barWidgetChrome="' + (Settings?.barWidgetChrome ?? "grouped") + '"',
+            'barDividers="' + (Settings?.barDividers ?? "line") + '"',
+            'barIslandMode=' + (Settings?.barIslandMode ?? true),
+            'bentoGap=' + (Settings?.bentoGap ?? 8),
+            'bentoHoverLift=' + (Settings?.bentoHoverLift ?? true),
             "barModulesLeft='" + JSON.stringify(Settings?.barModulesLeft ?? []) + "'",
             "barModulesCenter='" + JSON.stringify(Settings?.barModulesCenter ?? []) + "'",
             "barModulesRight='" + JSON.stringify(Settings?.barModulesRight ?? []) + "'",
             'cornerStyle="' + (Settings?.cornerStyle ?? "continuous-bezier") + '"',
             'notificationCornerStyle="' + (Settings?.notificationCornerStyle ?? "concave") + '"',
             'scoopRadius=' + (Settings?.scoopRadius ?? 16),
-            'widgetRadius=' + (Settings?.widgetRadius ?? 6)
+            'widgetRadius=' + (Settings?.widgetRadius ?? 8),
+            'widgetSpacing=' + (Settings?.widgetSpacing ?? 4),
+            'widgetPaddingH=' + (Settings?.widgetPaddingH ?? 8),
+            'paddingScale="' + (Settings?.paddingScale ?? "cozy") + '"',
+            'dynamicNotchFlared=' + (Settings?.dynamicNotchFlared ?? false),
+            'flavorMode="' + (Settings?.flavorMode ?? "actions") + '"'
         ];
         let confStr = lines.join("\n") + "\n";
         let targetFile = root.userPresetsDir + "/" + cleanName + ".conf";

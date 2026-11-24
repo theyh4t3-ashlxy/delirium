@@ -94,6 +94,7 @@ Item {
                 visible: root.icon !== ""
                 text: root.icon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.fontSizeSm
                 color: root.expanded ? root.accentColor : Theme.on_surface_variant
             }
@@ -125,6 +126,7 @@ Item {
             Text {
                 text: Theme.iconChevronDown
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.fontSizeXs
                 color: root.expanded ? root.accentColor : Theme.on_surface_variant
                 rotation: root.expanded ? 180 : 0
@@ -211,6 +213,7 @@ Item {
                                 visible: itemDelegate.itemIcon !== ""
                                 text: itemDelegate.itemIcon
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.fontSizeSm
                                 color: itemDelegate.isSelected ? Theme.on_primary_container : Theme.on_surface_variant
                             }
@@ -229,6 +232,7 @@ Item {
                                 visible: itemDelegate.isSelected
                                 text: Theme.iconCheck
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.on_primary_container
                             }

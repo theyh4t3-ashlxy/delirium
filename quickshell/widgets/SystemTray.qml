@@ -14,10 +14,10 @@ Rectangle {
 
     implicitWidth: Theme.isVertical ? (Theme.barHeight - 8) : contentW
     implicitHeight: Theme.isVertical ? contentH : (Theme.barHeight - 8)
-    radius: Theme.radiusPill
-    color: Theme.pillBg
-    border.color: Theme.pillBorder
-    border.width: Theme.pillBorder === "transparent" ? 0 : 1
+    radius: Theme.barWidgetRadius
+    color: Theme.barPillBg
+    border.color: Theme.barPillBorder
+    border.width: Theme.barPillBorderWidth
 
     Behavior on color { ColorAnimation { duration: Theme.animFast } }
     Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
@@ -27,6 +27,7 @@ Rectangle {
         visible: trayRoot.itemCount === 0
         text: Theme.iconTray
         font.family: (Theme.iconSet === "kaomoji" || Theme.iconSet === "text") ? Theme.fontFamily : Theme.fontIcon
+        font.variableAxes: Theme.iconAxes
         font.pixelSize: (Theme.iconSet === "kaomoji" || Theme.iconSet === "text") ? Theme.fontSizeXs : Theme.fontSizeSm
         color: Theme.on_surface_variant
         opacity: 0.65

@@ -22,14 +22,16 @@ Rectangle {
         ? (wsCol.implicitHeight + trackPadding * 2)
         : (Theme.barHeight - 8)
 
-    radius: Theme.radiusPill
+    readonly property int dotRadius: Theme.barWidgetRadius === 0 ? 1 : (Theme.barWidgetRadius < 12 ? Math.min(4, Theme.barWidgetRadius) : Theme.radiusPill)
+
+    radius: Theme.barWidgetRadius
     color: {
         if (wsMouse.pressed) return Theme.widgetActive;
         if (popup.open) return Theme.primary_overlay;
-        if (wsMouse.containsMouse) return Theme.pillHover;
-        return Theme.pillBg;
+        if (wsMouse.containsMouse) return Theme.barPillHover;
+        return Theme.barPillBg;
     }
-    border.color: popup.open ? Theme.primary : Theme.pillBorder
+    border.color: popup.open ? Theme.primary : Theme.barPillBorder
     border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
 
     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -178,7 +180,7 @@ Rectangle {
             id: fluidIndicatorV
             visible: wsContainer.workspaceList.length > 0 && wsContainer.wsMode !== "discrete"
             width: Theme.workspaceDotSize
-            radius: Theme.radiusPill
+            radius: wsContainer.dotRadius
             color: Theme.primary
             z: 2
             anchors.horizontalCenter: parent.horizontalCenter
@@ -247,7 +249,7 @@ Rectangle {
                         anchors.centerIn: parent
                         width: Theme.workspaceDotSize
                         height: parent.height
-                        radius: Theme.radiusPill
+                        radius: wsContainer.dotRadius
                         color: (wsContainer.wsMode === "discrete" && parent.isFocused)
                             ? Theme.primary
                             : (parent.isActive ? Theme.on_surface_variant : Theme.outline_variant)
@@ -275,7 +277,7 @@ Rectangle {
             id: fluidIndicatorH
             visible: wsContainer.workspaceList.length > 0 && wsContainer.wsMode !== "discrete"
             height: Theme.workspaceDotSize
-            radius: Theme.radiusPill
+            radius: wsContainer.dotRadius
             color: Theme.primary
             z: 2
             anchors.verticalCenter: parent.verticalCenter
@@ -344,7 +346,7 @@ Rectangle {
                         anchors.centerIn: parent
                         width: parent.width
                         height: Theme.workspaceDotSize
-                        radius: Theme.radiusPill
+                        radius: wsContainer.dotRadius
                         color: (wsContainer.wsMode === "discrete" && parent.isFocused)
                             ? Theme.primary
                             : (parent.isActive ? Theme.on_surface_variant : Theme.outline_variant)
@@ -490,6 +492,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: Theme.iconWorkspaces
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                         color: Theme.primary
                     }
@@ -674,6 +677,7 @@ Rectangle {
                                             anchors.centerIn: parent
                                             text: isCurrent ? Theme.iconCheck : Theme.iconChevronRight
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.fontSizeXs
                                             color: isCurrent ? Theme.on_primary : Theme.primary
                                         }
@@ -723,6 +727,7 @@ Rectangle {
                     Text {
                         text: Theme.iconSparkles
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                         color: Theme.primary
                     }

@@ -13,6 +13,7 @@ ClippingRectangle {
     property var lockSurface: null
     property var stage: null
     property var peakMonitor: null
+    readonly property bool isSeeking: seekMouse.pressed
 
                             width: parent.width
                             y: stage.blockY("media")
@@ -135,6 +136,7 @@ ClippingRectangle {
                                             anchors.centerIn: parent
                                             text: Theme.iconSet === "kaomoji" ? Theme.kaoMusic : Theme.iconMusic
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                                             color: lockSurface.artAccent
                                             visible: lockSurface.coverArtUrl === ""
@@ -208,6 +210,7 @@ ClippingRectangle {
                                     IconButton {
                                         icon: Theme.iconPrev
                                         iconSize: Theme.fontSizeSm
+                                        iconColor: root.uiTextPrimary
                                         tooltip: "previous"
                                         enabled: lockSurface.activePlayer?.canGoPrevious ?? false
                                         onClicked: {
@@ -234,6 +237,7 @@ ClippingRectangle {
                                             anchors.centerIn: parent
                                             text: lockSurface.playerIsPlaying ? Theme.iconPause : Theme.iconPlay
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                             font.weight: Theme.fontWeightBold
                                             color: root.uiOnAccent
@@ -254,6 +258,7 @@ ClippingRectangle {
                                     IconButton {
                                         icon: Theme.iconNext
                                         iconSize: Theme.fontSizeSm
+                                        iconColor: root.uiTextPrimary
                                         tooltip: "next"
                                         enabled: lockSurface.activePlayer?.canGoNext ?? false
                                         onClicked: {

@@ -11,15 +11,21 @@ PanelWindow {
     required property var modelData
     screen: modelData
 
-    readonly property string pos: Settings?.barPosition ?? "up"
-    readonly property bool isTop: pos === "up" || pos === "top"
-    readonly property bool isBottom: pos === "down" || pos === "bottom"
+    readonly property string rawPos: Settings?.barPosition ?? "top"
+    readonly property string pos: (rawPos === "up" || rawPos === "top") ? "top" : ((rawPos === "down" || rawPos === "bottom") ? "bottom" : rawPos)
+    readonly property bool isTop: pos === "top"
+    readonly property bool isBottom: pos === "bottom"
     readonly property bool isLeft: pos === "left"
     readonly property bool isRight: pos === "right"
     readonly property bool isVertical: isLeft || isRight
 
+    readonly property bool isConcave: (Settings?.notificationCornerStyle ?? "concave") === "concave"
+    readonly property real cardScoopR: Math.min(18, Math.max(8, Theme?.scoopRadiusX ?? Settings?.scoopRadius ?? 14))
     readonly property real scoopW: Math.max(16, Theme?.scoopRadiusX ?? 16)
     readonly property real scoopH: Math.max(16, Theme?.scoopRadiusY ?? 16)
+    readonly property bool barFloating: Settings?.barFloating ?? false
+    readonly property int barMarginOffset: barFloating ? ((Settings?.barMargin ?? 0) > 0 ? Settings.barMargin : 8) : 0
+    readonly property int barOffset: Theme.barHeight + barMarginOffset + (barFloating ? 6 : 0)
 
     color: "transparent"
     focusable: false
@@ -51,13 +57,12 @@ PanelWindow {
     }
 
     /*
-    clone notification properties into a plain js object so dangling c++ pointers
-    don't segfault the shell, and track _entered/_elapsedMs so array updates don't
-    make existing toasts fly in a second time
+    clone notification properties into a per-window plain js object so multi-monitor
+    Variants never mutate shared _entered/_elapsedMs state and dangling c++ pointers
+    never segfault the shell
     */
     function sanitize(notif): var {
         if (!notif) return null;
-        if (notif.__sanitized) return notif;
 
         let safeActions = [];
         try {
@@ -90,6 +95,7 @@ PanelWindow {
             appIcon: String(notif.appIcon ?? ""),
             urgency: Number(notif.urgency ?? 1),
             expireTimeout: Number(notif.expireTimeout ?? -1),
+            resident: Boolean(notif.resident ?? false),
             image: root.normalizeImageUri(String(notif.image ?? "")),
             actions: safeActions,
             _entered: false,
@@ -113,6 +119,11 @@ PanelWindow {
 
             const safe = root.sanitize(notif);
             if (!safe) return;
+
+            const existing = root.toastList.find(n => n && n.id === safe.id);
+            if (existing && existing._entered) {
+                safe._entered = true;
+            }
 
             let updated = root.toastList.filter(n => n && n.id !== safe.id);
             // evict oldest toast from screen without deleting it from notification history
@@ -138,6 +149,7 @@ PanelWindow {
         if (!notif) return;
         let id = (typeof notif === "object") ? notif.id : notif;
         if (id !== undefined && id !== null) {
+            if (NotificationService?.markExpired) NotificationService.markExpired(id);
             root.toastList = root.toastList.filter(n => n && n.id !== id);
         } else {
             root.toastList = root.toastList.filter(n => n && n !== notif);
@@ -162,21 +174,27 @@ PanelWindow {
     readonly property bool isEdgeTop: notifEdge === "top"
     readonly property bool isEdgeBottom: notifEdge === "bottom"
     readonly property int screenBorder: Settings?.screenBorderWidth ?? 0
-    readonly property int cornerOffset: (Settings?.screenCornerRadius ?? 16) + (Settings?.notificationCornerStyle === "concave" ? (Math.round(root.scoopH) + 6) : 8)
+    readonly property int cornerOffset: (Settings?.screenCornerRadius ?? 16) + (root.isConcave ? (Math.round(root.cardScoopR) + 6) : 8)
 
-    // account for left/right vertical bars too so toasts don't park on top of the bar
+    ScriptModel {
+        id: toastModel
+        objectProp: "id"
+        values: root.toastList
+    }
+
+    // account for left/right/floating bars too so toasts don't park on top of the bar
     Item {
         id: toastBox
         width: 360
         height: Math.max(1, toastCol.implicitHeight)
 
-        x: isEdgeLeft ? ((root.isLeft ? Theme.barHeight : 0) + root.screenBorder)
-         : isEdgeRight ? (root.width - width - (root.isRight ? Theme.barHeight : 0) - root.screenBorder)
+        x: isEdgeLeft ? ((root.isLeft ? root.barOffset : 0) + root.screenBorder)
+         : isEdgeRight ? (root.width - width - (root.isRight ? root.barOffset : 0) - root.screenBorder)
          : Math.round((root.width - width) / 2)
 
-        y: isEdgeTop ? (root.isTop ? (Theme.barHeight + root.screenBorder) : root.screenBorder)
-         : isEdgeBottom ? (root.isBottom ? (root.height - height - Theme.barHeight - root.screenBorder) : (root.height - height - root.screenBorder))
-         : (root.isTop ? (Theme.barHeight + root.screenBorder + root.cornerOffset) : (root.screenBorder + root.cornerOffset))
+        y: isEdgeTop ? ((root.isTop ? root.barOffset : 0) + root.screenBorder)
+         : isEdgeBottom ? (root.height - height - (root.isBottom ? root.barOffset : 0) - root.screenBorder)
+         : ((root.isTop ? root.barOffset : 0) + root.screenBorder + root.cornerOffset)
 
         Behavior on x { NumberAnimation { duration: Theme?.animFast ?? 120; easing.type: Theme?.animEasing ?? Easing.OutCubic } }
         Behavior on y { NumberAnimation { duration: Theme?.animFast ?? 120; easing.type: Theme?.animEasing ?? Easing.OutCubic } }
@@ -185,10 +203,10 @@ PanelWindow {
         ColumnLayout {
             id: toastCol
             width: parent.width
-            spacing: Settings?.notificationCornerStyle === "concave" ? 28 : 10
+            spacing: root.isConcave ? (Math.round(root.cardScoopR * 2) + 8) : 10
 
             Repeater {
-                model: root.toastList
+                model: toastModel
 
                 delegate: NotificationCard {
                     required property var modelData

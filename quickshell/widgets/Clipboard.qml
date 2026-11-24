@@ -8,10 +8,10 @@ Rectangle {
     id: root
     implicitWidth: Theme.isVertical ? Theme.barHeight - 8 : clipRow.implicitWidth + 24
     implicitHeight: Theme.barHeight - 8
-    radius: Theme.radiusPill
-    color: popup.open ? Theme.primary_overlay : (clipMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-    border.color: Theme.pillBorder
-    border.width: Theme.pillBorder === "transparent" ? 0 : 1
+    radius: Theme.barWidgetRadius
+    color: popup.open ? Theme.primary_overlay : (clipMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
+    border.color: popup.open ? Theme.primary : Theme.barPillBorder
+    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
 
     Behavior on color { ColorAnimation { duration: Theme.animFast } }
     Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
@@ -102,6 +102,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: Theme.iconClipboard
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.fontSizeMd
             color: popup.open ? Theme.primary : Theme.on_surface
         }
@@ -244,6 +245,7 @@ Rectangle {
                     Text {
                         text: Theme.iconSearch
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeSm
                         color: Theme.on_surface_variant
                     }

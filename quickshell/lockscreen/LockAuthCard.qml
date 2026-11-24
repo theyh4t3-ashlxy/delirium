@@ -13,6 +13,7 @@ ColumnLayout {
 
     property alias pwInput: pwInput
 
+                            width: parent.width
                             y: stage.blockY("password")
                             spacing: 8
                             opacity: root.zenMode ? 0.0 : 1.0
@@ -80,6 +81,7 @@ ColumnLayout {
                                         id: lockGlyph
                                         text: root.isChecking ? Theme.iconRefresh : Theme.iconLock
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeMd
                                         color: root.authFailed
                                             ? Theme.error
@@ -142,7 +144,8 @@ ColumnLayout {
                                         Keys.onPressed: (event) => {
                                             lockSurface.wakeFromZen();
                                             if (event.key === Qt.Key_CapsLock) {
-                                                if (root?.pollKeyboardState) root.pollKeyboardState();
+                                                if (root?.scheduleKeyboardPoll) root.scheduleKeyboardPoll();
+                                                else if (root?.pollKeyboardState) root.pollKeyboardState();
                                             } else if (event.key === Qt.Key_Tab && pwInput.text.length === 0 && !lockSurface.optionsOpen) {
                                                 root.zenMode = !root.zenMode;
                                                 event.accepted = true;
@@ -237,6 +240,7 @@ ColumnLayout {
                                         icon: Theme.iconClose
                                         tooltip: "clear"
                                         iconSize: Theme.fontSizeXs
+                                        iconColor: root.uiTextPrimary
                                         visible: root.sharedPassword.length > 0 && !root.isChecking
                                         onClicked: {
                                             root.sharedPassword = "";
@@ -251,6 +255,7 @@ ColumnLayout {
                                         icon: root.revealPassword ? Theme.iconEyeOff : Theme.iconEye
                                         tooltip: root.revealPassword ? "hide password" : "show password"
                                         iconSize: Theme.fontSizeSm
+                                        iconColor: root.uiTextPrimary
                                         visible: root.sharedPassword.length > 0 && !root.isChecking
                                         onClicked: {
                                             root.revealPassword = !root.revealPassword;
@@ -279,6 +284,7 @@ ColumnLayout {
                                             anchors.centerIn: parent
                                             text: Theme.iconChevronRight
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.fontSizeSm
                                             font.weight: Theme.fontWeightBold
                                             color: root.uiOnAccent

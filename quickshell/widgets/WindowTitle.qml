@@ -60,11 +60,11 @@ Rectangle {
     implicitWidth: (Theme?.isVertical ?? false) ? 0 : desiredWidth
     implicitHeight: (Theme?.isVertical ?? false) ? 0 : ((Theme?.barHeight ?? 48) - 8)
     width: parent ? parent.width : implicitWidth
-    radius: Theme?.radiusPill ?? 999
+    radius: Theme?.barWidgetRadius ?? 999
     clip: true
-    color: wtMouse.containsMouse ? (Theme?.pillHover ?? "#33ffffff") : (Theme?.pillBg ?? "#1a000000")
-    border.color: Theme?.pillBorder ?? "transparent"
-    border.width: (Theme?.pillBorder ?? "transparent") === "transparent" ? 0 : 1
+    color: wtMouse.containsMouse ? (Theme?.barPillHover ?? "#33ffffff") : (Theme?.barPillBg ?? "transparent")
+    border.color: Theme?.barPillBorder ?? "transparent"
+    border.width: (Theme?.barPillBorder ?? "transparent") === "transparent" ? 0 : 1
 
     Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 150; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
     Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 150; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
@@ -97,6 +97,7 @@ Rectangle {
             Layout.alignment: Qt.AlignVCenter
             text: windowTitleRoot.isDesktop ? (Theme.iconDistro ?? Theme.iconArch ?? "") : (Theme.iconTerminal ?? "")
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.fontSizeSm
             color: Theme.primary
             visible: windowTitleRoot.showAppIcon && (!appIcon.visible || appIcon.status === Image.Error)

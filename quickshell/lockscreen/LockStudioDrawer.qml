@@ -13,7 +13,7 @@ Rectangle {
     property var statusBarItem: null
     property var burstAnim: null
 
-    readonly property bool hasInputFocus: (typeof customQuoteInput !== "undefined" && customQuoteInput && customQuoteInput.activeFocus) ? true : false
+    readonly property bool hasInputFocus: customQuoteInput.activeFocus
 
                 component OptChip: Rectangle {
                     id: cRoot
@@ -46,6 +46,7 @@ Rectangle {
                             visible: cRoot.icon !== ""
                             text: cRoot.icon
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeXs
                             color: cRoot.selected ? root.uiAccent : root.uiTextSecondary
                         }
@@ -108,6 +109,7 @@ Rectangle {
                             visible: sRoot.icon !== ""
                             text: sRoot.icon
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeXs
                             color: sMouse.pressed || sMouse.containsMouse ? root.uiAccent : root.uiTextSecondary
                         }
@@ -228,6 +230,7 @@ Rectangle {
                         Text {
                             text: tRow.icon
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeMd
                             color: tRow.checked ? root.uiAccent : root.uiTextSecondary
                             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -313,6 +316,7 @@ Rectangle {
                                     Text {
                                         text: Theme.iconSliders
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeMd
                                         color: root.uiAccent
                                     }
@@ -329,6 +333,7 @@ Rectangle {
                                     IconButton {
                                         icon: root.studioLocked ? Theme.iconLock : Theme.iconShield
                                         iconSize: Theme.fontSizeXs
+                                        iconColor: root.uiTextPrimary
                                         highlighted: root.studioLocked
                                         tooltip: root.studioLocked ? "unlock studio controls" : "lock studio controls"
                                         onClicked: {
@@ -341,6 +346,7 @@ Rectangle {
                                     IconButton {
                                         icon: Theme.iconRefresh
                                         iconSize: Theme.fontSizeXs
+                                        iconColor: root.uiTextPrimary
                                         enabled: !root.studioLocked
                                         tooltip: "reset defaults"
                                         onClicked: {
@@ -352,6 +358,7 @@ Rectangle {
                                     IconButton {
                                         icon: Theme.iconClose
                                         iconSize: Theme.fontSizeXs
+                                        iconColor: root.uiTextPrimary
                                         tooltip: "close"
                                         onClicked: {
                                             lockSurface.optionsOpen = false;
@@ -381,6 +388,7 @@ Rectangle {
                                         Text {
                                             text: Theme.iconSparkles
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.fontSizeMd
                                             color: root.uiOnAccent
                                         }
@@ -401,7 +409,7 @@ Rectangle {
                                         enabled: !root.studioLocked
                                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                                         onClicked: {
-                                            burstAnim.restart();
+                                            if (burstAnim) burstAnim.restart();
                                             root.surpriseMe();
                                             lockSurface.claimSurfaceFocus();
                                         }
@@ -460,7 +468,7 @@ Rectangle {
                                                 label: modelData
                                                 selected: false
                                                 onClicked: {
-                                                    burstAnim.restart();
+                                                    if (burstAnim) burstAnim.restart();
                                                     root.applyPreset(modelData);
                                                 }
                                             }
@@ -926,18 +934,21 @@ Rectangle {
                                         IconButton {
                                             icon: Theme.iconRefresh
                                             iconSize: Theme.fontSizeXs
+                                            iconColor: root.uiTextPrimary
                                             tooltip: "roll new quote"
                                             visible: root.quoteMode !== "off" && root.quoteMode !== "custom"
                                             onClicked: root.refreshQuotes()
                                         }
                                     }
 
-                                    RowLayout {
+                                    GridLayout {
                                         Layout.fillWidth: true
-                                        spacing: 4
+                                        columns: 3
+                                        columnSpacing: 4
+                                        rowSpacing: 4
 
                                         Repeater {
-                                            model: ["smart", "hyprland", "unhinged", "custom", "off"]
+                                            model: ["smart", "hyprland", "quotes", "actions", "custom", "off"]
                                             delegate: OptChip {
                                                 required property string modelData
                                                 label: modelData
@@ -1000,6 +1011,7 @@ Rectangle {
                                             Text {
                                                 text: Theme.iconShuffle
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.fontSizeMd
                                                 color: root.uiAccent
                                             }

@@ -12,8 +12,9 @@ Rectangle {
     readonly property bool isBarFloating: Settings?.barFloating ?? false
     readonly property bool isBarBottom: Settings?.barPosition === "bottom"
     readonly property bool isCenterModule: (Settings?.barModulesCenter ?? []).indexOf("clock") !== -1
-    readonly property bool hasNotchInCenter: (Settings?.barModulesCenter ?? []).indexOf("dynamicnotch") !== -1
-    readonly property bool isFlared: (Settings?.dynamicNotchFlared ?? true) && !(Theme?.isVertical ?? false) && !isBarFloating && isCenterModule && !hasNotchInCenter
+    readonly property bool hasNotchInCenter: (Settings?.barModulesCenter ?? []).some(m => String(m).toLowerCase() === "dynamicnotch" || String(m).toLowerCase() === "notch")
+    readonly property bool hasCenterSiblings: (Settings?.barModulesCenter ?? ["clock"]).length > 1
+    readonly property bool isFlared: (Settings?.dynamicNotchFlared ?? true) && !(Theme?.isVertical ?? false) && !isBarFloating && !(Theme?.isBarGroupedSurface ?? false) && isCenterModule && !hasNotchInCenter && !hasCenterSiblings
     readonly property int flareRadius: Settings?.notchFlareRadius ?? 16
 
     implicitWidth: (Theme?.isVertical ?? false) ? (currentBarHeight - 8) : (clockRow.implicitWidth + 24)
@@ -22,17 +23,17 @@ Rectangle {
     height: isFlared ? currentBarHeight : implicitHeight
     y: isFlared ? (isBarBottom ? Math.round((currentBarHeight - implicitHeight) / 2) : -Math.round((currentBarHeight - implicitHeight) / 2)) : 0
 
-    radius: isFlared ? 0 : (Theme?.radiusPill ?? 999)
-    topLeftRadius: isFlared ? (isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.radiusPill ?? 999)
-    topRightRadius: isFlared ? (isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.radiusPill ?? 999)
-    bottomLeftRadius: isFlared ? (!isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.radiusPill ?? 999)
-    bottomRightRadius: isFlared ? (!isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.radiusPill ?? 999)
+    radius: isFlared ? 0 : (Theme?.barWidgetRadius ?? 999)
+    topLeftRadius: isFlared ? (isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.barWidgetRadius ?? 999)
+    topRightRadius: isFlared ? (isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.barWidgetRadius ?? 999)
+    bottomLeftRadius: isFlared ? (!isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.barWidgetRadius ?? 999)
+    bottomRightRadius: isFlared ? (!isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.barWidgetRadius ?? 999)
 
     color: calPopup.open
         ? (Theme?.primary_overlay ?? Theme?.primaryOverlay ?? Theme?.surface_container_highest ?? "#3389b4fa")
-        : (clkMouse.containsMouse ? (Theme?.pillHover ?? "#33ffffff") : (Theme?.pillBg ?? "#1e1e2e"))
-    border.color: Theme?.pillBorder ?? "transparent"
-    border.width: (Theme?.pillBorder ?? "transparent") === "transparent" ? 0 : 1
+        : (clkMouse.containsMouse ? (Theme?.barPillHover ?? "#33ffffff") : (isFlared ? (Theme?.pillBg ?? "#1e1e2e") : (Theme?.barPillBg ?? "transparent")))
+    border.color: calPopup.open ? (Theme?.primary ?? "transparent") : (Theme?.barPillBorder ?? "transparent")
+    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     visible: Settings?.showClock ?? true
     clip: false
 
@@ -107,13 +108,13 @@ Rectangle {
     function getClockMoodIcon(hrs) {
         if (!Theme) return "";
         if (hrs < 6) {
-            return Theme?.iconMoon ?? "󰖔";
+            return Theme?.iconMoon ?? "\u263E";
         } else if (hrs < 12) {
-            return Theme?.iconCoffee ?? "󰅶";
+            return Theme?.iconCoffee ?? "\u2615";
         } else if (hrs < 18) {
-            return Theme?.iconSun ?? "󰖙";
+            return Theme?.iconSun ?? "\u2600";
         } else {
-            return Theme?.iconMusic ?? "󰎈";
+            return Theme?.iconMusic ?? "\u266B";
         }
     }
 
@@ -135,6 +136,7 @@ Rectangle {
             }
             visible: text !== "" && !(Theme?.isVertical ?? false)
             font.family: Theme?.fontIcon ?? "sans-serif"
+            font.variableAxes: Theme?.iconAxes ?? ({})
             font.pixelSize: Theme?.fontSizeSm ?? 12
             color: calPopup.open ? (Theme?.primary ?? "#89b4fa") : (Theme?.on_surface_variant ?? "#a6adc8")
         }
@@ -358,6 +360,7 @@ Rectangle {
                         Text {
                             text: Theme?.iconCalendar ?? "\uE935"
                             font.family: Theme?.fontIcon ?? "sans-serif"
+                            font.variableAxes: Theme?.iconAxes ?? ({})
                             font.pixelSize: Theme?.fontSizeSm ?? 12
                             color: calPopup.activeTab === "calendar" ? (Theme?.on_primary ?? "#11111b") : (Theme?.on_surface ?? "#cdd6f4")
                         }
@@ -391,6 +394,7 @@ Rectangle {
                         Text {
                             text: Theme?.iconClock ?? "\uEFD6"
                             font.family: Theme?.fontIcon ?? "sans-serif"
+                            font.variableAxes: Theme?.iconAxes ?? ({})
                             font.pixelSize: Theme?.fontSizeSm ?? 12
                             color: calPopup.activeTab === "timer" ? (Theme?.on_primary ?? "#11111b") : (Theme?.on_surface ?? "#cdd6f4")
                         }
@@ -476,6 +480,7 @@ Rectangle {
                             Text {
                                 text: Theme?.iconClock ?? "\uE8B5"
                                 font.family: Theme?.fontIcon ?? "sans-serif"
+                                font.variableAxes: Theme?.iconAxes ?? ({})
                                 font.pixelSize: 11
                                 color: Theme?.primary ?? "#89b4fa"
                                 Layout.alignment: Qt.AlignRight
@@ -520,7 +525,7 @@ Rectangle {
                     }
 
                     IconButton {
-                        icon: Theme?.iconClock ?? "󰅐"
+                        icon: Theme?.iconClock ?? "\uEFD6"
                         iconSize: Theme?.fontSizeSm ?? 12
                         tooltip: "jump to today"
                         onClicked: {
@@ -815,6 +820,7 @@ Rectangle {
                                     Text {
                                         text: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.iconPause ?? "\uE034") : (Theme?.iconPlay ?? "\uE037")
                                         font.family: Theme?.fontIcon ?? "sans-serif"
+                                        font.variableAxes: Theme?.iconAxes ?? ({})
                                         font.pixelSize: Theme?.fontSizeSm ?? 12
                                         color: Theme?.on_primary ?? "#11111b"
                                     }

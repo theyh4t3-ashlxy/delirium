@@ -269,20 +269,20 @@ PopupPanel {
     }
 
     readonly property var availableIcons: [
-        { key: "terminal", icon: Theme?.iconTerminal ?? "󰆍", label: "dev" },
-        { key: "globe",    icon: Theme?.iconGlobe ?? "󰖟",    label: "web" },
-        { key: "music",    icon: Theme?.iconMusic ?? "󰝚",    label: "media" },
-        { key: "flame",    icon: Theme?.iconFlame ?? "󰈸",    label: "games" },
-        { key: "folder",   icon: Theme?.iconFolder ?? "󰉋",   label: "files" },
-        { key: "settings", icon: Theme?.iconSettings ?? "󰒓", label: "sys" },
-        { key: "heart",    icon: Theme?.iconHeart ?? "󰋑",    label: "fav" },
-        { key: "sparkles", icon: Theme?.iconSparkles ?? "󰓏", label: "cool" },
-        { key: "palette",  icon: Theme?.iconPalette ?? "󰏘",  label: "art" },
-        { key: "sliders",  icon: Theme?.iconSliders ?? "󰔡",  label: "tools" }
+        { key: "terminal", icon: Theme?.iconTerminal ?? ">_", label: "dev" },
+        { key: "globe",    icon: Theme?.iconGlobe ?? "web",   label: "web" },
+        { key: "music",    icon: Theme?.iconMusic ?? "♪",     label: "media" },
+        { key: "flame",    icon: Theme?.iconFlame ?? "*",     label: "games" },
+        { key: "folder",   icon: Theme?.iconFolder ?? "dir",  label: "files" },
+        { key: "settings", icon: Theme?.iconSettings ?? "cfg",label: "sys" },
+        { key: "heart",    icon: Theme?.iconHeart ?? "♥",     label: "fav" },
+        { key: "sparkles", icon: Theme?.iconSparkles ?? "+",  label: "cool" },
+        { key: "palette",  icon: Theme?.iconPalette ?? "art", label: "art" },
+        { key: "sliders",  icon: Theme?.iconSliders ?? "opt", label: "tools" }
     ]
 
     function resolveCategoryIcon(iconKey) {
-        if (!iconKey) return Theme?.iconFolder ?? "󰉋";
+        if (!iconKey) return Theme?.iconFolder ?? "dir";
         for (let i = 0; i < availableIcons.length; i++) {
             if (availableIcons[i].key === iconKey) return availableIcons[i].icon;
         }
@@ -309,12 +309,12 @@ PopupPanel {
     }
 
     readonly property var categoryList: {
-        let list = [{ id: "all", label: fmtText("all"), icon: Theme?.iconGrid ?? "󰕰" }];
+        let list = [{ id: "all", label: fmtText("all"), icon: Theme?.iconGrid ?? "⊞" }];
         if (root.pinnedApps.length > 0) {
             list.push({ id: "pinned", label: fmtText("pinned"), icon: Theme?.iconHeart ?? "♥" });
         }
         if ((Hyprland?.toplevels?.values?.length ?? 0) > 0) {
-            list.push({ id: "windows", label: fmtText("win"), icon: Theme?.iconWorkspaces ?? "󱂬" });
+            list.push({ id: "windows", label: fmtText("win"), icon: Theme?.iconWorkspaces ?? "◫" });
         }
         let custom = Settings?.launcherCustomCategories ?? [];
         if (Array.isArray(custom)) {
@@ -672,6 +672,7 @@ PopupPanel {
                                             ? Theme.iconFlame
                                             : (root.isWebSearch ? Theme.iconGlobe : Theme.iconSearch))))
                             font.family: root.calcResult !== null ? Theme.fontMono : Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeMd
                             font.weight: Theme.fontWeightBold
                             color: root.isCommand
@@ -878,6 +879,7 @@ PopupPanel {
                             anchors.centerIn: parent
                             text: root.gridViewMode ? Theme.iconClipboard : Theme.iconGrid
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeSm
                             color: root.gridViewMode ? Theme.primary : Theme.textSecondary
                         }
@@ -913,6 +915,7 @@ PopupPanel {
                             anchors.centerIn: parent
                             text: Theme.iconSliders
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeSm
                             color: root.showLauncherStudio ? Theme.primary : Theme.textSecondary
                         }
@@ -1279,6 +1282,7 @@ PopupPanel {
                                     Text {
                                         text: modelData.icon
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         color: isSelected ? Theme.primary : Theme.textSecondary
                                     }
@@ -1458,6 +1462,7 @@ PopupPanel {
                         Text {
                             text: root.isWebSearch ? Theme.iconGlobe : ">_"
                             font.family: root.isWebSearch ? Theme.fontIcon : Theme.fontMono
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeSm
                             font.weight: Theme.fontWeightBold
                             color: root.isWebSearch ? Theme.primary : Theme.tertiary
@@ -1561,6 +1566,7 @@ PopupPanel {
                                     anchors.centerIn: parent
                                     text: modelData.icon
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeMd
                                     color: Theme.primary
                                 }
@@ -1873,6 +1879,7 @@ PopupPanel {
                                     anchors.centerIn: parent
                                     text: Theme.iconHeart
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     color: appDelegate.isPinned ? Theme.primary : Theme.textSecondary
                                     opacity: appDelegate.isPinned ? 1.0 : 0.55
@@ -2027,6 +2034,7 @@ PopupPanel {
                                 anchors.margins: 6
                                 text: Theme.iconHeart
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: 9
                                 color: Theme.primary
                             }
@@ -2130,6 +2138,7 @@ PopupPanel {
                         Text {
                             text: Theme.iconSet === "kaomoji" ? Theme.kaoShrug : Theme.iconSearch
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeLg : Theme.fontSizeTitle
                             color: Theme.textSecondary
                             Layout.alignment: Qt.AlignHCenter
@@ -2220,6 +2229,7 @@ PopupPanel {
                             anchors.centerIn: parent
                             text: Theme.iconChevronLeft
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeSm
                             color: Theme.textPrimary
                         }
@@ -2407,6 +2417,7 @@ PopupPanel {
                                                 anchors.centerIn: parent
                                                 text: modelData.icon
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: isCurrent ? Theme.primary : Theme.textSecondary
                                             }
@@ -2459,6 +2470,7 @@ PopupPanel {
                                         anchors.centerIn: parent
                                         text: root.resolveCategoryIcon(modelData.icon)
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeSm
                                         color: Theme.primary
                                     }
@@ -2551,6 +2563,7 @@ PopupPanel {
                             Text {
                                 text: Theme.iconSearch
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.fontSizeSm
                                 color: catAppFilterInput.activeFocus ? Theme.primary : Theme.textSecondary
                             }
@@ -2664,6 +2677,7 @@ PopupPanel {
                                         visible: isChecked
                                         text: Theme.iconCheck
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightBold
                                         color: Theme.on_primary
@@ -2801,6 +2815,7 @@ PopupPanel {
                                     Text {
                                         text: modelData.icon
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         color: Theme.primary
                                     }
@@ -2873,6 +2888,7 @@ PopupPanel {
                                     Text {
                                         text: Theme.iconChevronRight
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         color: Theme.primary
                                     }
@@ -2962,6 +2978,7 @@ PopupPanel {
                                 Text {
                                     text: root.resolveCategoryIcon(modelData.icon)
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     color: Theme.primary
                                 }
@@ -2988,6 +3005,7 @@ PopupPanel {
                                         visible: isAssigned
                                         text: Theme.iconCheck
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightBold
                                         color: Theme.on_primary

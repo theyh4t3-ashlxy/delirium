@@ -356,6 +356,7 @@ PopupPanel {
                     anchors.centerIn: parent
                     text: Theme.iconSparkles
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                     color: Theme.primary
                 }
@@ -443,6 +444,7 @@ PopupPanel {
                             visible: !Theme.isTextIconSet
                             text: Theme.iconSave
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.primary
                             anchors.verticalCenter: parent.verticalCenter
@@ -491,6 +493,7 @@ PopupPanel {
                         visible: !Theme.isTextIconSet
                         text: Theme.iconRefresh
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface
                         anchors.verticalCenter: parent.verticalCenter
@@ -517,6 +520,52 @@ PopupPanel {
             }
 
             Rectangle {
+                height: 24
+                implicitWidth: reloadShellRow.implicitWidth + 14
+                radius: Theme.radiusPill
+                color: reloadShellMouse.containsMouse ? Theme.primary_overlay : Theme.pillBg
+                border.color: reloadShellMouse.containsMouse ? Theme.primary : Theme.widgetBorder
+                border.width: 1
+
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                Row {
+                    id: reloadShellRow
+                    anchors.centerIn: parent
+                    spacing: 4
+
+                    Text {
+                        visible: !Theme.isTextIconSet
+                        text: Theme.iconRefresh
+                        font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
+                        font.pixelSize: Theme.fontSizeXs
+                        color: reloadShellMouse.containsMouse ? Theme.primary : Theme.on_surface
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: "reload shell"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeXs
+                        color: reloadShellMouse.containsMouse ? Theme.primary : Theme.on_surface
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+
+                MouseArea {
+                    id: reloadShellMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (Settings) Settings.showBarStudio = false;
+                        root.open = false;
+                        Quickshell.execDetached([(Quickshell.env("HOME") || "") + "/.local/bin/cli", "shell", "restart"]);
+                    }
+                }
+            }
+
+            Rectangle {
                 Layout.preferredWidth: 28
                 Layout.preferredHeight: 28
                 radius: Theme.radiusPill
@@ -530,6 +579,7 @@ PopupPanel {
                     anchors.centerIn: parent
                     text: Theme.iconClose
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.fontSizeXs
                     color: closeMouse.containsMouse ? Theme.error : Theme.on_surface
                 }
@@ -619,6 +669,7 @@ PopupPanel {
                             anchors.centerIn: parent
                             text: parent.info.icon
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: 8
                             color: parent.isGhostTarget ? Theme.surface : (parent.isVis ? Theme.on_primary : Theme.on_surface_disabled)
                         }
@@ -865,6 +916,7 @@ PopupPanel {
                                         visible: !Theme.isTextIconSet
                                         text: parent.parent.info.icon
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         color: Theme.primary
                                         anchors.verticalCenter: parent.verticalCenter
@@ -1192,6 +1244,7 @@ PopupPanel {
                     anchors.centerIn: parent
                     text: dragGhost.info?.icon ?? Theme.iconGrid
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                     color: dragGhost.ghostColor
                 }

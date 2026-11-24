@@ -53,15 +53,15 @@ Rectangle {
         return Theme.barHeight - 8;
     }
     implicitHeight: Theme.barHeight - 8
-    radius: Theme.radiusPill
+    radius: Theme.barWidgetRadius
 
     color: {
         if (netMouse.pressed) return Theme.widgetActive;
         if (popup.open) return Theme.primary_overlay;
-        if (netMouse.containsMouse) return Theme.pillHover;
-        return Theme.pillBg;
+        if (netMouse.containsMouse) return Theme.barPillHover;
+        return Theme.barPillBg;
     }
-    border.color: popup.open ? Theme.primary : Theme.pillBorder
+    border.color: popup.open ? Theme.primary : Theme.barPillBorder
     border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     clip: true
 
@@ -124,6 +124,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: root.netIcon
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
             color: !NetworkService.isConnected
                 ? Theme.on_surface_variant
@@ -218,6 +219,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: root.netIcon
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                         color: NetworkService.isConnected ? Theme.primary : Theme.on_surface_variant
                     }
@@ -318,6 +320,7 @@ Rectangle {
                                 ? Theme.iconEthernet
                                 : (NetworkService.isWifiConnected ? Theme.iconWifiHigh : Theme.iconWifiOff)
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                             color: NetworkService.isConnected ? Theme.primary : Theme.on_surface_variant
                         }
@@ -499,6 +502,7 @@ Rectangle {
                         Text {
                             text: Theme.iconWifi
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                             color: Theme.primary
                         }
@@ -534,6 +538,7 @@ Rectangle {
                                     visible: !Theme.isTextIconSet
                                     text: Theme.iconRefresh
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     color: rescanMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
                                 }
@@ -575,6 +580,7 @@ Rectangle {
                                     visible: !Theme.isTextIconSet
                                     text: Theme.iconTerminal
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     color: nmtuiMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
                                 }
@@ -679,6 +685,7 @@ Rectangle {
                                             anchors.centerIn: parent
                                             text: Theme.getWifiIcon(netItem.sigPct, true, false)
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                             color: netItem.isItemConnected ? Theme.primary : Theme.on_surface_variant
                                         }
@@ -719,6 +726,7 @@ Rectangle {
                                             Text {
                                                 text: Theme.iconLock
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: Theme.on_surface_variant
                                                 visible: netItem.isSecured && !netItem.isItemConnected && !Theme.isTextIconSet
@@ -858,6 +866,7 @@ Rectangle {
                                     anchors.centerIn: parent
                                     text: !NetworkService.wifiEnabled ? Theme.iconWifiOff : Theme.iconWifi
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
                                     color: Theme.on_surface_variant
                                 }

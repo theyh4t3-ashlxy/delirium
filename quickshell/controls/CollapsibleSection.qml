@@ -52,6 +52,7 @@ Rectangle {
                     visible: root.icon !== ""
                     text: root.icon
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.fontSizeMd
                     color: root.collapsed ? Theme.on_surface_variant : root.accentColor
 
@@ -104,6 +105,7 @@ Rectangle {
                 Text {
                     text: Theme.iconChevronDown
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.fontSizeSm
                     color: headerMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
                     rotation: root.collapsed ? -90 : 0

@@ -93,12 +93,12 @@ Rectangle {
         return row.implicitWidth + (root.hPad * 2);
     }
     implicitHeight: root.pillSize
-    radius: Theme.radiusPill
+    radius: Theme.barWidgetRadius
     color: popup.open
         ? Theme.widgetActive
-        : (npMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-    border.color: popup.open ? Theme.alpha(root.artAccent, 0.55) : Theme.pillBorder
-    border.width: (popup.open || Theme.pillBorder.a > 0) ? 1 : 0
+        : (npMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
+    border.color: popup.open ? Theme.alpha(root.artAccent, 0.55) : Theme.barPillBorder
+    border.width: (popup.open || Theme.barPillBorder.a > 0) ? 1 : 0
     clip: true
 
     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -128,18 +128,11 @@ Rectangle {
     }
 
     function fixCoverUrl(url) {
-        if (!url || typeof url !== "string") return "";
-        let cleaned = url.trim();
-        if (cleaned.startsWith("/")) return "file://" + cleaned;
-        return cleaned;
+        return Theme.fixCoverUrl(url);
     }
 
     function formatTime(seconds) {
-        if (seconds === undefined || seconds === null || isNaN(seconds) || seconds < 0) return "0:00";
-        let sec = Math.floor(seconds);
-        let m = Math.floor(sec / 60);
-        let s = sec % 60;
-        return m + ":" + (s < 10 ? "0" : "") + s;
+        return Theme.formatTime(seconds);
     }
 
     function runPlayer(appId) {
@@ -196,6 +189,7 @@ Rectangle {
                 ? (Theme.iconSet === "kaomoji" ? Theme.kaoJam : Theme.iconMusic)
                 : (root.hasTrack ? Theme.iconPause : Theme.iconMusic)
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
             font.weight: Theme.isTextIconSet ? Theme.fontWeightBold : Theme.fontWeightRegular
             color: root.isPlaying ? root.artAccent : Theme.textSecondary
@@ -382,6 +376,7 @@ Rectangle {
                             visible: root.activeList.length > 1
                             text: Theme.iconChevronRight
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textSecondary
                         }
@@ -517,6 +512,7 @@ Rectangle {
                                 anchors.centerIn: parent
                                 text: Theme.iconSet === "kaomoji" ? Theme.kaoMusic : Theme.iconMusic
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
                                 color: root.artAccent
                                 visible: root.coverArtUrl === ""
@@ -534,6 +530,7 @@ Rectangle {
                                     scale: coverMouse.containsMouse ? 1.0 : 0.8
                                     text: root.isPlaying ? Theme.iconPause : Theme.iconPlay
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeLg
                                     color: Theme.on_surface
                                     Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
@@ -595,7 +592,7 @@ Rectangle {
 
                             // Flavor subtitle or kaomoji vibe badge
                             Text {
-                                visible: root.isPlaying && ((Settings?.unhingedFlavor ?? false) || Theme.iconSet === "kaomoji")
+                                visible: root.isPlaying && (((Settings?.flavorMode ?? "actions") !== "off") || Theme.iconSet === "kaomoji")
                                 text: Theme.getFlavor("media_playing", Theme.getVibe(Theme.kaoVibe + " vibing", "", ""))
                                 font.family: Theme.fontVibe
                                 font.pixelSize: Theme.fontSizeXs
@@ -679,6 +676,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: Theme.iconShuffle
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeSm
                             color: parent.active ? root.artAccent : Theme.textSecondary
                         }
@@ -723,6 +721,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: root.isPlaying ? Theme.iconPause : Theme.iconPlay
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                             font.weight: Theme.fontWeightBold
                             color: Theme.on_primary
@@ -769,6 +768,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: (root.player?.loopState === MprisLoopState.Track) ? Theme.iconRepeatOne : Theme.iconRepeat
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeSm
                             color: parent.active ? root.artAccent : Theme.textSecondary
                         }
@@ -805,6 +805,7 @@ Rectangle {
                     Text {
                         text: Theme.getVibe(Theme.kaoSilent, Theme.iconHeadphones, Theme.iconHeadphones)
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXl : Theme.fontSizeTitle
                         color: Theme.textSecondary
                         Layout.alignment: Qt.AlignHCenter
@@ -847,6 +848,7 @@ Rectangle {
                                 Text {
                                     text: root.selectedApp?.icon || Theme.iconMusic
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     color: Theme.primary
                                 }
@@ -864,6 +866,7 @@ Rectangle {
                                 Text {
                                     text: root.dropdownOpen ? Theme.iconChevronUp : Theme.iconChevronDown
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     color: Theme.textSecondary
                                 }
@@ -906,6 +909,7 @@ Rectangle {
                                 Text {
                                     text: Theme.iconPlay
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     color: Theme.on_primary
                                 }
@@ -970,6 +974,7 @@ Rectangle {
                                             Text {
                                                 text: modelData.icon
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: parent.parent.isSelected ? Theme.primary : Theme.textSecondary
                                             }
@@ -987,6 +992,7 @@ Rectangle {
                                             Text {
                                                 text: Theme.iconCheck
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: Theme.primary
                                                 visible: parent.parent.isSelected

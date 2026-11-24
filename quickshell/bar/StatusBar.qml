@@ -92,16 +92,67 @@ PanelWindow {
 
     readonly property real maxWindowTitleWidth: {
         let halfScreen = root.width / 2;
-        let centerHalf = (centerRowH.visible ? centerRowH.width : 0) / 2;
+        let centerHalf = centerZoneH.width / 2;
         let clockStart = halfScreen - centerHalf;
         return Math.max(160, clockStart - 260);
     }
     readonly property real maxRightRowWidth: {
         let halfScreen = root.width / 2;
-        let centerHalf = (centerRowH.visible ? centerRowH.width : 0) / 2;
+        let centerHalf = centerZoneH.width / 2;
         let clockRight = halfScreen - centerHalf;
         return Math.max(380, clockRight - (root.effectivePaddingH * 2));
     }
+
+    readonly property var moduleGroupMap: ({
+        "launcher": "tools", "wallpaper": "tools", "quickNotes": "tools", "clipboard": "tools", "idleInhibitor": "tools",
+        "workspaces": "nav", "layout": "nav", "layoutSwitcher": "nav",
+        "windowTitle": "context",
+        "clock": "center", "dynamicNotch": "center", "notch": "center", "notifications": "center",
+        "media": "media", "screenCapture": "media", "capture": "media",
+        "systemTray": "status", "network": "status", "bluetooth": "status", "volume": "status", "battery": "status",
+        "quickSettings": "session", "powerMenu": "session"
+    })
+
+    function buildClusters(modList) {
+        if (!modList || modList.length === 0) return [];
+        let visibleMods = [];
+        for (let i = 0; i < modList.length; i++) {
+            let id = modList[i];
+            if (root.isModuleVisible(id) && root.getModuleComponent(id) !== null) {
+                visibleMods.push(id);
+            }
+        }
+        if (visibleMods.length === 0) return [];
+
+        let grouping = Theme.barGrouping;
+        if (grouping === "zones" || (grouping === "none" && root.isIslandMode)) {
+            return [visibleMods];
+        }
+        if (grouping === "none") {
+            return visibleMods.map(id => [id]);
+        }
+
+        let clusters = [];
+        let cur = [];
+        let prevGroup = "";
+        for (let i = 0; i < visibleMods.length; i++) {
+            let id = visibleMods[i];
+            let grp = root.moduleGroupMap[id] ?? id;
+            if (cur.length > 0 && grp !== prevGroup) {
+                clusters.push(cur);
+                cur = [id];
+            } else {
+                cur.push(id);
+            }
+            prevGroup = grp;
+        }
+        if (cur.length > 0) clusters.push(cur);
+        return clusters;
+    }
+
+    readonly property var leftClusters:   buildClusters(Settings.barModulesLeft ?? [])
+    readonly property var centerClusters: buildClusters(Settings.barModulesCenter ?? ["clock"])
+    readonly property var rightClusters:  buildClusters(Settings.barModulesRight ?? [])
 
     readonly property bool isFloating: (Settings?.barFloating ?? false) || Theme.isBento || (Settings?.barStyle === "bento-floating")
     readonly property bool isIslandMode: Theme.isBento || (Settings?.barStyle === "bento-floating") || (root.isFloating && (Settings?.barIslandMode ?? true))
@@ -188,6 +239,16 @@ PanelWindow {
             || right.indexOf("screenCapture") !== -1 || right.indexOf("capture") !== -1;
     }
 
+    readonly property bool hasNotificationsModuleOnBar: {
+        if (!root.isModuleVisible("notifications")) return false;
+        let left = Settings?.barModulesLeft ?? [];
+        let center = Settings?.barModulesCenter ?? ["clock"];
+        let right = Settings?.barModulesRight ?? [];
+        return left.indexOf("notifications") !== -1
+            || center.indexOf("notifications") !== -1
+            || right.indexOf("notifications") !== -1;
+    }
+
     function traceScoopCurve(ctx, x0, y0, cx, cy, x1, y1, style, t) {
         if (style === "chamfer") {
             ctx.lineTo(x1, y1);
@@ -237,9 +298,9 @@ PanelWindow {
 
     mask: Region {
         item: root.isIslandMode ? null : barBg
-        Region { item: root.isIslandMode ? (root.isVertical ? bentoTopIslandV : bentoLeftIsland) : null }
-        Region { item: root.isIslandMode ? (root.isVertical ? bentoCenterIslandV : bentoCenterIsland) : null }
-        Region { item: root.isIslandMode ? (root.isVertical ? bentoBottomIslandV : bentoRightIsland) : null }
+        Region { item: root.isIslandMode ? (root.isVertical ? leftZoneV : leftZoneH) : null }
+        Region { item: root.isIslandMode ? (root.isVertical ? centerZoneV : centerZoneH) : null }
+        Region { item: root.isIslandMode ? (root.isVertical ? rightZoneV : rightZoneH) : null }
     }
 
     property alias launcherPopup: launcherPopup
@@ -247,6 +308,17 @@ PanelWindow {
     AppLauncher {
         id: launcherPopup
         screen: root.screen
+    }
+
+    Loader {
+        active: !root.hasNotificationsModuleOnBar
+        sourceComponent: Notifications {
+            barScreen: root.screen
+            barMonitor: root.hyprMonitor
+            visible: false
+            width: 0
+            height: 0
+        }
     }
 
     Timer {
@@ -283,9 +355,9 @@ PanelWindow {
         implicitHeight: root.isVertical ? Math.max(36, launcherText.implicitHeight + 12) : (Theme.barHeight - 8)
         width: implicitWidth
         height: implicitHeight
-        radius: Theme.radiusPill
-        color: lMouse.pressed ? Theme.widgetActive : lMouse.containsMouse ? Theme.pillHover : (root.launcherPopup.open ? Theme.primary_overlay : Theme.pillBg)
-        border.color: root.launcherPopup.open ? Theme.primary : Theme.pillBorder
+        radius: Theme.barWidgetRadius
+        color: lMouse.pressed ? Theme.widgetActive : lMouse.containsMouse ? Theme.barPillHover : (root.launcherPopup.open ? Theme.primary_overlay : Theme.barPillBg)
+        border.color: root.launcherPopup.open ? Theme.primary : Theme.barPillBorder
         border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -295,6 +367,7 @@ PanelWindow {
             anchors.centerIn: parent
             text: Theme.iconDistro ?? Theme.iconArch
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.isTextIconSet ? (root.isVertical ? Theme.fontSizeXs : Theme.fontSizeSm) : Theme.fontSizeLg
             color: root.launcherPopup.open || lMouse.containsMouse ? Theme.primary : Theme.on_surface
             Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -341,7 +414,7 @@ PanelWindow {
     Component { id: compQuickNotes; QuickNotes { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compClipboard; Clipboard {} }
     Component { id: compIdleInhibitor; IdleInhibitor { barScreen: root.screen; barMonitor: root.hyprMonitor } }
-    Component { id: compNotifications; Notifications {} }
+    Component { id: compNotifications; Notifications { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compSystemTray; SystemTray {} }
     Component { id: compBluetooth; Bluetooth {} }
     Component { id: compNetwork; NetworkStatus {} }
@@ -399,6 +472,238 @@ PanelWindow {
         if (modId === "powerMenu") return Settings?.showPowerMenu ?? true;
         if (modId === "screenCapture" || modId === "capture") return Settings?.showScreenCapture ?? true;
         return true;
+    }
+
+    component BarClusterZone: Item {
+        id: zoneRoot
+        property var clusters: []
+        property bool vertical: false
+        property bool showRecFallback: false
+        property real maxSpan: 0
+
+        readonly property int clusterGap: (Theme.isBarGroupedSurface || root.isIslandMode)
+            ? Math.max(4, Settings?.bentoGap ?? 8)
+            : root.effectiveSpacing
+        readonly property bool recVisible: showRecFallback && (typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording) && !root.hasCaptureModuleOnBar
+
+        implicitWidth: zoneRoot.maxSpan > 0 ? Math.min(zoneGrid.implicitWidth, zoneRoot.maxSpan) : zoneGrid.implicitWidth
+        implicitHeight: zoneRoot.vertical && zoneRoot.maxSpan > 0 ? Math.min(zoneGrid.implicitHeight, zoneRoot.maxSpan) : zoneGrid.implicitHeight
+        width: Math.round(implicitWidth)
+        height: Math.round(implicitHeight)
+        clip: zoneRoot.maxSpan > 0 && ((zoneRoot.vertical ? zoneGrid.implicitHeight : zoneGrid.implicitWidth) > zoneRoot.maxSpan)
+
+        Behavior on width { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
+
+        GridLayout {
+            id: zoneGrid
+            columns: zoneRoot.vertical ? 1 : 64
+            columnSpacing: zoneRoot.clusterGap
+            rowSpacing: zoneRoot.clusterGap
+
+            // fallback live screen recording badge when ScreenCapture isn't on the bar
+            Rectangle {
+                visible: zoneRoot.recVisible
+                Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+                implicitWidth: zoneRoot.vertical ? (Theme.barHeight - 8) : (recRowC.implicitWidth + 18)
+                implicitHeight: Theme.barHeight - 8
+                radius: Theme.barWidgetRadius
+                color: recMouseC.pressed ? Theme.error : (recMouseC.containsMouse ? Theme.alpha(Theme.error, 0.28) : Theme.error_overlay)
+                border.color: Theme.error
+                border.width: 1
+
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                RowLayout {
+                    id: recRowC
+                    anchors.centerIn: parent
+                    spacing: 6
+
+                    Rectangle {
+                        width: zoneRoot.vertical ? 10 : 8
+                        height: zoneRoot.vertical ? 10 : 8
+                        radius: 5
+                        color: recMouseC.pressed ? Theme.on_error : Theme.error
+
+                        SequentialAnimation on opacity {
+                            loops: Animation.Infinite
+                            running: typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording
+                            NumberAnimation { from: 1.0; to: 0.20; duration: 650; easing.type: Easing.InOutQuad }
+                            NumberAnimation { from: 0.20; to: 1.0; duration: 650; easing.type: Easing.InOutQuad }
+                        }
+                    }
+
+                    Text {
+                        visible: !zoneRoot.vertical
+                        text: "REC " + (ScreenRecService?.elapsedTimeString ?? "00:00")
+                        font.family: Theme.fontMono
+                        font.pixelSize: Theme.fontSizeXs
+                        font.weight: Theme.fontWeightBold
+                        color: recMouseC.pressed ? Theme.on_error : Theme.error
+                    }
+                }
+
+                MouseArea {
+                    id: recMouseC
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: (mouse) => {
+                        if (mouse.button === Qt.RightButton) {
+                            ScreenRecService?.discardRecording();
+                        } else {
+                            ScreenRecService?.stopRecording();
+                        }
+                    }
+                }
+            }
+
+            Repeater {
+                model: zoneRoot.clusters
+
+                delegate: Rectangle {
+                    id: clusterTray
+                    required property var modelData
+                    readonly property bool showTray: (root.isIslandMode || (Theme.isBarGroupedSurface && Theme.barWidgetChrome !== "ghost" && !Theme.isBarPills)) && modelData.length > 0
+                    readonly property int trayPad: showTray ? 5 : 0
+                    readonly property int trayH: showTray ? (Theme.barHeight - 4) : (Theme.barHeight - 8)
+                    readonly property int trayRadius: {
+                        if (!showTray) return 0;
+                        if ((Settings?.barRadius ?? 0) > 0) return Math.min(Settings.barRadius, Math.floor(trayH / 2));
+                        if (Theme.barWidgetRadius >= 999) return Theme.radiusPill;
+                        return Theme.barWidgetRadius === 0 ? 0 : Math.min(Theme.radiusLg, Theme.barWidgetRadius + 2);
+                    }
+
+                    Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+                    implicitWidth: zoneRoot.vertical ? Math.max(Theme.barHeight - 6, clusterFlow.implicitWidth + trayPad * 2) : (clusterFlow.implicitWidth + trayPad * 2)
+                    implicitHeight: zoneRoot.vertical ? (clusterFlow.implicitHeight + trayPad * 2) : Math.max(trayH, clusterFlow.implicitHeight)
+                    radius: trayRadius
+                    color: showTray ? Theme.barClusterBg : "transparent"
+                    border.color: showTray ? Theme.barClusterBorder : "transparent"
+                    border.width: (showTray && border.color !== "transparent" && border.color.a > 0) ? 1 : 0
+
+                    scale: showTray && (Settings?.bentoHoverLift ?? true) && trayHover.hovered ? 1.015 : 1.0
+                    HoverHandler { id: trayHover }
+                    Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
+                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+                    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                    Rectangle {
+                        visible: clusterTray.showTray && Theme.isAccentGlow
+                        anchors.fill: parent
+                        anchors.margins: -3
+                        radius: clusterTray.radius > 0 ? clusterTray.radius + 3 : 3
+                        color: Theme.alpha(Theme.primary, 0.18)
+                        z: -1
+                    }
+
+                    Rectangle {
+                        visible: clusterTray.showTray && Theme.isGlass
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.leftMargin: Math.min(8, clusterTray.radius)
+                        anchors.rightMargin: Math.min(8, clusterTray.radius)
+                        height: 1
+                        color: Theme.glassHighlight
+                    }
+
+                    GridLayout {
+                        id: clusterFlow
+                        anchors.centerIn: parent
+                        columns: zoneRoot.vertical ? 1 : 64
+                        columnSpacing: (Theme.isBarPills || !clusterTray.showTray) ? root.effectiveSpacing : Math.max(2, Math.round(root.effectiveSpacing * 0.75))
+                        rowSpacing: columnSpacing
+
+                        Repeater {
+                            model: clusterTray.modelData
+
+                            delegate: GridLayout {
+                                id: modSlot
+                                required property string modelData
+                                required property int index
+                                readonly property string modId: modelData
+                                readonly property bool showDiv: index > 0 && Theme.barDividers !== "none" && (clusterTray.showTray || !Theme.isBarPills)
+
+                                columns: zoneRoot.vertical ? 1 : 2
+                                columnSpacing: clusterFlow.columnSpacing
+                                rowSpacing: clusterFlow.rowSpacing
+                                Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+
+                                Rectangle {
+                                    visible: modSlot.showDiv
+                                    Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+                                    width: Theme.barDividers === "dot" ? 3 : (zoneRoot.vertical ? Math.max(10, Theme.barHeight - 20) : 1)
+                                    height: Theme.barDividers === "dot" ? 3 : (zoneRoot.vertical ? 1 : Math.max(10, Theme.barHeight - 20))
+                                    radius: Theme.barDividers === "dot" ? 2 : 0
+                                    color: Theme.barDividerColor
+                                }
+
+                                Item {
+                                    id: modBox
+                                    Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+                                    readonly property real targetW: {
+                                        if (!modLoader.item) return (Theme.barHeight - 8);
+                                        if (zoneRoot.vertical) return modLoader.item.implicitWidth;
+                                        if (modSlot.modId === "windowTitle") {
+                                            let mode = Settings?.windowTitleMode ?? "auto";
+                                            if (mode === "fill") return Math.max(80, root.maxWindowTitleWidth);
+                                            if (mode === "compact") return Math.max(40, Math.min(modLoader.item.implicitWidth, 260));
+                                            let maxAllowed = Math.min(Settings?.windowTitleMaxWidth ?? 760, root.maxWindowTitleWidth);
+                                            return Math.max(40, Math.min(modLoader.item.implicitWidth, maxAllowed));
+                                        }
+                                        return modLoader.item.implicitWidth;
+                                    }
+                                    readonly property real targetH: modLoader.item ? modLoader.item.implicitHeight : (Theme.barHeight - 8)
+
+                                    implicitWidth: Math.round(targetW)
+                                    implicitHeight: Math.round(targetH)
+                                    width: implicitWidth
+                                    height: implicitHeight
+                                    clip: modSlot.modId === "windowTitle"
+
+                                    HoverHandler { id: modHover }
+
+                                    Loader {
+                                        id: modLoader
+                                        sourceComponent: root.getModuleComponent(modSlot.modId)
+                                        width: modBox.width
+                                        height: modBox.height
+
+                                        Binding {
+                                            target: modLoader.item
+                                            property: "width"
+                                            value: modBox.width
+                                            when: modLoader.item !== null
+                                        }
+                                    }
+
+                                    // clean underline indicator when barWidgetChrome === "underline"
+                                    Rectangle {
+                                        visible: Theme.isBarUnderline
+                                        z: 5
+                                        anchors.bottom: (!root.isBottom && !zoneRoot.vertical) ? parent.bottom : undefined
+                                        anchors.top: (root.isBottom && !zoneRoot.vertical) ? parent.top : undefined
+                                        anchors.horizontalCenter: !zoneRoot.vertical ? parent.horizontalCenter : undefined
+                                        anchors.left: (root.isRight && zoneRoot.vertical) ? parent.left : undefined
+                                        anchors.right: (!root.isRight && zoneRoot.vertical) ? parent.right : undefined
+                                        anchors.verticalCenter: zoneRoot.vertical ? parent.verticalCenter : undefined
+                                        width: zoneRoot.vertical ? 2 : Math.max(8, modHover.hovered ? parent.width - 4 : Math.round(parent.width * 0.42))
+                                        height: zoneRoot.vertical ? Math.max(8, modHover.hovered ? parent.height - 4 : Math.round(parent.height * 0.42)) : 2
+                                        radius: 1
+                                        color: modHover.hovered ? Theme.primary : Theme.alpha(Theme.outline_variant, 0.45)
+
+                                        Behavior on width { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+                                        Behavior on height { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+                                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Item {
@@ -640,7 +945,7 @@ PanelWindow {
                         ctx.strokeStyle = Theme.glassHighlight;
                     } else if (hasPureBlack) {
                         ctx.lineWidth = 1;
-                        ctx.strokeStyle = "#1f1f1f";
+                        ctx.strokeStyle = Theme.barBorderColor;
                     }
                     ctx.stroke();
                 }
@@ -688,280 +993,32 @@ PanelWindow {
             anchors.fill: barBg
             visible: !root.isVertical
 
-            // bento floating island: left
-            Rectangle {
-                id: bentoLeftIsland
-                visible: root.isIslandMode && !root.isVertical && leftRowH.visible && (leftRowH.implicitWidth > 0)
-                anchors.verticalCenter: leftRowH.verticalCenter
-                anchors.left: leftRowH.left
-                anchors.leftMargin: -6
-                width: leftRowH.implicitWidth + 12
-                height: Theme.barHeight - 6
-                radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
-                color: Theme.cardBg
-                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
-                border.width: 1
-                z: -1
-                scale: (Settings?.bentoHoverLift ?? true) && bentoLeftHover.hovered ? 1.015 : 1.0
-                HoverHandler { id: bentoLeftHover }
-                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
-                Behavior on width { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
-                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                Rectangle {
-                    visible: Theme.isAccentGlow
-                    anchors.fill: parent
-                    anchors.margins: -4
-                    radius: parent.radius + 4
-                    color: Theme.alpha(Theme.primary, 0.22)
-                    z: -2
-                }
-                Rectangle {
-                    visible: Theme.isGlass
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: 1
-                    color: Theme.glassHighlight
-                }
-            }
-
-            // bento floating island: center
-            Rectangle {
-                id: bentoCenterIsland
-                visible: root.isIslandMode && !root.isVertical && centerRowH.visible && (centerRowH.implicitWidth > 0)
-                anchors.centerIn: centerRowH
-                width: centerRowH.implicitWidth + 24
-                height: Theme.barHeight - 6
-                radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
-                color: Theme.cardBg
-                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
-                border.width: 1
-                z: -1
-                scale: (Settings?.bentoHoverLift ?? true) && bentoCenterHover.hovered ? 1.015 : 1.0
-                HoverHandler { id: bentoCenterHover }
-                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
-                Behavior on width { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
-                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                Rectangle {
-                    visible: Theme.isAccentGlow
-                    anchors.fill: parent
-                    anchors.margins: -4
-                    radius: parent.radius + 4
-                    color: Theme.alpha(Theme.primary, 0.22)
-                    z: -2
-                }
-                Rectangle {
-                    visible: Theme.isGlass
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: 1
-                    color: Theme.glassHighlight
-                }
-            }
-
-            // bento floating island: right
-            Rectangle {
-                id: bentoRightIsland
-                visible: root.isIslandMode && !root.isVertical && rightRowContainer.visible && (rightRowContainer.width > 0)
-                anchors.verticalCenter: rightRowContainer.verticalCenter
-                anchors.right: rightRowContainer.right
-                anchors.rightMargin: -6
-                width: rightRowContainer.width + 12
-                height: Theme.barHeight - 6
-                radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
-                color: Theme.cardBg
-                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
-                border.width: 1
-                z: -1
-                scale: (Settings?.bentoHoverLift ?? true) && bentoRightHover.hovered ? 1.015 : 1.0
-                HoverHandler { id: bentoRightHover }
-                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
-                Behavior on width { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
-                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                Rectangle {
-                    visible: Theme.isAccentGlow
-                    anchors.fill: parent
-                    anchors.margins: -4
-                    radius: parent.radius + 4
-                    color: Theme.alpha(Theme.primary, 0.22)
-                    z: -2
-                }
-                Rectangle {
-                    visible: Theme.isGlass
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: 1
-                    color: Theme.glassHighlight
-                }
-            }
-
-            Row {
-                id: leftRowH
+            BarClusterZone {
+                id: leftZoneH
                 anchors.left: parent.left
                 anchors.leftMargin: root.effectivePaddingH
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: root.effectiveSpacing
-
-                Repeater {
-                    model: Settings.barModulesLeft ?? []
-                    delegate: Loader {
-                        id: lModLoader
-                        required property string modelData
-                        active: root.isModuleVisible(modelData) && !root.isVertical
-                        visible: active
-                        sourceComponent: root.getModuleComponent(modelData)
-                        readonly property real targetW: {
-                            if (!item) return (Theme.barHeight - 8);
-                            if (modelData === "windowTitle") {
-                                let mode = Settings?.windowTitleMode ?? "auto";
-                                if (mode === "fill") {
-                                    return Math.max(80, root.maxWindowTitleWidth);
-                                }
-                                if (mode === "compact") {
-                                    return Math.max(40, Math.min(item.implicitWidth, 260));
-                                }
-                                let maxAllowed = Math.min(Settings?.windowTitleMaxWidth ?? 760, root.maxWindowTitleWidth);
-                                return Math.max(40, Math.min(item.implicitWidth, maxAllowed));
-                            }
-                            return item.implicitWidth;
-                        }
-                        width: Math.round(targetW)
-                        height: Math.round(item ? item.implicitHeight : (Theme.barHeight - 8))
-                        clip: true
-                        Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-
-                        Binding {
-                            target: lModLoader.item
-                            property: "width"
-                            value: lModLoader.width
-                            when: lModLoader.item !== null
-                        }
-                    }
-                }
+                clusters: root.leftClusters
+                vertical: false
             }
 
-            Row {
-                id: centerRowH
+            BarClusterZone {
+                id: centerZoneH
                 anchors.centerIn: parent
-                spacing: root.effectiveSpacing
+                clusters: root.centerClusters
+                vertical: false
+                showRecFallback: true
                 z: 10
-
-                // fallback live screen recording pill if ScreenCapture isn't already on the bar
-                Rectangle {
-                    visible: (typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording) && !root.hasCaptureModuleOnBar
-                    implicitHeight: Theme.barHeight - 8
-                    implicitWidth: recRowH.implicitWidth + 18
-                    radius: Theme.radiusPill
-                    color: recMouseH.pressed ? Theme.error : (recMouseH.containsMouse ? Theme.alpha(Theme.error, 0.28) : Theme.error_overlay)
-                    border.color: Theme.error
-                    border.width: 1
-
-                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                    RowLayout {
-                        id: recRowH
-                        anchors.centerIn: parent
-                        spacing: 6
-
-                        Rectangle {
-                            width: 8
-                            height: 8
-                            radius: 4
-                            color: recMouseH.pressed ? Theme.on_error : Theme.error
-
-                            SequentialAnimation on opacity {
-                                loops: Animation.Infinite
-                                running: typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording
-                                NumberAnimation { from: 1.0; to: 0.20; duration: 650; easing.type: Easing.InOutQuad }
-                                NumberAnimation { from: 0.20; to: 1.0; duration: 650; easing.type: Easing.InOutQuad }
-                            }
-                        }
-
-                        Text {
-                            text: "REC " + (ScreenRecService?.elapsedTimeString ?? "00:00")
-                            font.family: Theme.fontMono
-                            font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
-                            color: recMouseH.pressed ? Theme.on_error : Theme.error
-                        }
-                    }
-
-                    MouseArea {
-                        id: recMouseH
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: (mouse) => {
-                            if (mouse.button === Qt.RightButton) {
-                                ScreenRecService?.discardRecording();
-                            } else {
-                                ScreenRecService?.stopRecording();
-                            }
-                        }
-                    }
-                }
-
-                Repeater {
-                    model: Settings.barModulesCenter ?? ["clock"]
-                    delegate: Loader {
-                        required property string modelData
-                        active: root.isModuleVisible(modelData) && !root.isVertical
-                        visible: active
-                        sourceComponent: root.getModuleComponent(modelData)
-                        width: Math.round(item ? item.implicitWidth : (Theme.barHeight - 8))
-                        height: Math.round(item ? item.implicitHeight : (Theme.barHeight - 8))
-                        Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-                    }
-                }
             }
 
-            Item {
-                id: rightRowContainer
+            BarClusterZone {
+                id: rightZoneH
                 anchors.right: parent.right
                 anchors.rightMargin: root.effectivePaddingH
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(rightRowH.implicitWidth, root.maxRightRowWidth)
-                height: rightRowH.implicitHeight
-                clip: rightRowH.implicitWidth > root.maxRightRowWidth
-                Behavior on width { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
-
-                Row {
-                    id: rightRowH
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: root.effectiveSpacing
-                    width: Math.min(implicitWidth, root.maxRightRowWidth)
-                    clip: true
-
-                    Repeater {
-                        model: Settings.barModulesRight ?? []
-                        delegate: Loader {
-                            id: rModLoader
-                            required property string modelData
-                            active: root.isModuleVisible(modelData) && !root.isVertical
-                            visible: active
-                            sourceComponent: root.getModuleComponent(modelData)
-                            readonly property real targetW: item ? item.implicitWidth : (Theme.barHeight - 8)
-                            width: Math.round(targetW)
-                            height: Math.round(item ? item.implicitHeight : (Theme.barHeight - 8))
-                            clip: true
-                            Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-
-                            Binding {
-                                target: rModLoader.item
-                                property: "width"
-                                value: rModLoader.width
-                                when: rModLoader.item !== null
-                            }
-                        }
-                    }
-                }
+                clusters: root.rightClusters
+                vertical: false
+                maxSpan: root.maxRightRowWidth
             }
         }
 
@@ -969,245 +1026,31 @@ PanelWindow {
             anchors.fill: barBg
             visible: root.isVertical
 
-            // bento floating island: top vertical
-            Rectangle {
-                id: bentoTopIslandV
-                visible: root.isIslandMode && root.isVertical && leftRowV.visible && (leftRowV.implicitHeight > 0)
-                anchors.horizontalCenter: leftRowV.horizontalCenter
-                anchors.top: leftRowV.top
-                anchors.topMargin: -6
-                width: Theme.barHeight - 6
-                height: leftRowV.implicitHeight + 12
-                radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
-                color: Theme.cardBg
-                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
-                border.width: 1
-                z: -1
-                scale: (Settings?.bentoHoverLift ?? true) && bentoTopHoverV.hovered ? 1.015 : 1.0
-                HoverHandler { id: bentoTopHoverV }
-                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
-                Behavior on height { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
-                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                Rectangle {
-                    visible: Theme.isAccentGlow
-                    anchors.fill: parent
-                    anchors.margins: -4
-                    radius: parent.radius + 4
-                    color: Theme.alpha(Theme.primary, 0.22)
-                    z: -2
-                }
-                Rectangle {
-                    visible: Theme.isGlass
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: 1
-                    color: Theme.glassHighlight
-                }
-            }
-
-            // bento floating island: center vertical
-            Rectangle {
-                id: bentoCenterIslandV
-                visible: root.isIslandMode && root.isVertical && centerRowV.visible && (centerRowV.implicitHeight > 0)
-                anchors.centerIn: centerRowV
-                width: Theme.barHeight - 6
-                height: centerRowV.implicitHeight + 16
-                radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
-                color: Theme.cardBg
-                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
-                border.width: 1
-                z: -1
-                scale: (Settings?.bentoHoverLift ?? true) && bentoCenterHoverV.hovered ? 1.015 : 1.0
-                HoverHandler { id: bentoCenterHoverV }
-                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
-                Behavior on height { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
-                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                Rectangle {
-                    visible: Theme.isAccentGlow
-                    anchors.fill: parent
-                    anchors.margins: -4
-                    radius: parent.radius + 4
-                    color: Theme.alpha(Theme.primary, 0.22)
-                    z: -2
-                }
-                Rectangle {
-                    visible: Theme.isGlass
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: 1
-                    color: Theme.glassHighlight
-                }
-            }
-
-            // bento floating island: bottom vertical
-            Rectangle {
-                id: bentoBottomIslandV
-                visible: root.isIslandMode && root.isVertical && rightRowV.visible && (rightRowV.implicitHeight > 0)
-                anchors.horizontalCenter: rightRowV.horizontalCenter
-                anchors.bottom: rightRowV.bottom
-                anchors.bottomMargin: -6
-                width: Theme.barHeight - 6
-                height: rightRowV.implicitHeight + 12
-                radius: Theme.radiusMd > 4 ? Theme.radiusMd : 8
-                color: Theme.cardBg
-                border.color: Theme.isCyberNeon ? Theme.primary : Theme.cardBorder
-                border.width: 1
-                z: -1
-                scale: (Settings?.bentoHoverLift ?? true) && bentoBottomHoverV.hovered ? 1.015 : 1.0
-                HoverHandler { id: bentoBottomHoverV }
-                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutQuad } }
-                Behavior on height { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
-                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                Rectangle {
-                    visible: Theme.isAccentGlow
-                    anchors.fill: parent
-                    anchors.margins: -4
-                    radius: parent.radius + 4
-                    color: Theme.alpha(Theme.primary, 0.22)
-                    z: -2
-                }
-                Rectangle {
-                    visible: Theme.isGlass
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: 1
-                    color: Theme.glassHighlight
-                }
-            }
-
-            Column {
-                id: leftRowV
+            BarClusterZone {
+                id: leftZoneV
                 anchors.top: parent.top
                 anchors.topMargin: root.effectivePaddingH
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: root.effectiveSpacing
-
-                Repeater {
-                    model: Settings.barModulesLeft ?? []
-                    delegate: Loader {
-                        id: lModLoaderV
-                        required property string modelData
-                        active: root.isModuleVisible(modelData) && root.isVertical
-                        visible: active
-                        sourceComponent: root.getModuleComponent(modelData)
-                        width: Math.round(item ? item.implicitWidth : (Theme.barHeight - 8))
-                        height: Math.round(item ? item.implicitHeight : (Theme.barHeight - 8))
-                        Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-
-                        Binding {
-                            target: lModLoaderV.item
-                            property: "width"
-                            value: lModLoaderV.width
-                            when: lModLoaderV.item !== null
-                        }
-                    }
-                }
+                clusters: root.leftClusters
+                vertical: true
             }
 
-            Column {
-                id: centerRowV
+            BarClusterZone {
+                id: centerZoneV
                 anchors.centerIn: parent
-                spacing: root.effectiveSpacing
+                clusters: root.centerClusters
+                vertical: true
+                showRecFallback: true
                 z: 10
-
-                // fallback live screen recording pill (vertical)
-                Rectangle {
-                    visible: (typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording) && !root.hasCaptureModuleOnBar
-                    implicitWidth: Theme.barHeight - 8
-                    implicitHeight: Theme.barHeight - 8
-                    radius: Theme.radiusPill
-                    color: recMouseV.pressed ? Theme.error : (recMouseV.containsMouse ? Theme.alpha(Theme.error, 0.28) : Theme.error_overlay)
-                    border.color: Theme.error
-                    border.width: 1
-
-                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 10
-                        height: 10
-                        radius: 5
-                        color: recMouseV.pressed ? Theme.on_error : Theme.error
-
-                        SequentialAnimation on opacity {
-                            loops: Animation.Infinite
-                            running: typeof ScreenRecService !== "undefined" && ScreenRecService.isRecording
-                            NumberAnimation { from: 1.0; to: 0.20; duration: 650; easing.type: Easing.InOutQuad }
-                            NumberAnimation { from: 0.20; to: 1.0; duration: 650; easing.type: Easing.InOutQuad }
-                        }
-                    }
-
-                    MouseArea {
-                        id: recMouseV
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: (mouse) => {
-                            if (mouse.button === Qt.RightButton) {
-                                ScreenRecService?.discardRecording();
-                            } else {
-                                ScreenRecService?.stopRecording();
-                            }
-                        }
-                    }
-                }
-
-                Repeater {
-                    model: Settings.barModulesCenter ?? ["clock"]
-                    delegate: Loader {
-                        id: cModLoaderV
-                        required property string modelData
-                        active: root.isModuleVisible(modelData) && root.isVertical
-                        visible: active
-                        sourceComponent: root.getModuleComponent(modelData)
-                        width: Math.round(item ? item.implicitWidth : (Theme.barHeight - 8))
-                        height: Math.round(item ? item.implicitHeight : (Theme.barHeight - 8))
-                        Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-
-                        Binding {
-                            target: cModLoaderV.item
-                            property: "width"
-                            value: cModLoaderV.width
-                            when: cModLoaderV.item !== null
-                        }
-                    }
-                }
             }
 
-            Column {
-                id: rightRowV
+            BarClusterZone {
+                id: rightZoneV
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: root.effectivePaddingH
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: root.effectiveSpacing
-
-                Repeater {
-                    model: Settings.barModulesRight ?? []
-                    delegate: Loader {
-                        id: rModLoaderV
-                        required property string modelData
-                        active: root.isModuleVisible(modelData) && root.isVertical
-                        visible: active
-                        sourceComponent: root.getModuleComponent(modelData)
-                        width: Math.round(item ? item.implicitWidth : (Theme.barHeight - 8))
-                        height: Math.round(item ? item.implicitHeight : (Theme.barHeight - 8))
-                        Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-
-                        Binding {
-                            target: rModLoaderV.item
-                            property: "width"
-                            value: rModLoaderV.width
-                            when: rModLoaderV.item !== null
-                        }
-                    }
-                }
+                clusters: root.rightClusters
+                vertical: true
             }
         }
     }

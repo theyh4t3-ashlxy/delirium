@@ -23,14 +23,14 @@ Rectangle {
         return (qsMouse.containsMouse || popup.open) ? (qsRow.implicitWidth + 20) : pillSize;
     }
     implicitHeight: pillSize
-    radius: Theme.radiusPill
+    radius: Theme.barWidgetRadius
     color: {
         if (qsMouse.pressed) return Theme.widgetActive;
         if (popup.open) return Theme.primary_overlay;
-        if (qsMouse.containsMouse) return Theme.pillHover;
-        return Theme.pillBg;
+        if (qsMouse.containsMouse) return Theme.barPillHover;
+        return Theme.barPillBg;
     }
-    border.color: popup.open ? Theme.primary : Theme.pillBorder
+    border.color: popup.open ? Theme.primary : Theme.barPillBorder
     border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     clip: true
 
@@ -52,7 +52,8 @@ Rectangle {
     readonly property string configDir: Quickshell.env("XDG_CONFIG_HOME") || (userHome + "/.config")
     readonly property string lockStatePath: configDir + "/quickshell/lockscreen/state"
 
-    // synced with ~/.config/quickshell/lockscreen/state so we don't nuke the lockscreen keys
+    // synced with ~/.config/quickshell/lockscreen/state so we don't nuke extra lockscreen keys
+    property var _extraLockState: ({})
     property var lockCfg: ({
         syncClockGlobal: false,
         clock24h: false,
@@ -65,7 +66,7 @@ Rectangle {
         customNormX: 0.5,
         customNormY: 0.5,
         clockScale: 1.0,
-        quoteMode: "hyprland",
+        quoteMode: "smart",
         scrimDim: 0.58,
         focusZoom: 1.05,
         showMedia: true,
@@ -128,6 +129,7 @@ Rectangle {
         if (!raw || raw.trim() === "") return;
 
         let next = Object.assign({}, root.lockCfg);
+        let extras = {};
         const lines = raw.trim().split("\n");
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i].trim();
@@ -149,7 +151,10 @@ Rectangle {
                 case "customNormX": { let nx = parseFloat(v); if (!isNaN(nx)) next.customNormX = nx; break; }
                 case "customNormY": { let ny = parseFloat(v); if (!isNaN(ny)) next.customNormY = ny; break; }
                 case "clockScale": { let sc = parseFloat(v); if (!isNaN(sc)) next.clockScale = sc; break; }
-                case "quoteMode": if (v !== "") next.quoteMode = v; break;
+                case "quoteMode":
+                    if (v === "unhinged") next.quoteMode = "actions";
+                    else if (v !== "") next.quoteMode = v;
+                    break;
                 case "scrimDim": { let dm = parseFloat(v); if (!isNaN(dm)) next.scrimDim = dm; break; }
                 case "focusZoom": { let fz = parseFloat(v); if (!isNaN(fz)) next.focusZoom = fz; break; }
                 case "showMedia": next.showMedia = parseBool(v, next.showMedia); break;
@@ -157,8 +162,10 @@ Rectangle {
                 case "showUser": next.showUser = parseBool(v, next.showUser); break;
                 case "wallpaperSync": next.wallpaperSync = parseBool(v, next.wallpaperSync); break;
                 case "customWallpaper": next.customWallpaper = v; break;
+                default: extras[k] = v; break;
             }
         }
+        root._extraLockState = extras;
         root.lockCfg = next;
     }
 
@@ -187,7 +194,7 @@ Rectangle {
             "customNormX=" + Number(c.customNormX ?? 0.5).toFixed(4),
             "customNormY=" + Number(c.customNormY ?? 0.5).toFixed(4),
             "clockScale=" + Number(c.clockScale ?? 1.0).toFixed(2),
-            "quoteMode=" + (c.quoteMode || "hyprland"),
+            "quoteMode=" + (c.quoteMode || "smart"),
             "scrimDim=" + Number(c.scrimDim ?? 0.58).toFixed(2),
             "focusZoom=" + Number(c.focusZoom ?? 1.05).toFixed(3),
             "showMedia=" + (c.showMedia ? "1" : "0"),
@@ -196,6 +203,10 @@ Rectangle {
             "wallpaperSync=" + (c.wallpaperSync ? "1" : "0"),
             "customWallpaper=" + (c.customWallpaper || "")
         ];
+        const extras = root._extraLockState || {};
+        for (const ek in extras) {
+            lines.push(ek + "=" + extras[ek]);
+        }
         lockStateFile.setText(lines.join("\n") + "\n");
     }
 
@@ -224,8 +235,12 @@ Rectangle {
     }
 
     readonly property bool usingMaterialIcons: Settings.iconSet === "material"
+        || Settings.iconSet === "material-rounded"
+        || Settings.iconSet === "rounded"
         || Settings.iconSet === "material-outlined"
+        || Settings.iconSet === "outlined"
         || Settings.iconSet === "material-sharp"
+        || Settings.iconSet === "sharp"
 
     readonly property string activeTabTitle: ({
         layout: "bar & geometry",
@@ -280,7 +295,7 @@ Rectangle {
             running = true;
         }
         function restartCurrent() {
-            switchShell("restart");
+            Quickshell.execDetached([root.userHome + "/.local/bin/cli", "shell", "restart"]);
         }
         onExited: shellWatcher.reload()
     }
@@ -341,6 +356,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: catHdr.icon
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.primary
                 }
@@ -449,6 +465,7 @@ Rectangle {
                 anchors.centerIn: parent
                 text: trRoot.icon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.fontSizeXs
                 color: trRoot.checked ? Theme.primary : Theme.textSecondary
             }
@@ -595,9 +612,11 @@ Rectangle {
             color: Theme.textSecondary
         }
 
-        RowLayout {
+        GridLayout {
             Layout.fillWidth: true
-            spacing: 5
+            columns: crRoot.model.length >= 6 ? 3 : Math.max(1, crRoot.model.length)
+            columnSpacing: 5
+            rowSpacing: 5
 
             Repeater {
                 model: crRoot.model
@@ -631,7 +650,9 @@ Rectangle {
 
                     Text {
                         anchors.centerIn: parent
+                        width: Math.min(implicitWidth, Math.max(0, parent.width - 10))
                         text: itemText
+                        horizontalAlignment: Text.AlignHCenter
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: isSelected ? Theme.fontWeightBold : Theme.fontWeightMedium
@@ -915,6 +936,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: Theme.iconSettings
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
             color: popup.open || qsMouse.containsMouse ? Theme.primary : Theme.textPrimary
 
@@ -938,14 +960,19 @@ Rectangle {
         updatePos: () => root.updatePopupPos()
     }
 
-    // left click opens settings, right click jumps straight into Bar Layout Studio
+    // left click opens settings, right click opens Bar Layout Studio, middle click reloads shell
     MouseArea {
         id: qsMouse
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
         cursorShape: Qt.PointingHandCursor
         onClicked: (mouse) => {
+            if (mouse.button === Qt.MiddleButton) {
+                popup.open = false;
+                switchProc.restartCurrent();
+                return;
+            }
             if (mouse.button === Qt.RightButton) {
                 popup.open = false;
                 if (Settings) Settings.showBarStudio = !Settings.showBarStudio;
@@ -1042,6 +1069,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: Theme.iconSettings
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                         color: Theme.primary
                     }
@@ -1086,6 +1114,7 @@ Rectangle {
                             visible: !Theme.isTextIconSet
                             text: Theme.iconCheck
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.primary
                         }
@@ -1097,6 +1126,16 @@ Rectangle {
                             font.weight: Theme.fontWeightBold
                             color: Theme.primary
                         }
+                    }
+                }
+
+                IconButton {
+                    icon: Theme.iconRefresh
+                    iconSize: Theme.fontSizeSm
+                    tooltip: "reload shell"
+                    onClicked: {
+                        popup.open = false;
+                        switchProc.restartCurrent();
                     }
                 }
 
@@ -1169,6 +1208,7 @@ Rectangle {
                                     visible: !Theme.isTextIconSet
                                     text: modelData.icon
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     color: isSelected ? Theme.primary : Theme.textSecondary
                                 }
@@ -1242,6 +1282,7 @@ Rectangle {
                                         anchors.centerIn: parent
                                         text: Theme.iconSparkles
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                         color: Settings.showBarStudio ? Theme.on_primary : Theme.primary
                                     }
@@ -1392,12 +1433,48 @@ Rectangle {
                         }
 
                         CategoryHeader {
-                            title: "floating bar & island physics"
-                            subtitle: "detach the bar from the screen edge or split into bento islands"
+                            title: "bar layout, grouping & chrome"
+                            subtitle: "configure floating islands, module clusters, dividers, and widget framing"
                             icon: Theme.iconExpand
                         }
 
                         SettingCard {
+                            ChoiceRow {
+                                title: "module grouping"
+                                model: [
+                                    { label: "clusters", value: "clusters" },
+                                    { label: "3 zones", value: "zones" },
+                                    { label: "none", value: "none" }
+                                ]
+                                currentValue: Settings.barGrouping || "clusters"
+                                onSelected: (val) => Settings.barGrouping = val
+                            }
+
+                            ChoiceRow {
+                                title: "widget chrome style"
+                                model: [
+                                    { label: "grouped", value: "grouped" },
+                                    { label: "ghost", value: "ghost" },
+                                    { label: "underline", value: "underline" },
+                                    { label: "pills", value: "pills" }
+                                ]
+                                currentValue: Settings.barWidgetChrome || "grouped"
+                                onSelected: (val) => Settings.barWidgetChrome = val
+                            }
+
+                            ChoiceRow {
+                                title: "cluster dividers"
+                                model: [
+                                    { label: "hairline", value: "line" },
+                                    { label: "dot", value: "dot" },
+                                    { label: "none", value: "none" }
+                                ]
+                                currentValue: Settings.barDividers || "line"
+                                onSelected: (val) => Settings.barDividers = val
+                            }
+
+                            RowDivider {}
+
                             ToggleRow {
                                 icon: Theme.iconExpand
                                 title: "floating bar"
@@ -1809,9 +1886,7 @@ Rectangle {
                                 title: "icon pack"
                                 model: [
                                     { label: "material", value: "material" },
-                                    { label: "nerd fonts", value: "nerd" },
                                     { label: "windows segoe", value: "windows" },
-                                    { label: "font awesome", value: "awesome" },
                                     { label: "(ﾉ◕ヮ◕)ﾉ kaomoji", value: "kaomoji" },
                                     { label: "plain text", value: "text" }
                                 ]
@@ -1824,7 +1899,7 @@ Rectangle {
                                         Settings.fontMaterial !== "Material Symbols Sharp") {
                                         Settings.fontMaterial = "Material Symbols Rounded";
                                     }
-                                    Settings.vibeStyle = (value === "kaomoji" || value === "text") ? value : "nerd";
+                                    Settings.vibeStyle = (value === "kaomoji" || value === "text") ? value : "icon";
                                 }
                             }
 
@@ -1845,15 +1920,13 @@ Rectangle {
                                 }
                             }
 
-                            ChoiceRow {
-                                visible: Settings.iconSet === "nerd"
-                                title: "nerd font family"
-                                model: [
-                                    { label: "jetbrains mono nerd", value: "JetBrainsMono Nerd Font" },
-                                    { label: "jetbrains mono nf", value: "JetBrainsMono NF" }
-                                ]
-                                currentValue: Settings.fontNerd
-                                onSelected: (value) => Settings.fontNerd = value
+                            ToggleRow {
+                                visible: root.usingMaterialIcons
+                                icon: Theme.iconPalette
+                                title: "solid material fill"
+                                subtitle: "fill material symbols solid so sharp and rounded shapes pop"
+                                checked: Settings.materialFilled
+                                onToggled: Settings.materialFilled = !Settings.materialFilled
                             }
 
                             RowDivider {}
@@ -1960,6 +2033,7 @@ Rectangle {
                                     Text {
                                         text: Theme.iconSearch
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeSm
                                         color: fontSearchInput.activeFocus ? Theme.primary : Theme.textSecondary
                                     }
@@ -2055,6 +2129,7 @@ Rectangle {
                                                 visible: isCurrent && !Theme.isTextIconSet
                                                 text: Theme.iconCheck
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: Theme.primary
                                             }
@@ -2129,6 +2204,7 @@ Rectangle {
                                         anchors.centerIn: parent
                                         text: Theme.iconLock
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeMd
                                         color: Theme.primary
                                     }
@@ -2226,11 +2302,14 @@ Rectangle {
                             ChoiceRow {
                                 title: "lock screen quote source"
                                 model: [
-                                    { label: "hyprctl", value: "hyprland" },
-                                    { label: "unhinged", value: "unhinged" },
+                                    { label: "smart", value: "smart" },
+                                    { label: "hyprland", value: "hyprland" },
+                                    { label: "quotes", value: "quotes" },
+                                    { label: "actions", value: "actions" },
+                                    { label: "custom", value: "custom" },
                                     { label: "hidden", value: "off" }
                                 ]
-                                currentValue: root.lockCfg.quoteMode ?? "hyprland"
+                                currentValue: root.lockCfg.quoteMode === "unhinged" ? "actions" : (root.lockCfg.quoteMode ?? "smart")
                                 onSelected: (val) => root.updateLockCfg("quoteMode", val)
                             }
 
@@ -2488,13 +2567,17 @@ Rectangle {
                                 }
                             }
                             RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconFlame
-                                title: "unhinged flavor text"
-                                subtitle: "chaotic system status quips & personality"
-                                checked: Settings.unhingedFlavor
-                                onToggled: {
-                                    Settings.unhingedFlavor = !Settings.unhingedFlavor;
+                            ChoiceRow {
+                                title: "shell flavor text"
+                                model: [
+                                    { label: "actions", value: "actions" },
+                                    { label: "quotes", value: "quotes" },
+                                    { label: "hyprland", value: "hyprland" },
+                                    { label: "off", value: "off" }
+                                ]
+                                currentValue: Settings.flavorMode ?? "actions"
+                                onSelected: (value) => {
+                                    Settings.flavorMode = value;
                                     root.saveSettings();
                                 }
                             }
@@ -2573,6 +2656,7 @@ Rectangle {
                                                 visible: !Theme.isTextIconSet
                                                 text: modelData.icon
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.fontSizeSm
                                                 color: scQuickM.pressed ? Theme.on_primary : Theme.primary
                                             }
@@ -2822,6 +2906,7 @@ Rectangle {
                                                     anchors.centerIn: parent
                                                     text: modelData.icon
                                                     font.family: Theme.fontIcon
+                                                    font.variableAxes: Theme.iconAxes
                                                     font.pixelSize: Theme.fontSizeSm
                                                     color: root.activeShell === modelData.id ? Theme.on_primary : Theme.textSecondary
                                                 }
@@ -2901,6 +2986,7 @@ Rectangle {
                                     Text {
                                         text: Theme.iconRefresh
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeSm
                                         color: Theme.primary
                                     }
@@ -2970,6 +3056,7 @@ Rectangle {
                                             Text {
                                                 text: Theme.iconWifi
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: Theme.primary
                                             }
@@ -3038,6 +3125,7 @@ Rectangle {
                                     Text {
                                         text: Theme.iconFlame
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeMd
                                         color: Theme.error
                                     }
@@ -3113,6 +3201,7 @@ Rectangle {
                 Text {
                     text: Theme.iconCheck
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.primary
                 }
@@ -3170,6 +3259,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: Theme.iconFlame
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeXl
                         color: Theme.error
                     }

@@ -10,6 +10,7 @@ singleton BrightnessService services/BrightnessService.qml
 singleton ScreenshotService services/ScreenshotService.qml
 singleton ScreenRecService services/ScreenRecService.qml
 singleton TimerService     services/TimerService.qml
+singleton PresetService    services/PresetService.qml
 
 # bar, corners & overlays
 StatusBar                bar/StatusBar.qml

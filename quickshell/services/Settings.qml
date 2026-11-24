@@ -12,7 +12,7 @@ QtObject {
     property string barPosition: "top"
     property int barMargin: 0
     property bool barFloating: false
-    property int barHeight: 32
+    property int barHeight: 34
     property string barStyle: "regular"
     property int scoopRadius: 16
     property real scoopTension: 0.55228475
@@ -38,7 +38,6 @@ QtObject {
     property bool hoverAutoClose: true
     property bool barScrollWorkspaces: true
     property string workspaceMode: "slide"
-    property string fontNerd: "JetBrainsMono Nerd Font"
 
     property bool customColorsEnabled: false
     property string customBg: ""
@@ -54,8 +53,11 @@ QtObject {
     property int bentoGap: 8
     property bool bentoHoverLift: true
     property bool barIslandMode: true
+    property string barWidgetChrome: "grouped" // "grouped" | "ghost" | "underline" | "pills"
+    property string barGrouping: "clusters"    // "clusters" | "zones" | "none"
+    property string barDividers: "line"        // "line" | "dot" | "none"
     property bool adaptiveTransparency: true
-    property bool dynamicNotchFlared: true
+    property bool dynamicNotchFlared: false
     property int notchFlareRadius: 16
     property bool showLayoutSwitcher: true
 
@@ -136,8 +138,8 @@ QtObject {
     signal requestCaptureClose()
 
     property var barModulesLeft: ["launcher", "wallpaper", "workspaces", "layout", "windowTitle"]
-    property var barModulesCenter: ["clock"]
-    property var barModulesRight: ["media", "quickNotes", "screenCapture", "clipboard", "idleInhibitor", "notifications", "systemTray", "bluetooth", "network", "volume", "battery", "quickSettings", "powerMenu"]
+    property var barModulesCenter: ["clock", "notifications"]
+    property var barModulesRight: ["media", "screenCapture", "systemTray", "volume", "battery", "quickSettings", "powerMenu"]
     property bool showBarStudio: false
     property bool showScreenCapture: true
 
@@ -147,17 +149,23 @@ QtObject {
     property string awwwTransitionType: "wipe"
     property int awwwTransitionAngle: 30
     property int awwwTransitionStep: 90
-    property int awwwTransitionDuration: 3
+    property real awwwTransitionDuration: 3
     property int awwwTransitionFps: 60
     property string awwwFilter: "Lanczos3"
     property string awwwResize: "crop"
+    property string awwwCropGravity: "center"
+    property string awwwFillColor: "auto"
     property string awwwTransitionPos: "center"
+    property string awwwTransitionBezier: ".54,0,.34,.99"
+    property string awwwTransitionWave: "20,20"
+    property bool awwwInvertY: false
     property real mpvPanscan: 1.0
     property bool mpvAudio: false
 
     property string animSpeed: "snappy"
-    property bool unhingedFlavor: true
-    property string vibeStyle: "nerd"
+    property string flavorMode: "actions"   // "actions" | "quotes" | "hyprland" | "off"
+    readonly property bool unhingedFlavor: flavorMode !== "off"
+    property string vibeStyle: "icon"
     property bool dnd: false
 
     property bool showWorkspaces: true
@@ -191,8 +199,8 @@ QtObject {
     property string fontSans: fontFamily
     property string fontMono: "JetBrainsMono Nerd Font"
     property string fontWindows: "Segoe Fluent Icons"
-    property string fontAwesome: "Font Awesome 6 Free"
     property string fontMaterial: "Material Symbols Rounded"
+    property bool materialFilled: false
     property real fontScale: 1.0
     property string fontWeight: "regular"
     property var networkAliases: ({})
@@ -212,8 +220,8 @@ QtObject {
 
     property int barRadius: 0
     property real barOpacity: 1.0
-    property int widgetRadius: 2
-    property int popupRadius: 8
+    property int widgetRadius: 8
+    property int popupRadius: 16
     property int widgetSpacing: 4
     property int widgetPaddingH: 8
     property real popupOpacity: 1.0
@@ -303,7 +311,12 @@ QtObject {
     onAwwwTransitionFpsChanged: queueSave()
     onAwwwFilterChanged: queueSave()
     onAwwwResizeChanged: queueSave()
+    onAwwwCropGravityChanged: queueSave()
+    onAwwwFillColorChanged: queueSave()
     onAwwwTransitionPosChanged: queueSave()
+    onAwwwTransitionBezierChanged: queueSave()
+    onAwwwTransitionWaveChanged: queueSave()
+    onAwwwInvertYChanged: queueSave()
     onAnimSpeedChanged: queueSave()
     onUnhingedFlavorChanged: queueSave()
     onCurrentWallpaperChanged: queueSave()
@@ -354,8 +367,8 @@ QtObject {
     onFontFamilyChanged: queueSave()
     onFontMonoChanged: queueSave()
     onFontWindowsChanged: queueSave()
-    onFontAwesomeChanged: queueSave()
     onFontMaterialChanged: queueSave()
+    onMaterialFilledChanged: queueSave()
     onFontScaleChanged: queueSave()
     onFontWeightChanged: queueSave()
     onMpvPanscanChanged: queueSave()
@@ -412,7 +425,6 @@ QtObject {
     onHoverAutoCloseChanged: queueSave()
     onBarScrollWorkspacesChanged: queueSave()
     onWorkspaceModeChanged: queueSave()
-    onFontNerdChanged: queueSave()
     onWindowTitleModeChanged: queueSave()
     onWindowTitleMaxWidthChanged: queueSave()
     onWindowTitleShowIconChanged: queueSave()
@@ -454,6 +466,9 @@ QtObject {
     onBentoGapChanged: queueSave()
     onBentoHoverLiftChanged: queueSave()
     onBarIslandModeChanged: queueSave()
+    onBarWidgetChromeChanged: queueSave()
+    onBarGroupingChanged: queueSave()
+    onBarDividersChanged: queueSave()
     onGlobalRoundingChanged: {
         if (!root._loading) {
             if (popupRadius !== globalRounding) popupRadius = globalRounding;
@@ -476,7 +491,7 @@ QtObject {
         { key: "barPosition", type: "string", def: "top" },
         { key: "barMargin", type: "int", def: 0 },
         { key: "barFloating", type: "bool", def: false },
-        { key: "barHeight", type: "int", def: 32 },
+        { key: "barHeight", type: "int", def: 34 },
         { key: "barStyle", type: "string", def: "regular" },
         { key: "scoopRadius", type: "int", def: 16 },
         { key: "scoopTension", type: "float", def: 0.55228475 },
@@ -492,17 +507,22 @@ QtObject {
         { key: "awwwTransitionType", type: "string", def: "wipe" },
         { key: "awwwTransitionAngle", type: "int", def: 30 },
         { key: "awwwTransitionStep", type: "int", def: 90 },
-        { key: "awwwTransitionDuration", type: "int", def: 3 },
+        { key: "awwwTransitionDuration", type: "float", def: 3 },
         { key: "awwwTransitionFps", type: "int", def: 60 },
         { key: "awwwFilter", type: "string", def: "Lanczos3" },
         { key: "awwwResize", type: "string", def: "crop" },
+        { key: "awwwCropGravity", type: "string", def: "center" },
+        { key: "awwwFillColor", type: "string", def: "auto" },
         { key: "awwwTransitionPos", type: "string", def: "center" },
+        { key: "awwwTransitionBezier", type: "string", def: ".54,0,.34,.99" },
+        { key: "awwwTransitionWave", type: "string", def: "20,20" },
+        { key: "awwwInvertY", type: "bool", def: false },
         { key: "mpvPanscan", type: "float", def: 1.0 },
         { key: "mpvAudio", type: "bool", def: false },
         { key: "dnd", type: "bool", def: false },
-        { key: "vibeStyle", type: "string", def: "nerd" },
+        { key: "vibeStyle", type: "string", def: "icon" },
         { key: "animSpeed", type: "string", def: "snappy" },
-        { key: "unhingedFlavor", type: "bool", def: true },
+        { key: "flavorMode", type: "string", def: "actions" },
         { key: "showWorkspaces", type: "bool", def: true },
         { key: "showLayoutSwitcher", type: "bool", def: true },
         { key: "showWindowTitle", type: "bool", def: true },
@@ -528,8 +548,8 @@ QtObject {
         { key: "lockscreenWallpaper", type: "string", def: "" },
         { key: "lockscreenShowMedia", type: "bool", def: true },
         { key: "barModulesLeft", type: "json", def: ["launcher", "wallpaper", "workspaces", "layout", "windowTitle"] },
-        { key: "barModulesCenter", type: "json", def: ["clock"] },
-        { key: "barModulesRight", type: "json", def: ["media", "quickNotes", "screenCapture", "clipboard", "idleInhibitor", "notifications", "systemTray", "bluetooth", "network", "volume", "battery", "quickSettings", "powerMenu"] },
+        { key: "barModulesCenter", type: "json", def: ["clock", "notifications"] },
+        { key: "barModulesRight", type: "json", def: ["media", "screenCapture", "systemTray", "volume", "battery", "quickSettings", "powerMenu"] },
         { key: "iconSet", type: "string", def: "material" },
         { key: "clockFormat", type: "string", def: "HH:mm" },
         { key: "dateFormat", type: "string", def: "ddd, MMM d" },
@@ -538,8 +558,8 @@ QtObject {
         { key: "fontFamily", type: "string", def: "Noto Sans" },
         { key: "fontMono", type: "string", def: "JetBrainsMono Nerd Font" },
         { key: "fontWindows", type: "string", def: "Segoe Fluent Icons" },
-        { key: "fontAwesome", type: "string", def: "Font Awesome 6 Free" },
         { key: "fontMaterial", type: "string", def: "Material Symbols Rounded" },
+        { key: "materialFilled", type: "bool", def: false },
         { key: "fontScale", type: "float", def: 1.0 },
         { key: "fontWeight", type: "string", def: "regular" },
         { key: "networkAliases", type: "json", def: ({}) },
@@ -557,8 +577,8 @@ QtObject {
         { key: "screenshotFlash", type: "bool", def: true },
         { key: "barRadius", type: "int", def: 0 },
         { key: "barOpacity", type: "float", def: 1.0 },
-        { key: "widgetRadius", type: "int", def: 2 },
-        { key: "popupRadius", type: "int", def: 8 },
+        { key: "widgetRadius", type: "int", def: 8 },
+        { key: "popupRadius", type: "int", def: 16 },
         { key: "widgetSpacing", type: "int", def: 4 },
         { key: "widgetPaddingH", type: "int", def: 8 },
         { key: "popupOpacity", type: "float", def: 1.0 },
@@ -584,7 +604,6 @@ QtObject {
         { key: "hoverAutoClose", type: "bool", def: true },
         { key: "barScrollWorkspaces", type: "bool", def: true },
         { key: "workspaceMode", type: "string", def: "slide" },
-        { key: "fontNerd", type: "string", def: "JetBrainsMono Nerd Font" },
         { key: "windowTitleMode", type: "string", def: "auto" },
         { key: "windowTitleMaxWidth", type: "int", def: 760 },
         { key: "windowTitleShowIcon", type: "bool", def: true },
@@ -614,9 +633,12 @@ QtObject {
         { key: "bentoGap", type: "int", def: 8 },
         { key: "bentoHoverLift", type: "bool", def: true },
         { key: "barIslandMode", type: "bool", def: true },
+        { key: "barWidgetChrome", type: "string", def: "grouped" },
+        { key: "barGrouping", type: "string", def: "clusters" },
+        { key: "barDividers", type: "string", def: "line" },
         { key: "launcherCustomCategories", type: "json", def: [] },
         { key: "adaptiveTransparency", type: "bool", def: true },
-        { key: "dynamicNotchFlared", type: "bool", def: true },
+        { key: "dynamicNotchFlared", type: "bool", def: false },
         { key: "notchFlareRadius", type: "int", def: 16 }
     ]
 
@@ -742,6 +764,19 @@ QtObject {
         }
         root._loading = true;
         loadObject(data);
+        if (data.flavorMode === undefined && data.unhingedFlavor !== undefined) {
+            root.flavorMode = (data.unhingedFlavor === true || data.unhingedFlavor === "true") ? "actions" : "off";
+        } else if (root.flavorMode === "unhinged") {
+            root.flavorMode = "actions";
+        } else if (!["actions", "quotes", "hyprland", "off"].includes(root.flavorMode)) {
+            root.flavorMode = "actions";
+        }
+        if (root.iconSet === "nerd" || root.iconSet === "awesome") {
+            root.iconSet = "material";
+        }
+        if (root.vibeStyle === "nerd") {
+            root.vibeStyle = "icon";
+        }
         if (data.clockFormat !== undefined) {
             let is12 = /ap/i.test(root.clockFormat);
             root.clockMilitary = !is12;
@@ -924,8 +959,12 @@ QtObject {
 
     function resetBarLayout() {
         barModulesLeft = ["launcher", "wallpaper", "workspaces", "layout", "windowTitle"];
-        barModulesCenter = ["clock"];
-        barModulesRight = ["media", "quickNotes", "screenCapture", "clipboard", "idleInhibitor", "notifications", "systemTray", "bluetooth", "network", "volume", "battery", "quickSettings", "powerMenu"];
+        barModulesCenter = ["clock", "notifications"];
+        barModulesRight = ["media", "screenCapture", "systemTray", "volume", "battery", "quickSettings", "powerMenu"];
+        barGrouping = "clusters";
+        barWidgetChrome = "grouped";
+        barDividers = "line";
+        dynamicNotchFlared = false;
     }
 
     function dispatchCloseWindow() {

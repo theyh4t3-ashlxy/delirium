@@ -100,6 +100,7 @@ Item {
                     Text {
                         text: Theme.iconSearch
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeSm
                         color: searchInput.activeFocus ? Theme.primary : Theme.on_surface_variant
                     }
@@ -349,6 +350,7 @@ Item {
                             Layout.alignment: Qt.AlignHCenter
                             text: Theme.iconSearch
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeXl
                             color: Theme.on_surface_variant
                         }

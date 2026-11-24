@@ -8,7 +8,7 @@ Shape {
     property real radius: 16
     property real radiusX: radius
     property real radiusY: radius
-    property color color: "#1e1e2d"
+    property color color: Theme?.cornerFill ?? Theme?.barBg ?? "#1e1e2d"
     property alias fillColor: root.color
 
     property bool isTop: true

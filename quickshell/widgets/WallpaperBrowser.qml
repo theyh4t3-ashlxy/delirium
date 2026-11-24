@@ -18,22 +18,24 @@ Rectangle {
     readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
     readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
 
+    readonly property int pillSize: Theme.barHeight - 8
+
     implicitWidth: {
-        if (Theme.isVertical) return Theme.barHeight - 8;
-        if (wpMouse.containsMouse || popup.open) return wpRow.implicitWidth + 20;
-        return Theme.barHeight - 8;
+        if (Theme.isVertical) return root.pillSize;
+        if (Theme.isTextIconSet) return wpRow.implicitWidth + 20;
+        return root.pillSize;
     }
-    implicitHeight: Theme.barHeight - 8
-    radius: Theme.radiusPill
+    implicitHeight: root.pillSize
+    radius: Theme.barWidgetRadius
     visible: Settings?.showWallpaper ?? true
 
     color: {
         if (wpMouse.pressed) return Theme.widgetActive;
         if (popup.open) return Theme.primary_overlay;
-        if (wpMouse.containsMouse) return Theme.pillHover;
-        return Theme.pillBg;
+        if (wpMouse.containsMouse) return Theme.barPillHover;
+        return Theme.barPillBg;
     }
-    border.color: popup.open ? Theme.primary : Theme.pillBorder
+    border.color: popup.open ? Theme.alpha(Theme.primary, 0.55) : Theme.barPillBorder
     border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     clip: true
 
@@ -44,9 +46,12 @@ Rectangle {
     property string activeTab: "local"
     property string localCategoryFilter: "all"
     property string localSubCategoryFilter: "all"
+    property string localMediaFilter: "all" // "all" | "images" | "gif" | "video"
+    property string localSortMode: "name"   // "name" | "category"
     property string localSearchQuery: ""
     property string onlineQuery: ""
     property string onlineSorting: "date_added"
+    property string onlineCategories: "111"
     property int onlinePage: 1
 
     readonly property string nativeRes: {
@@ -83,10 +88,58 @@ Rectangle {
         return res;
     }
 
+    readonly property var localFilenameSet: {
+        let map = {};
+        let items = root.allLocalWallpapers || [];
+        for (let i = 0; i < items.length; i++) {
+            let p = items[i]?.path || "";
+            if (!p) continue;
+            let slash = p.lastIndexOf("/");
+            let fname = (slash >= 0 ? p.slice(slash + 1) : p).toLowerCase();
+            if (fname) map[fname] = true;
+            // Also index wallhaven id if file starts with wallhaven-<id>
+            let m = fname.match(/wallhaven-([a-z0-9]+)/);
+            if (m && m[1]) map[m[1]] = true;
+        }
+        return map;
+    }
+
+    function hasLocalWallpaper(idOrUrl): bool {
+        if (!idOrUrl) return false;
+        let low = String(idOrUrl).toLowerCase();
+        if (root.localFilenameSet[low]) return true;
+        let m = low.match(/wallhaven-([a-z0-9]+)/);
+        return Boolean(m && m[1] && root.localFilenameSet[m[1]]);
+    }
+
+    function getBasename(p): string {
+        if (!p) return "";
+        let idx = p.lastIndexOf("/");
+        return idx >= 0 ? p.slice(idx + 1) : p;
+    }
+
+    function saveAwwSetting(fn) {
+        if (Settings) {
+            fn();
+            if (Settings.save) Settings.save();
+        }
+    }
+
     Timer {
         id: batchStatusResetTimer
         interval: 4000
         onTriggered: root.batchStatusText = ""
+    }
+
+    Connections {
+        target: WallpaperService
+        function onCommandFinished(ok) {
+            if (root.isBatchDownloading) {
+                root.isBatchDownloading = false;
+                root.batchStatusText = ok ? "saved wallpapers to library" : "download failed";
+                batchStatusResetTimer.restart();
+            }
+        }
     }
 
     function focusActiveInput() {
@@ -101,7 +154,11 @@ Rectangle {
     Connections {
         target: popup
         function onOpenChanged() {
-            if (popup.open) root.focusActiveInput();
+            if (popup.open) {
+                root.reloadLocalWallpapers();
+                if (WallpaperService?.queryAwwwState) WallpaperService.queryAwwwState();
+                root.focusActiveInput();
+            }
         }
     }
 
@@ -195,7 +252,7 @@ Rectangle {
         if (q !== "") params.push("q=" + encodeURIComponent(q));
         params.push("sorting=" + encodeURIComponent(s));
         params.push("page=" + p);
-        params.push("categories=111");
+        params.push("categories=" + encodeURIComponent(root.onlineCategories || "111"));
         params.push("purity=100");
 
         if (r !== "" && r.toLowerCase() !== "any") {
@@ -226,9 +283,10 @@ Rectangle {
 
         if (WallpaperService?.batchDownload) {
             WallpaperService.batchDownload(urls);
+        } else {
+            root.isBatchDownloading = false;
+            batchStatusResetTimer.restart();
         }
-        root.isBatchDownloading = false;
-        batchStatusResetTimer.restart();
     }
 
     function downloadCurrentSection() {
@@ -254,6 +312,9 @@ Rectangle {
         property string title: ""
         property string icon: ""
         property string badge: ""
+        property string actionLabel: ""
+        property string actionIcon: ""
+        signal actionClicked()
         default property alias body: cardCol.data
 
         Layout.fillWidth: true
@@ -288,6 +349,7 @@ Rectangle {
                     visible: sCard.icon !== "" && !Theme.isTextIconSet
                     text: sCard.icon
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.fontSizeSm
                     color: Theme.primary
                 }
@@ -319,6 +381,49 @@ Rectangle {
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Font.Bold
                         color: Theme.primary
+                    }
+                }
+
+                Rectangle {
+                    visible: sCard.actionLabel !== ""
+                    height: 22
+                    implicitWidth: actionRow.implicitWidth + 14
+                    radius: Theme.radiusPill
+                    color: sActionMouse.containsMouse ? Theme.primary : Theme.widgetBg
+                    border.color: sActionMouse.containsMouse ? Theme.primary : Theme.widgetBorder
+                    border.width: 1
+
+                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                    RowLayout {
+                        id: actionRow
+                        anchors.centerIn: parent
+                        spacing: 4
+
+                        Text {
+                            visible: sCard.actionIcon !== "" && !Theme.isTextIconSet
+                            text: sCard.actionIcon
+                            font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
+                            font.pixelSize: Theme.fontSizeXs
+                            color: sActionMouse.containsMouse ? Theme.on_primary : Theme.primary
+                        }
+
+                        Text {
+                            text: sCard.actionLabel
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: Font.Bold
+                            color: sActionMouse.containsMouse ? Theme.on_primary : Theme.on_surface
+                        }
+                    }
+
+                    MouseArea {
+                        id: sActionMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: sCard.actionClicked()
                     }
                 }
             }
@@ -364,6 +469,7 @@ Rectangle {
             Text {
                 text: fieldRoot.icon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                 color: inputItem.activeFocus ? Theme.primary : Theme.on_surface_variant
             }
@@ -474,6 +580,7 @@ Rectangle {
                 visible: chipRoot.icon !== "" && (!Theme.isTextIconSet || chipRoot.label === "")
                 text: chipRoot.icon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: chipRoot.fontSize
                 color: chipRoot.selected ? chipRoot.activeFg : chipRoot.inactiveFg
             }
@@ -523,6 +630,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: emptyRoot.loading ? Theme.iconRefresh : emptyRoot.icon
                     font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeMd : Theme.fontSizeTitle
                     color: emptyRoot.loading ? Theme.primary : Theme.on_surface_variant
 
@@ -556,6 +664,7 @@ Rectangle {
         property string tagText: ""
         property bool tagAccent: false
         property bool isSelected: false
+        property bool isSavedLocal: false
         property bool allowDownload: false
         signal applyRequested()
         signal downloadRequested()
@@ -575,6 +684,7 @@ Rectangle {
             Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
             Image {
+                id: cardImg
                 anchors.fill: parent
                 source: (cardRoot.thumbUrl.startsWith("http://") || cardRoot.thumbUrl.startsWith("https://") || cardRoot.thumbUrl.startsWith("file://"))
                     ? cardRoot.thumbUrl
@@ -582,6 +692,26 @@ Rectangle {
                 sourceSize: Qt.size(280, 180)
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
+                opacity: status === Image.Ready ? 1.0 : 0.0
+                scale: cardMouse.containsMouse ? 1.04 : 1.0
+
+                Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                visible: cardImg.status !== Image.Ready
+                color: Theme.surface_container_high
+
+                Text {
+                    anchors.centerIn: parent
+                    text: cardImg.status === Image.Error ? Theme.iconClose : Theme.iconWallpaper
+                    font.family: Theme.fontIcon
+                    font.variableAxes: Theme.iconAxes
+                    font.pixelSize: Theme.fontSizeLg
+                    color: Theme.on_surface_disabled
+                }
             }
 
             Rectangle {
@@ -651,15 +781,16 @@ Rectangle {
                     height: 20
                     width: 20
                     radius: Theme.radiusPill
-                    color: Theme.primary
-                    visible: cardRoot.isSelected
+                    color: cardRoot.isSelected ? Theme.primary : Theme.secondary
+                    visible: cardRoot.isSelected || cardRoot.isSavedLocal
 
                     Text {
                         anchors.centerIn: parent
                         text: Theme.iconCheck
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeXs
-                        color: Theme.on_primary
+                        color: cardRoot.isSelected ? Theme.on_primary : Theme.on_secondary
                     }
                 }
             }
@@ -703,6 +834,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: Theme.iconDownload
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.fontSizeXs
                         color: dlMouse.containsMouse ? Theme.on_primary : Theme.on_surface
                     }
@@ -729,6 +861,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: Theme.iconWallpaper
             font.family: Theme.fontIcon
+            font.variableAxes: Theme.iconAxes
             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
             color: popup.open || wpMouse.containsMouse ? Theme.primary : Theme.on_surface
 
@@ -737,13 +870,31 @@ Rectangle {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            visible: !Theme.isVertical && (wpMouse.containsMouse || popup.open)
-            text: "wallpapers"
+            visible: !Theme.isVertical && Theme.isTextIconSet
+            text: "wall"
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSm
+            font.pixelSize: Theme.fontSizeXs
             font.weight: Font.Medium
             color: Theme.on_surface
         }
+    }
+
+    Rectangle {
+        visible: (WallpaperService?.mpvActive ?? false) || (WallpaperService?.awwwPaused ?? false)
+        width: 5
+        height: 5
+        radius: 3
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 4
+        color: (WallpaperService?.awwwPaused ?? false) ? Theme.warn : Theme.primary
+    }
+
+    HoverFlyoutHandler {
+        id: wpHoverHandler
+        popup: popup
+        mouseArea: wpMouse
+        updatePos: () => root.syncAnchor()
     }
 
     // left click opens browser, right click rolls random wallpaper, middle click toggles dark/light mode
@@ -764,9 +915,7 @@ Rectangle {
                 }
                 return;
             }
-            root.syncAnchor();
-            popup.open = !popup.open;
-            if (popup.open) reloadLocalWallpapers();
+            wpHoverHandler.handlePillClick();
         }
     }
 
@@ -797,7 +946,7 @@ Rectangle {
         wantsFocus: true
         keyboardFocusMode: WlrKeyboardFocus.OnDemand
         cardWidth: 760
-        cardHeight: Math.min(600, (popup.screen?.height ?? 800) - 80)
+        cardHeight: Math.min(640, (popup.screen?.height ?? 800) - 80)
         targetRelativeX: 0
         targetRelativeY: 0
 
@@ -822,6 +971,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: Theme.iconWallpaper
                         font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
                         font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                         color: Theme.primary
                     }
@@ -876,6 +1026,16 @@ Rectangle {
                             onClicked: if (WallpaperService) WallpaperService.targetMonitor = modelData.name
                         }
                     }
+                }
+
+                Chip {
+                    visible: WallpaperService?.mpvActive ?? false
+                    icon: Theme.iconClose
+                    label: "stop video"
+                    chipHeight: 28
+                    inactiveBg: Theme.error_overlay
+                    inactiveFg: Theme.error
+                    onClicked: if (WallpaperService?.stopLiveWallpaper) WallpaperService.stopLiveWallpaper()
                 }
 
                 Chip {
@@ -959,6 +1119,7 @@ Rectangle {
                                     visible: !Theme.isTextIconSet
                                     text: modelData.icon
                                     font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     color: isSelected ? Theme.primary : Theme.on_surface_variant
                                 }
@@ -1024,6 +1185,7 @@ Rectangle {
                     let items = root.allLocalWallpapers || [];
                     let pFilter = root.localCategoryFilter;
                     let subFilter = root.localSubCategoryFilter;
+                    let mFilter = root.localMediaFilter;
                     let sQuery = root.localSearchQuery.trim().toLowerCase();
                     for (let i = 0; i < items.length; i++) {
                         let item = items[i];
@@ -1034,16 +1196,114 @@ Rectangle {
                         let subCat = item.subCategory ?? "";
                         let pMatch = pFilter === "all" || pCat === pFilter || catStr.indexOf(pFilter.toLowerCase()) !== -1;
                         let subMatch = subFilter === "all" || subCat === subFilter;
+                        let isVid = Boolean(item.isVideo);
+                        let isGif = Boolean(item.isGif);
+                        let mMatch = mFilter === "all"
+                            || (mFilter === "video" && isVid)
+                            || (mFilter === "gif" && isGif)
+                            || (mFilter === "images" && !isVid && !isGif);
                         let searchMatch = sQuery === "" || nameStr.indexOf(sQuery) !== -1 || catStr.indexOf(sQuery) !== -1;
 
-                        if (pMatch && subMatch && searchMatch) result.push(item);
+                        if (pMatch && subMatch && mMatch && searchMatch) result.push(item);
+                    }
+                    if (root.localSortMode === "name") {
+                        result.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+                    } else if (root.localSortMode === "category") {
+                        result.sort((a, b) => (a.category || "").localeCompare(b.category || "") || (a.name || "").localeCompare(b.name || ""));
                     }
                     return result;
                 }
 
+                // compact active wallpaper summary strip
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 42
+                    visible: (WallpaperService?.currentWallpaperPath ?? "") !== ""
+                    radius: Theme.radiusMd
+                    color: Theme.cardBg
+                    border.color: Theme.cardBorder
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 8
+
+                        Rectangle {
+                            Layout.preferredWidth: 44
+                            Layout.preferredHeight: 28
+                            radius: Theme.radiusSm
+                            color: Theme.surface_container_high
+                            clip: true
+                            border.color: Theme.widgetBorder
+                            border.width: 1
+
+                            Image {
+                                anchors.fill: parent
+                                source: {
+                                    let p = WallpaperService?.currentWallpaperPath ?? "";
+                                    return p ? ("file://" + p) : "";
+                                }
+                                sourceSize: Qt.size(88, 56)
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: root.getBasename(WallpaperService?.currentWallpaperPath ?? "")
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeXs
+                                font.weight: Font.Bold
+                                color: Theme.on_surface
+                                elide: Text.ElideMiddle
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: {
+                                    let parts = [
+                                        WallpaperService?.currentMode ?? "dark",
+                                        (WallpaperService?.currentSchemeType ?? "scheme-tonal-spot").replace("scheme-", "")
+                                    ];
+                                    if (WallpaperService?.mpvActive) parts.push("mpvpaper live");
+                                    else parts.push((Settings?.awwwTransitionType ?? "wipe") + (WallpaperService?.awwwPaused ? " (paused)" : ""));
+                                    return parts.join(" • ");
+                                }
+                                font.family: Theme.fontMono
+                                font.pixelSize: Math.max(9, Theme.fontSizeXs - 1)
+                                color: Theme.on_surface_variant
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Chip {
+                            icon: (WallpaperService?.awwwPaused ?? false) ? Theme.iconPlay : Theme.iconPause
+                            label: (WallpaperService?.awwwPaused ?? false) ? "resume" : "pause"
+                            chipHeight: 26
+                            visible: !(WallpaperService?.mpvActive ?? false)
+                            selected: WallpaperService?.awwwPaused ?? false
+                            onClicked: if (WallpaperService?.toggleAwwwPause) WallpaperService.toggleAwwwPause()
+                        }
+
+                        Chip {
+                            icon: Theme.iconRefresh
+                            label: "reapply"
+                            chipHeight: 26
+                            onClicked: if (WallpaperService?.reapplyTheme) WallpaperService.reapplyTheme()
+                        }
+                    }
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 8
+                    spacing: 6
 
                     SearchField {
                         id: localSearchField
@@ -1053,9 +1313,34 @@ Rectangle {
                         onCleared: root.localSearchQuery = ""
                     }
 
+                    Repeater {
+                        model: [
+                            { id: "all", label: "all" },
+                            { id: "images", label: "img" },
+                            { id: "gif", label: "gif" },
+                            { id: "video", label: "vid" }
+                        ]
+                        delegate: Chip {
+                            required property var modelData
+                            label: modelData.label
+                            chipHeight: 36
+                            selected: root.localMediaFilter === modelData.id
+                            inactiveBg: Theme.cardBg
+                            onClicked: root.localMediaFilter = modelData.id
+                        }
+                    }
+
+                    Chip {
+                        icon: Theme.iconFilter
+                        label: root.localSortMode === "name" ? "a-z" : "dir"
+                        chipHeight: 36
+                        inactiveBg: Theme.cardBg
+                        onClicked: root.localSortMode = (root.localSortMode === "name" ? "category" : "name")
+                    }
+
                     Chip {
                         icon: Theme.iconShuffle
-                        label: "random here"
+                        label: "random"
                         chipHeight: 36
                         inactiveBg: Theme.cardBg
                         onClicked: root.rollRandomWallpaper()
@@ -1063,12 +1348,22 @@ Rectangle {
                 }
 
                 Flickable {
+                    id: catFlick
                     Layout.fillWidth: true
                     Layout.preferredHeight: 28
                     contentWidth: unifiedCatRow.implicitWidth
                     flickableDirection: Flickable.HorizontalFlick
                     boundsBehavior: Flickable.StopAtBounds
                     clip: true
+
+                    WheelHandler {
+                        onWheel: (wheel) => {
+                            let dx = (wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x) * 0.6;
+                            let maxX = Math.max(0, catFlick.contentWidth - catFlick.width);
+                            catFlick.contentX = Math.max(0, Math.min(maxX, catFlick.contentX - dx));
+                            wheel.accepted = true;
+                        }
+                    }
 
                     RowLayout {
                         id: unifiedCatRow
@@ -1101,6 +1396,7 @@ Rectangle {
                             visible: localView.uniqueSubCategories.length > 0 && !Theme.isTextIconSet
                             text: Theme.iconFolder
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.primary
                         }
@@ -1222,6 +1518,26 @@ Rectangle {
 
                     Item { Layout.fillWidth: true }
 
+                    Repeater {
+                        model: [
+                            { label: "all", val: "111" },
+                            { label: "gen", val: "100" },
+                            { label: "anime", val: "010" },
+                            { label: "ppl", val: "001" }
+                        ]
+
+                        delegate: Chip {
+                            required property var modelData
+                            label: modelData.label
+                            selected: root.onlineCategories === modelData.val
+                            chipHeight: 26
+                            onClicked: {
+                                root.onlineCategories = modelData.val;
+                                fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
+                            }
+                        }
+                    }
+
                     Chip {
                         icon: Theme.iconChevronLeft
                         chipHeight: 26
@@ -1288,6 +1604,7 @@ Rectangle {
                         badgeText: modelData?.resolution ?? ""
                         tagText: modelData?.fileType ?? ""
                         tagAccent: modelData?.fileType === "png"
+                        isSavedLocal: root.hasLocalWallpaper(modelData?.fullUrl || modelData?.id)
                         allowDownload: true
                         onApplyRequested: if (WallpaperService?.setWallpaper) WallpaperService.setWallpaper(modelData.fullUrl)
                         onDownloadRequested: root.downloadUrls([modelData.fullUrl])
@@ -1349,6 +1666,38 @@ Rectangle {
                             }
                         }
                     }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Chip {
+                        icon: Theme.iconClose
+                        label: (WallpaperService?.mpvActive ?? false) ? "stop active video" : "stop video"
+                        chipHeight: 28
+                        selected: WallpaperService?.mpvActive ?? false
+                        activeBg: Theme.error_overlay
+                        activeFg: Theme.error
+                        onClicked: if (WallpaperService?.stopLiveWallpaper) WallpaperService.stopLiveWallpaper()
+                    }
+
+                    Chip {
+                        icon: (WallpaperService?.awwwPaused ?? false) ? Theme.iconPlay : Theme.iconPause
+                        label: (WallpaperService?.awwwPaused ?? false) ? "resume gif engine" : "pause gif engine"
+                        chipHeight: 28
+                        selected: WallpaperService?.awwwPaused ?? false
+                        onClicked: if (WallpaperService?.toggleAwwwPause) WallpaperService.toggleAwwwPause()
+                    }
+
+                    Chip {
+                        icon: Theme.iconTrash
+                        label: "clear awww cache"
+                        chipHeight: 28
+                        onClicked: if (WallpaperService?.clearAwwwCache) WallpaperService.clearAwwwCache()
+                    }
+
+                    Item { Layout.fillWidth: true }
                 }
 
                 GridView {
@@ -1507,6 +1856,15 @@ Rectangle {
                                         WallpaperService.applyColor(h);
                                     }
                                 }
+
+                                Connections {
+                                    target: Theme
+                                    function onPaletteColorsChanged() {
+                                        if (Theme.source_color && !hexField.activeFocus) {
+                                            hexField.text = String(Theme.source_color);
+                                        }
+                                    }
+                                }
                             }
 
                             Chip {
@@ -1556,9 +1914,12 @@ Rectangle {
                     }
 
                     SettingCard {
-                        title: "awww transition engine"
+                        title: "awww transition & scaling engine"
                         icon: Theme.iconFlame
-                        badge: (Settings?.awwwTransitionType ?? "fade") + " • " + (Settings?.awwwTransitionFps ?? 60) + " fps"
+                        badge: (Settings?.awwwTransitionType ?? "wipe") + " • " + (Settings?.awwwTransitionDuration ?? 3) + "s • " + (Settings?.awwwTransitionFps ?? 60) + " fps"
+                        actionLabel: "preview effect"
+                        actionIcon: Theme.iconPlay
+                        onActionClicked: if (WallpaperService?.reapplyTheme) WallpaperService.reapplyTheme()
 
                         RowLayout {
                             Layout.fillWidth: true
@@ -1589,10 +1950,7 @@ Rectangle {
                                             fillWidth: true
                                             chipHeight: 26
                                             onClicked: {
-                                                if (Settings) {
-                                                    Settings.awwwResize = modelData.val;
-                                                    if (Settings.save) Settings.save();
-                                                }
+                                                root.saveAwwSetting(() => Settings.awwwResize = modelData.val);
                                                 if (WallpaperService?.reapplyTheme) WallpaperService.reapplyTheme();
                                             }
                                         }
@@ -1611,7 +1969,7 @@ Rectangle {
                                     spacing: 6
 
                                     Repeater {
-                                        model: ["Lanczos3", "Bilinear", "CatmullRom", "Mitchell", "Nearest"]
+                                        model: ["Lanczos3", "Mitchell", "CatmullRom", "Bilinear", "Nearest"]
 
                                         delegate: Chip {
                                             required property string modelData
@@ -1619,12 +1977,99 @@ Rectangle {
                                             selected: (Settings?.awwwFilter ?? "Lanczos3") === modelData
                                             fillWidth: true
                                             chipHeight: 26
-                                            onClicked: {
-                                                if (Settings) {
-                                                    Settings.awwwFilter = modelData;
-                                                    if (Settings.save) Settings.save();
-                                                }
-                                            }
+                                            onClicked: root.saveAwwSetting(() => Settings.awwwFilter = modelData)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // --crop-gravity (awww 0.12.1 requires --resize crop)
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            visible: (Settings?.awwwResize ?? "crop") === "crop"
+
+                            GroupLabel { text: "crop gravity anchor" }
+
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 3
+                                rowSpacing: 5
+                                columnSpacing: 6
+
+                                Repeater {
+                                    model: [
+                                        "top-left", "top", "top-right",
+                                        "left", "center", "right",
+                                        "bottom-left", "bottom", "bottom-right"
+                                    ]
+
+                                    delegate: Chip {
+                                        required property string modelData
+                                        label: modelData
+                                        selected: (Settings?.awwwCropGravity ?? "center") === modelData
+                                        fillWidth: true
+                                        chipHeight: 24
+                                        onClicked: {
+                                            root.saveAwwSetting(() => Settings.awwwCropGravity = modelData);
+                                            if (WallpaperService?.reapplyTheme) WallpaperService.reapplyTheme();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // --fill-color (for fit / center padding)
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            visible: {
+                                let r = Settings?.awwwResize ?? "crop";
+                                return r === "fit" || r === "no";
+                            }
+
+                            GroupLabel { text: "padding fill color" }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                Repeater {
+                                    model: [
+                                        { label: "auto (theme bg)", val: "auto" },
+                                        { label: "pitch black", val: "000000" },
+                                        { label: "dark slate", val: "181a20" },
+                                        { label: "white", val: "ffffff" }
+                                    ]
+
+                                    delegate: Chip {
+                                        required property var modelData
+                                        label: modelData.label
+                                        selected: (Settings?.awwwFillColor ?? "auto").toLowerCase() === modelData.val
+                                        fillWidth: true
+                                        chipHeight: 26
+                                        onClicked: {
+                                            root.saveAwwSetting(() => Settings.awwwFillColor = modelData.val);
+                                            if (WallpaperService?.reapplyTheme) WallpaperService.reapplyTheme();
+                                        }
+                                    }
+                                }
+
+                                SearchField {
+                                    id: fillHexField
+                                    Layout.fillWidth: false
+                                    Layout.preferredWidth: 115
+                                    Layout.preferredHeight: 26
+                                    icon: Theme.iconPalette
+                                    text: Settings?.awwwFillColor ?? "auto"
+                                    placeholder: "rrggbb"
+                                    monoFont: true
+                                    onSubmitted: (val) => {
+                                        let v = val.trim().replace(/^#/, "");
+                                        if (v !== "") {
+                                            root.saveAwwSetting(() => Settings.awwwFillColor = v);
+                                            if (WallpaperService?.reapplyTheme) WallpaperService.reapplyTheme();
                                         }
                                     }
                                 }
@@ -1640,19 +2085,139 @@ Rectangle {
                             columnSpacing: 6
 
                             Repeater {
-                                model: ["fade", "simple", "wipe", "wave", "grow", "center", "outer", "any", "random", "left", "right", "top", "bottom", "none"]
+                                model: ["wipe", "wave", "fade", "simple", "grow", "outer", "center", "any", "random", "left", "right", "top", "bottom", "none"]
 
                                 delegate: Chip {
                                     required property string modelData
                                     label: modelData
-                                    selected: (Settings?.awwwTransitionType ?? "fade") === modelData
+                                    selected: (Settings?.awwwTransitionType ?? "wipe") === modelData
                                     fillWidth: true
                                     chipHeight: 26
-                                    onClicked: {
-                                        if (Settings) {
-                                            Settings.awwwTransitionType = modelData;
-                                            if (Settings.save) Settings.save();
+                                    onClicked: root.saveAwwSetting(() => Settings.awwwTransitionType = modelData)
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 12
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
+                                visible: {
+                                    let t = Settings?.awwwTransitionType ?? "wipe";
+                                    return t !== "simple" && t !== "none";
+                                }
+
+                                GroupLabel { text: "duration (seconds)" }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 5
+
+                                    Repeater {
+                                        model: [
+                                            { label: "0.4s", val: 0.4 },
+                                            { label: "0.8s", val: 0.8 },
+                                            { label: "1.2s", val: 1.2 },
+                                            { label: "2s", val: 2.0 },
+                                            { label: "3s", val: 3.0 },
+                                            { label: "5s", val: 5.0 }
+                                        ]
+
+                                        delegate: Chip {
+                                            required property var modelData
+                                            label: modelData.label
+                                            selected: Math.abs((Settings?.awwwTransitionDuration ?? 3) - modelData.val) < 0.05
+                                            fillWidth: true
+                                            chipHeight: 26
+                                            onClicked: root.saveAwwSetting(() => Settings.awwwTransitionDuration = modelData.val)
                                         }
+                                    }
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
+                                visible: (Settings?.awwwTransitionType ?? "wipe") !== "none"
+
+                                GroupLabel { text: "blend step" }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 5
+
+                                    Repeater {
+                                        model: [
+                                            { label: "silk", val: 25 },
+                                            { label: "smooth", val: 60 },
+                                            { label: "90", val: 90 },
+                                            { label: "fast", val: 150 },
+                                            { label: "instant", val: 255 }
+                                        ]
+
+                                        delegate: Chip {
+                                            required property var modelData
+                                            label: modelData.label
+                                            selected: (Settings?.awwwTransitionStep ?? 90) === modelData.val
+                                            fillWidth: true
+                                            chipHeight: 26
+                                            onClicked: root.saveAwwSetting(() => Settings.awwwTransitionStep = modelData.val)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // --transition-bezier
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            visible: {
+                                let t = Settings?.awwwTransitionType ?? "wipe";
+                                return t !== "simple" && t !== "none";
+                            }
+
+                            GroupLabel { text: "easing bezier curve" }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                Repeater {
+                                    model: [
+                                        { label: "default", val: ".54,0,.34,.99" },
+                                        { label: "linear", val: "0,0,1,1" },
+                                        { label: "smooth out", val: "0.22,1,0.36,1" },
+                                        { label: "material", val: "0.4,0,0.2,1" },
+                                        { label: "snappy", val: "0.16,1,0.3,1" },
+                                        { label: "overshoot", val: "0.34,1.56,0.64,1" }
+                                    ]
+
+                                    delegate: Chip {
+                                        required property var modelData
+                                        label: modelData.label
+                                        selected: (Settings?.awwwTransitionBezier ?? ".54,0,.34,.99") === modelData.val
+                                        fillWidth: true
+                                        chipHeight: 26
+                                        onClicked: root.saveAwwSetting(() => Settings.awwwTransitionBezier = modelData.val)
+                                    }
+                                }
+
+                                SearchField {
+                                    id: bezierField
+                                    Layout.fillWidth: false
+                                    Layout.preferredWidth: 132
+                                    Layout.preferredHeight: 26
+                                    icon: Theme.iconSliders
+                                    text: Settings?.awwwTransitionBezier ?? ".54,0,.34,.99"
+                                    placeholder: "x1,y1,x2,y2"
+                                    monoFont: true
+                                    onSubmitted: (val) => {
+                                        let v = val.trim().replace(/\s+/g, "");
+                                        if (v !== "") root.saveAwwSetting(() => Settings.awwwTransitionBezier = v);
                                     }
                                 }
                             }
@@ -1662,7 +2227,7 @@ Rectangle {
                             Layout.fillWidth: true
                             spacing: 6
                             visible: {
-                                let t = Settings?.awwwTransitionType ?? "fade";
+                                let t = Settings?.awwwTransitionType ?? "wipe";
                                 return t === "wipe" || t === "wave";
                             }
 
@@ -1674,6 +2239,7 @@ Rectangle {
                             Repeater {
                                 model: [
                                     { label: "0°", val: 0 },
+                                    { label: "30°", val: 30 },
                                     { label: "45°", val: 45 },
                                     { label: "90°", val: 90 },
                                     { label: "135°", val: 135 },
@@ -1684,46 +2250,104 @@ Rectangle {
                                 delegate: Chip {
                                     required property var modelData
                                     label: modelData.label
-                                    selected: (Settings?.awwwTransitionAngle ?? 0) === modelData.val
+                                    selected: (Settings?.awwwTransitionAngle ?? 30) === modelData.val
                                     fillWidth: true
                                     chipHeight: 26
-                                    onClicked: {
-                                        if (Settings) {
-                                            Settings.awwwTransitionAngle = modelData.val;
-                                            if (Settings.save) Settings.save();
-                                        }
+                                    onClicked: root.saveAwwSetting(() => Settings.awwwTransitionAngle = modelData.val)
+                                }
+                            }
+                        }
+
+                        // --transition-wave
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            visible: (Settings?.awwwTransitionType ?? "wipe") === "wave"
+
+                            GroupLabel { text: "wave geometry (width, height)" }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                Repeater {
+                                    model: [
+                                        { label: "fine (10x10)", val: "10,10" },
+                                        { label: "classic (20x20)", val: "20,20" },
+                                        { label: "broad (40x20)", val: "40,20" },
+                                        { label: "swell (65x35)", val: "65,35" },
+                                        { label: "tall (20x55)", val: "20,55" }
+                                    ]
+
+                                    delegate: Chip {
+                                        required property var modelData
+                                        label: modelData.label
+                                        selected: (Settings?.awwwTransitionWave ?? "20,20") === modelData.val
+                                        fillWidth: true
+                                        chipHeight: 26
+                                        onClicked: root.saveAwwSetting(() => Settings.awwwTransitionWave = modelData.val)
+                                    }
+                                }
+
+                                SearchField {
+                                    id: waveField
+                                    Layout.fillWidth: false
+                                    Layout.preferredWidth: 88
+                                    Layout.preferredHeight: 26
+                                    icon: Theme.iconSliders
+                                    text: Settings?.awwwTransitionWave ?? "20,20"
+                                    placeholder: "20,20"
+                                    monoFont: true
+                                    onSubmitted: (val) => {
+                                        let v = val.trim().replace(/\s+/g, "");
+                                        if (/^\d+,\d+$/.test(v)) root.saveAwwSetting(() => Settings.awwwTransitionWave = v);
                                     }
                                 }
                             }
                         }
 
-                        RowLayout {
+                        // --transition-pos + --invert-y
+                        ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 6
                             visible: {
-                                let t = Settings?.awwwTransitionType ?? "fade";
+                                let t = Settings?.awwwTransitionType ?? "wipe";
                                 return t === "grow" || t === "outer";
                             }
 
-                            GroupLabel {
-                                text: "origin:"
-                                Layout.rightMargin: 4
+                            RowLayout {
+                                Layout.fillWidth: true
+                                GroupLabel { text: "circle origin point" }
+                                Item { Layout.fillWidth: true }
+                                Chip {
+                                    icon: Theme.iconRefresh
+                                    label: "invert y axis"
+                                    selected: Settings?.awwwInvertY ?? false
+                                    chipHeight: 24
+                                    onClicked: root.saveAwwSetting(() => Settings.awwwInvertY = !(Settings.awwwInvertY ?? false))
+                                }
                             }
 
-                            Repeater {
-                                model: ["center", "top", "bottom", "left", "right"]
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 3
+                                rowSpacing: 5
+                                columnSpacing: 6
 
-                                delegate: Chip {
-                                    required property string modelData
-                                    label: modelData
-                                    selected: (Settings?.awwwTransitionPos ?? "center") === modelData
-                                    fillWidth: true
-                                    chipHeight: 26
-                                    onClicked: {
-                                        if (Settings) {
-                                            Settings.awwwTransitionPos = modelData;
-                                            if (Settings.save) Settings.save();
-                                        }
+                                Repeater {
+                                    model: [
+                                        "top-left", "top", "top-right",
+                                        "left", "center", "right",
+                                        "bottom-left", "bottom", "bottom-right"
+                                    ]
+
+                                    delegate: Chip {
+                                        required property string modelData
+                                        label: modelData
+                                        selected: (Settings?.awwwTransitionPos ?? "center") === modelData
+                                        fillWidth: true
+                                        chipHeight: 24
+                                        onClicked: root.saveAwwSetting(() => Settings.awwwTransitionPos = modelData)
                                     }
                                 }
                             }
@@ -1752,12 +2376,7 @@ Rectangle {
                                     selected: (Settings?.awwwTransitionFps ?? 60) === modelData.val
                                     fillWidth: true
                                     chipHeight: 26
-                                    onClicked: {
-                                        if (Settings) {
-                                            Settings.awwwTransitionFps = modelData.val;
-                                            if (Settings.save) Settings.save();
-                                        }
-                                    }
+                                    onClicked: root.saveAwwSetting(() => Settings.awwwTransitionFps = modelData.val)
                                 }
                             }
                         }

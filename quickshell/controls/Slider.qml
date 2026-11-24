@@ -55,6 +55,7 @@ Item {
                 visible: root.icon !== ""
                 text: root.icon
                 font.family: Theme.fontIcon
+                font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.fontSizeSm
                 color: Theme.on_surface_variant
             }
@@ -65,7 +66,7 @@ Item {
                 text: root.label
                 font.family: Theme.fontSans
                 font.pixelSize: Theme.fontSizeSm
-                font.weight: Font.Medium
+                font.weight: Theme.fontWeightMedium
                 color: Theme.on_surface
                 elide: Text.ElideRight
             }
@@ -91,7 +92,7 @@ Item {
                     }
                     font.family: Theme.fontMono
                     font.pixelSize: Theme.fontSizeXs
-                    font.weight: Font.DemiBold
+                    font.weight: Theme.fontWeightDemiBold
                     color: mouseArea.pressed ? Theme.on_primary_container : Theme.on_surface
                 }
             }

@@ -8,7 +8,7 @@ matugen reads your wallpaper image, runs color quantizer math on raw rgb vectors
 
 ## components
 - `config.toml`: the hit list. defines input templates, output destinations, keywords, and reload hooks. every app that matugen is legally permitted to assassinate is listed here.
-- `templates/`: skeleton files filled with template variables waiting for fresh hex codes. this includes `Theme.qml` which houses our official google material symbols and color tokens.
+- `templates/`: skeleton files filled with template variables waiting for fresh hex codes. this includes `palette.css` which quickshell reads live for material 3 tokens.
 - `post-hook-scripts/`: reactive shell scripts executed after templates compile to kick running daemons and force them to redraw their surfaces.
 
 ## life-saving invocation note

@@ -296,6 +296,7 @@ PanelWindow {
                             anchors.centerIn: parent
                             text: Theme.iconDistro
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
                             color: Theme.primary
                         }
@@ -379,6 +380,7 @@ PanelWindow {
                             anchors.centerIn: parent
                             text: Theme.iconClose
                             font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeXs
                             color: closeMouse.containsMouse ? Theme.error : Theme.on_surface
                         }
@@ -440,6 +442,7 @@ PanelWindow {
                                         visible: !Theme.isTextIconSet
                                         text: isPassed ? Theme.iconCheck : modelData.icon
                                         font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         color: isActive ? Theme.on_primary : (isPassed ? Theme.primary : Theme.on_surface_variant)
                                     }
@@ -517,6 +520,7 @@ PanelWindow {
                                         Text {
                                             text: Theme.iconPalette
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                                             color: Theme.primary
                                         }
@@ -654,6 +658,7 @@ PanelWindow {
                                                             visible: !Theme.isTextIconSet
                                                             text: modelData.icon
                                                             font.family: Theme.fontIcon
+                                                            font.variableAxes: Theme.iconAxes
                                                             font.pixelSize: Theme.fontSizeXs
                                                             color: parent.parent.isSel ? Theme.on_primary : Theme.primary
                                                         }
@@ -704,6 +709,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.iconShuffle
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                                 color: rollMouse.pressed ? Theme.on_primary : Theme.primary
                                             }
@@ -848,6 +854,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.iconSparkles
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                                 color: Theme.primary
                                             }
@@ -937,6 +944,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.iconWorkspaces
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
                                                 color: Theme.tertiary
                                             }
@@ -1101,7 +1109,7 @@ PanelWindow {
                                         Repeater {
                                             model: [
                                                 { id: "material", label: "material" },
-                                                { id: "nerd", label: "nerd font" },
+                                                { id: "windows", label: "segoe icons" },
                                                 { id: "kaomoji", label: "kaomoji (•̀ᴗ•́)و" },
                                                 { id: "text", label: "minimal text" }
                                             ]
@@ -1135,6 +1143,7 @@ PanelWindow {
                                                     onClicked: {
                                                         if (Settings) {
                                                             Settings.iconSet = modelData.id;
+                                                            Settings.vibeStyle = (modelData.id === "kaomoji" || modelData.id === "text") ? modelData.id : "icon";
                                                             if (Settings.save) Settings.save();
                                                         }
                                                     }
@@ -1176,6 +1185,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.iconEdit
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                                                 color: Theme.primary
                                             }
@@ -1261,6 +1271,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.iconFolder
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                                                 color: Theme.primary
                                             }
@@ -1343,6 +1354,7 @@ PanelWindow {
                                         Text {
                                             text: Theme.iconThermo
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                                             color: Theme.primary
                                         }
@@ -1426,6 +1438,7 @@ PanelWindow {
                                         Text {
                                             text: Theme.iconKeyboard
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                                             color: Theme.primary
                                         }
@@ -1558,6 +1571,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.iconKeyboard
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                                                 color: Theme.primary
                                             }
@@ -1601,6 +1615,7 @@ PanelWindow {
                                         Text {
                                             text: Theme.iconTerminal
                                             font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
                                             font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeSm
                                             color: Theme.primary
                                         }
@@ -1702,6 +1717,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.iconSparkles
                                                 font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
                                                 font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeMd
                                                 color: Theme.on_primary
                                             }
@@ -1751,6 +1767,7 @@ PanelWindow {
                             Text {
                                 text: Theme.iconChevronLeft
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.on_surface
                             }
@@ -1803,6 +1820,7 @@ PanelWindow {
                             Text {
                                 text: root.currentStep === root.totalSteps - 1 ? Theme.iconCheck : Theme.iconChevronRight
                                 font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.on_primary
                             }
