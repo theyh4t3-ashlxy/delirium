@@ -25,15 +25,15 @@ ShellRoot {
         NotificationToasts {}
     }
 
-    // the mad scientist bar studio for dragging pills around at 3am
+    // the mad scientist bar studio for dragging pills around at 3am (lazy-loaded on toggle)
     Variants {
-        model: Quickshell.screens
+        model: (typeof Settings !== "undefined" && Settings?.showBarStudio) ? Quickshell.screens : []
         BarStudio {}
     }
 
-    // bezier curves and spring physics calibration playground
+    // bezier curves and spring physics calibration playground (lazy-loaded on toggle)
     Variants {
-        model: Quickshell.screens
+        model: (typeof Settings !== "undefined" && Settings?.showMotionSandbox) ? Quickshell.screens : []
         MotionSandbox {}
     }
 
@@ -43,10 +43,9 @@ ShellRoot {
         OSD {}
     }
 
-    // first-run onboarding & vibe calibration monolith (who the fuck is 'we'?):
-    // instantiates per-screen via Variants and dynamically presents on whichever monitor is focused
+    // first-run onboarding & vibe calibration monolith (lazy-loaded on request)
     Variants {
-        model: Quickshell.screens
+        model: (typeof Settings !== "undefined" && Settings?.showWelcomeWizard) ? Quickshell.screens : []
         WelcomeWizard {}
     }
 

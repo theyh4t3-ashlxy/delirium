@@ -52,6 +52,8 @@ Clipboard                widgets/Clipboard.qml
 QuickSettings            widgets/QuickSettings.qml
 QuickNotes               widgets/QuickNotes.qml
 LockScreen               lockscreen/LockScreen.qml
+LockStudioDrawer         lockscreen/LockStudioDrawer.qml
+LockPowerDock            lockscreen/LockPowerDock.qml
 ScreenshotOverlay        widgets/ScreenshotOverlay.qml
 BarStudio                widgets/BarStudio.qml
 MotionSandbox            widgets/MotionSandbox.qml
