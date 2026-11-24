@@ -1,63 +1,28 @@
--- Pure ANSI / Kitty terminal theme for Neovim
--- Dynamically inherits colors from ~/.config/kitty/colors.conf with transparent background
+-- Pure ANSI ctermfg/ctermbg theme for Neovim
+-- Colors live in kitty's color registers (0-15). Matugen updates them on
+-- wallpaper change → kitty repaints → nvim inherits without any reload.
+--
+-- ANSI slot map (matches kitty colors.conf / matugen template):
+--   0  = background (surface / black)
+--   1  = red (error)
+--   2  = green  (strings — fixed calibrated)
+--   3  = yellow (types / warnings — fixed calibrated)
+--   4  = blue   = primary accent (follows wallpaper via matugen)
+--   5  = magenta = secondary (keywords)
+--   6  = cyan   = tertiary (constants, operators)
+--   7  = white  = foreground (on_surface)
+--   8  = bright_black = muted / outline (comments, borders)
+--   9  = bright_red
+--  10  = bright_green
+--  11  = bright_yellow
+--  12  = bright_blue
+--  13  = bright_magenta
+--  14  = bright_cyan
+--  15  = bright_white
+
 local M = {}
 
-local function load_kitty_colors()
-  local colors = {
-    bg = "NONE",
-    fg = "#e6e0e9",
-    cursor = "#d0bcff",
-    black = "#141218",
-    red = "#ea6962",
-    green = "#9ece6a",
-    yellow = "#e0af68",
-    blue = "#d0bcff",
-    magenta = "#ccc2dc",
-    cyan = "#efb8c8",
-    white = "#e6e0e9",
-    bright_black = "#49454f",
-    bright_red = "#ff6b6b",
-    bright_green = "#b9f27c",
-    bright_yellow = "#ff9e3b",
-    bright_blue = "#d0bcff",
-    bright_magenta = "#ccc2dc",
-    bright_cyan = "#efb8c8",
-    bright_white = "#ffffff",
-  }
-
-  local path = vim.fn.expand("~/.config/kitty/colors.conf")
-  local f = io.open(path, "r")
-  if f then
-    for line in f:lines() do
-      local k, v = line:match("^([%w_]+)%s+(#[%x]+)")
-      if k and v then
-        if k == "foreground" then colors.fg = v
-        elseif k == "cursor" then colors.cursor = v
-        elseif k == "color0" then colors.black = v
-        elseif k == "color1" then colors.red = v
-        elseif k == "color2" then colors.green = v
-        elseif k == "color3" then colors.yellow = v
-        elseif k == "color4" then colors.blue = v
-        elseif k == "color5" then colors.magenta = v
-        elseif k == "color6" then colors.cyan = v
-        elseif k == "color7" then colors.white = v
-        elseif k == "color8" then colors.bright_black = v
-        elseif k == "color9" then colors.bright_red = v
-        elseif k == "color10" then colors.bright_green = v
-        elseif k == "color11" then colors.bright_yellow = v
-        elseif k == "color12" then colors.bright_blue = v
-        elseif k == "color13" then colors.bright_magenta = v
-        elseif k == "color14" then colors.bright_cyan = v
-        elseif k == "color15" then colors.bright_white = v
-        end
-      end
-    end
-    f:close()
-  end
-  return colors
-end
-
-local function apply(c)
+local function apply()
   local function hl(name, attrs)
     vim.api.nvim_set_hl(0, name, attrs)
   end
@@ -66,136 +31,137 @@ local function apply(c)
   end
 
   -- Window & canvas (transparent)
-  hl("Normal", { fg = c.fg, bg = "NONE" })
-  hl("NormalNC", { fg = c.fg, bg = "NONE" })
-  hl("NormalFloat", { fg = c.fg, bg = "NONE" })
-  hl("FloatBorder", { fg = c.bright_black, bg = "NONE" })
-  hl("FloatTitle", { fg = c.blue, bg = "NONE", bold = true })
-  hl("SignColumn", { bg = "NONE" })
-  hl("EndOfBuffer", { fg = c.bright_black, bg = "NONE" })
-  hl("LineNr", { fg = c.bright_black, bg = "NONE" })
-  hl("CursorLineNr", { fg = c.blue, bg = "NONE", bold = true })
-  hl("CursorLine", { bg = "NONE" })
-  hl("ColorColumn", { bg = "NONE" })
-  hl("VertSplit", { fg = c.bright_black, bg = "NONE" })
-  hl("WinSeparator", { fg = c.bright_black, bg = "NONE" })
-  hl("Folded", { fg = c.bright_black, bg = "NONE" })
-  hl("FoldColumn", { fg = c.bright_black, bg = "NONE" })
+  hl("Normal",       { ctermbg = "NONE", ctermfg = 7 })
+  hl("NormalNC",     { ctermbg = "NONE", ctermfg = 7 })
+  hl("NormalFloat",  { ctermbg = "NONE", ctermfg = 7 })
+  hl("FloatBorder",  { ctermbg = "NONE", ctermfg = 8 })
+  hl("FloatTitle",   { ctermbg = "NONE", ctermfg = 4, bold = true })
+  hl("SignColumn",   { ctermbg = "NONE" })
+  hl("EndOfBuffer",  { ctermbg = "NONE", ctermfg = 8 })
+  hl("LineNr",       { ctermbg = "NONE", ctermfg = 8 })
+  hl("CursorLineNr", { ctermbg = "NONE", ctermfg = 4, bold = true })
+  hl("CursorLine",   { ctermbg = "NONE" })
+  hl("ColorColumn",  { ctermbg = "NONE" })
+  hl("VertSplit",    { ctermbg = "NONE", ctermfg = 8 })
+  hl("WinSeparator", { ctermbg = "NONE", ctermfg = 8 })
+  hl("Folded",       { ctermbg = "NONE", ctermfg = 8 })
+  hl("FoldColumn",   { ctermbg = "NONE", ctermfg = 8 })
 
   -- Selections & popup menus
-  hl("Pmenu", { fg = c.fg, bg = "NONE" })
-  hl("PmenuSel", { fg = c.black, bg = c.blue, bold = true })
-  hl("PmenuSbar", { bg = "NONE" })
-  hl("PmenuThumb", { bg = c.bright_black })
-  hl("Visual", { fg = c.black, bg = c.blue })
-  hl("Search", { fg = c.black, bg = c.yellow })
-  hl("IncSearch", { fg = c.black, bg = c.cyan })
-  hl("Directory", { fg = c.blue, bold = true })
-  hl("Title", { fg = c.blue, bold = true })
-  hl("MatchParen", { fg = c.cyan, bold = true, underline = true })
+  hl("Pmenu",     { ctermbg = "NONE", ctermfg = 7 })
+  hl("PmenuSel",  { ctermbg = 4,      ctermfg = 0, bold = true })
+  hl("PmenuSbar", { ctermbg = "NONE" })
+  hl("PmenuThumb",{ ctermbg = 8 })
+  hl("Visual",    { ctermbg = 4,      ctermfg = 0 })
+  hl("Search",    { ctermbg = 3,      ctermfg = 0 })
+  hl("IncSearch", { ctermbg = 6,      ctermfg = 0 })
+  hl("Directory", { ctermbg = "NONE", ctermfg = 4, bold = true })
+  hl("Title",     { ctermbg = "NONE", ctermfg = 4, bold = true })
+  hl("MatchParen",{ ctermbg = "NONE", ctermfg = 6, bold = true, underline = true })
 
-  -- Syntax highlighting (Treesitter & standard)
-  hl("Comment", { fg = c.bright_black, italic = true })
-  hl("Constant", { fg = c.cyan })
-  hl("String", { fg = c.green })
-  hl("Character", { fg = c.green })
-  hl("Number", { fg = c.cyan })
+  -- Syntax (Treesitter & standard)
+  hl("Comment",   { ctermbg = "NONE", ctermfg = 8, italic = true })
+  hl("Constant",  { ctermbg = "NONE", ctermfg = 6 })
+  hl("String",    { ctermbg = "NONE", ctermfg = 2 })
+  hl("Character", { ctermbg = "NONE", ctermfg = 2 })
+  hl("Number",    { ctermbg = "NONE", ctermfg = 6 })
   link("Boolean", "Number")
-  link("Float", "Number")
-  hl("Identifier", { fg = c.fg })
-  hl("Function", { fg = c.blue, bold = true })
-  hl("Statement", { fg = c.magenta })
+  link("Float",   "Number")
+  hl("Identifier",{ ctermbg = "NONE", ctermfg = 7 })
+  hl("Function",  { ctermbg = "NONE", ctermfg = 4, bold = true })
+  hl("Statement", { ctermbg = "NONE", ctermfg = 5 })
   link("Conditional", "Statement")
-  link("Repeat", "Statement")
-  link("Keyword", "Statement")
-  link("Exception", "Statement")
-  hl("Operator", { fg = c.cyan })
-  hl("PreProc", { fg = c.cyan })
-  hl("Type", { fg = c.yellow })
+  link("Repeat",      "Statement")
+  link("Keyword",     "Statement")
+  link("Exception",   "Statement")
+  hl("Operator",  { ctermbg = "NONE", ctermfg = 6 })
+  hl("PreProc",   { ctermbg = "NONE", ctermfg = 6 })
+  hl("Type",      { ctermbg = "NONE", ctermfg = 3 })
   link("StorageClass", "Type")
-  link("Structure", "Type")
-  hl("Special", { fg = c.cyan })
-  hl("Delimiter", { fg = c.fg })
-  hl("Underlined", { fg = c.blue, underline = true })
-  hl("Error", { fg = c.red, bold = true })
-  hl("Todo", { fg = c.black, bg = c.yellow, bold = true })
+  link("Structure",    "Type")
+  hl("Special",   { ctermbg = "NONE", ctermfg = 6 })
+  hl("Delimiter", { ctermbg = "NONE", ctermfg = 7 })
+  hl("Underlined",{ ctermbg = "NONE", ctermfg = 4, underline = true })
+  hl("Error",     { ctermbg = "NONE", ctermfg = 1, bold = true })
+  hl("Todo",      { ctermbg = 3,      ctermfg = 0, bold = true })
 
   -- Treesitter links
   local ts_links = {
-    ["@comment"] = "Comment", ["@constant"] = "Constant", ["@constant.builtin"] = "Constant",
-    ["@string"] = "String", ["@character"] = "Character", ["@number"] = "Number",
-    ["@boolean"] = "Boolean", ["@function"] = "Function", ["@function.call"] = "Function",
-    ["@method"] = "Function", ["@constructor"] = "Type", ["@variable"] = "Identifier",
-    ["@variable.builtin"] = "Special", ["@property"] = "Identifier", ["@keyword"] = "Keyword",
-    ["@operator"] = "Operator", ["@punctuation"] = "Delimiter", ["@type"] = "Type",
-    ["@attribute"] = "PreProc", ["@tag"] = "Statement", ["@tag.attribute"] = "Type",
-    ["@markup.heading"] = "Title", ["@markup.link"] = "Underlined",
+    ["@comment"]          = "Comment",    ["@constant"]         = "Constant",
+    ["@constant.builtin"] = "Constant",   ["@string"]           = "String",
+    ["@character"]        = "Character",  ["@number"]           = "Number",
+    ["@boolean"]          = "Boolean",    ["@function"]         = "Function",
+    ["@function.call"]    = "Function",   ["@method"]           = "Function",
+    ["@constructor"]      = "Type",       ["@variable"]         = "Identifier",
+    ["@variable.builtin"] = "Special",    ["@property"]         = "Identifier",
+    ["@keyword"]          = "Keyword",    ["@operator"]         = "Operator",
+    ["@punctuation"]      = "Delimiter",  ["@type"]             = "Type",
+    ["@attribute"]        = "PreProc",    ["@tag"]              = "Statement",
+    ["@tag.attribute"]    = "Type",       ["@markup.heading"]   = "Title",
+    ["@markup.link"]      = "Underlined",
   }
   for name, target in pairs(ts_links) do link(name, target) end
 
   -- Diagnostics
-  hl("DiagnosticError", { fg = c.red })
-  hl("DiagnosticWarn", { fg = c.yellow })
-  hl("DiagnosticInfo", { fg = c.blue })
-  hl("DiagnosticHint", { fg = c.cyan })
-  hl("DiagnosticUnderlineError", { undercurl = true, sp = c.red })
-  hl("DiagnosticUnderlineWarn", { undercurl = true, sp = c.yellow })
-  hl("DiagnosticUnderlineInfo", { undercurl = true, sp = c.blue })
-  hl("DiagnosticUnderlineHint", { undercurl = true, sp = c.cyan })
+  hl("DiagnosticError",          { ctermfg = 1 })
+  hl("DiagnosticWarn",           { ctermfg = 3 })
+  hl("DiagnosticInfo",           { ctermfg = 4 })
+  hl("DiagnosticHint",           { ctermfg = 6 })
+  hl("DiagnosticUnderlineError", { undercurl = true })
+  hl("DiagnosticUnderlineWarn",  { undercurl = true })
+  hl("DiagnosticUnderlineInfo",  { undercurl = true })
+  hl("DiagnosticUnderlineHint",  { undercurl = true })
 
   -- Git signs
-  hl("GitSignsAdd", { fg = c.green })
-  hl("GitSignsChange", { fg = c.blue })
-  hl("GitSignsDelete", { fg = c.red })
+  hl("GitSignsAdd",    { ctermfg = 2 })
+  hl("GitSignsChange", { ctermfg = 4 })
+  hl("GitSignsDelete", { ctermfg = 1 })
 
-  -- Plugin styles (Telescope, WhichKey, NeoTree)
-  hl("TelescopeNormal", { fg = c.fg, bg = "NONE" })
-  hl("TelescopeBorder", { fg = c.bright_black, bg = "NONE" })
-  hl("TelescopeTitle", { fg = c.blue, bg = "NONE", bold = true })
-  hl("TelescopePromptNormal", { fg = c.fg, bg = "NONE" })
-  hl("TelescopePromptBorder", { fg = c.blue, bg = "NONE" })
-  hl("TelescopePromptTitle", { fg = c.blue, bg = "NONE", bold = true })
-  hl("TelescopeSelection", { fg = c.black, bg = c.blue, bold = true })
-  hl("TelescopeMatching", { fg = c.yellow, bold = true })
+  -- Telescope
+  hl("TelescopeNormal",       { ctermbg = "NONE", ctermfg = 7 })
+  hl("TelescopeBorder",       { ctermbg = "NONE", ctermfg = 8 })
+  hl("TelescopeTitle",        { ctermbg = "NONE", ctermfg = 4, bold = true })
+  hl("TelescopePromptNormal", { ctermbg = "NONE", ctermfg = 7 })
+  hl("TelescopePromptBorder", { ctermbg = "NONE", ctermfg = 4 })
+  hl("TelescopePromptTitle",  { ctermbg = "NONE", ctermfg = 4, bold = true })
+  hl("TelescopeSelection",    { ctermbg = 4,      ctermfg = 0, bold = true })
+  hl("TelescopeMatching",     { ctermbg = "NONE", ctermfg = 3, bold = true })
 
-  hl("WhichKey", { fg = c.blue, bold = true })
-  hl("WhichKeyGroup", { fg = c.cyan })
-  hl("WhichKeyDesc", { fg = c.fg })
-  hl("WhichKeySeparator", { fg = c.bright_black })
-  hl("WhichKeyFloat", { bg = "NONE" })
-  hl("WhichKeyBorder", { fg = c.bright_black, bg = "NONE" })
+  -- WhichKey
+  hl("WhichKey",          { ctermbg = "NONE", ctermfg = 4, bold = true })
+  hl("WhichKeyGroup",     { ctermbg = "NONE", ctermfg = 6 })
+  hl("WhichKeyDesc",      { ctermbg = "NONE", ctermfg = 7 })
+  hl("WhichKeySeparator", { ctermbg = "NONE", ctermfg = 8 })
+  hl("WhichKeyFloat",     { ctermbg = "NONE" })
+  hl("WhichKeyBorder",    { ctermbg = "NONE", ctermfg = 8 })
 
-  hl("NeoTreeNormal", { fg = c.fg, bg = "NONE" })
-  hl("NeoTreeNormalNC", { fg = c.fg, bg = "NONE" })
-  hl("NeoTreeWinSeparator", { fg = c.bright_black, bg = "NONE" })
-  hl("NeoTreeDirectoryName", { fg = c.blue, bold = true })
-  hl("NeoTreeDirectoryIcon", { fg = c.blue })
-  hl("NeoTreeRootName", { fg = c.cyan, bold = true })
-  hl("NeoTreeFileName", { fg = c.fg })
+  -- NeoTree
+  hl("NeoTreeNormal",        { ctermbg = "NONE", ctermfg = 7 })
+  hl("NeoTreeNormalNC",      { ctermbg = "NONE", ctermfg = 7 })
+  hl("NeoTreeWinSeparator",  { ctermbg = "NONE", ctermfg = 8 })
+  hl("NeoTreeDirectoryName", { ctermbg = "NONE", ctermfg = 4, bold = true })
+  hl("NeoTreeDirectoryIcon", { ctermbg = "NONE", ctermfg = 4 })
+  hl("NeoTreeRootName",      { ctermbg = "NONE", ctermfg = 6, bold = true })
+  hl("NeoTreeFileName",      { ctermbg = "NONE", ctermfg = 7 })
 
-  -- Statusline highlights
-  hl("AshleyStatusMode", { fg = c.black, bg = c.blue, bold = true })
-  hl("AshleyStatusFile", { fg = c.fg, bg = "NONE", bold = true })
-  hl("AshleyStatusMuted", { fg = c.bright_black, bg = "NONE" })
-  hl("AshleyStatusNormal", { fg = c.fg, bg = "NONE" })
-  hl("AshleyStatusAccent", { fg = c.blue, bg = "NONE", bold = true })
-  hl("AshleyStatusError", { fg = c.red, bg = "NONE", bold = true })
-  hl("AshleyStatusWarn", { fg = c.yellow, bg = "NONE", bold = true })
-  hl("AshleyStatusInfo", { fg = c.blue, bg = "NONE", bold = true })
-end
-
-function M.reload()
-  apply(load_kitty_colors())
+  -- Statusline
+  hl("AshleyStatusMode",   { ctermbg = 4,      ctermfg = 0, bold = true })
+  hl("AshleyStatusFile",   { ctermbg = "NONE", ctermfg = 7, bold = true })
+  hl("AshleyStatusMuted",  { ctermbg = "NONE", ctermfg = 8 })
+  hl("AshleyStatusNormal", { ctermbg = "NONE", ctermfg = 7 })
+  hl("AshleyStatusAccent", { ctermbg = "NONE", ctermfg = 4, bold = true })
+  hl("AshleyStatusError",  { ctermbg = "NONE", ctermfg = 1, bold = true })
+  hl("AshleyStatusWarn",   { ctermbg = "NONE", ctermfg = 3, bold = true })
+  hl("AshleyStatusInfo",   { ctermbg = "NONE", ctermfg = 4, bold = true })
 end
 
 function M.setup()
-  vim.opt.termguicolors = true
-  M.reload()
-  vim.api.nvim_create_user_command("ThemeReload", M.reload, { force = true, desc = "Reload Kitty ANSI theme" })
-  vim.api.nvim_create_autocmd("FocusGained", {
-    callback = function() M.reload() end,
-    desc = "Auto-sync theme with Kitty palette",
-  })
+  -- termguicolors stays OFF — nvim defers to kitty's ANSI registers (0-15)
+  -- which matugen updates live on every wallpaper change
+  vim.opt.termguicolors = false
+  apply()
+  -- :ThemeReload kept as a manual escape hatch (e.g. after :set termguicolors)
+  vim.api.nvim_create_user_command("ThemeReload", apply, { force = true, desc = "Reapply ANSI theme" })
 end
 
 return M
