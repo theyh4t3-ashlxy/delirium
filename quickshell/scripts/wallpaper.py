@@ -470,7 +470,34 @@ def stream_download(url: str, dest_path: Path, timeout: int = 30) -> bool:
     return False
 
 
+def sanitize_host_dbus() -> None:
+  """Replace leaked Flatpak session bus paths when running directly on the host."""
+  if os.path.exists("/.flatpak-info"):
+    return
+  dbus_addr = os.environ.get("DBUS_SESSION_BUS_ADDRESS", "")
+  if "/run/flatpak/bus" not in dbus_addr and dbus_addr:
+    return
+  import stat
+
+  runtime_dir = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+  host_bus = os.path.join(runtime_dir, "bus")
+  try:
+    if stat.S_ISSOCK(os.stat(host_bus).st_mode):
+      os.environ["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={host_bus}"
+  except OSError:
+    pass
+
+
+sanitize_host_dbus()
+
+
+def in_gnome_session() -> bool:
+  return "gnome" in os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+
+
 def ensure_awww_daemon() -> bool:
+  if in_gnome_session():
+    return False
   try:
     res = subprocess.run(
         ["awww", "query"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -993,6 +1020,7 @@ def set_wallpaper(raw_args) -> bool:
   write_saved_wp(current_wp=img_path, mode=opts["mode"], scheme=opts["scheme"])
 
   ext_lower = Path(img_path).suffix.lower()
+  in_gnome = in_gnome_session()
 
   if ext_lower in VIDEO_EXTS:
     try:
@@ -1023,6 +1051,10 @@ def set_wallpaper(raw_args) -> bool:
       except Exception:
         pass
 
+    if in_gnome:
+      log_ok("gnome static frame & palette synced from video:", Path(img_path).name)
+      return True
+
     audio_flag = (
         "volume=70"
         if opts["mpv_audio"].lower() in ("true", "1", "yes")
@@ -1050,6 +1082,37 @@ def set_wallpaper(raw_args) -> bool:
       return False
   else:
     kill_mpvpaper()
+
+    matugen_target = (
+        str(CURR_WALL_STATIC.resolve())
+        if CURR_WALL_STATIC.is_symlink()
+        else img_path
+    )
+    matugen_cmd = [
+        "matugen",
+        "image",
+        matugen_target,
+        "-m",
+        opts["mode"],
+        "-t",
+        opts["scheme"],
+        "--source-color-index",
+        "0",
+    ]
+
+    # On GNOME, gnome-theme-reload.zsh updates picture-uri/dark & user-theme via matugen directly
+    if in_gnome:
+      try:
+        subprocess.run(matugen_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+      except Exception as e:
+        log_err(f"failed to execute matugen: {e}")
+        return False
+      log_ok(
+          "gnome wallpaper & palette synced:",
+          f"{Path(img_path).name} ({opts['mode']} • {opts['scheme'].replace('scheme-', '')})",
+      )
+      return True
+
     ensure_awww_daemon()
 
     awww_cmd = ["awww", "img"]
@@ -1089,23 +1152,6 @@ def set_wallpaper(raw_args) -> bool:
       awww_cmd.extend(["--transition-pos", pos])
       if invert_y:
         awww_cmd.append("--invert-y")
-
-    matugen_target = (
-        str(CURR_WALL_STATIC.resolve())
-        if CURR_WALL_STATIC.is_symlink()
-        else img_path
-    )
-    matugen_cmd = [
-        "matugen",
-        "image",
-        matugen_target,
-        "-m",
-        opts["mode"],
-        "-t",
-        opts["scheme"],
-        "--source-color-index",
-        "0",
-    ]
 
     # fire awww and matugen in parallel so colors morph during the wipe instead of after
     awww_proc = None
@@ -1279,10 +1325,13 @@ def set_color(args) -> bool:
   )
 
   kill_mpvpaper()
-  ensure_awww_daemon()
+  in_gnome = in_gnome_session()
+  if not in_gnome:
+    ensure_awww_daemon()
 
   try:
-    subprocess.run(["awww", "clear", raw_hex], stderr=subprocess.DEVNULL)
+    if not in_gnome:
+      subprocess.run(["awww", "clear", raw_hex], stderr=subprocess.DEVNULL)
     subprocess.run(
         ["matugen", "color", "hex", hex_color, "-m", mode, "-t", scheme],
         stderr=subprocess.DEVNULL,
@@ -1618,6 +1667,8 @@ def main():
       "toggle": lambda: set_mode(["toggle"]),
       "dark": lambda: set_mode(["dark"]),
       "light": lambda: set_mode(["light"]),
+      "pick": lambda: (interactive_picker(), True)[1],
+      "rand": lambda: random_wallpaper(args),
       "random": lambda: random_wallpaper(args),
       "roll": lambda: random_wallpaper(args),
       "wallhaven": lambda: random_wallhaven(args),

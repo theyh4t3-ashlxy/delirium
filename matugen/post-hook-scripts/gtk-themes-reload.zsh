@@ -1,6 +1,11 @@
 #!/usr/bin/env zsh
 # gtk-themes-reload.zsh - refresh GTK3/4 themes, toggle light/dark modes, and notify xsettingsd
 
+if [[ ! -f /.flatpak-info ]] && [[ "${DBUS_SESSION_BUS_ADDRESS:-}" == *"/run/flatpak/bus"* || -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+    _host_bus="${XDG_RUNTIME_DIR:-/run/user/$UID}/bus"
+    [[ -S "$_host_bus" ]] && export DBUS_SESSION_BUS_ADDRESS="unix:path=$_host_bus"
+fi
+
 # 1. Detect active light/dark mode
 mode="dark"
 for cfg_path in "$HOME/.local/state/quickshell/settings.conf" "$HOME/.config/quickshell/settings.conf"; do

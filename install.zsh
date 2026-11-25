@@ -16,9 +16,9 @@ BACKUP_DIR="$CACHE_DIR/dotfiles-backups"
 DRY_RUN=false
 FETCH_WP=false
 
-# discover config directories in repo, excluding wallpapers
+# discover config directories in repo, excluding non-~/.config directories
 ALL_DOTFILES=( "$DOTS_DIR"/*(/N:t) )
-ALL_DOTFILES=( ${ALL_DOTFILES:#wallpapers} )
+ALL_DOTFILES=( ${ALL_DOTFILES:#(wallpapers|gnome|nixos|pkgs)} )
 
 # logging helpers
 log_info() { print -P "%F{141}󰄛%f $1" }
@@ -445,7 +445,7 @@ initial_theming() {
     fi
 
     if [[ -n "${WAYLAND_DISPLAY:-}" || -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
-        if (( $+commands[awww] )); then
+        if (( $+commands[awww] )) && [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
             log_info "applying wallpaper via awww..."
             if ! awww query >/dev/null 2>&1; then
                 execute awww-daemon --format argb >/dev/null 2>&1 &!
@@ -454,6 +454,12 @@ initial_theming() {
             execute awww img "$target_wp" --transition-type wipe --transition-step 90 --transition-duration 2 >/dev/null 2>&1 || true
             log_ok "wallpaper applied to display outputs."
         fi
+    fi
+
+    if [[ -x "$DOTS_DIR/gnome/apply.zsh" ]] && (( $+commands[dconf] )); then
+        log_info "syncing gnome dconf & shell theme..."
+        execute "$DOTS_DIR/gnome/apply.zsh" >/dev/null 2>&1 || log_warn "gnome dconf apply skipped or partial."
+        log_ok "gnome dconf profile applied."
     fi
 }
 

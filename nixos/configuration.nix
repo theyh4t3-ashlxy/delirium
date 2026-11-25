@@ -285,11 +285,14 @@ EOF
     ui.enable = true; # installs gpu-screen-recorder-gtk frontend safely with appropriate capabilities
   };
 
-  # 9.5 portal plumbing: preventing screen share from streaming an infinite recursive void into discord
+  # 9.5 portal plumbing: keep hyprland portals on hyprland and gnome portals on gnome
   xdg.portal = {
     enable = true;
     extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
-    config.common.default = [ "hyprland" "gtk" ];
+    config = {
+      common.default = [ "hyprland" "gtk" ];
+      gnome.default = [ "gnome" "gtk" ];
+    };
   };
 
   # 10. digital hoarder collection: terminal toys to look like a cinematic hacker while nix rebuilds world
@@ -358,11 +361,19 @@ EOF
     # thinkpad fan curve and thermal control (gui + cli)
     fanControlPkg
 
-    # gnome tweaks and emotional support extensions for when hyprland breaks
+    # gnome tweaks, icons, and delirium-matched shell extensions
     gnome-tweaks
+    morewaita-icon-theme
+    gnomeExtensions.user-themes
     gnomeExtensions.blur-my-shell
     gnomeExtensions.dash-to-dock
     gnomeExtensions.appindicator
+    gnomeExtensions.just-perfection
+    gnomeExtensions.rounded-window-corners-reborn
+    gnomeExtensions.space-bar
+    gnomeExtensions.caffeine
+    gnomeExtensions.clipboard-indicator
+    gnomeExtensions.alphabetical-app-grid
 
     # antigravity desktop app & cli compiled directly into system closure from flake input
     inputs.antigravity-nix.packages.${pkgs.stdenv.hostPlatform.system}.default

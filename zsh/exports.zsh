@@ -22,6 +22,13 @@ export XDG_CACHE_HOME="$HOME/.cache"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_STATE_HOME="$HOME/.local/state"
 
+# repair leaked flatpak dbus address when spawning host shells from flatpak terminals (e.g. ptyxis)
+if [[ ! -f /.flatpak-info ]] && [[ "${DBUS_SESSION_BUS_ADDRESS:-}" == *"/run/flatpak/bus"* || -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+    _host_bus="${XDG_RUNTIME_DIR:-/run/user/$UID}/bus"
+    [[ -S "$_host_bus" ]] && export DBUS_SESSION_BUS_ADDRESS="unix:path=$_host_bus"
+    unset _host_bus
+fi
+
 # binary search path
 typeset -U path
 path=(

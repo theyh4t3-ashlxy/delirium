@@ -1,0 +1,96 @@
+[Palette]
+Name=matugen
+
+<* if {{is_dark_mode}} *>
+[Dark]
+Background={{ colors.surface.default.hex }}
+Foreground={{ colors.on_surface.default.hex }}
+TitlebarBackground={{ colors.surface_container.default.hex }}
+TitlebarForeground={{ colors.on_surface.default.hex }}
+Cursor={{ colors.primary.default.hex }}
+Color0={{ colors.surface.default.hex }}
+Color1={{ colors.error.default.hex | set_lightness: 46.0 }}
+Color2=#8fd694
+Color3=#e5c07b
+Color4={{ colors.primary.default.hex }}
+Color5={{ colors.tertiary.default.hex }}
+Color6={{ colors.secondary.default.hex }}
+Color7={{ colors.on_surface.default.hex }}
+Color8={{ colors.outline.default.hex }}
+Color9={{ colors.error.default.hex }}
+Color10=#a6e3a1
+Color11=#f5d896
+Color12={{ colors.primary.default.hex | auto_lightness: -12.0 }}
+Color13={{ colors.tertiary.default.hex | auto_lightness: -12.0 }}
+Color14={{ colors.secondary.default.hex | auto_lightness: -12.0 }}
+Color15={{ colors.on_surface.default.hex | auto_lightness: -6.0 }}
+
+[Light]
+Background={{ colors.surface.default.hex }}
+Foreground={{ colors.on_surface.default.hex }}
+TitlebarBackground={{ colors.surface_container.default.hex }}
+TitlebarForeground={{ colors.on_surface.default.hex }}
+Cursor={{ colors.primary.default.hex }}
+Color0={{ colors.surface.default.hex }}
+Color1={{ colors.error.default.hex | set_lightness: 46.0 }}
+Color2=#8fd694
+Color3=#e5c07b
+Color4={{ colors.primary.default.hex }}
+Color5={{ colors.tertiary.default.hex }}
+Color6={{ colors.secondary.default.hex }}
+Color7={{ colors.on_surface.default.hex }}
+Color8={{ colors.outline.default.hex }}
+Color9={{ colors.error.default.hex }}
+Color10=#a6e3a1
+Color11=#f5d896
+Color12={{ colors.primary.default.hex | auto_lightness: -12.0 }}
+Color13={{ colors.tertiary.default.hex | auto_lightness: -12.0 }}
+Color14={{ colors.secondary.default.hex | auto_lightness: -12.0 }}
+Color15={{ colors.on_surface.default.hex | auto_lightness: -6.0 }}
+<* else *>
+[Light]
+Background={{ colors.surface.default.hex }}
+Foreground={{ colors.on_surface.default.hex }}
+TitlebarBackground={{ colors.surface_container.default.hex }}
+TitlebarForeground={{ colors.on_surface.default.hex }}
+Cursor={{ colors.primary.default.hex }}
+Color0={{ colors.surface.default.hex }}
+Color1={{ colors.error.default.hex | set_lightness: 60.0 }}
+Color2=#246b35
+Color3=#8c5600
+Color4={{ colors.primary.default.hex }}
+Color5={{ colors.tertiary.default.hex }}
+Color6={{ colors.secondary.default.hex }}
+Color7={{ colors.on_surface.default.hex }}
+Color8={{ colors.outline.default.hex }}
+Color9={{ colors.error.default.hex }}
+Color10=#195427
+Color11=#6e4200
+Color12={{ colors.primary.default.hex | auto_lightness: -12.0 }}
+Color13={{ colors.tertiary.default.hex | auto_lightness: -12.0 }}
+Color14={{ colors.secondary.default.hex | auto_lightness: -12.0 }}
+Color15={{ colors.on_surface.default.hex }}
+
+[Dark]
+Background={{ colors.surface.default.hex }}
+Foreground={{ colors.on_surface.default.hex }}
+TitlebarBackground={{ colors.surface_container.default.hex }}
+TitlebarForeground={{ colors.on_surface.default.hex }}
+Cursor={{ colors.primary.default.hex }}
+Color0={{ colors.surface.default.hex }}
+Color1={{ colors.error.default.hex | set_lightness: 60.0 }}
+Color2=#246b35
+Color3=#8c5600
+Color4={{ colors.primary.default.hex }}
+Color5={{ colors.tertiary.default.hex }}
+Color6={{ colors.secondary.default.hex }}
+Color7={{ colors.on_surface.default.hex }}
+Color8={{ colors.outline.default.hex }}
+Color9={{ colors.error.default.hex }}
+Color10=#195427
+Color11=#6e4200
+Color12={{ colors.primary.default.hex | auto_lightness: -12.0 }}
+Color13={{ colors.tertiary.default.hex | auto_lightness: -12.0 }}
+Color14={{ colors.secondary.default.hex | auto_lightness: -12.0 }}
+Color15={{ colors.on_surface.default.hex }}
+<* endif *>
