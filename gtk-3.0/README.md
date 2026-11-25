@@ -1,11 +1,12 @@
 # gtk-3.0
 
-legacy gnome baggage that refuses to die peacefully.
+residual gnome toolkit files maintained solely to stop legacy dialogs from firing white-screen light flashes into an unlit room.
 
-why does css have to infect every corner of computing? nobody knows. but gtk3 applications still haunt our system (file pickers, legacy browsers, older tools), and if left unattended, they will render blinding white frames that burn your retinas.
+unconfigured gtk3 file pickers open directly into a raw `#ffffff` slab with zero ambient scaling—closer to an unannounced clinical penlight check on dilated eyes after seventy-two hours indoors than a normal OS window. css never belonged inside desktop toolkits, yet every file dialog still demands it.
 
-## the damage control
-- `settings.ini`: orders gtk3 to stop using adwaita light and enforce a dark color scheme alongside proper cursor and font scales.
-- `gtk.css`: imports generated color palettes and strips away ugly borders.
-- `colors.css`: matugen's victim. dynamically generated css variables extracted straight from your current wallpaper.
-- `bookmarks`: quick file picker paths so you don't have to wander through `/home` like an archaeologist lost in a cave.
+## containment files
+
+- `settings.ini`: locks `gtk-application-prefer-dark-theme`, kills light adwaita fallbacks, and enforces consistent font and cursor metrics.
+- `gtk.css`: pulls generated palette tokens and amputates leftover client-side borders.
+- `colors.css`: rewritten continuously by `matugen` so legacy tools inherit wallpaper luminance instead of resetting to bone white.
+- `bookmarks`: pinned directory anchors preventing prolonged wandering through `/home` while searching for one path.

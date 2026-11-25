@@ -1,68 +1,48 @@
 # backstory
 
-## why i didn't just use caelestia or end-4
+## the hardware (`ThinkPad T16 Gen 1`, `21BWS23200`)
 
-if you want a normal wayland desktop where volume sliders work on the first try, bluetooth connects without touching a terminal, and you can post clean screenshots to discord, go install `caelestia` or `end-4`. those projects have actual docs, support channels, and defaults that won't crash the whole shell if your battery reports an int instead of a float.
+none of this runs on a clean workstation. it runs on a `ThinkPad T16 Gen 1` (`N3BET70W` UEFI) packing a 12-core `i7-1260P` (`400–4700` MHz), an `Intel Alder Lake-P` iGPU (`i915`), and an `NVIDIA TU117M` (`GeForce MX550`) sitting idle on `nouveau` with zero useful purpose beyond soaking chassis plastic and leaking standby watts. `eDP-1` (`BOE 0x0A5F`, `340x220` mm) pushes `1920x1200` at `60Hz` (`srgb`); `HDMI-A-1` takes `1920x1080@60`. the bottom shell has bowed slightly from sustained heat, and `BAT0` already sits chewed down to `43.6 / 52.5 Wh` (`83.1%` capacity) at `14.14 V` below nominal minimum voltage (`15.48 V`).
 
-i built `delirium` at 16 because i hated how standard setups handled configs and hardware, and i didn't feel like adapting my muscle memory to someone else's dotfiles.
+clean boot required fighting the display firmware separately. `lanzaboote` handles secure boot with `plymouth` bgrt, and `i915` early KMS (`fastboot=1`) stays pinned inside initrd solely to stop the lenovo splash from strobing across the `60Hz` panel for twelve seconds during handoff.
 
-calling this repo `my_hyprland_dots` felt like lying. half of reddit copies a waybar config, changes three hex codes, and calls it a new rice. `delirium` is what happens when you refuse to use normal tools, write your own pam auth loops, calculate bezier curves for screen-corner cutouts, and wire pipewire audio peaks into your lockscreen just to watch waveforms bounce while typing your password at 4:18 am.
-
-steal whatever you want from here. grab the corner bezier math, the `matugen` templates, `cli.py`, or the thinkpad fan daemon.
+thermal control (`pkgs/fan-control/`) started because stock lenovo EC firmware (`dytc`) prioritizes quiet office rooms full of people who treat audible airflow like a workplace safety violation. firmware gladly lets the `i7-1260P` trip false `BD PROCHOT` latches and starve all twelve cores down to `400 MHz` just to spare an empty cubicle twenty decibels of blower noise. `daemon.py` and `watchdog.py` yank register control away from BIOS and shock `/proc/acpi/ibm/fan` into full-speed bursts whenever core clocks drop below `500 MHz`. if the bearing starts clicking under sustained stress, leave it.
 
 ---
 
-## the laptop (thinkpad t16 gen 1)
+## the tooling (and what survives automated runs)
 
-this whole thing runs on an alder lake i7-1260p paired with an nvidia geforce mx550 whose only real contribution is extra heat and multi-gpu buffer sync headaches on wayland. the bottom plastic cover has warped two millimeters to the left from sustained heat, and the battery health percentage reads like a timer ticking down to zero.
+half this tree is friction between one sleep-deprived human and two remaining google agent paths after google pulled the plug on **jules** (freezing it read-only before full retirement and folding agent execution into **antigravity**):
 
-getting boot to look clean took its own fight. i use `lanzaboote` for secure boot with `plymouth` bgrt, and i had to force early kms modules (`i915`, `fastboot=1`) into the initrd list just to stop the lenovo splash screen from strobing like a broken fluorescent tube for twelve seconds during handoff.
+- **`ai studio`**: where raw wayland protocol headers and mangled QML bindings get dumped at 3:45 am until a model hallucinates non-existent C++ methods and tries compiling them anyway.
+- **`antigravity`**: parallel local sub-agents racing across branched workspaces while the `i7-1260P` climbs past 98°c and the desk starts smelling faintly of cooked dust. one agent deletes array bounds, another invents state files nobody reads, and two burn hours arguing over border radii.
 
-then there were the fans (`pkgs/fan-control/`). the thinkpad cooler itself is fine, but lenovo tuned the factory embedded controller (`dytc`) for quiet office cubicles where hr yells at you if your fan spins past 2,200 rpm on a zoom call. stock firmware chokes cpu clock speeds just to keep the laptop quiet. i don't work in an office. if the cpu wants to boost, let it boost. i poked around the thinkpad acpi ec registers and packaged a root systemd service in `pkgs/fan-control/` that overrides the firmware cap and forces the fan to full speed (5,400 rpm) whenever temps spike. it sounds like a hair dryer eating aquarium rocks, and i don't care.
+everything desktop-facing runs inside `quickshell` (`qs`) with raw QML anchors. one null reference inside a popup widget kills the entire graphical layer and drops the terminal cleanly onto `tty1`. `cli.py` replaced old shell wrappers so one dependency-free python script handles reloads, layer cleanup, screenshot triggering, vpn/hotspot tab routing, and launcher control. `hyprland` (`0.57.2`) evaluates embedded lua tables instead of bracket configs, and `.json` is barred from runtime state entirely in favor of flat `.conf` files.
 
----
-
-## the stack (and the bots breaking it)
-
-most of this repo is a tug-of-war between me and three different google tools:
-- **ai studio**: my 3:45 am rubber duck. i dump 1.8 million tokens of raw wayland c headers, unindexed quickshell commits, and broken qml bindings into gemini's context window until it invents c++ methods that don't exist in any standard and tries to compile them anyway.
-- **antigravity**: four headless sub-agents running across parallel git worktrees until the thinkpad hits 104°c and the room smells like warm dust and cooked thermal paste. one agent invents a fake unix socket protocol, a second deletes working python list indexes, and the other two get stuck in a three-hour merge conflict loop over two pixels of border radius.
-- **jules**: an unattended cloud runner that clones this repo into a vm while i sleep, invents bugs to fix problems nobody had, and pushes commits straight to `main` with zero human supervision.
-
-on the desktop side, the whole shell runs in raw `quickshell` (`qs`) using qtquick and qml anchors, so a single null pointer in a battery widget drops the entire graphical session straight into `tty1`. i also deleted my old `qs-action` and `reload-qs` bash scripts and replaced them with `cli.py` so one zero-dependency python script handles shell switching, clean layer-shell restarts without leftover surfaces, file manager launches, and desktop actions.
-
-hyprland itself runs embedded lua tables instead of standard `hyprlang` brackets so the window manager evaluates lua closures at 240hz. and `.json` is completely banned from local state. no nested curly braces, no trailing-comma syntax errors, and no quote escaping. state lives in flat key-value `.conf` files or plain text tokens.
-
-if your compositor dumps core on login, that's between you and `coredumpctl`.
+if your compositor segfaults on boot, read `coredumpctl`. nobody else is driving this thing.
 
 ---
 
-## how i ended up on nixos (with a 4gb ramdisk root)
+## distro sequence (`windows` -> `arch` -> `gentoo` -> `nixos`)
 
 ### windows
-i left windows because my laptop ran way hotter on it, the background bloat never shut up, and everything was locked inside proprietary black boxes. the worst part was the fake permissions: even when your account says `Administrator`, windows treats you like a guest on your own hardware and tells you "access denied" because `SYSTEM` or `TrustedInstaller` owns the actual files. i got tired of begging my own operating system for permission to touch my laptop.
+left windows after realizing `Administrator` permissions are decorative theater. software keeps throttling thermals, spawning telemetry daemons, and responding with access denied because `SYSTEM` or `TrustedInstaller` owns your own filesystem. nobody needs to beg an OS for write access inside a machine they bought outright.
 
-### arch & the `atomic-lockfile` stunt
-people love the lazy meme that arch randomly breaks itself on every `pacman -Syu`, which is fake if you actually know how to maintain your system. arch was completely fine until i did something monumentally stupid during the june 2026 `atomic-lockfile` chaos.
+### arch & `atomic-lockfile`
+people repeat the lazy rumor that arch breaks itself on `pacman -Syu`, which is usually just incompetence. arch worked until I decided at 3:14 am—fully aware of what the payload was—to run `npm install atomic-lockfile` naked on bare metal with zero sandbox or VM just to watch what broke. there were no SSH keys worth taking, so thirty seconds later its post-install script scraped discord session tokens straight out of `~/.config/discord/Local Storage/leveldb` and exfiltrated them to a telegram bot while probing persistence. watching your own tokens fly out of RAM in real time settles whether you should trust yourself with stateful installs. I booted a live ISO, ran `blkdiscard -f /dev/nvme0n1` to wipe the Samsung NVMe down to raw flash cells, and moved on.
 
-i didn't even get hit through an orphaned aur package like normal people. at 3:14 am, wide awake and knowing full well what the package was, i let the intrusive thoughts win and typed `npm install atomic-lockfile` directly on bare metal with no vm and no container just to see what would happen. i didn't even have ssh keys on the machine for it to steal, so thirty seconds later its hook script just scraped my discord session tokens out of `~/.config/discord/Local Storage/leveldb` and fired them straight to a telegram bot (`api.telegram.org/bot<token>/sendDocument`) while trying to load its rootkit. watching your own discord tokens get shipped off to telegram in real time is a great way to realize you shouldn't be trusted with a normal setup. i booted a live usb, ran `blkdiscard -f /dev/nvme0n1` to wipe the nvme drive down to bare flash cells, and decided i wanted to try something new anyway.
+### five hours of gentoo
+tried gentoo for roughly five hours. watched the cooling fan strain compiling `glibc`, realized gnome dependencies were behind upstream anyway, and wiped the partition table out of irritation.
 
-### the 5-hour gentoo detour
-i tried gentoo for about five hours. spent the whole time compiling `glibc` while the fan screamed and warped the bottom case, found out the gnome packages were three minor versions behind, and wiped the partition table out of pure spite.
+### nixos + volatile `tmpfs` root
+nixos stayed because broken generations revert at boot instead of costing an afternoon. after inspecting another shell repo (`brain_shell`) that spawned six nested subshells via `(setsid bash -c 'systemctl poweroff' &)` just to shut down and fork-bombed `xargs -P 4` resizing jpegs, keeping state on `/` at all stopped feeling tolerable.
 
-### nixos + ephemeral `tmpfs` root (november 2026)
-nixos was the new thing that actually stuck. if a bad config or update breaks the compositor, i just reboot and pick generation `n-1` in the boot menu.
-
-in november 2026, after reading through another shell repo (`brain_shell`) that used six nested subshells running `(setsid bash -c 'systemctl poweroff' &)` just to turn off a laptop and fork-bombed `xargs -P 4` to resize jpegs, i decided a normal root partition was still too messy. `/` is now a 4gb `tmpfs` ramdisk. every time the laptop powers off, anything written to `/` disappears when the ram capacitors drain. real state lives exclusively in `@persist` on btrfs, 5.9gb of flatpaks sit in their own isolated subvolume, and secure boot is signed with `lanzaboote`.
+`/` now mounts inside a volatile `7.6G` `tmpfs` ramdisk (`tmpfs[/newroot]`) alongside `16 GiB` physical memory, `7.65 GiB` `zram0`, and a `16.82 GiB` NVMe swap partition (`/dev/nvme0n1p3`). shutting down drains the capacitors and clears everything not explicitly bound inside `@persist` on btrfs (`/home`, `/persist`, `/var/log` across `/dev/nvme0n1p2`, `459.12 GiB`), booting cleanly through `lanzaboote` from `/boot` (`1022 MiB` vfat). chemically clean erasure every poweroff.
 
 ---
 
-## humans vs bots in the issue tracker
+## issues & upstream pull requests
 
-### opening issues
-open an issue if you want, but i'm probably not reading it. google jules will clone your complaint into a cloud vm, antigravity will spin up four sub-agents to fight over it, and whatever survives the merge will get pushed straight to `main`. roast the bots all you want in the comments; they don't have feelings.
+do not expect issue triage. jules is dead—frozen read-only ahead of full shutdown—so nothing in github's cloud is watching your complaint. occasionally local `antigravity` runs chew through bugs, or human PRs sit unmerged until an overnight agent commit breaks them anyway.
 
-### sending pull requests
-if you are an actual human sending a PR to fix broken bot code: github actions will probably fail your lint check anyway, and there is a 90% chance i merge the bot's broken PR over yours just because it's funnier.
-
-fork it, break it, turn it into whatever weird setup you want. keep the license file in there so the mess stays legal. you can't copyright llm output anyway, so let the models sue each other.
+take whatever pieces hold together on your hardware (`cli.py`, bezier screen corners, `screenshot.py`, `fan-control`), keep the license intact, and leave the rest behind.

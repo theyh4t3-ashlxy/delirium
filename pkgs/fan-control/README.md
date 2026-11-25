@@ -1,19 +1,21 @@
-# fan-control
+# pkgs/fan-control
 
-hardware thermal containment daemon and cli frontend for the thinkpad t16 gen 1.
+thermal intervention daemon and cli frontend for the `ThinkPad T16 Gen 1` (`21BWS23200`).
 
-because lenovo's embedded controller firmware is an unmitigated disaster that trips false-positive bd prochot thermal flags and clamps the alder lake i7-1260p to a comatose 400mhz while idling at 42°c.
+lenovo calibrates stock embedded controller tables for quiet corporate offices where audible fan draw offends conference-call ergonomics. firmware prefers soaking chassis plastic until `BAT0` degrades to `83.1%` health (`43.6 / 52.5 Wh`, sitting at `14.14 V` below nominal minimum) and tripping false-positive `BD PROCHOT` latches—clamping all twelve `i7-1260P` cores into a `400 MHz` coma—over spinning up the cooler. this package strips firmware of discretion.
 
-## components
-- `fanctl`: standalone python cli tool for inspecting fan speed, sensor temperatures, setting manual levels (0-7, auto, full-speed), or switching dynamic fan curves (`quiet`, `balanced`, `performance`).
-- `daemon.py`: root-level d-bus system daemon (`org.thinkpad.FanControl`) communicating directly with `/proc/acpi/ibm/fan` and sysfs hwmon sensors.
-- `watchdog.py`: the anti-prochot defibrillator. polls cpu core frequencies; if frequencies plunge below 500mhz under active load, it shocks the ec registers with full-speed fan bursts to force-clear the throttle latch.
-- `default.nix`: native nix derivation packaged with python3, pygobject3, gtk4, and libadwaita hooks.
+## modules
+
+- `fanctl`: standalone python cli inspecting thermal sensors, polling tachometer rpm, writing raw EC states (`0`–`7`, `auto`, `full-speed`), and applying dynamic fan curves (`quiet`, `balanced`, `performance`).
+- `daemon.py`: privileged d-bus service (`org.thinkpad.FanControl`) writing straight into `/proc/acpi/ibm/fan` and hwmon sysfs nodes without asking `powerprofilesctl` for permission.
+- `watchdog.py`: frequency monitor polling core clocks under load. whenever clocks crash below `500 MHz` behind a stuck prochot flag, it forces full-speed fan pulses until the throttle register clears. if the bearing starts clicking from long sessions at max rpm, leave it.
+- `default.nix`: nix derivation packaging python3, pygobject3, gtk4, and libadwaita dependencies.
 
 ## usage
+
 ```zsh
-fanctl status        # print current temp, fan rpm, and profile
-fanctl curve quiet   # engage quiet thermal curve
-fanctl max           # emergency full-speed jet engine mode
-fanctl auto          # hand control back to bios firmware
+fanctl status        # print temp, fan rpm, and active curve
+fanctl curve quiet   # reduce fan draw on battery
+fanctl max           # hold maximum thermal evacuation
+fanctl auto          # hand register control back to lenovo bios
 ```

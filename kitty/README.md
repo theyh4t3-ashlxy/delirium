@@ -1,11 +1,12 @@
 # kitty
 
-gpu-accelerated terminal emulator where i type git commands i barely understand.
+opengl-accelerated terminal emulator used to maintain a hostile nixos flake and stare at tracebacks until dawn.
 
-if your terminal emulator uses web technologies or takes more than three milliseconds to open a new tab, you are doing computing wrong. kitty draws text with opengl and runs directly on your graphics card.
+spawning a hidden chromium engine purely to paint monospace text into a box is architectural rot. kitty pushes glyph atlases directly to the GPU so bad commands render and execute with zero visible latency.
 
-## configs
-- `kitty.conf`: internal window padding, background blur, tab bar aesthetics, keybinds, ligatures, and font overrides (jetbrains mono nerd font).
-- `colors.conf`: the battleground. violently overwritten by matugen whenever you switch wallpapers so your terminal colors match whatever image you pulled from the internet.
+## files
 
-if kitty doesn't update its palette after a wallpaper switch, blame a dead pid or run `pkill -USR1 kitty` to force the redraw.
+- `kitty.conf`: padding, background blur, tab layout, ligatures, keybindings, and font configuration (`jetbrains mono nerd font`).
+- `colors.conf`: rewritten without warning by `matugen` on every wallpaper shift.
+
+if existing terminal panes hold onto stale colors from an earlier hour, signal `pkill -USR1 kitty` to force live scrollback buffers to accept the new registers.

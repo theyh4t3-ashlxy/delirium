@@ -1,15 +1,12 @@
 > [!WARNING]
-> this repo is a pile of qml, python scripts, and a nixos config taped together at 4 am because i refused to use a computer like a normal person.  
-> half of this code was argued into existence with cloud models while my laptop fans screamed, and the other half was fixed by a second model after the first one broke my lockscreen.  
-> if you want a polite desktop with pastel corners and a discord server full of helpful people, close this tab and go install `caelestia` or `end-4`.
+> if anyone in your contacts would actually look for you after three days of silence, close this tab.  
+> this repository is what remains on a `ThinkPad T16 Gen 1` (`i7-1260P`, `MX550` idling on `nouveau`, `1920x1200@60Hz`) once sleep turns optional and automated agents spend the night rewriting broken QML anchors until dawn.  
+> install [caelestia](https://github.com/caelestia-dots/caelestia) or [end4-pC](https://github.com/pctrade/end4-pC) if you intend to use your laptop in public without debugging `tty1`.
 
-links so you don't even have to search:  
-[caelestia](https://github.com/caelestia-dots/caelestia) / [end4-pC](https://github.com/pctrade/end4-pC)
-
-here is fifteen seconds of live footage recorded right before wayland choked on a bad layer-shell surface and dropped me straight into `tty1`.
+recorded right before wayland dropped an orphaned layer-shell surface and dumped the graphical session onto `tty1`:
 
 > [!NOTE]
-> if the video doesn't load, either your browser's media player quietly segfaulted or github decided your user-agent doesn't get mp4 streams today. not my problem.
+> if github refuses to stream the mp4 or your browser codec drops out mid-decode, nothing of value was lost. keep scrolling.
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/bbc2284c-7273-48a3-8108-871a036a0b3f" controls="controls" style="max-width: 100%; height: auto;">
@@ -19,136 +16,118 @@ here is fifteen seconds of live footage recorded right before wayland choked on 
 ---
 
 ### contents
-1. [other rices vs this mess](#other-rices-vs-this-mess)
-2. [step 1: nixos packages](#step-1-nixos-packages)
-3. [step 2: running the installer](#step-2-running-the-installer)
-4. [bugs & suggestions](#bugs--suggestions)
-5. [backstory (BACKSTORY.md)](#backstory)
+1. [other configurations vs this](#other-configurations-vs-this)
+2. [step 1: nixos base packages](#step-1-nixos-base-packages)
+3. [step 2: installation](#step-2-installation)
+4. [defects & patches](#defects--patches)
+5. [record (BACKSTORY.md)](#record)
 
 ---
 
-## other rices vs this mess
+## other configurations vs this
 
-let's be real here. you have actual options, and almost all of them are better life choices than cloning this repo.
+there is no practical justification for running someone else's personal nervous ticks on your own SSD. balanced adults install software maintained for more than one head.
 
-| rice | actual stack | primary vibe | why people like it | why it beats this repo | survival rate |
+| setup | stack | posture | primary audience | reason to use it instead | expected stability |
 |---|---|---|---|---|---|
-| **[caelestia](https://github.com/caelestia-dots/caelestia)** | quickshell, typescript, lua (`hypr-vars.lua`), `caelestia-cli`. | chromebook if google hired real designers. | `"it loosk cool"` and installs straight from the AUR via `caelestia install`. | 4.7k stars and an actual community to save you when an update breaks your config. | 94% |
-| **[end4-pC](https://github.com/pctrade/end4-pC)** | 87% qml fork sitting on top of `@end-4`'s `illogical-impulse` (`ii`), plus lua vars. | material 3 expressive on steroids. | one-click community preset gallery (`gh` cli), lyrics, weather, and qr code screen snipping. | stable yet wild with customization, as long as you already have `illogical-impulse` installed. | 80% |
-| **[HyDE](https://github.com/HyDE-Project/HyDE)** | waybar, rofi, `wallbash`, shell + lua + python (formerly `hyprdots`). | classic arch rice ("i use arch btw"). | midwit bell curve: beginners want 50 widgets, veterans just want a bar that works and `themepatcher`. | 9.7k stars, most mature setup around, even has a nixos cousin (`hydenix`). | 90% |
-| **[ml4w](https://github.com/mylinuxforwork/dotfiles)** | qml (quickshell), shell, css, lua, plus its own live ISO ("ml4w os"). | employed adult with a day job. | GUI settings app and one-line installer supporting arch, fedora, ubuntu, and opensuse. | doesn't explode five minutes before a meeting. | 99% |
-| **delirium** *(this repo)* | quickshell, python, hyprland, nixos. | one ai model breaks it, a different ai model patches it, repeat forever. | population: me. built only for my specific muscle memory and ocd. | you want to try something weird that isn't mainstream, and you don't mind reading tracebacks. | 0% |
+| **[caelestia](https://github.com/caelestia-dots/caelestia)** | quickshell, typescript, lua (`hypr-vars.lua`), `caelestia-cli`. | sanitized material symmetry. | people with appointments, social plans, and functioning sleep cycles. | maintainers answer bug reports before things decay into tracebacks. | high |
+| **[end4-pC](https://github.com/pctrade/end4-pC)** | qml fork stacked onto `illogical-impulse`, lua vars. | expressive widgets, community gallery, lyrics. | people who want visual complexity without babysitting C++/QML bindings at 4 am. | coherent upstream structure and preset curation. | moderate |
+| **[HyDE](https://github.com/HyDE-Project/HyDE)** | waybar, rofi, `wallbash`, shell, lua, python. | conventional tiling minimalism. | users who want theme patching without touching `dbus` internals. | mature across distros (`hydenix` on nixos) with minimal triage. | high |
+| **[ml4w](https://github.com/mylinuxforwork/dotfiles)** | quickshell, shell, css, lua, dedicated live iso. | appliance predictability. | anyone who cannot lose their display server five minutes before a call. | GUI installers and tested release channels. | very high |
+| **delirium** *(this repo)* | quickshell, python, hyprland lua, nixos on `7.6G` `tmpfs`. | mutual resentment between human, lenovo embedded controller, and unattended agents. | population: 1. calibrated strictly around stiff knuckles and bad habits. | none. strip individual scripts for parts and leave the rest alone. | none |
 
-### why delirium exists anyway
-the other rices are built for an audience. `delirium` was built by a 16-year-old who refused to use standard tools and wanted total keyboard control over every pixel.
+### why i didn't just use `caelestia` or `end-4`
 
-if you want a painless desktop where volume sliders work on the first try and nothing yells at you in the terminal, go install **ml4w** or **caelestia**.
+if you want volume sliders that bind cleanly, bluetooth codecs that connect without touching `pw-dump`, and clean screenshots you can send to coworkers without cropping out a traceback, install `caelestia` or `end-4`. they assume you are healthy enough to want defaults that work.
 
-if you stick around anyway: steal the code, steal the bezier curves, steal `cli.py`, and take whatever qml parts work on your machine.
-
----
-
-## what's in this repo
-
-| directory | what it does |
-|---|---|
-| `quickshell/` | the entire desktop shell. bar, lockscreen, widgets, popups, notifications, presets, bar studio. |
-| `hypr/` | hyprland config in embedded lua tables instead of hyprlang. window rules, keybinds, animations, monitor layout. |
-| `zsh/` | zsh environment compiled to bytecode. prompt, syntax critic, fzf tools, matugen color sync. `sysup` runs the full nixos update pipeline in one command. |
-| `matugen/` | material you color pipeline. templates compile to kitty, quickshell, gtk, fastfetch, nvim, hyprland simultaneously on every wallpaper switch. |
-| `kitty/` | gpu terminal. palette registers `color0`–`color15` are owned by matugen and reload live via `pkill -USR1 kitty` without restarting open windows. |
-| `fastfetch/` | system info layout. template-driven, ansi-indexed, disk pinned to `/home` because `/` is a tmpfs ramdisk. |
-| `btop/` | resource monitor. `color_theme = TTY` so it inherits the terminal's ansi palette automatically. |
-| `nvim/` | neovim with lazy.nvim. colors pulled from matugen ansi registers, no hardcoded hex. |
-| `nixos/` | flake-driven nixos config. `sysup` does `nix flake update + rebuild + commit flake.lock + push` as a single command. |
-| `pkgs/fan-control/` | root systemd service that overrides the thinkpad ec fan cap and forces 5,400 rpm when temps spike. |
+this setup exists strictly so that when impulse wins at 4:10 am and `/dev/nvme0n1` gets discarded back to bare silicon, whatever is strictly functional survives offsite. take `cli.py`, the bezier screen corners, `screenshot.py`, `battery.py`, or the fan watchdog and walk away.
 
 ---
 
-## step 1: nixos packages
+## step 1: nixos base packages
 
-before running `./install.zsh`, put this block into `/etc/nixos/configuration.nix` (or your flake). if you skip this, `./install.zsh --doctor` will call out every missing binary in red text, `quickshell` (`qs`) won't start, `matugen` will have nothing to sample, and your terminal will render hollow unicode tofu boxes (`[]`) instead of icons:
+add these definitions into `/etc/nixos/configuration.nix` (or your flake module) prior to invoking `./install.zsh`. skipping them makes `./install.zsh --doctor` fail cleanly in red text, drops `quickshell` straight back to `tty1`, and degrades UI icons into hollow tofu boxes (`[]`):
 
 ```nix
-  # 1. wayland session: uwsm keeps systemd and hyprland from leaving zombie processes behind
+  # 1. wayland session: uwsm keeps systemd and hyprland from abandoning orphan daemons
   programs.hyprland = {
     enable = true;
-    withUWSM = true; # lets install.zsh restart quickshell cleanly via 'uwsm app -- qs -d'
+    withUWSM = true; # required so install.zsh can respawn quickshell via 'uwsm app -- qs -d'
   };
-  programs.zsh.enable = true;   # puts zsh in /etc/shells before you lock yourself out of tty1
-  programs.dconf.enable = true; # needed so gtk theme switches don't fail silently
+  programs.zsh.enable = true;   # prevents locking yourself out of tty1 on chsh
+  programs.dconf.enable = true; # required so gtk dark-mode toggles write through
 
-  # 2. packages checked by './install.zsh --doctor' + script glue
+  # 2. packages verified by './install.zsh --doctor' + script runtime glue
   environment.systemPackages = with pkgs; [
-    # wayland & rice daemons
-    kitty                # gpu terminal where we run git commands we barely understand
-    quickshell           # qml desktop shell ('qs') replacing waybar
-    matugen              # pulls material color palettes straight from wallpapers
-    awww                 # wallpaper daemon that doesn't crash when wayland blinks
-    mpvpaper             # video wallpaper player for when your gpu isn't warm enough
-    hyprpicker           # screen color picker for grabbing hex codes
-    wl-clipboard         # wl-copy and wl-paste so you can copy stackoverflow snippets
-    brightnessctl        # screen brightness control so you don't blind yourself at 3 am
-    playerctl            # media controller keeping spotify on a leash
-    adw-gtk3             # makes old gtk3 apps look like libadwaita
-    glib                 # gives you gsettings so gtk themes reload live
-    dconf                # gnome config backend for dark mode toggles
-    libnotify            # notify-send so background python scripts can ping you
-    ffmpeg               # grabs thumbnails from video wallpapers
-    rsync                # install.zsh uses this to copy gtk-3.0/4.0 folders for flatpak
-    curl                 # downloads missing icon fonts and random wallhaven wallpapers
-    fontconfig           # gives install.zsh fc-list and fc-cache to check installed fonts
+    # wayland & shell runtime
+    kitty                # opengl terminal
+    quickshell           # qml/c++ layer-shell host ('qs')
+    matugen              # wallpaper palette compiler
+    awww                 # wallpaper daemon
+    mpvpaper             # video wallpaper host for burning spare TDP
+    hyprpicker           # screen pixel sampler
+    wl-clipboard         # wl-copy / wl-paste
+    brightnessctl        # backlight sysfs control
+    playerctl            # mpris transport control
+    adw-gtk3             # gtk3 dark theme parity
+    glib                 # gsettings cli
+    dconf                # gnome settings backend
+    libnotify            # notify-send for background failure alerts
+    ffmpeg               # video wallpaper frame extraction
+    rsync                # flatpak gtk-3.0/4.0 folder sync
+    curl                 # downloads icon fonts during initial setup
+    fontconfig           # fc-list / fc-cache inspection
 
-    # cli tools
-    micro                # normal text editor for when you forget how to quit neovim
-    neovim               # the editor you tell people on reddit you use every day
-    fastfetch            # prints your system info before the next crash
-    eza                  # ls with nerd font icons
-    zoxide               # smart cd that remembers where you go
-    fzf                  # fuzzy finder for the interactive installer menu
-    bat                  # cat with syntax highlighting
-    ripgrep              # rg because regular grep takes forty business days
-    fd                   # find replacement without the ugly -exec \; syntax
-    jq                   # parses json payloads (install.zsh falls back to python3 if missing)
-    yazi                 # fast terminal file manager with image previews
-    git                  # for committing straight to main without testing
-    zsh                  # runs install.zsh and loads ~/.config/zsh/sources.zsh
+    # terminal utilities
+    micro                # fallback editor for people who panic inside vi
+    neovim               # configured with ijkl navigation
+    fastfetch            # hardware summary readout
+    eza                  # ls replacement
+    zoxide               # directory frequency index
+    fzf                  # interactive picker backend
+    bat                  # syntax-highlighted cat
+    ripgrep              # regex search
+    fd                   # file traversal
+    jq                   # json parsing fallback
+    yazi                 # terminal file browser
+    git                  # version control
+    zsh                  # shell runtime
 
     # python glue & archives
-    python3                # runs ~/.local/bin/cli and wallpaper.py
-    python3Packages.pillow # blurs images for the lockscreen cache
-    unar                   # unpacks archives without memorizing tar flags
-    gh                     # github cli for yelling at bots in issue trackers
+    python3                # executes cli.py, battery.py, network.py, screenshot.py, weather.py
+    python3Packages.pillow # lockscreen wallpaper blur preprocessing
+    unar                   # archive extraction
+    gh                     # github cli
   ];
 
-  # 3. fonts: keeps unicode tofu rectangles off your bar
+  # 3. fonts: keeps missing codepoints from rendering as empty rectangles
   fonts.packages = with pkgs; [
-    nerd-fonts.jetbrains-mono # main monospace font with patched icons
-    noto-fonts                # standard text fallback
-    noto-fonts-cjk-sans       # stops asian characters on spotify from turning into boxes
-    noto-fonts-color-emoji    # normal color emojis
+    nerd-fonts.jetbrains-mono
+    noto-fonts
+    noto-fonts-cjk-sans
+    noto-fonts-color-emoji
   ];
 ```
 
-switch your nixos generation before running the installer (or let `./install.zsh --rebuild` do it for you):
+apply the nixos generation before running the installer (or pass `--rebuild`):
 
 ```zsh
 sudo nixos-rebuild switch
 ```
 
 > [!NOTE]
-> **about the icon fonts:**  
-> `install.zsh` downloads google material symbols, font awesome 6 free, and `SegoeIcons.ttf` straight into `~/.local/share/fonts` and runs `fc-cache -f`. packaging microsoft fonts in nix is a headache, and `fontconfig` checks `~/.local/share/fonts` automatically anyway. if you run `./install.zsh --doctor` before running the installer once, it will complain that those icon fonts are missing.
+> **on proprietary and icon fonts:**  
+> `install.zsh` downloads google material symbols, font awesome 6 free, and `SegoeIcons.ttf` into `~/.local/share/fonts` and updates `fc-cache -f`. packaging proprietary windows/icon TTFs inside nix derivations creates needless friction when `fontconfig` resolves `~/.local/share/fonts` directly. running `--doctor` prior to a first `./install.zsh` run will flag them absent.
 
 ---
 
-## step 2: running the installer
+## step 2: installation
 
-do **not** run `./install.zsh` with `sudo`. the script checks `(( EUID == 0 ))` right at the start and quits immediately so you don't accidentally mess up permissions in `~/.config`.
+never execute `./install.zsh` with `sudo`. the script checks `(( EUID == 0 ))` immediately and exits rather than corrupting file ownership across `~/.config`.
 
-### option a: clone it normally
+### standard clone
 
-clone into `~/.local/share/dotfiles` so you don't clutter `~`:
+keep the checkout inside `~/.local/share/dotfiles` rather than cluttering `~`:
 
 ```zsh
 mkdir -p ~/.local/share
@@ -158,33 +137,29 @@ chmod +x install.zsh
 ./install.zsh
 ```
 
-just run `./install.zsh` and read the menu, or pass `--help` if you want to see the flags (`--doctor`, `--dry-run`, `--fetch-wp`, `--update`, etc.). if `fzf` is installed, you get a multi-select picker; if not, it drops down to typing comma-separated numbers like a 1994 `vt100` terminal.
+run `./install.zsh --help` for `--doctor`, `--dry-run`, `--fetch-wp`, `--update`, and `--rebuild`. with `fzf` on `$PATH` it presents a multi-select prompt; otherwise it drops to comma-separated numeric indices.
 
-### option b: one-liner
+### single-line bootstrap
 
-don't do `curl .../install.zsh | zsh` on its own. `install.zsh` sets `DOTS_DIR="${0:A:h}"` (the folder the script lives in) and doesn't run `git clone` itself, so piping `curl` straight into `zsh` in your home directory will make it try to symlink your `Downloads` and `Documents` folders into `~/.config`.
-
-if you want a one-liner, clone and run it together:
+do not pipe `curl .../install.zsh | zsh` alone from `$HOME`. `install.zsh` resolves `DOTS_DIR="${0:A:h}"` from its own location and runs no `git clone`, so an unanchored pipe inside `~` will try symlinking `Downloads` and `Documents` straight into `~/.config`:
 
 ```zsh
 git clone https://github.com/theyh4t3-ashlxy/delirium.git ~/.local/share/dotfiles && ~/.local/share/dotfiles/install.zsh
 ```
 
-the script reads interactive prompts straight from `/dev/tty`, so you have no excuses (as a certain charter school district motto once threatened. we do not speak its name).
+interactive prompts read straight from `/dev/tty`.
 
 ---
 
-## bugs & suggestions
+## defects & patches
 
 ### bugs
-zero reported fires so far. either the code is holding together or the crash logger segfaulted before it could snitch.
+an empty issue list does not indicate stability; either nothing broke locally or `quickshell` terminated before flushing logs to `/run/user/1000/quickshell`.
 
-### suggestions (no roadmap)
-i don't have a roadmap. roadmaps are for product managers.
-- if you have a suggestion or want to fix something weird, open an issue or send a PR.
-- if a cloud runner opens a PR at 3 am rewriting half the repo, just let it cook.
+### patches
+there is no roadmap or triage schedule. google shut down jules for active execution and rolled its workflow into antigravity, so no cloud bot is sitting around parsing issues anyway. send a PR if something offends you enough to fix it yourself; understand that late-night local agent passes on `main` may erase or break your diff before morning.
 
 ---
 
-## backstory
-for why prebuilt rices annoyed me enough to make this, the arch incident, laptop thermal struggles, and rules for arguing with ai models, read [BACKSTORY.md](BACKSTORY.md).
+## record
+for the hardware decay notes, the `atomic-lockfile` nvme wipe, `lanzaboote`, and why `/` clears itself inside a volatile `7.6G` `tmpfs` mount on poweroff, read [BACKSTORY.md](BACKSTORY.md).

@@ -1,13 +1,12 @@
 # yazi
 
-blazing fast terminal file manager written in rust because clicking around in electron or traversing nested directories with standard `cd` and `ls` is a test of human patience we refuse to take.
+asynchronous rust terminal file browser, chosen because scrolling through graphical file managers makes auditing neglected folders feel like pushing cold grease across a cafeteria tray.
 
-arrow keys and vim motions go zooom.
+directory trees populate in the background without hitching keyboard navigation, source previews highlight inline, archives expose layouts prior to extraction, and images render natively over kitty's graphics protocol so forgotten downloads stay visible without dragging GTK or Electron onto screen.
 
-yazi renders asynchronous directory trees, previews syntax-highlighted code, extracts archive contents, and displays raw image previews directly in the terminal via kitty's graphics protocol without segfaulting.
+## structure
 
-## configs
-- `theme.toml`: synched with matugen so file type badges, cursor bars, and selection borders match your desktop wallpaper.
-- `keymap.toml`: custom keybindings tailored for lightning navigation.
-- `package.toml`: package and plugin manifest.
-- `plugins/`: custom yazi extensions like `smart-enter` to open files or enter directories seamlessly with a single key.
+- `theme.toml`: synced with `matugen` so file tags, selection bars, and preview borders track active wallpaper contrast.
+- `keymap.toml`: direct traversal bindings.
+- `package.toml`: plugin manifest.
+- `plugins/`: extensions including `smart-enter` to descend trees or spawn handlers in a single stroke.

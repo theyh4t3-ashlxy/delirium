@@ -1,16 +1,15 @@
 # hypr
 
-lua-powered hyprland config because standard hyprland syntax wasn't psychotic enough.
+`Hyprland 0.57.2` driven by embedded lua tables because static bracket configs make it too comfortable to forget what your compositor is allocating in RAM.
 
-configuring a wayland compositor with declarative brackets and quotes is for normal people. we run lua tables and functions because if our display server isn't running an embedded scripting runtime at 240hz, what are we even doing with our lives?
+runs against real `ThinkPad T16 Gen 1` hardware: `eDP-1` (`BOE 0x0A5F`, `1920x1200@60Hz`, `srgb`) paired with `HDMI-A-1` (`1920x1080@60Hz` `auto-left`) pushed across `Intel Alder Lake-P` (`i915`) while `NVIDIA TU117M` (`GeForce MX550`) stays idle on `nouveau` converting battery charge into ambient plastic warmth. if changing scale or monitor placement dumps your focused windows off-screen, read `hyprctl monitors` before opening an issue claiming your desktop vanished.
 
-if your screen flickers or your windows start teleporting into the fourth dimension, check your monitor coordinates before crying to me.
+## load sequence
 
-## the architecture of chaos
-- `hyprland.lua`: the entrypoint. the puppeteer holding the strings of your entire visual reality.
-- `binds.lua`: muscle memory torture chamber. every combination of super, alt, shift, and ctrl mapped to quickshell toggles, terminal spawns, and scratchpad summoning.
-- `rules.lua`: window rules forcing stubborn electron apps, picture-in-picture windows, and file pickers to float, tile, or get pinned where they belong.
-- `anims.lua`: cubic bezier curves tuned so aggressively your gpu actually sweats just resizing a terminal.
-- `startup.lua`: daemons and processes dragged kicking and screaming into existence on login (quickshell, hypridle, polkit, wireplumber).
-- `monitors.lua`: display resolutions, scaling factors, and refresh rates. don't look directly at it or your edid will cry.
-- `colors.lua`: auto-generated matugen paint. dynamically rewritten on wallpaper shifts. do not edit this by hand unless you enjoy having your changes mercilessly overwritten.
+- `hyprland.lua`: primary entrypoint evaluating layout, rules, and bindings directly into compositor state.
+- `binds.lua`: chorded `super` / `alt` / `shift` / `ctrl` permutations wired to `quickshell` IPC, terminal spawns, screenshot captures, and scratchpads.
+- `rules.lua`: containment policies pinning uncooperative electron dialogs, picture-in-picture windows, and legacy portals to explicit coordinates so nothing steals focus unattended.
+- `anims.lua`: tight cubic bezier curves terminating fast enough to match a `60Hz` LCD sample interval without lingering blur.
+- `startup.lua`: background daemons dragged up at session start (`quickshell`, `hypridle`, polkit agent, `wireplumber`). if one stalls waiting on `dbus`, session startup hangs silently.
+- `monitors.lua`: literal monitor geometry (`eDP-1` `1920x1200@60` at `0x0`, `HDMI-A-1` `1920x1080@60` `auto-left`, `srgb`).
+- `colors.lua`: active border tokens overwritten continuously by `matugen`. manual changes evaporate on the next wallpaper rotation.

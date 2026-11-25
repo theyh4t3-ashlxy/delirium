@@ -1,37 +1,39 @@
 # zsh
 
-zero-framework zsh environment. configs compile to `.zwc` bytecode so interactive startup is instant regardless of module count.
+frameworkless zsh compiled to `.zwc` bytecode so interactive prompts appear instantaneously before doubt reaches your prefrontal cortex.
+
+oh-my-zsh wastes hundreds of milliseconds parsing dead plugin wrappers so newcomers feel cushioned while waiting for a prompt. everything here runs native, compiled, and openly contemptuous of hesitant typing.
 
 ## modules
 
-- `prompt.zsh`: reactive prompt engine. git v2 status, command timers, transient collapse, and instant layout switching via `settings`.
-- `roast.zsh`: syntax critic and session check-in engine. hooks `command_not_found_handler` with non-repeating dry commentary, pure-zsh typo correction, and nix package hints.
-- `nuke.zsh`: fzf process sniper with live preview, multi-select, and batched sudo escalation.
-- `dnd.zsh`: do-not-disturb toggle that writes directly into quickshell's state without ipc.
-- `tools.zsh`: `zoxide`, `eza`, `bat`, `rg`, `fd`, `btop`, `yazi`, and `fzf` integration. `c` replaces `cd` with auto-ls on arrival.
-- `functions.zsh`: `glog` / `gbr` / `gdiff` interactive git tools, `extract`, `ports`, `serve`, `calc`, `take`, `fif`, `fe`, and `nixs`.
-- `aliases.zsh`: nixos rebuild/update (`sysup`/`nixup`), gc shortcuts (`cleanup`), safe file ops, `why`, `please`, and named directory hashes (`~qs`, `~hypr`, `~nix`, etc.).
-- `settings.zsh` & `user_prefs.conf`: live terminal customization hub. prompt style, syntax critic toggle, session check-in, transient mode, vi/emacs bind mode, and config quick-jump. `user_prefs.conf` is gitignored — it's yours.
-- `matugen.zsh`: wallpaper-synced palette exports. injects ansi hex codes into `fzf`, `zsh-syntax-highlighting`, and `NEWT_COLORS` on every matugen run.
-- `help.zsh`: cheat sheet rendered by `dots_help`, `cheatsheet`, or bare `help` with no arguments.
+- `prompt.zsh`: reactive prompt reporting git v2 state, command timing, transient line collapse, and layout switching via `settings`.
+- `roast.zsh`: syntax critic hooking `command_not_found_handler` with dry, unrepeating disapproval, pure-zsh spell correction, and nixpkgs package hints whenever fatigue turns two keystrokes into gibberish.
+- `nuke.zsh`: `fzf` process termination selector using live previews, multi-select marking, and batched `sudo` signal escalation to execute unresponsive daemons without offering polite `SIGTERM` negotiation.
+- `dnd.zsh`: writes silence state directly into quickshell's runtime files without waiting on IPC round-trips.
+- `tools.zsh`: integrates `zoxide`, `eza`, `bat`, `rg`, `fd`, `btop`, `yazi`, and `fzf`. redefines `c` to replace `cd` with immediate directory listing so dead folders cannot hide behind silent transitions.
+- `functions.zsh`: interactive git inspection (`glog`, `gbr`, `gdiff`), archive extraction (`extract`), socket auditing (`ports`, `serve`), `calc`, `take`, `fif`, `fe`, and `nixs`.
+- `aliases.zsh`: full-flake rebuild pipeline (`sysup` / `nixup`), generation purge (`cleanup`), interactive file guardrails (`rm -I`, `cp -iv`, `mv -iv`), `why`, `please`, and named hashes (`~qs`, `~hypr`, `~nix`).
+- `settings.zsh` & `user_prefs.conf`: live terminal control panel adjusting prompt layout, syntax critic cadence, check-ins, transient prompt cleanup, and `vi`/`emacs` keymaps. `user_prefs.conf` stays gitignored so machine changes never pollute `git status`.
+- `matugen.zsh`: exports runtime wallpaper colors into `fzf`, `zsh-syntax-highlighting`, and `NEWT_COLORS`.
+- `help.zsh`: cheat sheet printed on `dots_help`, `cheatsheet`, or bare `help`.
 
-## commands worth knowing
+## operations
 
 ```zsh
 sysup              # nix flake update + nixos-rebuild switch + commit flake.lock + push
-sysup "my message" # same but with a custom commit message instead of a random one
+sysup "message"    # override randomized lockfile commit quote
 nixup              # alias for sysup
 
 rebuild            # sudo nixos-rebuild switch --flake .#lost
-test-build         # nixos-rebuild test  (doesn't set boot entry)
-boot-build         # nixos-rebuild boot  (staged, activates on next reboot)
-cleanup            # nix-collect-garbage --delete-older-than 7d (user + system)
+test-build         # nixos-rebuild test (volatile generation, skipped on boot menu)
+boot-build         # nixos-rebuild boot (activates only after reboot)
+cleanup            # purge nix generations older than 7 days across user and system
 gens               # list nixos generations
 
-settings           # interactive prompt/config customization menu
-dots_help          # full cheat sheet
-why                # decode the last exit code
-please             # re-run the last command with sudo
-nuke               # interactive process sniper (fzf multi-select)
-dnd                # toggle do-not-disturb in quickshell
+settings           # terminal customization panel
+dots_help          # full command reference
+why                # translate previous exit status
+please             # replay last command wrapped in sudo
+nuke               # fzf process termination
+dnd                # toggle quickshell do-not-disturb
 ```

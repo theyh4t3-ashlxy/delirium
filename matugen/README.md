@@ -1,22 +1,22 @@
 # matugen
 
-material you color engine. reads a wallpaper, extracts palette tokens, and writes them simultaneously across hyprland, kitty, quickshell, fastfetch, zsh, nvim, yazi, and gtk.
+material palette extraction rewriting every surface on the system from a single wallpaper seed.
 
-one `wp random` and every surface on the desktop recolors live, including open terminal windows via `pkill -USR1 kitty` without restarting them.
+one `wp random` sweeps existing colors out of hyprland borders, kitty, quickshell, fastfetch, zsh, nvim, yazi, and gtk simultaneously, forcing an instant monochrome or tonal sterilization without tearing down running applications. `pkill -USR1 kitty` updates active terminal buffers mid-command so even scrollback from thirty minutes ago wakes up inside the new palette.
 
-## components
+## pipeline structure
 
-- `config.toml`: defines input templates, output paths, and post-compile reload hooks. everything matugen touches is listed here.
-- `templates/`: skeleton configs with `{{ variable }}` placeholders. matugen fills these and writes the compiled outputs to their target paths.
-  - `kitty-colors.conf` → `kitty/colors.conf`: ansi registers `color0`–`color15` plus foreground, background, cursor, selection. all terminal color in the setup flows from these 16 slots.
-  - `fastfetch-colors.jsonc` → `fastfetch/config.jsonc`: fastfetch layout and ansi color names. the generated file is gitignored; edit the template.
-  - `zsh-colors.zsh` → `zsh/matugen.zsh`: hex exports for fzf, zsh-syntax-highlighting, and NEWT_COLORS.
-  - `palette.css` → `quickshell/palette.css`: material 3 tokens read live by the quickshell theme engine.
-  - gtk3/gtk4, hyprland, nvim, kde: same pattern.
-- `post-hook-scripts/`: shell scripts that run after template compilation. `pkill -USR1 kitty` for live terminal reload, hyprctl for border recolor, gsettings for gtk dark mode sync.
+- `config.toml`: registry mapping every input template to its compilation output path and post-write hook.
+- `templates/`: source skeletons containing `{{ variable }}` tokens expanded during palette synthesis.
+  - `kitty-colors.conf` -> `kitty/colors.conf`: owns ANSI slots `color0`–`color15`, cursor, selection, and background. terminal apps inherit nothing outside these 16 registers.
+  - `fastfetch-colors.jsonc` -> `fastfetch/config.jsonc`: layout and ANSI labels. the compiled file is gitignored because editing generated artifacts instead of templates wastes effort.
+  - `zsh-colors.zsh` -> `zsh/matugen.zsh`: exports palette strings for `fzf`, `zsh-syntax-highlighting`, and `NEWT_COLORS`.
+  - `palette.css` -> `quickshell/palette.css`: material 3 tokens watched live on disk by `Theme.qml`.
+  - gtk3, gtk4, hyprland, nvim, and kde outputs follow identical rewrite rules.
+- `post-hook-scripts/`: synchronous hooks signaling kitty (`USR1`), notifying hyprctl, and toggling gsettings dark mode right after output emission.
 
-## notes
+## operational constraints
 
-- always pass `--source-color-index 0` in scripts. without it, matugen waits for stdin input that will never arrive.
-- templates use `<* if {{is_dark_mode}} *>` / `<* else *>` blocks for dark/light conditional output. one template, two modes, no duplicate files.
-- kitty colors are pure ansi indices with zero hardcoded hex values in app configs. the hex lives only in `kitty/colors.conf` where matugen controls it.
+- pass `--source-color-index 0` in automated scripts. omitting it leaves matugen blocking indefinitely on stdin for an interactive choice that will never arrive.
+- templates branch via `<* if {{is_dark_mode}} *>` / `<* else *>` inside a single file rather than maintaining duplicate light/dark skeletons.
+- hexadecimal color literals are stripped out of application configs wherever possible so only `kitty/colors.conf` and `palette.css` hold concrete values.

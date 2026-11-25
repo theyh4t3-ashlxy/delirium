@@ -1,72 +1,58 @@
 # nvim
 
-neovim configured cleanly in lua because vimscript belongs in a museum of ancient curses.
+lua-configured neovim running on `lazy.nvim`. leave with `:qa!` or pull AC power from the wall.
 
-exit with `:qa!` or rip the power supply out of the wall. there is no middle ground.
+treesitter AST highlighting, LSP diagnostics, completion, and dynamically compiled `matugen` material tokens inject current wallpaper colors directly into syntax groups so the editor looks calm while you rewrite broken QML anchors at 03:30.
 
-powered by `lazy.nvim`. instantaneous startup times, zero plugin bloat, intelligent lsp auto-completion, treesitter ast parsing, and dynamically injected material 3 palette tokens from matugen so your syntax highlights match whatever wallpaper is currently glued to your display server.
+## navigation baseline
 
-## get your bearings
+if muscle memory locks up, `:Help` or `:Cheatsheet` opens a floating reference modal scrolled via `i`/`k` or `Ctrl-u`/`Ctrl-d` and dismissed with `q` or `Esc`. `<leader>?` toggles the same window. native documentation remains intact at `:help`.
 
-lost? type `:Help` or `:Cheatsheet` to open the ijkl guide modal. it floats centered over your buffer, closes with `q` or `Esc`, and scrolls with `i`/`k` or `Ctrl-u`/`Ctrl-d`. the guide is also wired to `<leader>?` if the binding is free. built-in neovim docs are still at `:help` (lowercase) as god intended.
+## the `ijkl` remap & `roast.lua`
 
-## the ijkl heresy & the arrow key shame engine
-we don't use `hjkl`. `hjkl` was invented on an adm-3a terminal in 1976 because the arrows were painted onto the keys. this is 2026.
+maintaining `hjkl` exclusively because a 1976 ADM-3A terminal painted four arrows onto incompatible keys is anatomical inertia. modal movement here sits on an inverted T around home row:
 
-here, modal navigation is remapped to `ijkl`:
 - `i` = up
 - `k` = down
 - `j` = left
 - `l` = right
 - `I` / `K` = jump 5 lines up / down
-- `J` / `L` = jump to start / end of line
+- `J` / `L` = start / end of line
 
-`h` and `a` take over insert mode duties that `i` vacated: `h` inserts before the cursor, `H` inserts at start of line.
+`h` and `a` inherit insert entry vacated by `i` (`h` inserts before cursor, `H` inserts at start of line).
 
-### `roast.lua`: psychological warfare on arrow key users
-if you coward out and reach for the arrow cluster in the bottom right corner of your keyboard, `roast.lua` intercepts the keystroke and triggers a high-priority notify warning mocking your tactile incompetence:
-> *"reaching for the arrows like a lost vscode tourist. ijkl is literally right there."*  
-> *"you spent four hours configuring dotfiles just to navigate like it's windows notepad. tragic."*  
-> *"every time you press an arrow key, another bloated electron app gets spawned. stop."*
+### `roast.lua`: behavioral correction on arrow keys
 
-toggle your suffering on or off with `:RoastToggle` or `<leader>rt`.
+reaching across the keyboard for the physical arrow cluster indicates unaddressed conditioning. `roast.lua` intercepts arrow keypresses and fires desktop warning notifications shaming the relapse until your fingers stop straying off home row.
 
-## quick reference
+toggle notifications off with `:RoastToggle` or `<leader>rt` if the nagging starts interfering with debugging.
 
-| keys | what it does |
+## reference bindings
+
+| keys | action |
 |---|---|
-| `:Help` / `:Cheatsheet` | open the ijkl guide modal |
-| `<leader>?` | toggle the guide |
-| `:RoastToggle` / `<leader>rt` | toggle arrow key roast mode |
-| `<leader>e` | toggle neo-tree sidebar |
-| `<leader>sv` / `<leader>sh` | split vertically / horizontally |
-| `<leader>sx` | close current split |
-| `Alt-i/k/j/l` | move between splits |
-| `<leader>mr` | toggle markdown render |
-| `<leader>mp` | open markdown browser preview |
-| `<leader>j` | join line with the next |
+| `:Help` / `:Cheatsheet` | open `ijkl` reference modal |
+| `<leader>?` | toggle reference modal |
+| `:RoastToggle` / `<leader>rt` | toggle arrow-key warning notifications |
+| `<leader>e` | toggle `neo-tree` sidebar |
+| `<leader>sv` / `<leader>sh` | vertical / horizontal split |
+| `<leader>sx` | close active split |
+| `Alt-i/k/j/l` | switch split focus |
+| `<leader>mr` | toggle inline markdown rendering |
+| `<leader>mp` | open browser markdown preview |
+| `<leader>j` | join current line with next |
 
-## the armory
-- `init.lua`: the bootstrap orchestrator. clones `lazy.nvim` if missing and mounts the modular lua spec tree.
-- `lazy-lock.json`: deterministic lockfile pinning every plugin commit so upstream breaking changes don't incinerate your workflow mid-session.
+## file tree
+
+- `init.lua`: bootstraps `lazy.nvim` when missing and mounts `lua/config/` and `lua/plugins/`.
+- `lazy-lock.json`: pins exact plugin commits so upstream regressions cannot silently destroy half your bindings between boots.
 - `lua/config/`:
-  - `keybinds.lua`: home-row ijkl navigation, split management, buffer hopping, and quick save bindings.
-  - `options.lua`: sensible editor defaults, relative line numbers, 4-space indentation, and persistent undofiles.
-  - `lsp-keymaps.lua`: code actions, hover diagnostics, definition jumps, and refactor hooks.
-  - `roast.lua`: arrow key detection and custom warning toasts. toggle with `:RoastToggle`.
-  - `cheatsheet.lua`: floating modal guide. open with `:Help`, `:Cheatsheet`, or `<leader>?`.
-  - `statusline.lua`: lightweight custom statusline fallback for when lualine isn't loaded.
-  - `theme.lua`: matugen material 3 palette token injection — rerun after `wp` to sync syntax highlights to your wallpaper.
-  - `colors.lua`: color utility helpers used by the theme layer.
-  - `lazy.lua`: lazy.nvim bootstrap and plugin spec loader.
-- `lua/plugins/`:
-  - `lsp/lsp.lua`: native language server protocols with diagnostic signs.
-  - `nvim-cmp.lua`: asynchronous completion engine with snippet expansion.
-  - `treesitter.lua`: syntax highlighting that understands ast nodes instead of relying on broken regex.
-  - `telescope.lua`: fuzzy file finder and ripgrep grep engine.
-  - `neotree.lua`: clean sidebar filesystem tree.
-  - `render-markdown.lua` & `markdown-preview.lua`: live markdown rendering with formatted tables and callout alerts.
-  - `which-key.lua`: popup guide reminding you what key combinations exist before you guess.
-  - `gitsigns.lua`: inline git blame, diff hunks, and staging.
-  - `autopairs.lua`: automatic bracket closure so you don't forget closing parentheses.
-  - `color.lua`: color picker and highlight utilities.
+  - `keybinds.lua`: `ijkl` movement, split control, buffer traversal, write shortcuts.
+  - `options.lua`: relative line numbers, 4-space tab width, persistent undo history surviving restarts.
+  - `lsp-keymaps.lua`: diagnostics, definitions, hover inspection, symbol renames.
+  - `roast.lua`: arrow-key trap and notify spam.
+  - `cheatsheet.lua`: modal overlay.
+  - `statusline.lua`: minimal fallback bar.
+  - `theme.lua` & `colors.lua`: material token parser; re-syncs syntax groups to wallpaper state.
+  - `lazy.lua`: plugin loader spec.
+- `lua/plugins/`: `lsp/lsp.lua`, `nvim-cmp.lua`, `treesitter.lua`, `telescope.lua`, `neotree.lua`, `render-markdown.lua`, `markdown-preview.lua`, `which-key.lua`, `gitsigns.lua`, `autopairs.lua`, `color.lua`.
