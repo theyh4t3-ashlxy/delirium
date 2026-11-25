@@ -22,6 +22,8 @@ NotificationCard         notifications/NotificationCard.qml
 OSD                      osd/OSD.qml
 
 # controls
+BarPill                  controls/BarPill.qml
+CustomTooltip            controls/CustomTooltip.qml
 IconButton               controls/IconButton.qml
 ToggleSwitch             controls/ToggleSwitch.qml
 PopupPanel               controls/PopupPanel.qml
@@ -31,7 +33,6 @@ ScreenshotActions        controls/ScreenshotActions.qml
 Dropdown                 controls/Dropdown.qml
 Slider                   controls/Slider.qml
 CollapsibleSection       controls/CollapsibleSection.qml
-ColorStudioModal         controls/ColorStudioModal.qml
 HoverFlyoutHandler       controls/HoverFlyoutHandler.qml
 
 # widgets
@@ -66,6 +67,5 @@ MotionSandbox            widgets/MotionSandbox.qml
 KeybindsPreview          widgets/KeybindsPreview.qml
 WelcomeWizard            widgets/WelcomeWizard.qml
 ScreenCapture            widgets/ScreenCapture.qml
-DynamicNotch             widgets/DynamicNotch.qml
 PolkitDialog             widgets/PolkitDialog.qml
 

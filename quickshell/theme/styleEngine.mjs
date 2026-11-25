@@ -241,13 +241,6 @@ const ROLE_RULES = {
 
 /** Resolve surface/border role color for the active `barStyle` preset `bs`. */
 export function getStyleColor(role, bs, t) {
-    if (role === "pillBg" && t.hasCustomColors && (t.cfg?.customWidgetBg ?? "") !== "") {
-        return resolveColor(t.cfg.customWidgetBg, t.rgba) ?? t.cfg.customWidgetBg;
-    }
-    if (role === "pillBorder" && t.hasCustomColors && (t.cfg?.customBorder ?? "") !== "") {
-        return resolveColor(t.cfg.customBorder, t.rgba) ?? t.cfg.customBorder;
-    }
-
     const rules = ROLE_RULES[role];
     if (!rules) return t.surface_container_low;
 

@@ -4,6 +4,7 @@ import QtQuick.Controls
 import ".."
 import "../controls"
 import "../corners"
+import "../theme/confFormat.mjs" as ConfFmt
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -17,6 +18,7 @@ Scope {
     id: lockRoot
 
     property bool locked: false
+    property bool unlocking: false
     property bool authFailed: false
     property bool isChecking: false
     property bool pamRespondedThisTurn: false
@@ -113,6 +115,46 @@ Scope {
     property bool wallpaperSync: true
     property string localWallpaperOverride: ""
 
+    // visual redesign, transitions, typography & independent lockscreen matugen palette
+    property string lockTransition: "blur-dissolve"     // "blur-dissolve" | "slide-up" | "zoom-snap" | "curtain-fade" | "editorial-stagger"
+    property string lockAnimSpeed: "smooth"             // "snappy" | "smooth" | "cinematic"
+    property string clockFont: "display"                // "display" | "sans" | "mono" | "serif"
+    property string clockWeight: "bold"                 // "light" | "bold" | "black"
+    property string backdropTexture: "none"             // "none" | "dots" | "grid"
+    property bool syncPaletteWithDesktop: true
+    property string lockMatugenScheme: "scheme-tonal-spot"
+    property bool isExtractingPalette: false
+    property string lockPalPrimary: ""
+    property string lockPalOnPrimary: ""
+    property string lockPalSecondary: ""
+    property string lockPalTertiary: ""
+    property string lockPalSurface: ""
+    property string lockPalContainer: ""
+    property string lockPalText: ""
+    property string lockPalSubtext: ""
+    property string lockPalSource: ""
+
+    readonly property string spectrumScriptPath: decodeURIComponent(Qt.resolvedUrl("../scripts/spectrum.py").toString().replace(/^file:\/\//, ""))
+    property var spectrumBands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    readonly property real lockAnimFactor: lockAnimSpeed === "snappy" ? 0.65 : (lockAnimSpeed === "cinematic" ? 1.45 : 1.0)
+    readonly property int unlockDurationMs: Math.round(240 * lockAnimFactor)
+
+    readonly property string resolvedClockFontFamily: {
+        if (clockFont === "mono") return Theme.fontMono;
+        if (clockFont === "sans") return Theme.fontFamily;
+        if (clockFont === "serif") return "Georgia";
+        return Theme.fontDisplay;
+    }
+
+    readonly property int resolvedClockWeight: {
+        if (clockWeight === "light") return Font.Light;
+        if (clockWeight === "black") return Font.Black;
+        return Theme.fontWeightBold;
+    }
+
+    readonly property bool useCustomLockPalette: !syncPaletteWithDesktop && !wallpaperSync && localWallpaperOverride !== "" && lockPalPrimary !== ""
+
     property string hyprSplash: ""
     property string rolledQuote: ""
     property real wavePhase: 0.0
@@ -156,7 +198,10 @@ Scope {
     full light & dark mode palette engine:
     works whether matugen generated light tokens OR dark tokens
     */
-    readonly property real surfaceLuminance: (0.2126 * Theme.surface.r) + (0.7152 * Theme.surface.g) + (0.0722 * Theme.surface.b)
+    readonly property real surfaceLuminance: {
+        let sCol = useCustomLockPalette && lockPalSurface !== "" ? Qt.color(lockPalSurface) : Theme.surface;
+        return (0.2126 * sCol.r) + (0.7152 * sCol.g) + (0.0722 * sCol.b);
+    }
     readonly property bool matugenIsLight: surfaceLuminance > 0.5
     readonly property bool globalCfgLight: (typeof Settings !== "undefined" && Settings)
         ? Boolean(Settings.lightMode || Settings.isLight || Settings.themeMode === "light" || Settings.colorScheme === "light")
@@ -164,26 +209,36 @@ Scope {
     readonly property bool isLight: backdropMode === "light" || (backdropMode === "auto" && (matugenIsLight || globalCfgLight))
 
     readonly property color uiAccent: {
-        if (!isLight) return Theme.primary;
-        if (matugenIsLight) return Theme.primary;
-        let darkened = Qt.rgba(Theme.primary.r * 0.62, Theme.primary.g * 0.62, Theme.primary.b * 0.62, 1.0);
+        let raw = useCustomLockPalette && lockPalPrimary !== "" ? Qt.color(lockPalPrimary) : Theme.primary;
+        if (!isLight) return raw;
+        if (matugenIsLight) return raw;
+        let darkened = Qt.rgba(raw.r * 0.62, raw.g * 0.62, raw.b * 0.62, 1.0);
         return Theme.blend(darkened, Theme.on_primary_container, 0.35);
     }
-    readonly property color uiOnAccent: !isLight || matugenIsLight ? Theme.on_primary : "#ffffff"
+    readonly property color uiTertiary: useCustomLockPalette && lockPalTertiary !== "" ? Qt.color(lockPalTertiary) : Theme.tertiary
+    readonly property color uiOnAccent: {
+        if (!isLight || matugenIsLight) {
+            return (useCustomLockPalette && lockPalOnPrimary !== "") ? Qt.color(lockPalOnPrimary) : Theme.on_primary;
+        }
+        return "#ffffff";
+    }
     readonly property color uiAccentOverlay: Theme.alpha(uiAccent, isLight ? 0.16 : 0.18)
 
     readonly property color uiSurfaceBase: {
-        if (!isLight) return Theme.surface;
-        if (matugenIsLight) return Theme.surface;
-        return Theme.blend(Qt.rgba(0.97, 0.96, 0.99, 1.0), Theme.primary, 0.05);
+        let sCol = useCustomLockPalette && lockPalSurface !== "" ? Qt.color(lockPalSurface) : Theme.surface;
+        if (!isLight) return sCol;
+        if (matugenIsLight) return sCol;
+        return Theme.blend(Qt.rgba(0.97, 0.96, 0.99, 1.0), uiAccent, 0.05);
     }
     readonly property color uiTextPrimary: {
-        if (!isLight) return matugenIsLight ? Theme.inverse_on_surface : Theme.textPrimary;
-        return matugenIsLight ? Theme.textPrimary : Theme.blend(Qt.rgba(0.11, 0.10, 0.14, 1.0), Theme.primary, 0.08);
+        let fg = useCustomLockPalette && lockPalText !== "" ? Qt.color(lockPalText) : Theme.textPrimary;
+        if (!isLight) return matugenIsLight ? Theme.inverse_on_surface : fg;
+        return matugenIsLight ? fg : Theme.blend(Qt.rgba(0.11, 0.10, 0.14, 1.0), uiAccent, 0.08);
     }
     readonly property color uiTextSecondary: {
-        if (!isLight) return matugenIsLight ? Theme.alpha(Theme.inverse_on_surface, 0.72) : Theme.textSecondary;
-        return matugenIsLight ? Theme.textSecondary : Theme.alpha(uiTextPrimary, 0.68);
+        let sub = useCustomLockPalette && lockPalSubtext !== "" ? Qt.color(lockPalSubtext) : Theme.textSecondary;
+        if (!isLight) return matugenIsLight ? Theme.alpha(Theme.inverse_on_surface, 0.72) : sub;
+        return matugenIsLight ? sub : Theme.alpha(uiTextPrimary, 0.68);
     }
     readonly property color uiTextDisabled: Theme.alpha(uiTextPrimary, 0.40)
 
@@ -193,46 +248,49 @@ Scope {
     }
 
     readonly property color uiPillBg: {
+        let containerC = useCustomLockPalette && lockPalContainer !== "" ? Qt.color(lockPalContainer) : Theme.pillBg;
         let base = !isLight
-            ? Theme.pillBg
-            : Theme.alpha(matugenIsLight ? Theme.surface_container_lowest : Theme.blend(Qt.rgba(0.98, 0.97, 1.0, 1.0), Theme.primary, 0.05), Theme.isGlass ? 0.82 : 0.92);
+            ? (useCustomLockPalette ? Theme.alpha(containerC, Theme.isGlass ? 0.68 : 0.88) : Theme.pillBg)
+            : Theme.alpha(matugenIsLight ? (useCustomLockPalette ? containerC : Theme.surface_container_lowest) : Theme.blend(Qt.rgba(0.98, 0.97, 1.0, 1.0), uiAccent, 0.05), Theme.isGlass ? 0.82 : 0.92);
         return applyAlphaBoost(base, cardOpacityBoost);
     }
     readonly property color uiPillHover: {
+        let containerC = useCustomLockPalette && lockPalContainer !== "" ? Qt.color(lockPalContainer) : Theme.pillHover;
         let base = !isLight
-            ? Theme.pillHover
-            : Theme.alpha(matugenIsLight ? Theme.surface_container_high : Theme.blend(Qt.rgba(0.93, 0.91, 0.96, 1.0), Theme.primary, 0.10), 0.94);
+            ? (useCustomLockPalette ? Theme.blend(containerC, uiAccent, 0.12) : Theme.pillHover)
+            : Theme.alpha(matugenIsLight ? (useCustomLockPalette ? containerC : Theme.surface_container_high) : Theme.blend(Qt.rgba(0.93, 0.91, 0.96, 1.0), uiAccent, 0.10), 0.94);
         return applyAlphaBoost(base, cardOpacityBoost);
     }
-    readonly property color uiPillBorder: !isLight ? Theme.pillBorder : Theme.alpha(uiAccent, 0.24)
+    readonly property color uiPillBorder: !isLight ? (useCustomLockPalette ? Theme.alpha(uiAccent, 0.28) : Theme.pillBorder) : Theme.alpha(uiAccent, 0.24)
 
     readonly property color uiCardBg: {
+        let containerC = useCustomLockPalette && lockPalSurface !== "" ? Qt.color(lockPalSurface) : Theme.cardBg;
         let base = !isLight
-            ? Theme.cardBg
-            : Theme.alpha(matugenIsLight ? Theme.surface_container_low : Theme.blend(Qt.rgba(0.97, 0.96, 0.99, 1.0), Theme.primary, 0.06), Theme.isGlass ? 0.85 : 0.94);
+            ? (useCustomLockPalette ? Theme.alpha(containerC, Theme.isGlass ? 0.72 : 0.90) : Theme.cardBg)
+            : Theme.alpha(matugenIsLight ? (useCustomLockPalette ? containerC : Theme.surface_container_low) : Theme.blend(Qt.rgba(0.97, 0.96, 0.99, 1.0), uiAccent, 0.06), Theme.isGlass ? 0.85 : 0.94);
         return applyAlphaBoost(base, cardOpacityBoost);
     }
-    readonly property color uiCardBorder: !isLight ? Theme.cardBorder : Theme.alpha(uiAccent, 0.22)
+    readonly property color uiCardBorder: !isLight ? (useCustomLockPalette ? Theme.alpha(uiAccent, 0.26) : Theme.cardBorder) : Theme.alpha(uiAccent, 0.22)
 
     readonly property color uiPopupBg: {
-        if (!isLight) return Theme.popupBg;
-        let base = matugenIsLight ? Theme.surface_container_lowest : Theme.blend(Qt.rgba(0.98, 0.97, 1.0, 1.0), Theme.primary, 0.04);
+        if (!isLight) return useCustomLockPalette && lockPalSurface !== "" ? Theme.alpha(Qt.color(lockPalSurface), 0.94) : Theme.popupBg;
+        let base = matugenIsLight ? Theme.surface_container_lowest : Theme.blend(Qt.rgba(0.98, 0.97, 1.0, 1.0), uiAccent, 0.04);
         return Theme.alpha(base, 0.95);
     }
-    readonly property color uiPopupBorder: !isLight ? Theme.popupBorderColor : Theme.alpha(uiAccent, 0.26)
+    readonly property color uiPopupBorder: !isLight ? (useCustomLockPalette ? Theme.alpha(uiAccent, 0.32) : Theme.popupBorderColor) : Theme.alpha(uiAccent, 0.26)
 
     readonly property color uiWidgetBg: {
-        if (!isLight) return Theme.widgetBg;
-        let base = matugenIsLight ? Theme.surface_container : Theme.blend(Qt.rgba(0.93, 0.92, 0.96, 1.0), Theme.primary, 0.07);
+        if (!isLight) return useCustomLockPalette && lockPalContainer !== "" ? Theme.alpha(Qt.color(lockPalContainer), 0.82) : Theme.widgetBg;
+        let base = matugenIsLight ? Theme.surface_container : Theme.blend(Qt.rgba(0.93, 0.92, 0.96, 1.0), uiAccent, 0.07);
         return Theme.alpha(base, 0.88);
     }
     readonly property color uiWidgetHover: {
-        if (!isLight) return Theme.widgetHover;
-        let base = matugenIsLight ? Theme.surface_container_high : Theme.blend(Qt.rgba(0.89, 0.87, 0.93, 1.0), Theme.primary, 0.12);
+        if (!isLight) return useCustomLockPalette && lockPalContainer !== "" ? Theme.blend(Qt.color(lockPalContainer), uiAccent, 0.16) : Theme.widgetHover;
+        let base = matugenIsLight ? Theme.surface_container_high : Theme.blend(Qt.rgba(0.89, 0.87, 0.93, 1.0), uiAccent, 0.12);
         return Theme.alpha(base, 0.94);
     }
-    readonly property color uiWidgetActive: !isLight ? Theme.widgetActive : Theme.alpha(uiAccent, 0.20)
-    readonly property color uiWidgetBorder: !isLight ? Theme.widgetBorder : Theme.alpha(uiAccent, 0.20)
+    readonly property color uiWidgetActive: !isLight ? Theme.alpha(uiAccent, 0.22) : Theme.alpha(uiAccent, 0.20)
+    readonly property color uiWidgetBorder: !isLight ? Theme.alpha(uiAccent, 0.20) : Theme.alpha(uiAccent, 0.20)
 
     SystemClock {
         id: sysClock
@@ -398,6 +456,85 @@ Scope {
         return Math.max(minVal, Math.min(maxVal, n));
     }
 
+    function parseMatugenField(raw: string, tokenName: string, modeKey: string): string {
+        let idx = raw.indexOf('"' + tokenName + '"');
+        if (idx < 0) return "";
+        let slice = raw.slice(idx, idx + 420);
+        let mRe = new RegExp('"' + modeKey + '"\\s*:\\s*\\{\\s*"color"\\s*:\\s*"(#[0-9a-fA-F]{6})"');
+        let m = slice.match(mRe);
+        if (m && m[1]) return m[1].toLowerCase();
+        let defM = slice.match(/"default"\s*:\s*\{\s*"color"\s*:\s*"(#[0-9a-fA-F]{6})"/);
+        return (defM && defM[1]) ? defM[1].toLowerCase() : "";
+    }
+
+    function extractLockPalette(imagePath: string) {
+        let wp = (imagePath || "").trim();
+        if (!wp || /\.(mp4|webm|mkv|mov)$/i.test(wp)) {
+            wp = (typeof WallpaperService !== "undefined" ? WallpaperService?.currWallStatic : "") || (lockRoot.homeDir + "/.curr_wall_static.jpg");
+        }
+        if (!wp) return;
+        let mode = lockRoot.isLight ? "light" : "dark";
+        let scheme = lockRoot.lockMatugenScheme || "scheme-tonal-spot";
+        lockRoot.isExtractingPalette = true;
+        if (lockMatugenProc.running) lockMatugenProc.running = false;
+        lockMatugenProc.command = ["matugen", "image", wp, "--source-color-index", "0", "--dry-run", "-j", "hex", "-m", mode, "-t", scheme];
+        lockMatugenProc.running = true;
+    }
+
+    Process {
+        id: lockMatugenProc
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                lockRoot.isExtractingPalette = false;
+                let raw = text || "";
+                if (raw.trim() === "") return;
+                let modeKey = lockRoot.isLight ? "light" : "dark";
+                let p = lockRoot.parseMatugenField(raw, "primary", modeKey);
+                if (p === "") return;
+                lockRoot.lockPalPrimary = p;
+                lockRoot.lockPalOnPrimary = lockRoot.parseMatugenField(raw, "on_primary", modeKey) || "#111111";
+                lockRoot.lockPalSecondary = lockRoot.parseMatugenField(raw, "secondary", modeKey) || p;
+                lockRoot.lockPalTertiary = lockRoot.parseMatugenField(raw, "tertiary", modeKey) || p;
+                lockRoot.lockPalSurface = lockRoot.parseMatugenField(raw, "surface", modeKey) || "#171217";
+                lockRoot.lockPalContainer = lockRoot.parseMatugenField(raw, "surface_container_high", modeKey) || "#262026";
+                lockRoot.lockPalText = lockRoot.parseMatugenField(raw, "on_surface", modeKey) || "#ece0eb";
+                lockRoot.lockPalSubtext = lockRoot.parseMatugenField(raw, "on_surface_variant", modeKey) || "#cfc3ce";
+                lockRoot.lockPalSource = lockRoot.parseMatugenField(raw, "source_color", modeKey) || p;
+                lockRoot.saveSandbox();
+            }
+        }
+        onExited: (exitCode) => {
+            if (exitCode !== 0) lockRoot.isExtractingPalette = false;
+        }
+    }
+
+    Process {
+        id: lockSpectrumProc
+        command: ["python3", lockRoot.spectrumScriptPath]
+        running: lockRoot.locked && !lockRoot.unlocking && lockRoot.anyPlayerPlaying && !lockRoot.zenMode && (
+            (lockRoot.showMediaCard && lockRoot.showMediaVisualizer) || lockRoot.ambientOrbs
+        )
+        stdout: SplitParser {
+            onRead: (line) => {
+                let parts = line.trim().split(",");
+                if (parts.length === 24) {
+                    let next = [];
+                    for (let i = 0; i < 24; i++) {
+                        let v = parseInt(parts[i], 10);
+                        next.push(isNaN(v) ? 0 : Math.max(0, Math.min(1, v / 99.0)));
+                    }
+                    lockRoot.spectrumBands = next;
+                }
+            }
+        }
+        onRunningChanged: {
+            if (!running) {
+                lockRoot.spectrumBands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            }
+        }
+    }
+
     function loadState() {
         let raw = lockStateFile.text();
         if (!raw || raw.trim() === "") {
@@ -405,15 +542,9 @@ Scope {
             return;
         }
 
-        const lines = raw.trim().split("\n");
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i].trim();
-            if (!line || line.startsWith("#")) continue;
-            let eqIdx = line.indexOf("=");
-            if (eqIdx < 0) continue;
-            let k = line.slice(0, eqIdx).trim();
-            let v = line.slice(eqIdx + 1).trim();
-
+        const parsed = ConfFmt.parseFlatConf(raw);
+        for (const k in parsed) {
+            let v = ConfFmt.unescapeField(parsed[k]);
             switch (k) {
                 case "studioLocked": lockRoot.studioLocked = parseBool(v, lockRoot.studioLocked); break;
                 case "syncClockGlobal": lockRoot.syncClockGlobal = parseBool(v, lockRoot.syncClockGlobal); break;
@@ -426,6 +557,12 @@ Scope {
                     break;
                 case "secondsStyle":
                     if (["badge", "supersub", "tower", "inline"].includes(v)) lockRoot.secondsStyle = v;
+                    break;
+                case "clockFont":
+                    if (["display", "sans", "mono", "serif"].includes(v)) lockRoot.clockFont = v;
+                    break;
+                case "clockWeight":
+                    if (["light", "bold", "black"].includes(v)) lockRoot.clockWeight = v;
                     break;
                 case "dateFormat": if (v !== "") lockRoot.dateFormat = v; break;
                 case "textCase":
@@ -455,6 +592,15 @@ Scope {
                 case "backdropMode":
                     if (["auto", "dark", "light"].includes(v)) lockRoot.backdropMode = v;
                     break;
+                case "backdropTexture":
+                    if (["none", "dots", "grid"].includes(v)) lockRoot.backdropTexture = v;
+                    break;
+                case "lockTransition":
+                    if (["blur-dissolve", "slide-up", "zoom-snap", "curtain-fade", "editorial-stagger"].includes(v)) lockRoot.lockTransition = v;
+                    break;
+                case "lockAnimSpeed":
+                    if (["snappy", "smooth", "cinematic"].includes(v)) lockRoot.lockAnimSpeed = v;
+                    break;
                 case "pamService": if (v !== "") lockRoot.pamService = v; break;
                 case "scrimDim": lockRoot.scrimDim = parseClamped(v, 0.05, 0.98, 0.58); break;
                 case "vignetteStrength": lockRoot.vignetteStrength = parseClamped(v, 0.0, 0.95, 0.35); break;
@@ -473,6 +619,17 @@ Scope {
                 case "autoZenIdle": lockRoot.autoZenIdle = parseBool(v, lockRoot.autoZenIdle); break;
                 case "wallpaperSync": lockRoot.wallpaperSync = parseBool(v, lockRoot.wallpaperSync); break;
                 case "customWallpaper": lockRoot.localWallpaperOverride = v; break;
+                case "syncPaletteWithDesktop": lockRoot.syncPaletteWithDesktop = parseBool(v, lockRoot.syncPaletteWithDesktop); break;
+                case "lockMatugenScheme": if (v !== "") lockRoot.lockMatugenScheme = v; break;
+                case "lockPalPrimary": lockRoot.lockPalPrimary = v; break;
+                case "lockPalOnPrimary": lockRoot.lockPalOnPrimary = v; break;
+                case "lockPalSecondary": lockRoot.lockPalSecondary = v; break;
+                case "lockPalTertiary": lockRoot.lockPalTertiary = v; break;
+                case "lockPalSurface": lockRoot.lockPalSurface = v; break;
+                case "lockPalContainer": lockRoot.lockPalContainer = v; break;
+                case "lockPalText": lockRoot.lockPalText = v; break;
+                case "lockPalSubtext": lockRoot.lockPalSubtext = v; break;
+                case "lockPalSource": lockRoot.lockPalSource = v; break;
             }
         }
 
@@ -488,11 +645,15 @@ Scope {
         if (lockRoot.studioLocked) return;
         if (presetName === "expressive") {
             lockRoot.clockStyle = "stacked";
+            lockRoot.clockFont = "display";
+            lockRoot.clockWeight = "bold";
             lockRoot.secondsStyle = "badge";
             lockRoot.showSeconds = true;
             lockRoot.layoutPosition = "center";
             lockRoot.stackOrder = "clock,media,password";
             lockRoot.shapePreset = "squircle";
+            lockRoot.lockTransition = "blur-dissolve";
+            lockRoot.backdropTexture = "none";
             lockRoot.clockScale = 1.08;
             lockRoot.scrimDim = 0.54;
             lockRoot.vignetteStrength = 0.40;
@@ -500,11 +661,15 @@ Scope {
             lockRoot.dateAboveClock = true;
         } else if (presetName === "cards") {
             lockRoot.clockStyle = "split";
+            lockRoot.clockFont = "display";
+            lockRoot.clockWeight = "bold";
             lockRoot.secondsStyle = "badge";
             lockRoot.showSeconds = true;
             lockRoot.layoutPosition = "center";
             lockRoot.stackOrder = "clock,password,media";
             lockRoot.shapePreset = "squircle";
+            lockRoot.lockTransition = "zoom-snap";
+            lockRoot.backdropTexture = "dots";
             lockRoot.clockScale = 1.0;
             lockRoot.scrimDim = 0.62;
             lockRoot.vignetteStrength = 0.45;
@@ -512,32 +677,44 @@ Scope {
             lockRoot.dateAboveClock = false;
         } else if (presetName === "editorial") {
             lockRoot.clockStyle = "editorial";
+            lockRoot.clockFont = "serif";
+            lockRoot.clockWeight = "bold";
             lockRoot.showSeconds = true;
             lockRoot.secondsStyle = "tower";
             lockRoot.layoutPosition = "left";
             lockRoot.stackOrder = "clock,media,password";
             lockRoot.shapePreset = "pill";
+            lockRoot.lockTransition = "editorial-stagger";
+            lockRoot.backdropTexture = "none";
             lockRoot.clockScale = 1.05;
             lockRoot.scrimDim = 0.48;
             lockRoot.vignetteStrength = 0.45;
             lockRoot.dateAboveClock = true;
         } else if (presetName === "cyber") {
             lockRoot.clockStyle = "digital";
+            lockRoot.clockFont = "mono";
+            lockRoot.clockWeight = "bold";
             lockRoot.showSeconds = true;
             lockRoot.secondsStyle = "inline";
             lockRoot.layoutPosition = "center";
             lockRoot.stackOrder = "clock,password,media";
             lockRoot.shapePreset = "sharp";
+            lockRoot.lockTransition = "curtain-fade";
+            lockRoot.backdropTexture = "grid";
             lockRoot.clockScale = 1.0;
             lockRoot.scrimDim = 0.65;
             lockRoot.vignetteStrength = 0.50;
             lockRoot.ambientOrbs = true;
         } else if (presetName === "minimal") {
             lockRoot.clockStyle = "minimal";
+            lockRoot.clockFont = "sans";
+            lockRoot.clockWeight = "light";
             lockRoot.showSeconds = false;
             lockRoot.layoutPosition = "top";
             lockRoot.stackOrder = "clock,password,media";
             lockRoot.shapePreset = "theme";
+            lockRoot.lockTransition = "slide-up";
+            lockRoot.backdropTexture = "none";
             lockRoot.clockScale = 0.95;
             lockRoot.scrimDim = 0.42;
             lockRoot.vignetteStrength = 0.20;
@@ -552,6 +729,8 @@ Scope {
         lockRoot.showClock = true;
         lockRoot.showDate = true;
         lockRoot.clockStyle = "inline";
+        lockRoot.clockFont = "display";
+        lockRoot.clockWeight = "bold";
         lockRoot.secondsStyle = "badge";
         lockRoot.dateFormat = "dddd, MMMM d";
         lockRoot.textCase = "lower";
@@ -567,6 +746,9 @@ Scope {
         lockRoot.customNormY = 0.5;
         lockRoot.clockScale = 1.0;
         lockRoot.backdropMode = "auto";
+        lockRoot.backdropTexture = "none";
+        lockRoot.lockTransition = "blur-dissolve";
+        lockRoot.lockAnimSpeed = "smooth";
         lockRoot.scrimDim = 0.58;
         lockRoot.vignetteStrength = 0.35;
         lockRoot.focusZoom = 1.05;
@@ -585,15 +767,21 @@ Scope {
         lockRoot.autoZenIdle = false;
         lockRoot.wallpaperSync = true;
         lockRoot.localWallpaperOverride = "";
+        lockRoot.syncPaletteWithDesktop = true;
+        lockRoot.lockMatugenScheme = "scheme-tonal-spot";
         lockRoot.saveSandbox();
     }
 
     function surpriseMe() {
         if (lockRoot.studioLocked) return;
         const cStyles = ["inline", "stacked", "split", "typo", "digital", "editorial", "minimal"];
+        const cFonts = ["display", "sans", "mono", "serif"];
+        const cWeights = ["light", "bold", "black"];
         const sStyles = ["badge", "supersub", "tower", "inline"];
         const positions = ["center", "top", "bottom", "left", "right"];
         const shapes = ["theme", "pill", "squircle", "sharp"];
+        const transitions = ["blur-dissolve", "slide-up", "zoom-snap", "curtain-fade", "editorial-stagger"];
+        const textures = ["none", "none", "dots", "grid"];
         const orders = [
             "clock,media,password",
             "clock,password,media",
@@ -602,8 +790,12 @@ Scope {
         const qModes = ["smart", "hyprland", "quotes", "actions"];
 
         lockRoot.clockStyle = cStyles[Math.floor(Math.random() * cStyles.length)];
+        lockRoot.clockFont = cFonts[Math.floor(Math.random() * cFonts.length)];
+        lockRoot.clockWeight = cWeights[Math.floor(Math.random() * cWeights.length)];
         lockRoot.secondsStyle = sStyles[Math.floor(Math.random() * sStyles.length)];
         lockRoot.shapePreset = shapes[Math.floor(Math.random() * shapes.length)];
+        lockRoot.lockTransition = transitions[Math.floor(Math.random() * transitions.length)];
+        lockRoot.backdropTexture = textures[Math.floor(Math.random() * textures.length)];
         lockRoot.showSeconds = true;
         lockRoot.layoutPosition = positions[Math.floor(Math.random() * positions.length)];
         lockRoot.stackOrder = orders[Math.floor(Math.random() * orders.length)];
@@ -639,30 +831,36 @@ Scope {
 
     function flushStateToDisk() {
         let lines = [
+            "# Quickshell native lockscreen studio configuration",
             "studioLocked=" + (lockRoot.studioLocked ? "1" : "0"),
             "syncClockGlobal=" + (lockRoot.syncClockGlobal ? "1" : "0"),
             "showClock=" + (lockRoot.showClock ? "1" : "0"),
             "showDate=" + (lockRoot.showDate ? "1" : "0"),
             "clock24h=" + (lockRoot.sandboxClock24h ? "1" : "0"),
             "showSeconds=" + (lockRoot.showSeconds ? "1" : "0"),
-            "clockStyle=" + lockRoot.clockStyle,
-            "secondsStyle=" + lockRoot.secondsStyle,
-            "dateFormat=" + lockRoot.dateFormat,
-            "textCase=" + lockRoot.textCase,
-            "pwMaskChar=" + lockRoot.pwMaskChar,
+            "clockStyle=" + ConfFmt.escapeField(lockRoot.clockStyle),
+            "clockFont=" + ConfFmt.escapeField(lockRoot.clockFont),
+            "clockWeight=" + ConfFmt.escapeField(lockRoot.clockWeight),
+            "secondsStyle=" + ConfFmt.escapeField(lockRoot.secondsStyle),
+            "dateFormat=" + ConfFmt.escapeField(lockRoot.dateFormat),
+            "textCase=" + ConfFmt.escapeField(lockRoot.textCase),
+            "pwMaskChar=" + ConfFmt.escapeField(lockRoot.pwMaskChar),
             "stageWidth=" + lockRoot.stageWidth,
-            "shapePreset=" + lockRoot.shapePreset,
+            "shapePreset=" + ConfFmt.escapeField(lockRoot.shapePreset),
             "cardOpacityBoost=" + Number(lockRoot.cardOpacityBoost).toFixed(2),
-            "layoutPosition=" + lockRoot.layoutPosition,
-            "stackOrder=" + lockRoot.stackOrder,
+            "layoutPosition=" + ConfFmt.escapeField(lockRoot.layoutPosition),
+            "stackOrder=" + ConfFmt.escapeField(lockRoot.stackOrder),
             "dateAboveClock=" + (lockRoot.dateAboveClock ? "1" : "0"),
             "customNormX=" + Number(lockRoot.customNormX).toFixed(4),
             "customNormY=" + Number(lockRoot.customNormY).toFixed(4),
             "clockScale=" + Number(lockRoot.clockScale).toFixed(2),
-            "quoteMode=" + lockRoot.quoteMode,
-            "customQuoteText=" + lockRoot.customQuoteText,
-            "backdropMode=" + lockRoot.backdropMode,
-            "pamService=" + lockRoot.pamService,
+            "quoteMode=" + ConfFmt.escapeField(lockRoot.quoteMode),
+            "customQuoteText=" + ConfFmt.escapeField(lockRoot.customQuoteText),
+            "backdropMode=" + ConfFmt.escapeField(lockRoot.backdropMode),
+            "backdropTexture=" + ConfFmt.escapeField(lockRoot.backdropTexture),
+            "lockTransition=" + ConfFmt.escapeField(lockRoot.lockTransition),
+            "lockAnimSpeed=" + ConfFmt.escapeField(lockRoot.lockAnimSpeed),
+            "pamService=" + ConfFmt.escapeField(lockRoot.pamService),
             "scrimDim=" + Number(lockRoot.scrimDim).toFixed(2),
             "vignetteStrength=" + Number(lockRoot.vignetteStrength).toFixed(2),
             "focusZoom=" + Number(lockRoot.focusZoom).toFixed(3),
@@ -679,7 +877,18 @@ Scope {
             "albumArtBackdrop=" + (lockRoot.albumArtBackdrop ? "1" : "0"),
             "autoZenIdle=" + (lockRoot.autoZenIdle ? "1" : "0"),
             "wallpaperSync=" + (lockRoot.wallpaperSync ? "1" : "0"),
-            "customWallpaper=" + lockRoot.localWallpaperOverride
+            "customWallpaper=" + ConfFmt.escapeField(lockRoot.localWallpaperOverride),
+            "syncPaletteWithDesktop=" + (lockRoot.syncPaletteWithDesktop ? "1" : "0"),
+            "lockMatugenScheme=" + ConfFmt.escapeField(lockRoot.lockMatugenScheme),
+            "lockPalPrimary=" + ConfFmt.escapeField(lockRoot.lockPalPrimary),
+            "lockPalOnPrimary=" + ConfFmt.escapeField(lockRoot.lockPalOnPrimary),
+            "lockPalSecondary=" + ConfFmt.escapeField(lockRoot.lockPalSecondary),
+            "lockPalTertiary=" + ConfFmt.escapeField(lockRoot.lockPalTertiary),
+            "lockPalSurface=" + ConfFmt.escapeField(lockRoot.lockPalSurface),
+            "lockPalContainer=" + ConfFmt.escapeField(lockRoot.lockPalContainer),
+            "lockPalText=" + ConfFmt.escapeField(lockRoot.lockPalText),
+            "lockPalSubtext=" + ConfFmt.escapeField(lockRoot.lockPalSubtext),
+            "lockPalSource=" + ConfFmt.escapeField(lockRoot.lockPalSource)
         ];
         lockStateFile.setText(lines.join("\n") + "\n");
     }
@@ -866,17 +1075,6 @@ Scope {
                 let p = item?.path ?? item?.url ?? "";
                 if (p !== "") return p;
             }
-            if (WallpaperService.localWpListFile) {
-                try {
-                    let raw = WallpaperService.localWpListFile.text();
-                    let parsed = JSON.parse(raw) || [];
-                    let staticList = parsed.filter(w => w && w.path && !/\.(mp4|webm|mkv|mov)$/i.test(w.path));
-                    let pool = staticList.length > 0 ? staticList : parsed;
-                    if (pool.length > 0) {
-                        return pool[Math.floor(Math.random() * pool.length)].path || "";
-                    }
-                } catch (e) {}
-            }
             if (WallpaperService.currentWallpaperPath) return WallpaperService.currentWallpaperPath;
             if (WallpaperService.currWallStatic) return WallpaperService.currWallStatic;
         }
@@ -935,11 +1133,32 @@ Scope {
         }
     }
 
+    onIsLightChanged: {
+        if (lockRoot.stateLoaded && !lockRoot.syncPaletteWithDesktop && !lockRoot.wallpaperSync && lockRoot.localWallpaperOverride !== "") {
+            lockRoot.extractLockPalette(lockRoot.localWallpaperOverride);
+        }
+    }
+
+    Timer {
+        id: unlockFinalizeTimer
+        interval: lockRoot.unlockDurationMs
+        repeat: false
+        onTriggered: {
+            lockRoot.unlocking = false;
+            lockRoot.locked = false;
+        }
+    }
+
+    function beginUnlockTransition() {
+        if (!lockRoot.locked || lockRoot.unlocking) return;
+        lockRoot.unlocking = true;
+        unlockFinalizeTimer.interval = Math.max(80, lockRoot.unlockDurationMs);
+        unlockFinalizeTimer.restart();
+    }
+
     Timer {
         interval: 75
-        running: lockRoot.locked && lockRoot.anyPlayerPlaying && (
-            (lockRoot.showMediaCard && lockRoot.showMediaVisualizer) || lockRoot.ambientOrbs
-        )
+        running: lockRoot.locked && !lockRoot.unlocking && lockRoot.anyPlayerPlaying && lockRoot.ambientOrbs && !lockRoot.zenMode
         repeat: true
         onTriggered: {
             lockRoot.wavePhase = (lockRoot.wavePhase + 0.28) % (Math.PI * 20);
@@ -966,13 +1185,15 @@ Scope {
     IpcHandler {
         target: "lock"
         function lock(): void {
+            unlockFinalizeTimer.stop();
+            lockRoot.unlocking = false;
             lockRoot.locked = true;
         }
         function isLocked(): bool {
             return lockRoot.locked;
         }
         function unlock(): void {
-            lockRoot.locked = false;
+            lockRoot.beginUnlockTransition();
         }
     }
 
@@ -1021,9 +1242,10 @@ Scope {
             lockRoot.pendingPassword = "";
 
             if (result === PamResult.Success) {
-                lockRoot.locked = false;
                 lockRoot.authFailed = false;
-                lockRoot.pamFeedback = "";
+                lockRoot.pamFeedback = "unlocked";
+                lockRoot.pamFeedbackIsError = false;
+                lockRoot.beginUnlockTransition();
             } else {
                 lockRoot.authFailed = true;
                 lockRoot.failedAttempts += 1;
@@ -1131,6 +1353,14 @@ Scope {
                     if (lockRoot.activeSurface === null) {
                         lockRoot.activeSurface = surface;
                         claimSurfaceFocus();
+                    }
+                }
+
+                Connections {
+                    target: lockRoot
+                    function onUnlockingChanged() {
+                        if (lockRoot.unlocking) surface.entered = false;
+                        else if (lockRoot.locked) surface.entered = true;
                     }
                 }
 
@@ -1260,6 +1490,11 @@ Scope {
                     Keys.forwardTo: (passwordBlock && passwordBlock.pwInput) ? [passwordBlock.pwInput] : []
 
                     readonly property bool isDeepFocused: lockRoot.sharedPassword.length > 0 || surface.optionsOpen || lockRoot.isChecking
+                    readonly property bool activeVisual: surface.entered && !lockRoot.unlocking
+                    readonly property int transMs: Math.round(320 * lockRoot.lockAnimFactor)
+
+                    opacity: activeVisual ? 1.0 : 0.0
+                    Behavior on opacity { NumberAnimation { duration: Math.max(90, screenCanvas.transMs); easing.type: Theme.animEasing } }
 
                     MouseArea {
                         anchors.fill: parent
@@ -1299,10 +1534,20 @@ Scope {
                         }
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
-                        scale: parent.isDeepFocused ? lockRoot.focusZoom : 1.0
+                        scale: {
+                            if (!surface.entered) {
+                                if (lockRoot.lockTransition === "zoom-snap") return 1.14;
+                                if (lockRoot.lockTransition === "curtain-fade") return 1.06;
+                                return 1.02;
+                            }
+                            return parent.isDeepFocused ? lockRoot.focusZoom : 1.0;
+                        }
 
                         Behavior on scale {
-                            NumberAnimation { duration: Theme.expressiveSlow; easing.type: Theme.animEasing }
+                            NumberAnimation {
+                                duration: Math.max(120, Math.round(420 * lockRoot.lockAnimFactor))
+                                easing.type: Theme.animEasing
+                            }
                         }
                     }
 
@@ -1332,12 +1577,54 @@ Scope {
                         Behavior on opacity { NumberAnimation { duration: Theme.animSlow; easing.type: Theme.animEasing } }
                     }
 
+                    // optional tactile architectural texture overlay (dots matrix or fine grid)
+                    Canvas {
+                        id: texCanvas
+                        anchors.fill: parent
+                        visible: lockRoot.backdropTexture !== "none"
+                        opacity: lockRoot.isLight ? 0.12 : 0.09
+                        property string curMode: lockRoot.backdropTexture
+                        property color inkColor: lockRoot.uiTextPrimary
+                        onCurModeChanged: requestPaint()
+                        onInkColorChanged: requestPaint()
+                        onWidthChanged: requestPaint()
+                        onHeightChanged: requestPaint()
+                        onPaint: {
+                            let ctx = getContext("2d");
+                            ctx.clearRect(0, 0, width, height);
+                            if (curMode === "none" || width <= 0 || height <= 0) return;
+                            ctx.fillStyle = inkColor;
+                            ctx.strokeStyle = inkColor;
+                            if (curMode === "dots") {
+                                const step = 22;
+                                for (let y = 11; y < height; y += step) {
+                                    for (let x = 11; x < width; x += step) {
+                                        ctx.fillRect(x, y, 1.5, 1.5);
+                                    }
+                                }
+                            } else if (curMode === "grid") {
+                                const step = 44;
+                                ctx.lineWidth = 1;
+                                ctx.beginPath();
+                                for (let x = 0; x < width; x += step) {
+                                    ctx.moveTo(x + 0.5, 0);
+                                    ctx.lineTo(x + 0.5, height);
+                                }
+                                for (let y = 0; y < height; y += step) {
+                                    ctx.moveTo(0, y + 0.5);
+                                    ctx.lineTo(width, y + 0.5);
+                                }
+                                ctx.stroke();
+                            }
+                        }
+                    }
+
                     // ambient audio-reactive glow orbs
                     Item {
                         anchors.fill: parent
                         visible: lockRoot.ambientOrbs
                         opacity: surface.entered ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: Theme.expressiveSlow } }
+                        Behavior on opacity { NumberAnimation { duration: Math.max(120, Math.round(380 * lockRoot.lockAnimFactor)) } }
 
                         Rectangle {
                             width: Math.min(parent.width, parent.height) * (0.48 + surface.liveAudioPeak * 0.14)
@@ -1346,7 +1633,7 @@ Scope {
                             x: centerStage.x - width * 0.25 + Math.sin(lockRoot.wavePhase * 0.25) * 32
                             y: centerStage.y - height * 0.20 + Math.cos(lockRoot.wavePhase * 0.20) * 24
                             color: surface.artAccent
-                            opacity: (lockRoot.isLight ? 0.16 : 0.11) + (surface.liveAudioPeak * 0.10)
+                            opacity: (lockRoot.isLight ? 0.16 : 0.12) + (surface.liveAudioPeak * 0.11)
                             Behavior on width { NumberAnimation { duration: 140; easing.type: Easing.OutQuad } }
                             Behavior on color { ColorAnimation { duration: Theme.animSlow } }
                         }
@@ -1357,8 +1644,8 @@ Scope {
                             radius: width / 2
                             x: centerStage.x + centerStage.width * 0.35 - Math.cos(lockRoot.wavePhase * 0.22) * 28
                             y: centerStage.y + centerStage.height * 0.25 + Math.sin(lockRoot.wavePhase * 0.18) * 28
-                            color: Theme.tertiary
-                            opacity: (lockRoot.isLight ? 0.13 : 0.08) + (surface.liveAudioPeak * 0.08)
+                            color: lockRoot.uiTertiary
+                            opacity: (lockRoot.isLight ? 0.13 : 0.09) + (surface.liveAudioPeak * 0.08)
                             Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutQuad } }
                         }
                     }
@@ -1514,11 +1801,37 @@ Scope {
                             NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance }
                         }
 
-                        scale: (surface.entered ? 1.0 : 0.94) * surface.stageBurstScale
+                        scale: {
+                            if (surface.entered) return surface.stageBurstScale;
+                            if (lockRoot.lockTransition === "zoom-snap") return 0.84;
+                            if (lockRoot.lockTransition === "curtain-fade") return 0.96;
+                            return 0.93;
+                        }
                         opacity: surface.entered ? 1.0 : 0.0
 
-                        Behavior on scale { NumberAnimation { duration: Theme.expressiveDefault; easing.type: Theme.animEasingEntrance } }
-                        Behavior on opacity { NumberAnimation { duration: Theme.animNormal } }
+                        transform: Translate {
+                            y: {
+                                if (surface.entered) return 0;
+                                if (lockRoot.lockTransition === "slide-up") return 56;
+                                if (lockRoot.lockTransition === "editorial-stagger") return 28;
+                                if (lockRoot.lockTransition === "curtain-fade") return -24;
+                                return 12;
+                            }
+                            Behavior on y {
+                                NumberAnimation {
+                                    duration: Math.max(100, screenCanvas.transMs)
+                                    easing.type: lockRoot.lockTransition === "slide-up" ? Easing.OutBack : Theme.animEasingEntrance
+                                }
+                            }
+                        }
+
+                        Behavior on scale {
+                            NumberAnimation {
+                                duration: Math.max(100, screenCanvas.transMs)
+                                easing.type: lockRoot.lockTransition === "zoom-snap" ? Easing.OutBack : Theme.animEasingEntrance
+                            }
+                        }
+                        Behavior on opacity { NumberAnimation { duration: Math.max(90, Math.round(screenCanvas.transMs * 0.8)) } }
 
 
 

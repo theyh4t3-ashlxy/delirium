@@ -1,6 +1,7 @@
 pragma Singleton
 import QtQuick
 import ".."
+import "../theme/confFormat.mjs" as ConfFmt
 import Quickshell
 import Quickshell.Io
 
@@ -48,7 +49,6 @@ QtObject {
             windowTitle: Theme.iconSparkles,
             sparkles: Theme.iconSparkles,
             clock: Theme.iconClock,
-            dynamicNotch: Theme.iconSparkles,
             quickSettings: Theme.iconSettings,
             settings: Theme.iconSettings,
             battery: Theme.iconBatFull,
@@ -133,8 +133,8 @@ QtObject {
                     val = false;
                 } else if (/^-?\d+(\.\d+)?$/.test(val)) {
                     val = Number(val);
-                } else if (val.startsWith("[") && val.endsWith("]")) {
-                    try { val = JSON.parse(val); } catch(e) {}
+                } else if (key === "barModulesLeft" || key === "barModulesCenter" || key === "barModulesRight") {
+                    val = ConfFmt.parseList(val);
                 }
                 data[key] = val;
             }
@@ -146,27 +146,6 @@ QtObject {
         try {
             let str = catalogFile.text();
             if (!str || str.trim() === "") return;
-
-            if (str.trim().startsWith("{")) {
-                let data = JSON.parse(str);
-                root.catalog = data;
-                let blocks = data.blocks || {};
-                let map = {};
-                for (let k in blocks) {
-                    let item = blocks[k];
-                    map[k] = {
-                        id: k,
-                        type: item.type || "widget",
-                        category: item.category || "tools",
-                        name: item.name || k,
-                        icon: item.icon || "\uE9B0",
-                        desc: item.desc || "",
-                        color: root.getCategoryColor(item.category || "tools")
-                    };
-                }
-                root.blockMap = map;
-                return;
-            }
 
             let lines = str.split("\n");
             let map = {};
@@ -238,9 +217,6 @@ QtObject {
             else if (presetId === "tactile") t = tactilePresetFile.text();
 
             if (t && t.trim() !== "") {
-                if (t.trim().startsWith("{")) {
-                    return JSON.parse(t);
-                }
                 return parseConf(t);
             }
         } catch (e) {
@@ -283,9 +259,9 @@ QtObject {
         if (presetData.barIslandMode !== undefined) Settings.barIslandMode = Boolean(presetData.barIslandMode);
         if (presetData.bentoGap !== undefined) Settings.bentoGap = Number(presetData.bentoGap);
         if (presetData.bentoHoverLift !== undefined) Settings.bentoHoverLift = Boolean(presetData.bentoHoverLift);
-        if (presetData.barModulesLeft !== undefined) Settings.barModulesLeft = presetData.barModulesLeft;
-        if (presetData.barModulesCenter !== undefined) Settings.barModulesCenter = presetData.barModulesCenter;
-        if (presetData.barModulesRight !== undefined) Settings.barModulesRight = presetData.barModulesRight;
+        if (presetData.barModulesLeft !== undefined) Settings.barModulesLeft = Settings.normalizeZoneList(ConfFmt.parseList(presetData.barModulesLeft), false);
+        if (presetData.barModulesCenter !== undefined) Settings.barModulesCenter = Settings.normalizeZoneList(ConfFmt.parseList(presetData.barModulesCenter), true);
+        if (presetData.barModulesRight !== undefined) Settings.barModulesRight = Settings.normalizeZoneList(ConfFmt.parseList(presetData.barModulesRight), false);
         if (presetData.cornerStyle !== undefined) Settings.cornerStyle = presetData.cornerStyle;
         if (presetData.notificationCornerStyle !== undefined) Settings.notificationCornerStyle = presetData.notificationCornerStyle;
         if (presetData.scoopRadius !== undefined) Settings.scoopRadius = Number(presetData.scoopRadius);
@@ -293,28 +269,7 @@ QtObject {
         if (presetData.widgetSpacing !== undefined) Settings.widgetSpacing = Number(presetData.widgetSpacing);
         if (presetData.widgetPaddingH !== undefined) Settings.widgetPaddingH = Number(presetData.widgetPaddingH);
         if (presetData.paddingScale !== undefined) Settings.paddingScale = presetData.paddingScale;
-        if (presetData.dynamicNotchFlared !== undefined) Settings.dynamicNotchFlared = Boolean(presetData.dynamicNotchFlared);
         if (presetData.flavorMode !== undefined) Settings.flavorMode = presetData.flavorMode;
-
-        // Nested JSON backward compatibility
-        if (presetData.bar) {
-            if (presetData.bar.position !== undefined) Settings.barPosition = presetData.bar.position;
-            if (presetData.bar.floating !== undefined) Settings.barFloating = presetData.bar.floating;
-            if (presetData.bar.margin !== undefined) Settings.barMargin = presetData.bar.margin;
-            if (presetData.bar.height !== undefined) Settings.barHeight = presetData.bar.height;
-            if (presetData.bar.style !== undefined) Settings.barStyle = presetData.bar.style;
-        }
-        if (presetData.zones) {
-            if (presetData.zones.left) Settings.barModulesLeft = presetData.zones.left;
-            if (presetData.zones.center) Settings.barModulesCenter = presetData.zones.center;
-            if (presetData.zones.right) Settings.barModulesRight = presetData.zones.right;
-        }
-        if (presetData.styling) {
-            if (presetData.styling.cornerStyle) Settings.cornerStyle = presetData.styling.cornerStyle;
-            if (presetData.styling.notificationCornerStyle) Settings.notificationCornerStyle = presetData.styling.notificationCornerStyle;
-            if (presetData.styling.scoopRadius) Settings.scoopRadius = presetData.styling.scoopRadius;
-            if (presetData.styling.widgetRadius) Settings.widgetRadius = presetData.styling.widgetRadius;
-        }
 
         if (presetName) root.activePresetName = presetName;
         Settings.save();
@@ -338,9 +293,9 @@ QtObject {
             'barIslandMode=' + (Settings?.barIslandMode ?? true),
             'bentoGap=' + (Settings?.bentoGap ?? 8),
             'bentoHoverLift=' + (Settings?.bentoHoverLift ?? true),
-            "barModulesLeft='" + JSON.stringify(Settings?.barModulesLeft ?? []) + "'",
-            "barModulesCenter='" + JSON.stringify(Settings?.barModulesCenter ?? []) + "'",
-            "barModulesRight='" + JSON.stringify(Settings?.barModulesRight ?? []) + "'",
+            "barModulesLeft=" + ConfFmt.serializeList(Settings?.barModulesLeft ?? []),
+            "barModulesCenter=" + ConfFmt.serializeList(Settings?.barModulesCenter ?? []),
+            "barModulesRight=" + ConfFmt.serializeList(Settings?.barModulesRight ?? []),
             'cornerStyle="' + (Settings?.cornerStyle ?? "continuous-bezier") + '"',
             'notificationCornerStyle="' + (Settings?.notificationCornerStyle ?? "concave") + '"',
             'scoopRadius=' + (Settings?.scoopRadius ?? 16),
@@ -348,7 +303,6 @@ QtObject {
             'widgetSpacing=' + (Settings?.widgetSpacing ?? 4),
             'widgetPaddingH=' + (Settings?.widgetPaddingH ?? 8),
             'paddingScale="' + (Settings?.paddingScale ?? "cozy") + '"',
-            'dynamicNotchFlared=' + (Settings?.dynamicNotchFlared ?? false),
             'flavorMode="' + (Settings?.flavorMode ?? "actions") + '"'
         ];
         let confStr = lines.join("\n") + "\n";

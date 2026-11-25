@@ -8,34 +8,21 @@ import Quickshell.Wayland
 import Quickshell.Io
 import Quickshell.Hyprland
 
-Rectangle {
+BarPill {
     id: root
-
-    property var barScreen: null
-    property var barMonitor: null
 
     readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
     readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
 
-    readonly property int pillSize: Theme.barHeight - 8
+    active: popup.open
+    hovered: qsMouse.containsMouse
+    pressed: qsMouse.pressed
     implicitWidth: {
         if (Theme.isVertical) return pillSize;
         return (qsMouse.containsMouse || popup.open) ? (qsRow.implicitWidth + 20) : pillSize;
     }
-    implicitHeight: pillSize
-    radius: Theme.barWidgetRadius
-    color: {
-        if (qsMouse.pressed) return Theme.widgetActive;
-        if (popup.open) return Theme.primary_overlay;
-        if (qsMouse.containsMouse) return Theme.barPillHover;
-        return Theme.barPillBg;
-    }
-    border.color: popup.open ? Theme.primary : Theme.barPillBorder
-    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     clip: true
 
-    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
 
     property string activeTab: "layout"
@@ -45,179 +32,13 @@ Rectangle {
     property string activeShell: "quickshell"
     property bool fontsLoaded: false
     property var allFonts: []
-    property string pendingShotMode: ""
 
     readonly property string userHome: Quickshell.env("HOME") || ""
     readonly property string cacheDir: Quickshell.env("XDG_CACHE_HOME") || (userHome + "/.cache")
     readonly property string configDir: Quickshell.env("XDG_CONFIG_HOME") || (userHome + "/.config")
-    readonly property string lockStatePath: configDir + "/quickshell/lockscreen/state"
-
-    // synced with ~/.config/quickshell/lockscreen/state so we don't nuke extra lockscreen keys
-    property var _extraLockState: ({})
-    property var lockCfg: ({
-        syncClockGlobal: false,
-        clock24h: false,
-        showSeconds: true,
-        clockStyle: "inline",
-        secondsStyle: "badge",
-        layoutPosition: "center",
-        stackOrder: "clock,media,password",
-        dateAboveClock: false,
-        customNormX: 0.5,
-        customNormY: 0.5,
-        clockScale: 1.0,
-        quoteMode: "smart",
-        scrimDim: 0.58,
-        focusZoom: 1.05,
-        showMedia: true,
-        showMediaVisualizer: true,
-        showUser: true,
-        wallpaperSync: true,
-        customWallpaper: ""
-    })
-
-    FileView {
-        id: lockStateFile
-        path: root.lockStatePath
-        blockLoading: false
-        watchChanges: true
-        printErrors: false
-        onFileChanged: {
-            if (!lockSaveTimer.running) {
-                reload();
-            }
-        }
-        onLoaded: root.loadLockState()
-    }
-
-    Timer {
-        id: lockSaveTimer
-        interval: 120
-        repeat: false
-        onTriggered: root.flushLockState()
-    }
-
-    // waits for quick settings to close before firing a test screenshot
-    Timer {
-        id: quickShotTimer
-        interval: 140
-        repeat: false
-        onTriggered: {
-            if (typeof ScreenshotService === "undefined" || !ScreenshotService) return;
-            if (root.pendingShotMode === "full") {
-                const scr = root.barScreen || (Quickshell.screens?.length > 0 ? Quickshell.screens[0] : null);
-                ScreenshotService.captureFullscreen(scr, Settings?.screenshotDefaultAction || "both");
-            } else if (ScreenshotService.open) {
-                ScreenshotService.open(root.pendingShotMode);
-            }
-        }
-    }
 
     function saveSettings() {
         if (Settings?.save) Settings.save();
-    }
-
-    function parseBool(val, fallback) {
-        let v = String(val).trim().toLowerCase();
-        if (v === "1" || v === "true" || v === "yes") return true;
-        if (v === "0" || v === "false" || v === "no") return false;
-        return fallback;
-    }
-
-    function loadLockState() {
-        let raw = lockStateFile.text();
-        if (!raw || raw.trim() === "") return;
-
-        let next = Object.assign({}, root.lockCfg);
-        let extras = {};
-        const lines = raw.trim().split("\n");
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i].trim();
-            if (!line || line.startsWith("#")) continue;
-            let eqIdx = line.indexOf("=");
-            if (eqIdx < 0) continue;
-            let k = line.slice(0, eqIdx).trim();
-            let v = line.slice(eqIdx + 1).trim();
-
-            switch (k) {
-                case "syncClockGlobal": next.syncClockGlobal = parseBool(v, next.syncClockGlobal); break;
-                case "clock24h": next.clock24h = parseBool(v, next.clock24h); break;
-                case "showSeconds": next.showSeconds = parseBool(v, next.showSeconds); break;
-                case "clockStyle": if (v !== "") next.clockStyle = v; break;
-                case "secondsStyle": if (v !== "") next.secondsStyle = v; break;
-                case "layoutPosition": if (v !== "") next.layoutPosition = v; break;
-                case "stackOrder": if (v !== "") next.stackOrder = v; break;
-                case "dateAboveClock": next.dateAboveClock = parseBool(v, next.dateAboveClock); break;
-                case "customNormX": { let nx = parseFloat(v); if (!isNaN(nx)) next.customNormX = nx; break; }
-                case "customNormY": { let ny = parseFloat(v); if (!isNaN(ny)) next.customNormY = ny; break; }
-                case "clockScale": { let sc = parseFloat(v); if (!isNaN(sc)) next.clockScale = sc; break; }
-                case "quoteMode":
-                    if (v === "unhinged") next.quoteMode = "actions";
-                    else if (v !== "") next.quoteMode = v;
-                    break;
-                case "scrimDim": { let dm = parseFloat(v); if (!isNaN(dm)) next.scrimDim = dm; break; }
-                case "focusZoom": { let fz = parseFloat(v); if (!isNaN(fz)) next.focusZoom = fz; break; }
-                case "showMedia": next.showMedia = parseBool(v, next.showMedia); break;
-                case "showMediaVisualizer": next.showMediaVisualizer = parseBool(v, next.showMediaVisualizer); break;
-                case "showUser": next.showUser = parseBool(v, next.showUser); break;
-                case "wallpaperSync": next.wallpaperSync = parseBool(v, next.wallpaperSync); break;
-                case "customWallpaper": next.customWallpaper = v; break;
-                default: extras[k] = v; break;
-            }
-        }
-        root._extraLockState = extras;
-        root.lockCfg = next;
-    }
-
-    function updateLockCfg(key, val) {
-        let next = Object.assign({}, root.lockCfg);
-        next[key] = val;
-        root.lockCfg = next;
-
-        if (next.syncClockGlobal && (key === "clock24h" || key === "showSeconds" || key === "syncClockGlobal")) {
-            root.applyGlobalClock(next.clock24h, next.showSeconds);
-        }
-        lockSaveTimer.restart();
-    }
-
-    function flushLockState() {
-        const c = root.lockCfg;
-        let lines = [
-            "syncClockGlobal=" + (c.syncClockGlobal ? "1" : "0"),
-            "clock24h=" + (c.clock24h ? "1" : "0"),
-            "showSeconds=" + (c.showSeconds ? "1" : "0"),
-            "clockStyle=" + (c.clockStyle || "inline"),
-            "secondsStyle=" + (c.secondsStyle || "badge"),
-            "layoutPosition=" + (c.layoutPosition || "center"),
-            "stackOrder=" + (c.stackOrder || "clock,media,password"),
-            "dateAboveClock=" + (c.dateAboveClock ? "1" : "0"),
-            "customNormX=" + Number(c.customNormX ?? 0.5).toFixed(4),
-            "customNormY=" + Number(c.customNormY ?? 0.5).toFixed(4),
-            "clockScale=" + Number(c.clockScale ?? 1.0).toFixed(2),
-            "quoteMode=" + (c.quoteMode || "smart"),
-            "scrimDim=" + Number(c.scrimDim ?? 0.58).toFixed(2),
-            "focusZoom=" + Number(c.focusZoom ?? 1.05).toFixed(3),
-            "showMedia=" + (c.showMedia ? "1" : "0"),
-            "showMediaVisualizer=" + (c.showMediaVisualizer ? "1" : "0"),
-            "showUser=" + (c.showUser ? "1" : "0"),
-            "wallpaperSync=" + (c.wallpaperSync ? "1" : "0"),
-            "customWallpaper=" + (c.customWallpaper || "")
-        ];
-        const extras = root._extraLockState || {};
-        for (const ek in extras) {
-            lines.push(ek + "=" + extras[ek]);
-        }
-        lockStateFile.setText(lines.join("\n") + "\n");
-    }
-
-    function applyGlobalClock(is24h, withSec) {
-        if (!Settings) return;
-        let fmt = is24h ? (withSec ? "HH:mm:ss" : "HH:mm") : (withSec ? "h:mm:ss ap" : "h:mm ap");
-        Settings.clockFormat = fmt;
-        Settings.clock24h = is24h;
-        Settings.clockMilitary = is24h;
-        Settings.clockShowSeconds = withSec;
-        root.saveSettings();
     }
 
     // only query system fonts when the user actually opens the appearance tab
@@ -246,16 +67,14 @@ Rectangle {
         layout: "bar & geometry",
         style: "appearance",
         behavior: "behavior",
-        capture: "capture",
         keybinds: "keybinds",
         advanced: "system"
     })[root.activeTab] || "settings"
 
     readonly property string activeTabSubtitle: ({
         layout: "bar dimensions, floating islands, and studio launcher",
-        style: "materials, colors, concave scoops, and typography",
-        behavior: "lock screen studio, clock formats, and motion physics",
-        capture: "screenshots, audio sources, and overlay guides",
+        style: "materials, concave scoops, and typography",
+        behavior: "clock formats, idle timing, and motion physics",
         keybinds: "view and manage your shell shortcuts",
         advanced: "shell profiles, network aliases, and recovery"
     })[root.activeTab] || ""
@@ -265,7 +84,6 @@ Rectangle {
         if (root.activeTab === "layout" && flickLayout) flickLayout.contentY = 0;
         else if (root.activeTab === "style" && flickStyle) flickStyle.contentY = 0;
         else if (root.activeTab === "behavior" && flickBehavior) flickBehavior.contentY = 0;
-        else if (root.activeTab === "capture" && flickScreenshot) flickScreenshot.contentY = 0;
         else if (root.activeTab === "advanced" && flickAdvanced) flickAdvanced.contentY = 0;
     }
 
@@ -521,72 +339,6 @@ Rectangle {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: trRoot.toggled()
-        }
-    }
-
-    component ColorTile: Rectangle {
-        id: colorTileRoot
-        property string title: ""
-        property string subtitle: ""
-        property color swatchColor: Theme.primary
-        signal clicked()
-
-        width: parent ? parent.width : 0
-        Layout.fillWidth: true
-        height: 52
-        radius: Theme.radiusMd
-        color: colorTileMouse.containsMouse ? Theme.widgetHover : Theme.widgetBg
-        border.color: colorTileMouse.containsMouse ? Theme.primary : Theme.widgetBorder
-        border.width: 1
-
-        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-        Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 8
-            spacing: 8
-
-            Rectangle {
-                width: 28
-                height: 28
-                radius: Theme.radiusSm
-                color: colorTileRoot.swatchColor
-                border.color: Theme.alpha(Theme.outline, 0.5)
-                border.width: 1
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 1
-
-                Text {
-                    text: colorTileRoot.title
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeXs
-                    font.weight: Theme.fontWeightDemiBold
-                    color: Theme.textPrimary
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
-                }
-
-                Text {
-                    text: colorTileRoot.subtitle
-                    font.family: Theme.fontMono
-                    font.pixelSize: Theme.fontSizeXs
-                    color: Theme.textSecondary
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
-                }
-            }
-        }
-
-        MouseArea {
-            id: colorTileMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: colorTileRoot.clicked()
         }
     }
 
@@ -1178,7 +930,6 @@ Rectangle {
                             { id: "layout", label: "bar", icon: Theme.iconGrid },
                             { id: "style", label: "appearance", icon: Theme.iconSparkles },
                             { id: "behavior", label: "behavior", icon: Theme.iconFlame },
-                            { id: "capture", label: "capture", icon: Theme.iconCamera },
                             { id: "keybinds", label: "keybinds", icon: Theme.iconKeyboard },
                             { id: "advanced", label: "system", icon: Theme.iconSliders }
                         ]
@@ -1536,8 +1287,8 @@ Rectangle {
                         }
 
                         CategoryHeader {
-                            title: "window title & dynamic notch"
-                            subtitle: "configure active window badge and center island behavior"
+                            title: "window title"
+                            subtitle: "configure active window pill sizing and app icon"
                             icon: Theme.iconSparkles
                         }
 
@@ -1562,42 +1313,6 @@ Rectangle {
                                     Settings.windowTitleShowIcon = !(Settings.windowTitleShowIcon ?? true);
                                     root.saveSettings();
                                 }
-                            }
-
-                            RowDivider {}
-
-                            ChoiceGrid {
-                                title: "dynamic notch mode"
-                                columns: 3
-                                model: [
-                                    { label: "adaptive auto", value: "auto" },
-                                    { label: "clock only", value: "clock" },
-                                    { label: "timer only", value: "timer" }
-                                ]
-                                currentValue: Settings.dynamicNotchMode || "auto"
-                                onSelected: (val) => Settings.dynamicNotchMode = val
-                            }
-
-                            ToggleRow {
-                                icon: Theme.iconSparkles
-                                title: "dynamic notch concave flares"
-                                subtitle: "melt center notch into screen bezel"
-                                checked: Settings.dynamicNotchFlared
-                                onToggled: {
-                                    Settings.dynamicNotchFlared = !Settings.dynamicNotchFlared;
-                                    root.saveSettings();
-                                }
-                            }
-
-                            SliderRow {
-                                visible: Settings.dynamicNotchFlared
-                                title: "notch flare radius"
-                                from: 8
-                                to: 32
-                                stepSize: 2
-                                suffix: "px"
-                                value: Settings.notchFlareRadius
-                                onMoved: (val) => Settings.notchFlareRadius = val
                             }
                         }
                     }
@@ -1626,7 +1341,7 @@ Rectangle {
 
                         CategoryHeader {
                             title: "surface & material"
-                            subtitle: "bar shader preset, adaptive opacity, and color overrides"
+                            subtitle: "bar shader preset, adaptive opacity, and surface glass"
                             icon: Theme.iconSparkles
                         }
 
@@ -1681,69 +1396,6 @@ Rectangle {
                                 value: Settings.popupOpacity
                                 formatter: (v) => Math.round(v * 100) + "%"
                                 onMoved: (val) => Settings.popupOpacity = val
-                            }
-                        }
-
-                        SettingCard {
-                            ToggleRow {
-                                icon: Theme.iconPalette
-                                title: "custom color overrides"
-                                subtitle: "override matugen palette tokens with custom hex colors"
-                                checked: Settings.customColorsEnabled
-                                onToggled: {
-                                    Settings.customColorsEnabled = !Settings.customColorsEnabled;
-                                    root.saveSettings();
-                                }
-                            }
-
-                            GridLayout {
-                                visible: Settings.customColorsEnabled
-                                width: parent.width
-                                columns: 2
-                                columnSpacing: 6
-                                rowSpacing: 6
-
-                                ColorTile {
-                                    title: "background"
-                                    subtitle: Settings.customBg !== "" ? Settings.customBg : "default"
-                                    swatchColor: Settings.customBg !== "" ? Settings.customBg : Theme.background
-                                    onClicked: colorStudioModal.open("customBg", "background color", "main background surface color", Settings.customBg, Theme.background)
-                                }
-
-                                ColorTile {
-                                    title: "accent"
-                                    subtitle: Settings.customActive !== "" ? Settings.customActive : "default"
-                                    swatchColor: Settings.customActive !== "" ? Settings.customActive : Theme.primary
-                                    onClicked: colorStudioModal.open("customActive", "accent color", "primary highlight color", Settings.customActive, Theme.primary)
-                                }
-
-                                ColorTile {
-                                    title: "text"
-                                    subtitle: Settings.customText !== "" ? Settings.customText : "default"
-                                    swatchColor: Settings.customText !== "" ? Settings.customText : Theme.textPrimary
-                                    onClicked: colorStudioModal.open("customText", "text color", "primary foreground text", Settings.customText, Theme.textPrimary)
-                                }
-
-                                ColorTile {
-                                    title: "subtext"
-                                    subtitle: Settings.customSubtext !== "" ? Settings.customSubtext : "default"
-                                    swatchColor: Settings.customSubtext !== "" ? Settings.customSubtext : Theme.textSecondary
-                                    onClicked: colorStudioModal.open("customSubtext", "subtext color", "secondary labels and muted icons", Settings.customSubtext, Theme.textSecondary)
-                                }
-
-                                ColorTile {
-                                    title: "border"
-                                    subtitle: Settings.customBorder !== "" ? Settings.customBorder : "default"
-                                    swatchColor: Settings.customBorder !== "" ? Settings.customBorder : Theme.outline
-                                    onClicked: colorStudioModal.open("customBorder", "border color", "outlines and dividers", Settings.customBorder, Theme.outline)
-                                }
-
-                                ColorTile {
-                                    title: "widget & pill"
-                                    subtitle: Settings.customWidgetBg !== "" ? Settings.customWidgetBg : "default"
-                                    swatchColor: Settings.customWidgetBg !== "" ? Settings.customWidgetBg : Theme.pillBg
-                                    onClicked: colorStudioModal.open("customWidgetBg", "widget & pill color", "surface color for bar pills", Settings.customWidgetBg, Theme.pillBg)
-                                }
                             }
                         }
 
@@ -2184,179 +1836,6 @@ Rectangle {
                         spacing: Theme.popupSpacing
 
                         CategoryHeader {
-                            title: "lock screen studio"
-                            subtitle: "synced live with ~/.config/quickshell/lockscreen/state"
-                            icon: Theme.iconLock
-                        }
-
-                        SettingCard {
-                            RowLayout {
-                                width: parent.width
-                                spacing: 10
-
-                                Rectangle {
-                                    width: 36
-                                    height: 36
-                                    radius: Theme.radiusMd
-                                    color: Theme.primary_overlay
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: Theme.iconLock
-                                        font.family: Theme.fontIcon
-                                        font.variableAxes: Theme.iconAxes
-                                        font.pixelSize: Theme.fontSizeMd
-                                        color: Theme.primary
-                                    }
-                                }
-
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 1
-
-                                    Text {
-                                        text: "session lock screen"
-                                        font.family: Theme.fontDisplay
-                                        font.pixelSize: Theme.fontSizeSm
-                                        font.weight: Theme.fontWeightBold
-                                        color: Theme.textPrimary
-                                    }
-
-                                    Text {
-                                        text: root.lockCfg.clockStyle + " clock  •  " + root.lockCfg.layoutPosition + " position"
-                                        font.family: Theme.fontMono
-                                        font.pixelSize: Theme.fontSizeXs
-                                        color: Theme.textSecondary
-                                    }
-                                }
-
-                                Rectangle {
-                                    height: 28
-                                    implicitWidth: lockNowTxt.implicitWidth + 18
-                                    radius: Theme.radiusPill
-                                    color: lockNowMouse.containsMouse
-                                        ? Theme.stateHover(Theme.primary, Theme.on_primary)
-                                        : Theme.primary
-
-                                    Text {
-                                        id: lockNowTxt
-                                        anchors.centerIn: parent
-                                        text: "lock now"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Theme.fontWeightBold
-                                        color: Theme.on_primary
-                                    }
-
-                                    MouseArea {
-                                        id: lockNowMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            popup.open = false;
-                                            Quickshell.execDetached(["qs", "ipc", "call", "lock", "lock"]);
-                                        }
-                                    }
-                                }
-                            }
-
-                            RowDivider {}
-
-                            ChoiceRow {
-                                title: "clock layout style"
-                                model: [
-                                    { label: "inline", value: "inline" },
-                                    { label: "stacked", value: "stacked" },
-                                    { label: "minimal", value: "minimal" }
-                                ]
-                                currentValue: root.lockCfg.clockStyle ?? "inline"
-                                onSelected: (val) => root.updateLockCfg("clockStyle", val)
-                            }
-
-                            ChoiceRow {
-                                title: "seconds design"
-                                model: [
-                                    { label: "big pill", value: "badge" },
-                                    { label: "split", value: "supersub" },
-                                    { label: "tower / bar", value: "tower" },
-                                    { label: "inline", value: "inline" }
-                                ]
-                                currentValue: root.lockCfg.secondsStyle ?? "badge"
-                                onSelected: (val) => root.updateLockCfg("secondsStyle", val)
-                            }
-
-                            ChoiceRow {
-                                title: "screen position"
-                                model: [
-                                    { label: "left", value: "left" },
-                                    { label: "top", value: "top" },
-                                    { label: "center", value: "center" },
-                                    { label: "bottom", value: "bottom" },
-                                    { label: "right", value: "right" }
-                                ]
-                                currentValue: root.lockCfg.layoutPosition ?? "center"
-                                onSelected: (val) => root.updateLockCfg("layoutPosition", val)
-                            }
-
-                            ChoiceRow {
-                                title: "lock screen quote source"
-                                model: [
-                                    { label: "smart", value: "smart" },
-                                    { label: "hyprland", value: "hyprland" },
-                                    { label: "quotes", value: "quotes" },
-                                    { label: "actions", value: "actions" },
-                                    { label: "custom", value: "custom" },
-                                    { label: "hidden", value: "off" }
-                                ]
-                                currentValue: root.lockCfg.quoteMode === "unhinged" ? "actions" : (root.lockCfg.quoteMode ?? "smart")
-                                onSelected: (val) => root.updateLockCfg("quoteMode", val)
-                            }
-
-                            RowDivider {}
-
-                            SliderRow {
-                                title: "lock clock scale"
-                                from: 0.70
-                                to: 1.45
-                                stepSize: 0.03
-                                value: root.lockCfg.clockScale ?? 1.0
-                                formatter: (v) => Math.round(v * 100) + "%"
-                                onMoved: (val) => root.updateLockCfg("clockScale", val)
-                            }
-
-                            SliderRow {
-                                title: "lock backdrop dim"
-                                from: 0.15
-                                to: 0.95
-                                stepSize: 0.02
-                                value: root.lockCfg.scrimDim ?? 0.58
-                                formatter: (v) => Math.round(v * 100) + "%"
-                                onMoved: (val) => root.updateLockCfg("scrimDim", val)
-                            }
-
-                            RowDivider {}
-
-                            ToggleRow {
-                                icon: Theme.iconClock
-                                title: "sync clock globally across rice"
-                                subtitle: root.lockCfg.syncClockGlobal
-                                    ? "bar & lock screen share 12h/24h and seconds"
-                                    : "lock screen clock stays independent"
-                                checked: Boolean(root.lockCfg.syncClockGlobal)
-                                onToggled: root.updateLockCfg("syncClockGlobal", !root.lockCfg.syncClockGlobal)
-                            }
-
-                            ToggleRow {
-                                icon: Theme.iconWallpaper
-                                title: "sync lock wallpaper with desktop"
-                                subtitle: "disable to keep a separate shuffled wallpaper on the lock screen"
-                                checked: root.lockCfg.wallpaperSync ?? true
-                                onToggled: root.updateLockCfg("wallpaperSync", !(root.lockCfg.wallpaperSync ?? true))
-                            }
-                        }
-
-                        CategoryHeader {
                             title: "bar clock & workspaces"
                             icon: Theme.iconClock
                         }
@@ -2378,11 +1857,6 @@ Rectangle {
                                     Settings.clockMilitary = !is12;
                                     Settings.clock24h = !is12;
                                     Settings.clockShowSeconds = hasSec;
-                                    if (root.lockCfg.syncClockGlobal) {
-                                        let next = Object.assign({}, root.lockCfg, { clock24h: !is12, showSeconds: hasSec });
-                                        root.lockCfg = next;
-                                        lockSaveTimer.restart();
-                                    }
                                 }
                             }
 
@@ -2596,239 +2070,6 @@ Rectangle {
                     }
                 }
                 TabScrollTrack { target: flickBehavior }
-
-                // 4. capture & recording tab
-                Flickable {
-                    id: flickScreenshot
-                    anchors.fill: parent
-                    visible: root.activeTab === "capture"
-                    clip: true
-                    contentWidth: width
-                    contentHeight: screenshotCol.implicitHeight + 28
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    WheelHandler {
-                        orientation: Qt.Vertical
-                        target: parent
-                    }
-
-                    ColumnLayout {
-                        id: screenshotCol
-                        width: parent.width
-                        spacing: Theme.popupSpacing
-
-                        CategoryHeader {
-                            title: "quick capture & recording"
-                            subtitle: "launch a screenshot or configure capture defaults"
-                            icon: Theme.iconCamera
-                        }
-
-                        SettingCard {
-                            RowLayout {
-                                width: parent.width
-                                spacing: 8
-
-                                Repeater {
-                                    model: [
-                                        { id: "region", label: "shot region", icon: Theme.iconCrop },
-                                        { id: "window", label: "shot window", icon: Theme.iconWorkspaces },
-                                        { id: "full", label: "shot display", icon: Theme.iconExpand }
-                                    ]
-
-                                    delegate: Rectangle {
-                                        required property var modelData
-                                        Layout.fillWidth: true
-                                        height: 36
-                                        radius: scQuickM.pressed ? Theme.radiusPill : Theme.radiusMd
-                                        color: scQuickM.pressed
-                                            ? Theme.primary
-                                            : (scQuickM.containsMouse ? Theme.primary_overlay : Theme.widgetBg)
-                                        border.color: scQuickM.containsMouse ? Theme.primary : Theme.widgetBorder
-                                        border.width: 1
-
-                                        Behavior on radius { NumberAnimation { duration: Theme.animFast } }
-                                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
-
-                                        RowLayout {
-                                            anchors.centerIn: parent
-                                            spacing: 6
-                                            Text {
-                                                visible: !Theme.isTextIconSet
-                                                text: modelData.icon
-                                                font.family: Theme.fontIcon
-                                                font.variableAxes: Theme.iconAxes
-                                                font.pixelSize: Theme.fontSizeSm
-                                                color: scQuickM.pressed ? Theme.on_primary : Theme.primary
-                                            }
-                                            Text {
-                                                text: modelData.label
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSizeXs
-                                                font.weight: Theme.fontWeightBold
-                                                color: scQuickM.pressed ? Theme.on_primary : Theme.textPrimary
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: scQuickM
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                root.pendingShotMode = modelData.id;
-                                                popup.open = false;
-                                                quickShotTimer.restart();
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            RowDivider {}
-
-                            ChoiceRow {
-                                title: "recording audio input sources"
-                                model: [
-                                    { label: "desktop + mic", value: "both" },
-                                    { label: "desktop", value: "desktop" },
-                                    { label: "mic only", value: "mic" },
-                                    { label: "muted", value: "none" }
-                                ]
-                                currentValue: ScreenRecService.activeAudio
-                                onSelected: (val) => ScreenRecService.activeAudio = val
-                            }
-
-                            ChoiceRow {
-                                title: "default screenshot action"
-                                model: [
-                                    { label: "save & copy", value: "both" },
-                                    { label: "copy", value: "copy" },
-                                    { label: "save", value: "save" },
-                                    { label: "editor", value: "edit" }
-                                ]
-                                currentValue: Settings.screenshotDefaultAction
-                                onSelected: (val) => Settings.screenshotDefaultAction = val
-                            }
-                        }
-
-                        CategoryHeader {
-                            title: "selection overlay & guides"
-                            icon: Theme.iconSliders
-                        }
-
-                        SettingCard {
-                            ToggleRow {
-                                icon: Theme.iconWorkspaces
-                                title: "window snapping"
-                                subtitle: "hover over any hyprland client to snap to its geometry"
-                                checked: Settings.screenshotWindowSnapping
-                                onToggled: {
-                                    Settings.screenshotWindowSnapping = !Settings.screenshotWindowSnapping;
-                                    root.saveSettings();
-                                }
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconEye
-                                title: "freeze frame on open"
-                                subtitle: "freeze display during selection so windows don't move"
-                                checked: Settings.screenshotFreeze
-                                onToggled: {
-                                    Settings.screenshotFreeze = !Settings.screenshotFreeze;
-                                    root.saveSettings();
-                                }
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconFlame
-                                title: "shutter flash"
-                                subtitle: "visual flash animation when capture finishes"
-                                checked: Settings.screenshotFlash
-                                onToggled: {
-                                    Settings.screenshotFlash = !Settings.screenshotFlash;
-                                    root.saveSettings();
-                                }
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconBell
-                                title: "desktop notification"
-                                subtitle: "send notification with image preview on capture"
-                                checked: Settings.screenshotNotify
-                                onToggled: {
-                                    Settings.screenshotNotify = !Settings.screenshotNotify;
-                                    root.saveSettings();
-                                }
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconGrid
-                                title: "hairline crosshairs"
-                                subtitle: "show alignment crosshairs tracking cursor"
-                                checked: Settings.screenshotShowCrosshair
-                                onToggled: {
-                                    Settings.screenshotShowCrosshair = !Settings.screenshotShowCrosshair;
-                                    root.saveSettings();
-                                }
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconNote
-                                title: "live dimension badge"
-                                subtitle: "show [w × h] and window class above selection"
-                                checked: Settings.screenshotShowBadge
-                                onToggled: {
-                                    Settings.screenshotShowBadge = !Settings.screenshotShowBadge;
-                                    root.saveSettings();
-                                }
-                            }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconExpand
-                                title: "corner accent handles"
-                                subtitle: "render accent markers on selection corners"
-                                checked: Settings.screenshotShowHandles
-                                onToggled: {
-                                    Settings.screenshotShowHandles = !Settings.screenshotShowHandles;
-                                    root.saveSettings();
-                                }
-                            }
-
-                            RowDivider {}
-
-                            SliderRow {
-                                title: "backdrop dimming opacity"
-                                from: 0.1
-                                to: 0.9
-                                stepSize: 0.05
-                                value: Settings.screenshotDimOpacity
-                                formatter: (v) => Math.round(v * 100) + "%"
-                                onMoved: (val) => Settings.screenshotDimOpacity = val
-                            }
-
-                            SliderRow {
-                                title: "selection border width"
-                                from: 1
-                                to: 6
-                                stepSize: 1
-                                suffix: "px"
-                                value: Settings.screenshotBorderWidth
-                                onMoved: (val) => Settings.screenshotBorderWidth = val
-                            }
-
-                            SliderRow {
-                                title: "selection corner radius"
-                                from: 0
-                                to: 20
-                                stepSize: 2
-                                suffix: "px"
-                                value: Settings.screenshotBorderRadius
-                                onMoved: (val) => Settings.screenshotBorderRadius = val
-                            }
-                        }
-                    }
-                }
-                TabScrollTrack { target: flickScreenshot }
 
                 // 5. system & recovery tab
                 Flickable {
@@ -3344,10 +2585,6 @@ Rectangle {
                     }
                 }
             }
-        }
-
-        ColorStudioModal {
-            id: colorStudioModal
         }
     }
 }

@@ -35,11 +35,11 @@ path=(
 )
 export PATH
 
-# nmtui / whiptail dark palette
-export NEWT_COLORS="root=white,black:border=gray,black:window=white,black:shadow=black,gray:title=cyan,black:button=black,lightgray:actbutton=black,cyan:compactbutton=lightgray,black:checkbox=lightgray,black:actcheckbox=black,cyan:entry=white,gray:disentry=gray,black:label=lightgray,black:listbox=lightgray,black:actlistbox=black,cyan:sellistbox=black,cyan:actsellistbox=black,cyan:textbox=lightgray,black:acttextbox=lightgray,black:helpline=gray,black:roottext=gray,black:emptyscale=gray,black:fullscale=cyan,black"
+# nmtui / whiptail ANSI-friendly palette (overridden by matugen.zsh if present)
+export NEWT_COLORS="root=white,default:window=white,default:border=blue,default:title=blue,default:button=black,blue:actbutton=black,cyan:checkbox=white,default:actcheckbox=black,blue:entry=white,default:listbox=white,default:actlistbox=black,blue:sellistbox=black,cyan:actsellistbox=black,cyan"
 
 # flatpak desktop applications and icons
 export XDG_DATA_DIRS="$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 
-# bat syntax theme
-export BAT_THEME="base16"
+# bat syntax theme (pure ANSI follows kitty live dark/light reloads)
+export BAT_THEME="ansi"

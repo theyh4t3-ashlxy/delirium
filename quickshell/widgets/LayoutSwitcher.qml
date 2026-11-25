@@ -8,11 +8,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 
-Rectangle {
+BarPill {
     id: root
-
-    property var barScreen: null
-    property var barMonitor: null
 
     // actual built-in hyprland 0.54+ layout names (scrolling, not scroller)
     property string currentLayout: "dwindle"
@@ -50,6 +47,12 @@ Rectangle {
         }
     ]
 
+    active: popup.open
+    hovered: lMouse.containsMouse
+    pressed: lMouse.pressed
+    activeBorder: Theme?.primary ?? "transparent"
+    normalBorder: ((Theme?.isBarPills ?? true) && (Theme?.isCyberNeon ?? false)) ? (Theme?.primary ?? Theme.barPillBorder) : (Theme?.barPillBorder ?? "transparent")
+
     implicitWidth: {
         if (Theme?.isVertical ?? false) return (Theme?.barHeight ?? 32) - 8;
         return (lMouse.containsMouse || popup.open)
@@ -57,25 +60,9 @@ Rectangle {
             : Math.max(34, pillRow.implicitWidth + 14);
     }
     implicitHeight: (Theme?.isVertical ?? false) ? Math.max(36, pillCol.implicitHeight + 12) : ((Theme?.barHeight ?? 32) - 8)
-    radius: Theme?.barWidgetRadius ?? 999
-    color: popup.open
-        ? (Theme?.primary_overlay ?? "#33ffffff")
-        : (lMouse.containsMouse ? (Theme?.barPillHover ?? "#22ffffff") : (Theme?.barPillBg ?? "transparent"))
-    border.color: ((Theme?.isBarPills ?? true) && (Theme?.isCyberNeon ?? false)) ? (Theme?.primary ?? "#00ffff") : (popup.open ? (Theme?.primary ?? "#00ffff") : (Theme?.barPillBorder ?? "transparent"))
-    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
     visible: Settings?.showLayoutSwitcher ?? true
 
-    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 120; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
-    Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 120; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
     Behavior on implicitWidth {
-        NumberAnimation {
-            duration: Theme?.animFast ?? 120
-            easing.type: Theme?.animEasing ?? Easing.OutQuad
-        }
-    }
-
-    scale: (Settings?.bentoHoverLift ?? true) && lMouse.containsMouse && !popup.open ? 1.02 : 1.0
-    Behavior on scale {
         NumberAnimation {
             duration: Theme?.animFast ?? 120
             easing.type: Theme?.animEasing ?? Easing.OutQuad

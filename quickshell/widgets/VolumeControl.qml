@@ -7,25 +7,17 @@ import Quickshell
 import Quickshell.Widgets
 import Quickshell.Services.Pipewire
 
-Rectangle {
+BarPill {
     id: volRoot
 
-    property var barScreen: null
-    property var barMonitor: null
-
+    active: popup.open
+    hovered: vMouse.containsMouse
+    pressed: vMouse.pressed
+    normalBg: volRoot.muted ? (Theme.isBarPills ? Theme.widgetBg : Theme.alpha(Theme.on_surface, 0.08)) : Theme.barPillBg
     implicitWidth: Theme.isVertical
-        ? Theme.barHeight - 8
+        ? pillSize
         : (volIcon.implicitWidth + 24 + ((vMouse.containsMouse || popup.open) ? (volText.implicitWidth + 6) : 0))
-    implicitHeight: Theme.barHeight - 8
-    radius: Theme.barWidgetRadius
-    color: popup.open
-        ? Theme.primary_overlay
-        : (volRoot.muted ? (Theme.isBarPills ? Theme.widgetBg : Theme.alpha(Theme.on_surface, 0.08)) : (vMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg))
-    border.color: popup.open ? Theme.primary : Theme.barPillBorder
-    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
 
-    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
 
     readonly property var sink: Pipewire.defaultAudioSink
@@ -59,7 +51,9 @@ Rectangle {
     readonly property bool ready: sink?.ready ?? false
     readonly property real vol: (ready && sink?.audio) ? sink.audio.volume : 0
     readonly property bool muted: (ready && sink?.audio) ? sink.audio.muted : true
+    property bool micBoost: (source?.audio?.volume ?? 0) > 1.01
     readonly property real maxVolRatio: Math.max(1.0, (Settings?.volumeMax ?? 150) / 100.0)
+    readonly property real micMaxRatio: (micBoost || ((source?.audio?.volume ?? 0) > 1.01)) ? 1.5 : 1.0
     readonly property bool isOverdriven: !muted && vol > 1.005
     readonly property string mixerScript: Qt.resolvedUrl("../scripts/open-mixer.zsh").toString().replace(/^file:\/\//, "")
 
@@ -408,6 +402,58 @@ Rectangle {
                             }
                         }
                     }
+
+                    // quick one-click default output switcher when multiple sinks exist
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        visible: volRoot.outputDevices.length > 1
+
+                        Repeater {
+                            model: volRoot.outputDevices.slice(0, 3)
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                readonly property bool isCur: modelData?.id === volRoot.sink?.id
+                                readonly property string shortName: ((modelData?.nickname || modelData?.description || modelData?.name || "sink")).toLowerCase()
+
+                                Layout.fillWidth: true
+                                height: 22
+                                radius: Theme.radiusPill
+                                color: isCur
+                                    ? Theme.primary_overlay
+                                    : (quickSinkMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                                border.color: isCur ? Theme.primary : Theme.pillBorder
+                                border.width: 1
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    width: parent.width - 12
+                                    text: parent.shortName
+                                    elide: Text.ElideRight
+                                    horizontalAlignment: Text.AlignHCenter
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.weight: isCur ? Theme.fontWeightBold : Theme.fontWeightMedium
+                                    color: isCur ? Theme.primary : Theme.on_surface_variant
+                                }
+
+                                MouseArea {
+                                    id: quickSinkMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (!modelData) return;
+                                        Pipewire.preferredDefaultAudioSink = modelData;
+                                        if (modelData.id) {
+                                            Quickshell.execDetached(["wpctl", "set-default", String(modelData.id)]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -486,10 +532,12 @@ Rectangle {
                                 border.width: 1
 
                                 Rectangle {
-                                    width: parent.width * Math.min(1.0, Math.max(0.0, volRoot.source?.audio?.volume ?? 0))
+                                    width: parent.width * Math.min(1.0, Math.max(0.0, (volRoot.source?.audio?.volume ?? 0) / volRoot.micMaxRatio))
                                     height: parent.height
                                     radius: Theme.radiusPill
-                                    color: (volRoot.source?.audio?.muted ?? false) ? Theme.on_surface_disabled : Theme.primary
+                                    color: (volRoot.source?.audio?.muted ?? false)
+                                        ? Theme.on_surface_disabled
+                                        : ((volRoot.source?.audio?.volume ?? 0) > 1.01 ? Theme.warn : Theme.primary)
 
                                     Behavior on width { NumberAnimation { duration: 40 } }
                                 }
@@ -503,13 +551,71 @@ Rectangle {
 
                                 function applyMicVolume(posX) {
                                     if (!volRoot.source?.audio || width <= 0) return;
-                                    const clamped = Math.max(0.0, Math.min(1.0, posX / width));
+                                    const clamped = Math.max(0.0, Math.min(volRoot.micMaxRatio, (posX / width) * volRoot.micMaxRatio));
                                     volRoot.source.audio.volume = clamped;
                                     if (volRoot.source.audio.muted && clamped > 0) volRoot.source.audio.muted = false;
                                 }
 
                                 onPressed: (mouse) => applyMicVolume(mouse.x)
                                 onPositionChanged: (mouse) => { if (pressed) applyMicVolume(mouse.x); }
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Repeater {
+                            model: [
+                                { label: "mute", val: -1, boost: false },
+                                { label: "50%", val: 0.5, boost: false },
+                                { label: "100%", val: 1.0, boost: false },
+                                { label: "boost 150%", val: 1.5, boost: true }
+                            ]
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                readonly property bool micMuted: volRoot.source?.audio?.muted ?? true
+                                readonly property real curVol: volRoot.source?.audio?.volume ?? 0
+                                readonly property bool isActive: modelData.val < 0
+                                    ? micMuted
+                                    : (!micMuted && Math.abs(curVol - modelData.val) < 0.04)
+
+                                Layout.fillWidth: true
+                                height: 22
+                                radius: Theme.radiusPill
+                                color: isActive
+                                    ? (modelData.boost ? Theme.warn : Theme.primary)
+                                    : (micPresetMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                                border.color: isActive ? "transparent" : Theme.pillBorder
+                                border.width: isActive ? 0 : 1
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: modelData.label
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.weight: isActive ? Theme.fontWeightBold : Theme.fontWeightMedium
+                                    color: isActive ? (modelData.boost ? Theme.on_warn_container : Theme.on_primary) : Theme.on_surface_variant
+                                }
+
+                                MouseArea {
+                                    id: micPresetMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (!volRoot.source?.audio) return;
+                                        if (modelData.val < 0) {
+                                            volRoot.source.audio.muted = !volRoot.source.audio.muted;
+                                        } else {
+                                            volRoot.micBoost = modelData.boost || modelData.val > 1.0;
+                                            volRoot.source.audio.volume = modelData.val;
+                                            volRoot.source.audio.muted = false;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -663,6 +769,38 @@ Rectangle {
                                         color: streamCard.streamMuted ? Theme.on_surface_disabled : Theme.on_surface_variant
                                         Layout.preferredWidth: 34
                                         horizontalAlignment: Text.AlignRight
+                                    }
+
+                                    Rectangle {
+                                        width: 22
+                                        height: 22
+                                        radius: Theme.radiusSm
+                                        color: streamCard.streamMuted
+                                            ? Theme.error_overlay
+                                            : (sMuteMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                                        border.color: streamCard.streamMuted ? Theme.error : Theme.pillBorder
+                                        border.width: 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: streamCard.streamMuted ? Theme.iconVolMute : Theme.iconVolHigh
+                                            font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
+                                            font.pixelSize: 12
+                                            color: streamCard.streamMuted ? Theme.error : Theme.on_surface_variant
+                                        }
+
+                                        MouseArea {
+                                            id: sMuteMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (streamCard.modelData?.audio) {
+                                                    streamCard.modelData.audio.muted = !streamCard.modelData.audio.muted;
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

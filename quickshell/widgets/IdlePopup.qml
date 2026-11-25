@@ -9,11 +9,35 @@ import "../services"
 PopupPanel {
     id: root
 
-    cardWidth: 360
-    cardHeight: 310
+    cardWidth: 368
+    cardHeight: Math.min(540, idleCol.implicitHeight + (Theme.popupPadding * 2))
 
     property int remainingSecs: 0
     readonly property bool hasTimer: remainingSecs > 0
+    property bool showTimeouts: false
+
+    function formatDurationShort(sec) {
+        let s = Math.max(0, Math.round(sec));
+        if (s < 60) return s + "s";
+        let m = Math.floor(s / 60);
+        let rem = s % 60;
+        if (rem === 0) return m + "m";
+        return m + "m " + rem + "s";
+    }
+
+    function stepIdleSetting(propEnabled, propSec, deltaSec, minSec, maxSec) {
+        if (!Settings) return;
+        let next = Math.max(minSec, Math.min(maxSec, (Settings[propSec] ?? minSec) + deltaSec));
+        Settings[propSec] = next;
+        if (!Settings[propEnabled]) Settings[propEnabled] = true;
+        if (Settings.save) Settings.save();
+    }
+
+    function toggleIdleSetting(propEnabled) {
+        if (!Settings) return;
+        Settings[propEnabled] = !Settings[propEnabled];
+        if (Settings.save) Settings.save();
+    }
 
     Timer {
         id: countdownTimer
@@ -45,6 +69,7 @@ PopupPanel {
     }
 
     content: ColumnLayout {
+        id: idleCol
         anchors.fill: parent
         spacing: Theme.popupSpacing
 
@@ -268,6 +293,152 @@ PopupPanel {
                     onClicked: {
                         Quickshell.execDetached(["qs", "ipc", "call", "lock", "lock"]);
                         root.open = false;
+                    }
+                }
+            }
+        }
+
+        // Configurable automatic idle pipeline (dim -> lock -> dpms -> suspend)
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: timeoutCol.implicitHeight + 16
+            radius: Theme.radiusMd
+            color: Theme.surface_container
+            border.color: Theme.glassBorder
+            border.width: 1
+
+            ColumnLayout {
+                id: timeoutCol
+                anchors.fill: parent
+                anchors.margins: 8
+                spacing: 6
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Text {
+                        text: Theme.iconSliders
+                        font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
+                        font.pixelSize: Theme.fontSizeXs
+                        color: Theme.primary
+                    }
+
+                    Text {
+                        text: "auto idle schedule"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeXs
+                        font.weight: Font.Bold
+                        color: Theme.on_surface
+                        Layout.fillWidth: true
+                    }
+
+                    Text {
+                        text: root.showTimeouts ? "hide" : "edit"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 10
+                        color: Theme.primary
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.showTimeouts = !root.showTimeouts
+                    }
+                }
+
+                // summary strip when collapsed
+                Text {
+                    visible: !root.showTimeouts
+                    Layout.fillWidth: true
+                    text: [
+                        "dim " + ((Settings?.idleDimEnabled ?? true) ? root.formatDurationShort(Settings?.idleDimSeconds ?? 150) : "off"),
+                        "lock " + ((Settings?.idleLockEnabled ?? true) ? root.formatDurationShort(Settings?.idleLockSeconds ?? 300) : "off"),
+                        "dpms " + ((Settings?.idleDpmsEnabled ?? true) ? root.formatDurationShort(Settings?.idleDpmsSeconds ?? 330) : "off"),
+                        "sleep " + ((Settings?.idleSuspendEnabled ?? true) ? root.formatDurationShort(Settings?.idleSuspendSeconds ?? 600) : "off")
+                    ].join(" • ")
+                    font.family: Theme.fontMono
+                    font.pixelSize: 10
+                    color: Theme.on_surface_variant
+                    elide: Text.ElideRight
+                }
+
+                Repeater {
+                    model: root.showTimeouts ? [
+                        { label: "dim screen",  enKey: "idleDimEnabled",     secKey: "idleDimSeconds",     step: 30, min: 30,  max: 900,  def: 150 },
+                        { label: "auto lock",   enKey: "idleLockEnabled",    secKey: "idleLockSeconds",    step: 60, min: 30,  max: 1800, def: 300 },
+                        { label: "screen off",  enKey: "idleDpmsEnabled",    secKey: "idleDpmsSeconds",    step: 60, min: 30,  max: 2400, def: 330 },
+                        { label: "auto sleep",  enKey: "idleSuspendEnabled", secKey: "idleSuspendSeconds", step: 60, min: 60,  max: 3600, def: 600 }
+                    ] : []
+
+                    delegate: RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        readonly property bool isOn: Settings ? Boolean(Settings[modelData.enKey]) : true
+                        readonly property int curSec: Settings ? (Settings[modelData.secKey] ?? modelData.def) : modelData.def
+
+                        Rectangle {
+                            height: 22
+                            width: 38
+                            radius: Theme.radiusPill
+                            color: parent.isOn ? Theme.primary_overlay : Theme.surface_container_high
+                            border.color: parent.isOn ? Theme.primary : Theme.widgetBorder
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: parent.parent.isOn ? "on" : "off"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 9
+                                font.weight: Font.Bold
+                                color: parent.parent.isOn ? Theme.primary : Theme.on_surface_variant
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.toggleIdleSetting(modelData.enKey)
+                            }
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: modelData.label
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            color: parent.isOn ? Theme.on_surface : Theme.on_surface_disabled
+                        }
+
+                        IconButton {
+                            icon: Theme.iconChevronLeft
+                            iconSize: 10
+                            implicitWidth: 22
+                            implicitHeight: 22
+                            tooltip: "-" + modelData.step + "s"
+                            onClicked: root.stepIdleSetting(modelData.enKey, modelData.secKey, -modelData.step, modelData.min, modelData.max)
+                        }
+
+                        Text {
+                            Layout.preferredWidth: 44
+                            horizontalAlignment: Text.AlignHCenter
+                            text: root.formatDurationShort(parent.curSec)
+                            font.family: Theme.fontMono
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: Font.Bold
+                            color: parent.isOn ? Theme.primary : Theme.on_surface_disabled
+                        }
+
+                        IconButton {
+                            icon: Theme.iconChevronRight
+                            iconSize: 10
+                            implicitWidth: 22
+                            implicitHeight: 22
+                            tooltip: "+" + modelData.step + "s"
+                            onClicked: root.stepIdleSetting(modelData.enKey, modelData.secKey, modelData.step, modelData.min, modelData.max)
+                        }
                     }
                 }
             }

@@ -8,6 +8,7 @@ import Quickshell.Hyprland
 import ".."
 import "../controls"
 import "../services"
+import "../theme/confFormat.mjs" as ConfFmt
 
 PopupPanel {
     id: root
@@ -41,8 +42,9 @@ PopupPanel {
 
     readonly property string homeDir: Quickshell.env("HOME") || ""
     readonly property string configDir: Quickshell.env("XDG_CONFIG_HOME") || (homeDir + "/.config")
+    readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || (homeDir + "/.local/state")) + "/quickshell"
     readonly property string pinnedStatePath: configDir + "/quickshell/pinned_apps"
-    readonly property string launcherStatePath: configDir + "/quickshell/launcher_state.json"
+    readonly property string launcherStatePath: stateDir + "/launcher_state.conf"
     readonly property string userShell: Quickshell.env("SHELL") || "zsh"
     readonly property string userTerminal: Quickshell.env("TERMINAL") || ""
 
@@ -91,37 +93,62 @@ PopupPanel {
             return;
         }
         try {
-            let data = JSON.parse(raw);
+            let data = ConfFmt.parseFlatConf(raw);
             if (data) {
-                if (typeof data.gridViewMode === "boolean") root.gridViewMode = data.gridViewMode;
+                if (data.gridViewMode === "true" || data.gridViewMode === "false") root.gridViewMode = (data.gridViewMode === "true");
                 if (["smart", "recent", "alpha"].includes(data.sortMode)) root.sortMode = data.sortMode;
                 if (["lower", "normal", "upper"].includes(data.textCase)) root.textCase = data.textCase;
                 if (["desc", "exec", "hide"].includes(data.subtitleMode)) root.subtitleMode = data.subtitleMode;
                 if (["compact", "cozy", "roomy"].includes(data.rowDensity)) root.rowDensity = data.rowDensity;
-                if ([3, 4, 5].includes(data.gridColumns)) root.gridColumns = data.gridColumns;
-                if (typeof data.autoDesktopCats === "boolean") root.autoDesktopCats = data.autoDesktopCats;
-                if (typeof data.showUsageBadges === "boolean") root.showUsageBadges = data.showUsageBadges;
-                if (typeof data.launcherWide === "boolean") root.launcherWide = data.launcherWide;
-                if (data.usage && typeof data.usage === "object") root.usageMap = data.usage;
+                let cols = parseInt(data.gridColumns, 10);
+                if ([3, 4, 5].includes(cols)) root.gridColumns = cols;
+                if (data.autoDesktopCats === "true" || data.autoDesktopCats === "false") root.autoDesktopCats = (data.autoDesktopCats === "true");
+                if (data.showUsageBadges === "true" || data.showUsageBadges === "false") root.showUsageBadges = (data.showUsageBadges === "true");
+                if (data.launcherWide === "true" || data.launcherWide === "false") root.launcherWide = (data.launcherWide === "true");
+
+                let loadedUsage = {};
+                for (const k in data) {
+                    if (!k.startsWith("usage.")) continue;
+                    let appK = ConfFmt.unescapeField(k.slice(6));
+                    let parts = String(data[k] || "").split(",");
+                    let count = parseInt(parts[0], 10);
+                    let lastUsed = parseInt(parts[1], 10);
+                    if (appK && !isNaN(count)) {
+                        loadedUsage[appK] = {
+                            count: count,
+                            lastUsed: isNaN(lastUsed) ? 0 : lastUsed
+                        };
+                    }
+                }
+                root.usageMap = loadedUsage;
             }
         } catch (e) {}
         root.stateLoaded = true;
     }
 
     function saveLauncherState() {
-        let payload = {
-            gridViewMode: root.gridViewMode,
-            sortMode: root.sortMode,
-            textCase: root.textCase,
-            subtitleMode: root.subtitleMode,
-            rowDensity: root.rowDensity,
-            gridColumns: root.gridColumns,
-            autoDesktopCats: root.autoDesktopCats,
-            showUsageBadges: root.showUsageBadges,
-            launcherWide: root.launcherWide,
-            usage: root.usageMap
-        };
-        launcherStateFile.setText(JSON.stringify(payload, null, 2) + "\n");
+        let lines = [
+            "# Quickshell App Launcher State & Preferences",
+            "gridViewMode=" + (root.gridViewMode ? "true" : "false"),
+            "sortMode=\"" + root.sortMode + "\"",
+            "textCase=\"" + root.textCase + "\"",
+            "subtitleMode=\"" + root.subtitleMode + "\"",
+            "rowDensity=\"" + root.rowDensity + "\"",
+            "gridColumns=" + root.gridColumns,
+            "autoDesktopCats=" + (root.autoDesktopCats ? "true" : "false"),
+            "showUsageBadges=" + (root.showUsageBadges ? "true" : "false"),
+            "launcherWide=" + (root.launcherWide ? "true" : "false"),
+            "",
+            "# App Usage Statistics: usage.<appKey>=<count>,<lastUsed>"
+        ];
+        let keys = Object.keys(root.usageMap || {}).sort();
+        for (let i = 0; i < keys.length; i++) {
+            let k = keys[i];
+            let entry = root.usageMap[k];
+            if (!entry) continue;
+            lines.push("usage." + ConfFmt.escapeField(k) + "=" + (entry.count || 0) + "," + (entry.lastUsed || 0));
+        }
+        launcherStateFile.setText(lines.join("\n") + "\n");
     }
 
     function appKey(app): string {
@@ -212,17 +239,34 @@ PopupPanel {
         root.open = false;
     }
 
-    // prefix modes: > or $ for shell, @ for windows, : for system actions, ? for web search
+    // prefix modes: > or $ for shell, @ for windows, : for system actions, ? for web search, ~/ or / for paths
     readonly property string cleanQuery: query.trim()
     readonly property bool isWindowMode: cleanQuery.startsWith("@") || activeCategory === "windows"
     readonly property bool isActionMode: cleanQuery.startsWith(":") && !cleanQuery.startsWith("::")
     readonly property bool isWebSearch: cleanQuery.startsWith("?") && cleanQuery.length > 1
     readonly property bool isCommand: (cleanQuery.startsWith(">") || cleanQuery.startsWith("$")) && (Settings?.launcherCommandEnabled ?? true)
+    readonly property bool isPathQuery: (Settings?.launcherCommandEnabled ?? true) && !isCommand && !isWindowMode && !isActionMode && !isWebSearch && (cleanQuery === "~" || cleanQuery.startsWith("~/") || cleanQuery.startsWith("/"))
     readonly property string cleanCommand: isCommand ? cleanQuery.slice(1).trim() : ""
     readonly property string cleanWebQuery: isWebSearch ? cleanQuery.slice(1).trim() : ""
-    readonly property var calcResult: (Settings?.launcherCalcEnabled ?? true) && !isCommand && !isWindowMode && !isActionMode && !isWebSearch
+    readonly property string expandedPath: {
+        if (!isPathQuery) return "";
+        if (cleanQuery === "~") return homeDir;
+        if (cleanQuery.startsWith("~/")) return homeDir + cleanQuery.slice(1);
+        return cleanQuery;
+    }
+    readonly property var calcResult: (Settings?.launcherCalcEnabled ?? true) && !isCommand && !isWindowMode && !isActionMode && !isWebSearch && !isPathQuery
         ? evaluateMath(cleanQuery)
         : null
+
+    function openPathInTerminal(targetPath: string) {
+        if (!targetPath) return;
+        let term = root.userTerminal !== "" ? root.userTerminal.replace(/"/g, "") : "";
+        let script = "p=\"$1\"; d=\"$p\"; [ ! -d \"$d\" ] && d=\"$(dirname \"$d\")\"; [ ! -d \"$d\" ] && d=\"$HOME\"; cd \"$d\" || exit 1; " +
+            "for t in " + (term ? ("\"" + term + "\" ") : "") + "kitty foot ghostty alacritty wezterm xterm; do " +
+            "if command -v \"$t\" >/dev/null 2>&1; then exec \"$t\"; fi; done";
+        Quickshell.execDetached([root.userShell, "-c", script, "--", targetPath]);
+        root.open = false;
+    }
 
     // built-in quick system & rice actions when typing ":"
     readonly property var quickActions: [
@@ -635,10 +679,10 @@ PopupPanel {
                 radius: searchInput.text.length > 0 ? Theme.radiusLg : Theme.radiusPill
                 border.color: root.isCommand
                     ? Theme.tertiary
-                    : (root.calcResult !== null || root.isWindowMode || root.isActionMode
+                    : (root.calcResult !== null || root.isWindowMode || root.isActionMode || root.isPathQuery
                         ? Theme.primary
                         : (searchInput.activeFocus ? Theme.alpha(Theme.primary, 0.65) : Theme.pillBorder))
-                border.width: (searchInput.activeFocus || root.isCommand || root.calcResult !== null || root.isWindowMode || root.isActionMode) ? 2 : 1
+                border.width: (searchInput.activeFocus || root.isCommand || root.calcResult !== null || root.isWindowMode || root.isActionMode || root.isPathQuery) ? 2 : 1
 
                 Behavior on radius { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
                 Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -654,7 +698,7 @@ PopupPanel {
                         width: 28
                         height: 28
                         radius: Theme.radiusPill
-                        color: (root.isCommand || root.calcResult !== null || root.isWindowMode || root.isActionMode || root.isWebSearch)
+                        color: (root.isCommand || root.calcResult !== null || root.isWindowMode || root.isActionMode || root.isWebSearch || root.isPathQuery)
                             ? Theme.primary_overlay
                             : "transparent"
 
@@ -670,7 +714,9 @@ PopupPanel {
                                         ? Theme.iconWorkspaces
                                         : (root.isActionMode
                                             ? Theme.iconFlame
-                                            : (root.isWebSearch ? Theme.iconGlobe : Theme.iconSearch))))
+                                            : (root.isPathQuery
+                                                ? Theme.iconFolder
+                                                : (root.isWebSearch ? Theme.iconGlobe : Theme.iconSearch)))))
                             font.family: root.calcResult !== null ? Theme.fontMono : Theme.fontIcon
                             font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeMd
@@ -829,7 +875,7 @@ PopupPanel {
                                 }
                                 if (root.calcResult !== null) {
                                     Quickshell.execDetached(["wl-copy", "--", root.calcResult]);
-                                    root.open = false;
+                                    if (!shiftHeld) root.open = false;
                                     event.accepted = true;
                                     return;
                                 }
@@ -838,7 +884,16 @@ PopupPanel {
                                     event.accepted = true;
                                     return;
                                 }
-                                if (root.filteredApps.length === 0 && root.cleanQuery.length > 0 && (Settings?.launcherCommandEnabled ?? true)) {
+                                if (root.isPathQuery && root.expandedPath.length > 0) {
+                                    if (shiftHeld) root.openPathInTerminal(root.expandedPath);
+                                    else {
+                                        Quickshell.execDetached(["xdg-open", root.expandedPath]);
+                                        root.open = false;
+                                    }
+                                    event.accepted = true;
+                                    return;
+                                }
+                                if (!root.isPathQuery && root.filteredApps.length === 0 && root.cleanQuery.length > 0 && (Settings?.launcherCommandEnabled ?? true)) {
                                     Quickshell.execDetached([root.userShell, "-c", root.cleanQuery]);
                                     root.open = false;
                                     event.accepted = true;
@@ -1431,10 +1486,150 @@ PopupPanel {
                 }
             }
 
+            // inline path opener / terminal card for ~/ or / queries
+            Rectangle {
+                id: pathCard
+                visible: !root.showCategoryManager && root.isPathQuery && root.expandedPath.length > 0
+                Layout.fillWidth: true
+                Layout.preferredHeight: 54
+                radius: Theme.radiusLg
+                color: Theme.blend(Theme.cardBg, Theme.primary, 0.12)
+                border.color: Theme.alpha(Theme.primary, 0.5)
+                border.width: 1
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        Quickshell.execDetached(["xdg-open", root.expandedPath]);
+                        root.open = false;
+                    }
+                }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 10
+
+                    Rectangle {
+                        Layout.preferredWidth: 34
+                        Layout.preferredHeight: 34
+                        radius: Theme.radiusMd
+                        color: Theme.primary_overlay
+                        border.color: Theme.alpha(Theme.primary, 0.45)
+                        border.width: 1
+
+                        Text {
+                            text: Theme.iconFolder
+                            font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
+                            font.pixelSize: Theme.fontSizeMd
+                            color: Theme.primary
+                            anchors.centerIn: parent
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 1
+
+                        Text {
+                            text: root.expandedPath
+                            font.family: Theme.fontMono
+                            font.pixelSize: Theme.fontSizeSm
+                            font.weight: Theme.fontWeightBold
+                            color: Theme.textPrimary
+                            elide: Text.ElideMiddle
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: root.fmtText("enter to open • shift+enter for terminal")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            color: Theme.primary
+                        }
+                    }
+
+                    Row {
+                        spacing: 6
+
+                        Rectangle {
+                            height: 26
+                            implicitWidth: pathCopyTxt.implicitWidth + 14
+                            radius: Theme.radiusPill
+                            color: pathCopyMouse.containsMouse ? Theme.surface_container_highest : Theme.surface_container_high
+                            border.color: Theme.outline_variant
+                            border.width: 1
+
+                            Text {
+                                id: pathCopyTxt
+                                anchors.centerIn: parent
+                                text: root.fmtText("copy")
+                                font.family: Theme.fontMono
+                                font.pixelSize: Theme.fontSizeXs
+                                color: Theme.textPrimary
+                            }
+
+                            MouseArea {
+                                id: pathCopyMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Quickshell.execDetached(["wl-copy", "--", root.expandedPath])
+                            }
+                        }
+
+                        Rectangle {
+                            height: 26
+                            implicitWidth: pathTermTxt.implicitWidth + 14
+                            radius: Theme.radiusPill
+                            color: pathTermMouse.containsMouse ? Theme.secondary_container : Theme.surface_container_high
+                            border.color: Theme.outline_variant
+                            border.width: 1
+
+                            Text {
+                                id: pathTermTxt
+                                anchors.centerIn: parent
+                                text: root.fmtText("term ⇧↵")
+                                font.family: Theme.fontMono
+                                font.pixelSize: Theme.fontSizeXs
+                                color: Theme.textPrimary
+                            }
+
+                            MouseArea {
+                                id: pathTermMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.openPathInTerminal(root.expandedPath)
+                            }
+                        }
+
+                        Rectangle {
+                            height: 26
+                            implicitWidth: pathOpenTxt.implicitWidth + 16
+                            radius: Theme.radiusPill
+                            color: Theme.primary
+
+                            Text {
+                                id: pathOpenTxt
+                                anchors.centerIn: parent
+                                text: root.fmtText("open ↵")
+                                font.family: Theme.fontMono
+                                font.pixelSize: Theme.fontSizeXs
+                                font.weight: Font.Bold
+                                color: Theme.on_primary
+                            }
+                        }
+                    }
+                }
+            }
+
             // inline zsh command runner / web search card
             Rectangle {
                 id: cmdCard
-                visible: !root.showCategoryManager && (
+                visible: !root.showCategoryManager && !root.isPathQuery && (
                     root.isWebSearch ||
                     (root.isCommand && root.cleanCommand.length > 0) ||
                     (!root.isWindowMode && !root.isActionMode && root.filteredApps.length === 0 && root.calcResult === null && root.cleanQuery.length > 0 && (Settings?.launcherCommandEnabled ?? true))

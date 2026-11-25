@@ -35,44 +35,48 @@ QtObject {
         }
     }
 
-    // 150s: dim screen
+    // dim screen on idle
     property IdleMonitor dimMonitor: IdleMonitor {
-        timeout: 150
+        enabled: root.enabled && (Settings?.idleDimEnabled ?? true) && (Settings?.idleDimSeconds ?? 150) > 0
+        timeout: Math.max(10, Settings?.idleDimSeconds ?? 150)
         respectInhibitors: true
         onIsIdleChanged: {
-            if (!root.enabled) return;
+            if (!root.enabled || !(Settings?.idleDimEnabled ?? true)) return;
             Quickshell.execDetached(isIdle ? ["brightnessctl", "-s", "set", "10%"] : ["brightnessctl", "-r"]);
         }
     }
 
-    // 300s: lock screen natively via Quickshell
+    // lock screen natively via Quickshell
     property IdleMonitor lockMonitor: IdleMonitor {
-        timeout: 300
+        enabled: root.enabled && (Settings?.idleLockEnabled ?? true) && (Settings?.idleLockSeconds ?? 300) > 0
+        timeout: Math.max(15, Settings?.idleLockSeconds ?? 300)
         respectInhibitors: true
         onIsIdleChanged: {
-            if (!root.enabled || !isIdle) return;
+            if (!root.enabled || !(Settings?.idleLockEnabled ?? true) || !isIdle) return;
             Quickshell.execDetached(["qs", "ipc", "call", "lock", "lock"]);
         }
     }
 
-    // 330s: turn off monitors via native Hyprland IPC
+    // turn off monitors via native Hyprland IPC
     property IdleMonitor dpmsMonitor: IdleMonitor {
-        timeout: 330
+        enabled: root.enabled && (Settings?.idleDpmsEnabled ?? true) && (Settings?.idleDpmsSeconds ?? 330) > 0
+        timeout: Math.max(20, Settings?.idleDpmsSeconds ?? 330)
         respectInhibitors: true
         onIsIdleChanged: {
-            if (!root.enabled) return;
+            if (!root.enabled || !(Settings?.idleDpmsEnabled ?? true)) return;
 
             let action = isIdle ? "disable" : "enable";
             Settings.dispatchDpms(action);
         }
     }
 
-    // 600s: suspend system
+    // suspend system
     property IdleMonitor suspendMonitor: IdleMonitor {
-        timeout: 600
+        enabled: root.enabled && (Settings?.idleSuspendEnabled ?? true) && (Settings?.idleSuspendSeconds ?? 600) > 0
+        timeout: Math.max(30, Settings?.idleSuspendSeconds ?? 600)
         respectInhibitors: true
         onIsIdleChanged: {
-            if (!root.enabled || !isIdle) return;
+            if (!root.enabled || !(Settings?.idleSuspendEnabled ?? true) || !isIdle) return;
             Quickshell.execDetached(["systemctl", "suspend"]);
         }
     }

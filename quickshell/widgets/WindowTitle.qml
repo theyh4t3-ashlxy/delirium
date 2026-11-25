@@ -1,15 +1,13 @@
 import QtQuick
 import QtQuick.Layouts
 import ".."
+import "../controls"
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Hyprland
 
-Rectangle {
+BarPill {
     id: windowTitleRoot
-
-    property var barScreen: null
-    property var barMonitor: null
 
     readonly property var activeTop: Hyprland?.activeToplevel
     readonly property string rawTitle: (activeTop?.title ?? activeTop?.wayland?.title ?? "").trim()
@@ -57,17 +55,14 @@ Rectangle {
     }
 
     visible: !(Theme?.isVertical ?? false) && (Settings?.showWindowTitle ?? true)
+    hovered: wtMouse.containsMouse
+    pressed: wtMouse.pressed
+    active: winPopup.open
     implicitWidth: (Theme?.isVertical ?? false) ? 0 : desiredWidth
-    implicitHeight: (Theme?.isVertical ?? false) ? 0 : ((Theme?.barHeight ?? 48) - 8)
+    implicitHeight: (Theme?.isVertical ?? false) ? 0 : pillSize
     width: parent ? parent.width : implicitWidth
-    radius: Theme?.barWidgetRadius ?? 999
     clip: true
-    color: wtMouse.containsMouse ? (Theme?.barPillHover ?? "#33ffffff") : (Theme?.barPillBg ?? "transparent")
-    border.color: Theme?.barPillBorder ?? "transparent"
-    border.width: (Theme?.barPillBorder ?? "transparent") === "transparent" ? 0 : 1
 
-    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 150; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
-    Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 150; easing.type: Theme?.animColorEasing ?? Easing.OutQuad } }
     Behavior on implicitWidth { NumberAnimation { duration: Theme?.animFast ?? 150; easing.type: Theme?.animEasing ?? Easing.OutQuad } }
 
     WindowTitlePopup {

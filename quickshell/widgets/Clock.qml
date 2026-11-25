@@ -2,83 +2,24 @@ import QtQuick
 import QtQuick.Layouts
 import ".."
 import "../controls"
-import "../corners"
 
-Rectangle {
+BarPill {
     id: clockRoot
 
-    // ── Concave Flare & Bezel Attachment ──────────────────────────────────
     readonly property int currentBarHeight: Theme?.barHeight ?? 48
-    readonly property bool isBarFloating: Settings?.barFloating ?? false
-    readonly property bool isBarBottom: Settings?.barPosition === "bottom"
-    readonly property bool isCenterModule: (Settings?.barModulesCenter ?? []).indexOf("clock") !== -1
-    readonly property bool hasNotchInCenter: (Settings?.barModulesCenter ?? []).some(m => String(m).toLowerCase() === "dynamicnotch" || String(m).toLowerCase() === "notch")
-    readonly property bool hasCenterSiblings: (Settings?.barModulesCenter ?? ["clock"]).length > 1
-    readonly property bool isFlared: (Settings?.dynamicNotchFlared ?? true) && !(Theme?.isVertical ?? false) && !isBarFloating && !(Theme?.isBarGroupedSurface ?? false) && isCenterModule && !hasNotchInCenter && !hasCenterSiblings
-    readonly property int flareRadius: Settings?.notchFlareRadius ?? 16
 
-    implicitWidth: (Theme?.isVertical ?? false) ? (currentBarHeight - 8) : (clockRow.implicitWidth + 24)
-    implicitHeight: (Theme?.isVertical ?? false) ? 42 : (currentBarHeight - 8)
+    active: calPopup.open
+    hovered: clkMouse.containsMouse
+    pressed: clkMouse.pressed
+
+    implicitWidth: (Theme?.isVertical ?? false) ? pillSize : (clockRow.implicitWidth + 24)
+    implicitHeight: (Theme?.isVertical ?? false) ? 42 : pillSize
     width: implicitWidth
-    height: isFlared ? currentBarHeight : implicitHeight
-    y: isFlared ? (isBarBottom ? Math.round((currentBarHeight - implicitHeight) / 2) : -Math.round((currentBarHeight - implicitHeight) / 2)) : 0
-
-    radius: isFlared ? 0 : (Theme?.barWidgetRadius ?? 999)
-    topLeftRadius: isFlared ? (isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.barWidgetRadius ?? 999)
-    topRightRadius: isFlared ? (isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.barWidgetRadius ?? 999)
-    bottomLeftRadius: isFlared ? (!isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.barWidgetRadius ?? 999)
-    bottomRightRadius: isFlared ? (!isBarBottom ? Math.max(Theme?.radiusMd ?? 12, 12) : 0) : (Theme?.barWidgetRadius ?? 999)
-
-    color: calPopup.open
-        ? (Theme?.primary_overlay ?? Theme?.primaryOverlay ?? Theme?.surface_container_highest ?? "#3389b4fa")
-        : (clkMouse.containsMouse ? (Theme?.barPillHover ?? "#33ffffff") : (isFlared ? (Theme?.pillBg ?? "#1e1e2e") : (Theme?.barPillBg ?? "transparent")))
-    border.color: calPopup.open ? (Theme?.primary ?? "transparent") : (Theme?.barPillBorder ?? "transparent")
-    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+    height: implicitHeight
     visible: Settings?.showClock ?? true
     clip: false
 
-    Behavior on color { ColorAnimation { duration: Theme?.animFast ?? 150 } }
-    Behavior on border.color { ColorAnimation { duration: Theme?.animFast ?? 150 } }
-    Behavior on height { NumberAnimation { duration: Theme?.animNormal ?? 200; easing.type: Theme?.animEasing ?? Easing.OutQuad } }
-    Behavior on y { NumberAnimation { duration: Theme?.animNormal ?? 200; easing.type: Theme?.animEasing ?? Easing.OutQuad } }
     Behavior on width { NumberAnimation { duration: Theme?.animFast ?? 150; easing.type: Theme?.animEasing ?? Easing.OutQuad } }
-
-    // ── Concave Flares (Ears) Melting Into Screen Bezel ──────────────────
-    ConcaveCorner {
-        id: flareLeft
-        visible: clockRoot.isFlared
-        width: clockRoot.flareRadius
-        height: clockRoot.flareRadius
-        x: -width
-        y: clockRoot.isBarBottom ? (clockRoot.height - height) : 0
-        radiusX: clockRoot.flareRadius
-        radiusY: clockRoot.flareRadius
-        fillColor: clockRoot.color
-        cornerStyle: Settings?.cornerStyle ?? "continuous-bezier"
-        flipX: true
-        flipY: clockRoot.isBarBottom
-        showBorder: clockRoot.border.width > 0
-        borderWidth: clockRoot.border.width
-        borderColor: clockRoot.border.color
-    }
-
-    ConcaveCorner {
-        id: flareRight
-        visible: clockRoot.isFlared
-        width: clockRoot.flareRadius
-        height: clockRoot.flareRadius
-        x: clockRoot.width
-        y: clockRoot.isBarBottom ? (clockRoot.height - height) : 0
-        radiusX: clockRoot.flareRadius
-        radiusY: clockRoot.flareRadius
-        fillColor: clockRoot.color
-        cornerStyle: Settings?.cornerStyle ?? "continuous-bezier"
-        flipX: false
-        flipY: clockRoot.isBarBottom
-        showBorder: clockRoot.border.width > 0
-        borderWidth: clockRoot.border.width
-        borderColor: clockRoot.border.color
-    }
 
     property date now: new Date()
     // breaking date parts out prevents the calendar from recreating 42 delegates every tick
@@ -138,7 +79,7 @@ Rectangle {
             font.family: Theme?.fontIcon ?? "sans-serif"
             font.variableAxes: Theme?.iconAxes ?? ({})
             font.pixelSize: Theme?.fontSizeSm ?? 12
-            color: calPopup.open ? (Theme?.primary ?? "#89b4fa") : (Theme?.on_surface_variant ?? "#a6adc8")
+            color: calPopup.open ? Theme.primary : Theme.on_surface_variant
         }
 
         Text {
@@ -176,7 +117,7 @@ Rectangle {
             font.family: Theme?.fontFamily ?? "sans-serif"
             font.pixelSize: (Theme?.isVertical ?? false) ? 10 : (Theme?.fontSizeMd ?? 14)
             font.weight: Font.Medium
-            color: calPopup.open ? (Theme?.primary ?? "#89b4fa") : (Theme?.on_surface ?? "#cdd6f4")
+            color: calPopup.open ? Theme.primary : Theme.on_surface
         }
 
         Row {
@@ -189,7 +130,7 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "•"
                 font.pixelSize: Theme?.fontSizeSm ?? 12
-                color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService?.timerRemaining <= 30) ? (Theme?.error ?? "#f38ba8") : (Theme?.primary ?? "#89b4fa")
+                color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService?.timerRemaining <= 30) ? Theme.error : Theme.primary
                 SequentialAnimation on opacity {
                     loops: Animation.Infinite
                     running: typeof TimerService !== "undefined" && (TimerService?.timerRunning ?? false) && ((TimerService?.timerRemaining ?? 999) <= 30)
@@ -211,7 +152,7 @@ Rectangle {
                 font.family: Theme?.fontMono ?? "monospace"
                 font.pixelSize: Theme?.fontSizeSm ?? 11
                 font.weight: Font.Bold
-                color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService?.timerRemaining <= 30) ? (Theme?.error ?? "#f38ba8") : (Theme?.primary ?? "#89b4fa")
+                color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService?.timerRemaining <= 30) ? Theme.error : Theme.primary
             }
         }
     }
@@ -350,8 +291,8 @@ Rectangle {
                     Layout.preferredHeight: 32
                     implicitHeight: 32
                     radius: Theme?.radiusPill ?? 16
-                    color: calPopup.activeTab === "calendar" ? (Theme?.primary ?? "#89b4fa") : (Theme?.cardBg ?? Theme?.surface_container_highest ?? "#1e1e2e")
-                    border.color: calPopup.activeTab === "calendar" ? (Theme?.primary ?? "#89b4fa") : (Theme?.cardBorder ?? Theme?.widgetBorder ?? "#313244")
+                    color: calPopup.activeTab === "calendar" ? Theme.primary : Theme.cardBg
+                    border.color: calPopup.activeTab === "calendar" ? Theme.primary : Theme.widgetBorder
                     border.width: 1
 
                     RowLayout {
@@ -362,14 +303,14 @@ Rectangle {
                             font.family: Theme?.fontIcon ?? "sans-serif"
                             font.variableAxes: Theme?.iconAxes ?? ({})
                             font.pixelSize: Theme?.fontSizeSm ?? 12
-                            color: calPopup.activeTab === "calendar" ? (Theme?.on_primary ?? "#11111b") : (Theme?.on_surface ?? "#cdd6f4")
+                            color: calPopup.activeTab === "calendar" ? Theme.on_primary : Theme.on_surface
                         }
                         Text {
                             text: "calendar"
                             font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
                             font.pixelSize: Theme?.fontSizeSm ?? 12
                             font.weight: Font.DemiBold
-                            color: calPopup.activeTab === "calendar" ? (Theme?.on_primary ?? "#11111b") : (Theme?.on_surface ?? "#cdd6f4")
+                            color: calPopup.activeTab === "calendar" ? Theme.on_primary : Theme.on_surface
                         }
                     }
                     MouseArea {
@@ -384,8 +325,8 @@ Rectangle {
                     Layout.preferredHeight: 32
                     implicitHeight: 32
                     radius: Theme?.radiusPill ?? 16
-                    color: calPopup.activeTab === "timer" ? (Theme?.primary ?? "#89b4fa") : (Theme?.cardBg ?? Theme?.surface_container_highest ?? "#1e1e2e")
-                    border.color: calPopup.activeTab === "timer" ? (Theme?.primary ?? "#89b4fa") : (Theme?.cardBorder ?? Theme?.widgetBorder ?? "#313244")
+                    color: calPopup.activeTab === "timer" ? Theme.primary : Theme.cardBg
+                    border.color: calPopup.activeTab === "timer" ? Theme.primary : Theme.widgetBorder
                     border.width: 1
 
                     RowLayout {
@@ -396,14 +337,14 @@ Rectangle {
                             font.family: Theme?.fontIcon ?? "sans-serif"
                             font.variableAxes: Theme?.iconAxes ?? ({})
                             font.pixelSize: Theme?.fontSizeSm ?? 12
-                            color: calPopup.activeTab === "timer" ? (Theme?.on_primary ?? "#11111b") : (Theme?.on_surface ?? "#cdd6f4")
+                            color: calPopup.activeTab === "timer" ? Theme.on_primary : Theme.on_surface
                         }
                         Text {
                             text: "timer"
                             font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
                             font.pixelSize: Theme?.fontSizeSm ?? 12
                             font.weight: Font.DemiBold
-                            color: calPopup.activeTab === "timer" ? (Theme?.on_primary ?? "#11111b") : (Theme?.on_surface ?? "#cdd6f4")
+                            color: calPopup.activeTab === "timer" ? Theme.on_primary : Theme.on_surface
                         }
                     }
                     MouseArea {
@@ -426,9 +367,9 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 64
                     implicitHeight: 64
-                    radius: Theme?.widgetRadius ?? Theme?.radiusMd ?? 8
-                    color: Theme?.cardBg ?? Theme?.surface_container_highest ?? "#1e1e2e"
-                    border.color: Theme?.widgetBorder ?? Theme?.cardBorder ?? "#313244"
+                    radius: Theme.widgetRadius
+                    color: Theme.cardBg
+                    border.color: Theme.widgetBorder
                     border.width: 1
 
                     RowLayout {
@@ -447,17 +388,17 @@ Rectangle {
                                         : "dddd, MMMM d, yyyy";
                                     return Qt.formatDateTime(clockRoot.now, dFmt).toLowerCase();
                                 }
-                                font.family: Theme?.fontFamily ?? "sans-serif"
-                                font.pixelSize: Theme?.fontSizeSm ?? 12
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSm
                                 font.weight: Font.Bold
-                                color: Theme?.on_surface ?? "#cdd6f4"
+                                color: Theme.on_surface
                             }
 
                             Text {
                                 text: "day " + clockRoot.getDayOfYear(clockRoot.now) + " of " + clockRoot.now.getFullYear()
-                                font.family: Theme?.fontFamily ?? "sans-serif"
+                                font.family: Theme.fontFamily
                                 font.pixelSize: 10
-                                color: Theme?.on_surface_variant ?? "#a6adc8"
+                                color: Theme.on_surface_variant
                             }
                         }
 
@@ -470,19 +411,19 @@ Rectangle {
                                     let is12 = (Settings?.clockFormat && /ap/i.test(Settings.clockFormat)) || (Settings?.clockMilitary === false) || (Settings?.clock24h === false);
                                     return Qt.formatDateTime(clockRoot.now, is12 ? "h:mm:ss ap" : "HH:mm:ss").toLowerCase();
                                 }
-                                font.family: Theme?.fontMono ?? "monospace"
-                                font.pixelSize: Theme?.fontSizeLg ?? 16
+                                font.family: Theme.fontMono
+                                font.pixelSize: Theme.fontSizeLg
                                 font.weight: Font.Bold
-                                color: Theme?.primary ?? "#89b4fa"
+                                color: Theme.primary
                                 Layout.alignment: Qt.AlignRight
                             }
 
                             Text {
                                 text: Theme?.iconClock ?? "\uE8B5"
-                                font.family: Theme?.fontIcon ?? "sans-serif"
-                                font.variableAxes: Theme?.iconAxes ?? ({})
+                                font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
                                 font.pixelSize: 11
-                                color: Theme?.primary ?? "#89b4fa"
+                                color: Theme.primary
                                 Layout.alignment: Qt.AlignRight
                             }
                         }
@@ -500,10 +441,10 @@ Rectangle {
                             let d = new Date(clockRoot.selectedYear, clockRoot.selectedMonth, 1);
                             return Qt.formatDate(d, "MMMM yyyy").toLowerCase();
                         }
-                        font.family: Theme?.fontFamily ?? "sans-serif"
-                        font.pixelSize: Theme?.fontSizeMd ?? 14
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeMd
                         font.weight: Font.Bold
-                        color: Theme?.primary ?? "#89b4fa"
+                        color: Theme.primary
                     }
 
                     Item {
@@ -560,7 +501,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 1
                     implicitHeight: 1
-                    color: Theme?.widgetBorder ?? Theme?.cardBorder ?? "#313244"
+                    color: Theme.widgetBorder
                 }
 
                 // Days of Week Headers (Mo, Tu, We, Th, Fr, Sa, Su)
@@ -582,10 +523,10 @@ Rectangle {
                             Text {
                                 anchors.centerIn: parent
                                 text: modelData
-                                font.family: Theme?.fontMono ?? "monospace"
+                                font.family: Theme.fontMono
                                 font.pixelSize: 10
                                 font.weight: Font.Bold
-                                color: (index >= 5) ? (Theme?.primary ?? "#89b4fa") : (Theme?.on_surface_variant ?? "#a6adc8")
+                                color: (index >= 5) ? Theme.primary : Theme.on_surface_variant
                             }
                         }
                     }
@@ -629,27 +570,23 @@ Rectangle {
                             Layout.preferredWidth: 1
                             Layout.preferredHeight: 32
                             implicitHeight: 32
-                            radius: Theme?.radiusSm ?? 6
+                            radius: Theme.radiusSm
                             color: (modelData.currentMonth && modelData.isToday)
-                                ? (Theme?.primary ?? "#89b4fa")
-                                : (dayMouse.containsMouse
-                                    ? (Theme?.surface_container_highest ?? "#313244")
-                                    : "transparent")
+                                ? Theme.primary
+                                : (dayMouse.containsMouse ? Theme.surface_container_highest : "transparent")
 
-                            border.color: (modelData.currentMonth && modelData.isToday) ? (Theme?.primary ?? "#89b4fa") : "transparent"
+                            border.color: (modelData.currentMonth && modelData.isToday) ? Theme.primary : "transparent"
                             border.width: 1
 
                             Text {
                                 anchors.centerIn: parent
                                 text: modelData.day
-                                font.family: Theme?.fontMono ?? "monospace"
+                                font.family: Theme.fontMono
                                 font.pixelSize: 11
                                 font.weight: modelData.isToday ? Font.Bold : Font.Normal
                                 color: (modelData.currentMonth && modelData.isToday)
-                                    ? (Theme?.on_primary ?? "#11111b")
-                                    : (modelData.currentMonth
-                                        ? (Theme?.on_surface ?? "#cdd6f4")
-                                        : (Theme?.on_surface_disabled ?? Qt.alpha(Theme?.on_surface ?? "#cdd6f4", 0.35)))
+                                    ? Theme.on_primary
+                                    : (modelData.currentMonth ? Theme.on_surface : Theme.on_surface_disabled)
                             }
 
                             MouseArea {
@@ -685,7 +622,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 1
                     implicitHeight: 1
-                    color: Theme?.widgetBorder ?? Theme?.cardBorder ?? "#313244"
+                    color: Theme.widgetBorder
                 }
 
                 // Footer: Day progress
@@ -698,7 +635,7 @@ Rectangle {
                         Layout.preferredHeight: 6
                         implicitHeight: 6
                         radius: 3
-                        color: Theme?.surface_container_highest ?? "#313244"
+                        color: Theme.surface_container_highest
                         clip: true
 
                         Rectangle {
@@ -707,15 +644,15 @@ Rectangle {
                             anchors.bottom: parent.bottom
                             width: parent.width * Math.min(1.0, Math.max(0.0, ((clockRoot.now.getHours() * 60 + clockRoot.now.getMinutes()) / 1440)))
                             radius: 3
-                            color: Theme?.primary ?? "#89b4fa"
+                            color: Theme.primary
                         }
                     }
 
                     Text {
                         text: Math.round(((clockRoot.now.getHours() * 60 + clockRoot.now.getMinutes()) / 1440) * 100) + "% day elapsed"
-                        font.family: Theme?.fontMono ?? "monospace"
+                        font.family: Theme.fontMono
                         font.pixelSize: 9
-                        color: Theme?.on_surface_variant ?? "#a6adc8"
+                        color: Theme.on_surface_variant
                     }
                 }
             }
@@ -731,9 +668,9 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: timerInnerLayout.implicitHeight + 32
                     implicitHeight: timerInnerLayout.implicitHeight + 32
-                    radius: Theme?.radiusMd ?? 10
-                    color: Theme?.cardBg ?? Theme?.surface_container_highest ?? "#1e1e2e"
-                    border.color: Theme?.cardBorder ?? Theme?.widgetBorder ?? "#313244"
+                    radius: Theme.radiusMd
+                    color: Theme.cardBg
+                    border.color: Theme.widgetBorder
                     border.width: 1
 
                     ColumnLayout {
@@ -752,10 +689,10 @@ Rectangle {
                                 }
                                 return TimerService.timerDisplay;
                             }
-                            font.family: Theme?.fontMono ?? "monospace"
+                            font.family: Theme.fontMono
                             font.pixelSize: 46
                             font.weight: Font.Bold
-                            color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService.timerRemaining <= 30) ? (Theme?.error ?? "#f38ba8") : (Theme?.primary ?? "#89b4fa")
+                            color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService.timerRemaining <= 30) ? Theme.error : Theme.primary
                         }
 
                         // Quick Preset Chips (+1m, +5m, +15m, +25m Pomodoro)
@@ -775,18 +712,18 @@ Rectangle {
                                     Layout.preferredHeight: 32
                                     implicitWidth: 68
                                     implicitHeight: 32
-                                    radius: Theme?.radiusPill ?? 16
-                                    color: Theme?.surface_container_highest ?? "#313244"
-                                    border.color: Theme?.cardBorder ?? Theme?.widgetBorder ?? "#45475a"
+                                    radius: Theme.radiusPill
+                                    color: Theme.surface_container_highest
+                                    border.color: Theme.widgetBorder
                                     border.width: 1
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: modelData.label
-                                        font.family: Theme?.fontMono ?? "monospace"
-                                        font.pixelSize: Theme?.fontSizeSm ?? 12
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontSizeSm
                                         font.weight: Font.DemiBold
-                                        color: Theme?.on_surface ?? "#cdd6f4"
+                                        color: Theme.on_surface
                                     }
                                     MouseArea {
                                         anchors.fill: parent
@@ -812,24 +749,24 @@ Rectangle {
                                 implicitWidth: 110
                                 implicitHeight: 40
                                 radius: 20
-                                color: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.error ?? "#f38ba8") : (Theme?.primary ?? "#89b4fa")
+                                color: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? Theme.error : Theme.primary
 
                                 RowLayout {
                                     anchors.centerIn: parent
                                     spacing: 6
                                     Text {
                                         text: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? (Theme?.iconPause ?? "\uE034") : (Theme?.iconPlay ?? "\uE037")
-                                        font.family: Theme?.fontIcon ?? "sans-serif"
-                                        font.variableAxes: Theme?.iconAxes ?? ({})
-                                        font.pixelSize: Theme?.fontSizeSm ?? 12
-                                        color: Theme?.on_primary ?? "#11111b"
+                                        font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
+                                        font.pixelSize: Theme.fontSizeSm
+                                        color: Theme.on_primary
                                     }
                                     Text {
                                         text: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? "pause" : "start"
-                                        font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
-                                        font.pixelSize: Theme?.fontSizeSm ?? 12
+                                        font.family: Theme.fontSans
+                                        font.pixelSize: Theme.fontSizeSm
                                         font.weight: Font.Bold
-                                        color: Theme?.on_primary ?? "#11111b"
+                                        color: Theme.on_primary
                                     }
                                 }
 
@@ -853,17 +790,17 @@ Rectangle {
                                 implicitWidth: 96
                                 implicitHeight: 40
                                 radius: 20
-                                color: Theme?.surface_container_highest ?? "#313244"
-                                border.color: Theme?.cardBorder ?? Theme?.widgetBorder ?? "#45475a"
+                                color: Theme.surface_container_highest
+                                border.color: Theme.widgetBorder
                                 border.width: 1
 
                                 Text {
                                     anchors.centerIn: parent
                                     text: "reset"
-                                    font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
-                                    font.pixelSize: Theme?.fontSizeSm ?? 12
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: Theme.fontSizeSm
                                     font.weight: Font.Medium
-                                    color: Theme?.on_surface ?? "#cdd6f4"
+                                    color: Theme.on_surface
                                 }
 
                                 MouseArea {
@@ -886,14 +823,14 @@ Rectangle {
                             implicitWidth: 180
                             implicitHeight: 32
                             radius: 16
-                            color: Theme?.surface_container_high ?? "#262837"
+                            color: Theme.surface_container_high
 
                             Text {
                                 anchors.centerIn: parent
                                 text: (typeof TimerService !== "undefined" && (TimerService?.stopwatchRunning || TimerService?.stopwatchElapsed > 0)) ? "switch to timer" : "switch to stopwatch"
-                                font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
-                                font.pixelSize: Theme?.fontSizeXs ?? 11
-                                color: Theme?.primary ?? "#89b4fa"
+                                font.family: Theme.fontSans
+                                font.pixelSize: Theme.fontSizeXs
+                                color: Theme.primary
                             }
                             MouseArea {
                                 anchors.fill: parent

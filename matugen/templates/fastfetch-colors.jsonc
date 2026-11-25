@@ -4,16 +4,39 @@
     "color": {
       "title": "blue",
       "keys": "cyan",
-      "separator": "bright_black",
+      "separator": "90",
       "output": "white"
     },
-    "separator": " 󰅂 ",
-    "key": {
-      "width": 14
+    "separator": "· ",
+    "bar": {
+      "char": {
+        "elapsed": "━",
+        "total": "─"
+      },
+      "border": {
+        "left": "",
+        "right": ""
+      },
+      "width": 10,
+      "color": {
+        "total": "90"
+      }
+    },
+    "percent": {
+      "type": 3
+    },
+    "duration": {
+      "abbreviation": true
+    },
+    "size": {
+      "ndigits": 1
+    },
+    "temp": {
+      "unit": "C",
+      "ndigits": 0
     }
   },
   "logo": {
-    "source": "auto",
     "color": {
       "1": "blue",
       "2": "cyan",
@@ -21,30 +44,106 @@
       "4": "bright_blue",
       "5": "bright_cyan",
       "6": "bright_magenta",
-      "7": "bright_black",
-      "8": "black",
+      "7": "90",
+      "8": "90",
       "9": "white"
     },
     "padding": {
+      "top": 0,
       "right": 4
     }
   },
   "modules": [
-    { "type": "title" },
-    "separator",
-    { "type": "os", "key": " os" },
-    { "type": "host", "key": "󰌢 host", "format": "{version}" },
-    { "type": "kernel", "key": "󰌽 kernel" },
-    { "type": "uptime", "key": "󰅐 uptime" },
-    { "type": "packages", "key": "󰏖 pkgs" },
-    { "type": "shell", "key": "󰞷 shell" },
-    { "type": "wm", "key": "󱂬 wm" },
-    { "type": "terminal", "key": "󰞍 term" },
-    { "type": "cpu", "key": "󰍛 cpu" },
-    { "type": "memory", "key": "󰘚 mem" },
-    { "type": "disk", "key": "󰋊 disk" },
-    { "type": "battery", "key": "󰂄 bat", "format": "{capacity} [{status}]" },
+    {
+      "type": "title",
+      "format": "{#blue}{user-name}{#90}@{#cyan}{host-name}{#90}  •  {#magenta}{home-dir}"
+    },
+    {
+      "type": "custom",
+      "format": "{#90}────────────────────────────────────────────"
+    },
+    {
+      "type": "os",
+      "key": "╭─  os     ",
+      "keyColor": "blue",
+      "format": "{pretty-name} {arch}"
+    },
+    {
+      "type": "host",
+      "key": "│  󰌢 host   ",
+      "keyColor": "blue",
+      "format": "{version}"
+    },
+    {
+      "type": "kernel",
+      "key": "│  󰌽 kernel ",
+      "keyColor": "blue",
+      "format": "{sysname} {release}"
+    },
+    {
+      "type": "packages",
+      "key": "│  󰏖 pkgs   ",
+      "keyColor": "blue",
+      "format": "{nix-all} nix {#90}• {#white}{flatpak-all} flatpak"
+    },
+    {
+      "type": "uptime",
+      "key": "╰─ 󰅐 uptime ",
+      "keyColor": "blue"
+    },
+    {
+      "type": "wm",
+      "key": "╭─ 󱂬 wm     ",
+      "keyColor": "magenta",
+      "format": "{pretty-name} {version}"
+    },
+    {
+      "type": "terminal",
+      "key": "│  󰞍 term   ",
+      "keyColor": "magenta"
+    },
+    {
+      "type": "shell",
+      "key": "╰─ 󰞷 shell  ",
+      "keyColor": "magenta"
+    },
+    {
+      "type": "cpu",
+      "key": "╭─ 󰍛 cpu    ",
+      "keyColor": "cyan",
+      "temp": true,
+      "format": "{name} @ {freq-max} {#90}[{#}{temperature}{#90}]"
+    },
+    {
+      "type": "gpu",
+      "key": "│  󰢮 gpu    ",
+      "keyColor": "cyan",
+      "format": "{name}"
+    },
+    {
+      "type": "memory",
+      "key": "│  󰘚 mem    ",
+      "keyColor": "cyan",
+      "format": "{used} / {total}  {percentage-bar} {percentage}"
+    },
+    {
+      "type": "disk",
+      "key": "│  󰋊 disk   ",
+      "keyColor": "cyan",
+      "folders": "/home",
+      "format": "{size-used} / {size-total}  {size-percentage-bar} {size-percentage}"
+    },
+    {
+      "type": "battery",
+      "key": "╰─ 󰂄 bat    ",
+      "keyColor": "cyan",
+      "format": "{capacity}  {capacity-bar} {#90}[{#white}{status}{#90}]"
+    },
     "break",
-    { "type": "colors", "symbol": "circle" }
+    {
+      "type": "colors",
+      "paddingLeft": 14,
+      "symbol": "circle"
+    }
   ]
 }

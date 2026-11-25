@@ -42,4 +42,10 @@ Rectangle {
         cursorShape: Qt.PointingHandCursor
         onClicked: root.clicked()
     }
+
+    CustomTooltip {
+        anchorItem: root
+        active: mouseArea.containsMouse && root.tooltip !== ""
+        text: root.tooltip
+    }
 }

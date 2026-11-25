@@ -57,11 +57,11 @@ ColumnLayout {
                                         }
                                         return hm;
                                     }
-                                    font.family: Theme.fontDisplay
+                                    font.family: root.resolvedClockFontFamily
                                     font.pixelSize: (root.effectiveShowSeconds && root.secondsStyle === "inline")
                                         ? Math.round(clockBlock.baseClockPx * 0.76)
                                         : clockBlock.baseClockPx
-                                    font.weight: root.clockStyle === "minimal" ? Theme.fontWeightDemiBold : Theme.fontWeightBold
+                                    font.weight: root.clockStyle === "minimal" ? (root.clockWeight === "black" ? Font.Bold : Font.Light) : root.resolvedClockWeight
                                     color: root.uiTextPrimary
                                     Layout.alignment: Qt.AlignVCenter
 
@@ -111,9 +111,9 @@ ColumnLayout {
 
                                     Text {
                                         text: ":" + clockBlock.secondsDigits
-                                        font.family: Theme.fontDisplay
+                                        font.family: root.resolvedClockFontFamily
                                         font.pixelSize: Math.max(20, Math.round(clockBlock.baseClockPx * 0.44))
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: root.resolvedClockWeight
                                         color: root.uiAccent
                                     }
 
@@ -139,18 +139,18 @@ ColumnLayout {
 
                                     Text {
                                         text: clockBlock.mainHoursText
-                                        font.family: Theme.fontDisplay
+                                        font.family: root.resolvedClockFontFamily
                                         font.pixelSize: Math.round(92 * Theme.fontScale * root.clockScale)
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: root.resolvedClockWeight
                                         color: root.uiTextPrimary
                                         Layout.alignment: Qt.AlignHCenter
                                     }
 
                                     Text {
                                         text: clockBlock.mainMinutesText
-                                        font.family: Theme.fontDisplay
+                                        font.family: root.resolvedClockFontFamily
                                         font.pixelSize: Math.round(92 * Theme.fontScale * root.clockScale)
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: root.resolvedClockWeight
                                         color: root.uiAccent
                                         Layout.alignment: Qt.AlignHCenter
                                     }
@@ -158,10 +158,10 @@ ColumnLayout {
                                     Text {
                                         visible: root.effectiveShowSeconds && root.secondsStyle === "tower"
                                         text: clockBlock.secondsDigits
-                                        font.family: Theme.fontDisplay
+                                        font.family: root.resolvedClockFontFamily
                                         font.pixelSize: Math.round(92 * Theme.fontScale * root.clockScale)
-                                        font.weight: Theme.fontWeightBold
-                                        color: Theme.tertiary
+                                        font.weight: root.resolvedClockWeight
+                                        color: root.uiTertiary
                                         Layout.alignment: Qt.AlignHCenter
                                     }
                                 }
@@ -229,15 +229,27 @@ ColumnLayout {
                                     height: parent.cardSize
                                     radius: root.uiRadiusXl
                                     color: root.uiCardBg
-                                    border.color: Theme.alpha(root.uiAccent, 0.35)
+                                    border.color: Theme.alpha(root.uiAccent, 0.38)
                                     border.width: 1
+
+                                    // frosted inner top rim highlight
+                                    Rectangle {
+                                        anchors.top: parent.top
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.topMargin: 1
+                                        anchors.leftMargin: parent.radius * 0.4
+                                        anchors.rightMargin: parent.radius * 0.4
+                                        height: 1
+                                        color: Theme.alpha("#ffffff", root.isLight ? 0.45 : 0.16)
+                                    }
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: clockBlock.mainHoursText
-                                        font.family: Theme.fontDisplay
+                                        font.family: root.resolvedClockFontFamily
                                         font.pixelSize: parent.parent.digitPx
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: root.resolvedClockWeight
                                         color: root.uiTextPrimary
                                     }
 
@@ -279,12 +291,23 @@ ColumnLayout {
                                     border.color: Theme.alpha(root.uiAccent, 0.55)
                                     border.width: 1
 
+                                    Rectangle {
+                                        anchors.top: parent.top
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.topMargin: 1
+                                        anchors.leftMargin: parent.radius * 0.4
+                                        anchors.rightMargin: parent.radius * 0.4
+                                        height: 1
+                                        color: Theme.alpha("#ffffff", root.isLight ? 0.45 : 0.22)
+                                    }
+
                                     Text {
                                         anchors.centerIn: parent
                                         text: clockBlock.mainMinutesText
-                                        font.family: Theme.fontDisplay
+                                        font.family: root.resolvedClockFontFamily
                                         font.pixelSize: parent.parent.digitPx
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: root.resolvedClockWeight
                                         color: root.uiAccent
                                     }
 
@@ -310,9 +333,9 @@ ColumnLayout {
 
                                 Text {
                                     text: root.numberToWords(clockBlock.displayHourNum)
-                                    font.family: Theme.fontDisplay
+                                    font.family: root.resolvedClockFontFamily
                                     font.pixelSize: Math.round(56 * Theme.fontScale * root.clockScale)
-                                    font.weight: Theme.fontWeightBold
+                                    font.weight: root.resolvedClockWeight
                                     color: root.uiTextPrimary
                                     Layout.alignment: Qt.AlignHCenter
                                 }
@@ -323,10 +346,10 @@ ColumnLayout {
                                         : (clockBlock.displayMinNum < 10
                                             ? (root.fmtText("oh ") + root.numberToWords(clockBlock.displayMinNum))
                                             : root.numberToWords(clockBlock.displayMinNum))
-                                    font.family: Theme.fontDisplay
+                                    font.family: root.resolvedClockFontFamily
                                     font.pixelSize: Math.round(48 * Theme.fontScale * root.clockScale)
                                     font.italic: true
-                                    font.weight: Theme.fontWeightDemiBold
+                                    font.weight: Font.DemiBold
                                     color: root.uiAccent
                                     Layout.alignment: Qt.AlignHCenter
                                 }
@@ -377,9 +400,9 @@ ColumnLayout {
 
                                 Text {
                                     text: root.fmtText(Qt.formatDateTime(root.currentTime, "dddd"))
-                                    font.family: Theme.fontDisplay
+                                    font.family: root.resolvedClockFontFamily
                                     font.pixelSize: Math.round(58 * Theme.fontScale * root.clockScale)
-                                    font.weight: Theme.fontWeightBold
+                                    font.weight: root.resolvedClockWeight
                                     color: root.uiTextPrimary
                                     Layout.alignment: Qt.AlignHCenter
                                 }

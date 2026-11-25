@@ -50,7 +50,6 @@ PopupPanel {
         "battery":        { name: "battery & power",   icon: Theme.iconBatFull,     desc: "upower level & charging" },
         "quickSettings":  { name: "quick settings",    icon: Theme.iconSettings,    desc: "system & appearance toggles" },
         "powerMenu":      { name: "power menu",        icon: Theme.iconPower,       desc: "lock, logout & power off" },
-        "dynamicNotch":   { name: "dynamic notch",     icon: Theme.iconSparkles,    desc: "reactive island carousel (clock, calendar & timer)" },
         "screenCapture":  { name: "screen capture",    icon: Theme.iconCamera,      desc: "screenshot & screen recording" }
     })
 
@@ -108,7 +107,6 @@ PopupPanel {
         let b = (typeof PresetService !== "undefined" && PresetService?.getBlockInfo) ? PresetService.getBlockInfo(modId) : null;
         if (b) return b;
         if (modId === "layoutSwitcher") return root.moduleCatalog["layout"];
-        if (modId === "notch") return root.moduleCatalog["dynamicNotch"];
         if (modId === "capture") return root.moduleCatalog["screenCapture"];
         return root.moduleCatalog[modId] ?? {
             name: modId,
@@ -128,7 +126,6 @@ PopupPanel {
             case "layout": case "layoutSwitcher": return Settings.showLayoutSwitcher ?? true;
             case "windowTitle": return Settings.showWindowTitle ?? true;
             case "clock": return Settings.showClock ?? true;
-            case "dynamicNotch": case "notch": return Settings.showDynamicNotch ?? true;
             case "media": return Settings.showMedia ?? true;
             case "quickNotes": return Settings.showQuickNotes ?? true;
             case "clipboard": return Settings.showClipboard ?? true;
@@ -160,7 +157,6 @@ PopupPanel {
             case "layout": case "layoutSwitcher": Settings.showLayoutSwitcher = visible; break;
             case "windowTitle": Settings.showWindowTitle = visible; break;
             case "clock": Settings.showClock = visible; break;
-            case "dynamicNotch": case "notch": Settings.showDynamicNotch = visible; break;
             case "media": Settings.showMedia = visible; break;
             case "quickNotes": Settings.showQuickNotes = visible; break;
             case "clipboard": Settings.showClipboard = visible; break;

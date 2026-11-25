@@ -31,10 +31,22 @@ ColumnLayout {
                                     ? Theme.error
                                     : (root.capsLockActive && root.sharedPassword.length > 0
                                         ? Theme.warn
-                                        : (root.sharedPassword.length > 0
+                                        : (root.sharedPassword.length > 0 || root.unlocking
                                             ? root.uiAccent
-                                            : (pwInput.activeFocus ? Theme.alpha(root.uiAccent, 0.65) : root.uiPillBorder)))
+                                            : (pwInput.activeFocus ? Theme.alpha(root.uiAccent, 0.70) : root.uiPillBorder)))
                                 border.width: (pwInput.activeFocus || root.authFailed || root.capsLockActive) ? 2 : 1
+
+                                // frosted inner top rim highlight
+                                Rectangle {
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.topMargin: 1
+                                    anchors.leftMargin: Math.min(parent.width * 0.2, Math.max(12, parent.radius * 0.4))
+                                    anchors.rightMargin: Math.min(parent.width * 0.2, Math.max(12, parent.radius * 0.4))
+                                    height: 1
+                                    color: Theme.alpha("#ffffff", root.isLight ? 0.45 : 0.16)
+                                }
 
                                 Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                                 Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -313,23 +325,27 @@ ColumnLayout {
                                 Text {
                                     anchors.centerIn: parent
                                     text: root.fmtText(
-                                        root.pamFeedback !== ""
-                                            ? root.pamFeedback
-                                            : (root.isChecking
-                                                ? "authenticating..."
-                                                : (root.authFailed
-                                                    ? (root.faillockTripped
-                                                        ? "account locked by pam_faillock (run 'faillock --reset' in tty)"
-                                                        : "incorrect password, try again")
-                                                    : (root.capsLockActive ? "caps lock is on" : "")))
+                                        root.unlocking
+                                            ? "welcome back..."
+                                            : (root.pamFeedback !== ""
+                                                ? root.pamFeedback
+                                                : (root.isChecking
+                                                    ? "authenticating..."
+                                                    : (root.authFailed
+                                                        ? (root.faillockTripped
+                                                            ? "account locked by pam_faillock (run 'faillock --reset' in tty)"
+                                                            : "incorrect password, try again")
+                                                        : (root.capsLockActive ? "caps lock is on" : ""))))
                                     )
                                     opacity: text !== "" ? 1.0 : 0.0
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightMedium
-                                    color: (root.authFailed || root.pamFeedbackIsError)
-                                        ? Theme.error
-                                        : (root.capsLockActive ? Theme.warn : root.uiTextSecondary)
+                                    color: root.unlocking
+                                        ? root.uiAccent
+                                        : ((root.authFailed || root.pamFeedbackIsError)
+                                            ? Theme.error
+                                            : (root.capsLockActive ? Theme.warn : root.uiTextSecondary))
 
                                     Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
                                 }

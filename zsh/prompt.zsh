@@ -19,9 +19,11 @@ add-zsh-hook -d precmd _gp_precmd 2>/dev/null
 
 typeset -gi _GP_EXIT=0 _GP_RAN=0 _GP_ELAPSED=0
 typeset -gi _GP_DIRTY=0 _GP_CONFLICT=0
-typeset -g _GP_START="" _GP_MOOD_KEY=""
-typeset -g _GP_FACE="" _GP_BANTER=""
-typeset -g _GP_LEFT="" _GP_RIGHT="" _GP_GIT=""
+typeset -g  _GP_START="" _GP_MOOD_KEY=""
+typeset -g  _GP_FACE="" _GP_BANTER=""
+typeset -g  _GP_LAST_FACE="" _GP_LAST_BANTER=""
+typeset -g  _GP_LEFT="" _GP_RIGHT="" _GP_GIT=""
+typeset -g  _GP_TRANSIENT_LEFT=""
 
 PROMPT='${_GP_LEFT}'
 RPROMPT='${_GP_RIGHT}'
@@ -36,20 +38,22 @@ _gp_colors() {
     emulate -L zsh
     typeset -g _GP_OUT='%F{8}'
     typeset -g _GP_PRI='%F{4}'
-    typeset -g _GP_SEC='%F{5}'
-    typeset -g _GP_TER='%F{6}'
+    typeset -g _GP_SEC='%F{6}'
+    typeset -g _GP_TER='%F{5}'
     typeset -g _GP_ERR='%F{1}'
-    typeset -g _GP_BG='0'
+    typeset -g _GP_WRN='%F{3}'
+    typeset -g _GP_OK='%F{2}'
+    typeset -g _GP_BG='4'
     typeset -g _GP_ACC="$_GP_PRI"
 
     case "${PROMPT_ACCENT:-primary}" in
         secondary) _GP_ACC="$_GP_SEC" ;;
         tertiary)  _GP_ACC="$_GP_TER" ;;
-        cyan)      _GP_ACC='%F{117}' ;;
-        green)     _GP_ACC='%F{120}' ;;
-        magenta)   _GP_ACC='%F{141}' ;;
-        yellow)    _GP_ACC='%F{221}' ;;
-        white)     _GP_ACC='%F{white}' ;;
+        cyan)      _GP_ACC='%F{14}' ;;
+        green)     _GP_ACC='%F{2}' ;;
+        magenta)   _GP_ACC='%F{5}' ;;
+        yellow)    _GP_ACC='%F{3}' ;;
+        white)     _GP_ACC='%F{15}' ;;
     esac
 }
 
@@ -276,27 +280,43 @@ _gp_mood() {
     esac
 
     if (( ${#faces} )); then
-        _GP_FACE="${faces[RANDOM % ${#faces} + 1]}"
+        local -i fidx=$(( RANDOM % ${#faces} + 1 ))
+        if (( ${#faces} > 1 )) && [[ "${faces[$fidx]}" == "$_GP_LAST_FACE" ]]; then
+            fidx=$(( (fidx % ${#faces}) + 1 ))
+        fi
+        _GP_FACE="${faces[$fidx]}"
+        _GP_LAST_FACE="$_GP_FACE"
     else
         _GP_FACE=""
+        _GP_LAST_FACE=""
     fi
 
-    _GP_BANTER="${words[RANDOM % ${#words} + 1]}"
+    if (( ${#words} )); then
+        local -i widx=$(( RANDOM % ${#words} + 1 ))
+        if (( ${#words} > 1 )) && [[ "${words[$widx]}" == "$_GP_LAST_BANTER" ]]; then
+            widx=$(( (widx % ${#words}) + 1 ))
+        fi
+        _GP_BANTER="${words[$widx]}"
+        _GP_LAST_BANTER="$_GP_BANTER"
+    else
+        _GP_BANTER=""
+    fi
     return 0
 }
 
 _gp_build() {
     emulate -L zsh
     local out="$_GP_OUT" pri="$_GP_PRI" sec="$_GP_SEC"
-    local ter="$_GP_TER" err="$_GP_ERR" acc="$_GP_ACC" bg="$_GP_BG"
+    local ter="$_GP_TER" err="$_GP_ERR" wrn="$_GP_WRN" acc="$_GP_ACC"
     local REPLY symbol face="" identity dir extras="" venv=""
-    local elapsed="" vname style="${PROMPT_STYLE:-unhinged}"
+    local elapsed="" vname style="${PROMPT_STYLE:-two-line}"
     local -a rparts
 
     (( _GP_EXIT != 0 || EUID == 0 )) && acc="$err"
 
     _gp_literal "${PROMPT_SYMBOL:-❯}"
     symbol="${acc}${REPLY}%f"
+    _GP_TRANSIENT_LEFT="${out}%D{%H:%M}%f ${symbol} "
 
     if [[ -n "$_GP_FACE" ]]; then
         _gp_literal "$_GP_FACE"
@@ -307,10 +327,10 @@ _gp_build() {
     dir="${ter}%~%f"
 
     [[ -w . ]] || extras+=" ${err}%f"
-    extras+=' %(1j.%F{yellow}⚙ %j%f.)'
+    extras+=" %(1j.${wrn}⚙ %j%f.)"
 
     if [[ -n "${SSH_CONNECTION-}${SSH_CLIENT-}" ]]; then
-        extras+=" ${ter}[ssh]%f"
+        extras+=" ${sec}[ssh]%f"
     fi
 
     if (( SHLVL > 1 )) &&
@@ -357,8 +377,8 @@ _gp_build() {
             _GP_LEFT+=$'\n'"${out}└──╼%f ${symbol} "
             ;;
         capsule)
-            _GP_LEFT=$'\n'"%F{${bg}}%K{${bg}}${identity}%k%F{${bg}} %K{${bg}}${dir}%k%F{${bg}}%f${face:+ ${face}}${context}"
-            _GP_LEFT+=$'\n'" ${symbol} "
+            _GP_LEFT=$'\n'"${pri}%K{4}%F{0}%B%n@%m%b%f%k${pri} ${sec}%K{6}%F{0}%~%f%k${sec}%f${face:+ ${face}}${context}"
+            _GP_LEFT+=$'\n'"${symbol} "
             ;;
         two-line)
             _GP_LEFT=$'\n'"${out}╭─[ ${identity} ${out}in ${dir} ${out}]%f${face:+ ${face}}${context}"
@@ -395,9 +415,36 @@ _gp_build() {
     return 0
 }
 
+_gp_zle_line_finish() {
+    if [[ "${TRANSIENT_PROMPT:-false}" == "true" ]]; then
+        case "${PROMPT_STYLE:-two-line}" in
+            single-line|minimal|bracket) ;;
+            *)
+                PROMPT='${_GP_TRANSIENT_LEFT}'
+                RPROMPT=''
+                zle .reset-prompt 2>/dev/null || zle reset-prompt 2>/dev/null
+                ;;
+        esac
+    fi
+}
+zle -N zle-line-finish _gp_zle_line_finish
+
+_gp_reload() {
+    _GP_MOOD_KEY=""
+    _gp_colors
+    _gp_git
+    _gp_mood
+    _gp_build
+    PROMPT='${_GP_LEFT}'
+    RPROMPT='${_GP_RIGHT}'
+}
+
 _gp_precmd() {
     local -i last_exit=$?
     emulate -L zsh
+
+    PROMPT='${_GP_LEFT}'
+    RPROMPT='${_GP_RIGHT}'
 
     if (( _GP_RAN )); then
         _GP_EXIT=$last_exit

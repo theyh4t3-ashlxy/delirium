@@ -4,43 +4,31 @@ import QtQuick.Layouts
 import ".."
 import "../controls"
 import "../services"
+import "../theme/confFormat.mjs" as ConfFmt
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 
-Rectangle {
+BarPill {
     id: root
-
-    property var barScreen: null
-    property var barMonitor: null
 
     readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
     readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
 
-    readonly property int pillSize: Theme.barHeight - 8
+    active: popup.open
+    hovered: wpMouse.containsMouse
+    pressed: wpMouse.pressed
+    activeBorder: Theme.alpha(Theme.primary, 0.55)
+    clip: true
 
     implicitWidth: {
         if (Theme.isVertical) return root.pillSize;
         if (Theme.isTextIconSet) return wpRow.implicitWidth + 20;
         return root.pillSize;
     }
-    implicitHeight: root.pillSize
-    radius: Theme.barWidgetRadius
     visible: Settings?.showWallpaper ?? true
 
-    color: {
-        if (wpMouse.pressed) return Theme.widgetActive;
-        if (popup.open) return Theme.primary_overlay;
-        if (wpMouse.containsMouse) return Theme.barPillHover;
-        return Theme.barPillBg;
-    }
-    border.color: popup.open ? Theme.alpha(Theme.primary, 0.55) : Theme.barPillBorder
-    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
-    clip: true
-
-    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
 
     property string activeTab: "local"
@@ -51,8 +39,28 @@ Rectangle {
     property string localSearchQuery: ""
     property string onlineQuery: ""
     property string onlineSorting: "date_added"
+    property string onlineOrder: "desc"
+    property string onlineTopRange: "1M"
     property string onlineCategories: "111"
+    property string onlinePurity: "100"
+    property string onlineRatios: ""
+    property string onlineAtleast: ""
+    property string onlineColor: ""
+    property string onlineApiKey: ""
     property int onlinePage: 1
+    property int onlineTotalPages: 1
+    property int onlineTotalCount: 0
+    property string onlineErrorText: ""
+    property bool onlineShowSavedOnly: false
+    property bool showApiKeyRow: false
+
+    readonly property string wallhavenConfPath: (Quickshell?.env("HOME") || "/home/ashley") + "/.local/state/quickshell/wallhaven.conf"
+    readonly property string wallhavenFavsPath: (Quickshell?.env("HOME") || "/home/ashley") + "/.local/share/quickshell/wallpaper_favs.conf"
+    property var wallhavenFavs: []
+    property var selectedDetailItem: null
+    property var detailMeta: ({ loaded: false, loading: false, error: "", uploader: "", fileSize: "", purity: "", category: "", views: 0, favorites: 0, ratio: "", colors: [], tags: [] })
+
+    readonly property var displayedOnlineWallpapers: root.onlineShowSavedOnly ? root.wallhavenFavs : root.onlineWallpapers
 
     readonly property string nativeRes: {
         if (root.barScreen?.width && root.barScreen?.height) {
@@ -158,6 +166,8 @@ Rectangle {
                 root.reloadLocalWallpapers();
                 if (WallpaperService?.queryAwwwState) WallpaperService.queryAwwwState();
                 root.focusActiveInput();
+            } else {
+                root.selectedDetailItem = null;
             }
         }
     }
@@ -208,33 +218,285 @@ Rectangle {
         }
     }
 
-    // lightweight regex scraper for wallhaven API responses so we don't even touch JSON.parse
+    Timer {
+        id: wallhavenConfSaveTimer
+        interval: 250
+        onTriggered: {
+            let lines = [
+                "# Quickshell Wallhaven preferences & optional API key",
+                "sorting=" + ConfFmt.escapeField(root.onlineSorting),
+                "order=" + ConfFmt.escapeField(root.onlineOrder),
+                "topRange=" + ConfFmt.escapeField(root.onlineTopRange),
+                "categories=" + ConfFmt.escapeField(root.onlineCategories),
+                "purity=" + ConfFmt.escapeField(root.onlinePurity),
+                "ratios=" + ConfFmt.escapeField(root.onlineRatios),
+                "atleast=" + ConfFmt.escapeField(root.onlineAtleast),
+                "color=" + ConfFmt.escapeField(root.onlineColor),
+                "resolution=" + ConfFmt.escapeField(root.onlineResolution),
+                "apiKey=" + ConfFmt.escapeField(root.onlineApiKey)
+            ];
+            wallhavenConfFile.setText(lines.join("\n") + "\n");
+        }
+    }
+
+    FileView {
+        id: wallhavenConfFile
+        path: root.wallhavenConfPath
+        blockLoading: true
+        printErrors: false
+        onLoaded: {
+            let d = ConfFmt.parseFlatConf(text());
+            if (d.sorting) root.onlineSorting = ConfFmt.unescapeField(d.sorting);
+            if (d.order) root.onlineOrder = ConfFmt.unescapeField(d.order);
+            if (d.topRange) root.onlineTopRange = ConfFmt.unescapeField(d.topRange);
+            if (d.categories) root.onlineCategories = ConfFmt.unescapeField(d.categories);
+            if (d.purity) root.onlinePurity = ConfFmt.unescapeField(d.purity);
+            if (d.ratios !== undefined) root.onlineRatios = ConfFmt.unescapeField(d.ratios);
+            if (d.atleast !== undefined) root.onlineAtleast = ConfFmt.unescapeField(d.atleast);
+            if (d.color !== undefined) root.onlineColor = ConfFmt.unescapeField(d.color);
+            if (d.resolution !== undefined && d.resolution !== "") root.onlineResolution = ConfFmt.unescapeField(d.resolution);
+            if (d.apiKey !== undefined) root.onlineApiKey = ConfFmt.unescapeField(d.apiKey);
+        }
+    }
+
+    FileView {
+        id: wallhavenFavsFile
+        path: root.wallhavenFavsPath
+        blockLoading: true
+        watchChanges: true
+        printErrors: false
+        onLoaded: {
+            let recs = ConfFmt.parseRecords(text(), "fav");
+            let list = [];
+            for (let i = 0; i < recs.length; i++) {
+                let r = recs[i];
+                if (!r || !r.id) continue;
+                list.push({
+                    id: r.id,
+                    fullUrl: r.fullUrl || "",
+                    thumbUrl: r.thumbUrl || "",
+                    resolution: r.resolution || "",
+                    fileType: r.fileType || "jpg",
+                    colors: r.colors ? r.colors.split("|").filter(Boolean) : []
+                });
+            }
+            root.wallhavenFavs = list;
+        }
+    }
+
+    function saveWallhavenConf() {
+        wallhavenConfSaveTimer.restart();
+    }
+
+    function saveWallhavenFavs() {
+        let rows = [];
+        for (let i = 0; i < root.wallhavenFavs.length; i++) {
+            let it = root.wallhavenFavs[i];
+            if (!it || !it.id) continue;
+            rows.push({
+                id: it.id,
+                fullUrl: it.fullUrl || "",
+                thumbUrl: it.thumbUrl || "",
+                resolution: it.resolution || "",
+                fileType: it.fileType || "jpg",
+                colors: Array.isArray(it.colors) ? it.colors.join("|") : ""
+            });
+        }
+        wallhavenFavsFile.setText(ConfFmt.serializeRecords(rows, "fav", ["id", "fullUrl", "thumbUrl", "resolution", "fileType", "colors"]));
+    }
+
+    function isFavWallhaven(wpId): bool {
+        if (!wpId) return false;
+        let target = String(wpId).toLowerCase();
+        for (let i = 0; i < root.wallhavenFavs.length; i++) {
+            if (String(root.wallhavenFavs[i]?.id || "").toLowerCase() === target) return true;
+        }
+        return false;
+    }
+
+    function toggleFavWallhaven(item) {
+        if (!item || !item.id) return;
+        let target = String(item.id).toLowerCase();
+        let next = [];
+        let existed = false;
+        for (let i = 0; i < root.wallhavenFavs.length; i++) {
+            let cur = root.wallhavenFavs[i];
+            if (String(cur?.id || "").toLowerCase() === target) {
+                existed = true;
+            } else {
+                next.push(cur);
+            }
+        }
+        if (!existed) {
+            next.unshift({
+                id: target,
+                fullUrl: item.fullUrl || "",
+                thumbUrl: item.thumbUrl || "",
+                resolution: item.resolution || "",
+                fileType: item.fileType || "jpg",
+                colors: Array.isArray(item.colors) ? item.colors : []
+            });
+        }
+        root.wallhavenFavs = next;
+        root.saveWallhavenFavs();
+    }
+
+    function formatBytes(bytes): string {
+        let b = Number(bytes) || 0;
+        if (b <= 0) return "";
+        if (b >= 1048576) return (b / 1048576).toFixed(1) + " mb";
+        return Math.round(b / 1024) + " kb";
+    }
+
+    function copyColorHex(hexStr) {
+        if (!hexStr) return;
+        if (Quickshell) Quickshell.clipboardText = hexStr;
+        root.batchStatusText = "copied " + hexStr.toLowerCase();
+        batchStatusResetTimer.restart();
+    }
+
+    // lightweight regex scraper for wallhaven API v1 search responses (zero JSON.parse)
     function parseWallhavenResponse(raw) {
-        if (!raw) return [];
+        if (!raw) return { items: [], lastPage: 1, total: 0 };
+        let metaIdx = raw.lastIndexOf('"meta"');
+        let dataRaw = metaIdx > 0 ? raw.slice(0, metaIdx) : raw;
+        let metaRaw = metaIdx > 0 ? raw.slice(metaIdx) : "";
+        let lastPageMatch = metaRaw.match(/"last_page"\s*:\s*(\d+)/);
+        let totalMatch = metaRaw.match(/"total"\s*:\s*(\d+)/);
+
         let results = [];
-        let blocks = raw.split('"id":');
+        let blocks = dataRaw.split('"id":');
         for (let i = 1; i < blocks.length; i++) {
             let b = blocks[i];
             let idMatch = b.match(/^\s*"([^"]+)"/);
             let pathMatch = b.match(/"path"\s*:\s*"([^"]+)"/);
-            let thumbMatch = b.match(/"small"\s*:\s*"([^"]+)"/);
+            let thumbLarge = b.match(/"large"\s*:\s*"([^"]+)"/);
+            let thumbSmall = b.match(/"small"\s*:\s*"([^"]+)"/);
             let resMatch = b.match(/"resolution"\s*:\s*"([^"]+)"/);
+            let ratioMatch = b.match(/"ratio"\s*:\s*"([^"]+)"/);
             let typeMatch = b.match(/"file_type"\s*:\s*"image\/([^"]+)"/);
+            let colorsMatch = b.match(/"colors"\s*:\s*\[([^\]]*)\]/);
+            let colorsList = [];
+            if (colorsMatch && colorsMatch[1]) {
+                let hexMatches = colorsMatch[1].match(/#[0-9a-fA-F]{6}/g) || [];
+                for (let c = 0; c < hexMatches.length; c++) colorsList.push(hexMatches[c].toLowerCase());
+            }
             if (pathMatch) {
+                let fullUrl = pathMatch[1].replace(/\\\//g, "/");
+                let thumbUrl = thumbLarge
+                    ? thumbLarge[1].replace(/\\\//g, "/")
+                    : (thumbSmall ? thumbSmall[1].replace(/\\\//g, "/") : fullUrl);
                 results.push({
                     id: idMatch ? idMatch[1].toLowerCase() : "",
-                    fullUrl: pathMatch[1].replace(/\\\//g, "/"),
-                    thumbUrl: thumbMatch ? thumbMatch[1].replace(/\\\//g, "/") : pathMatch[1].replace(/\\\//g, "/"),
+                    fullUrl: fullUrl,
+                    thumbUrl: thumbUrl,
                     resolution: resMatch ? resMatch[1] : "",
-                    fileType: typeMatch ? typeMatch[1].toLowerCase() : "img"
+                    ratio: ratioMatch ? ratioMatch[1] : "",
+                    fileType: typeMatch ? typeMatch[1].toLowerCase() : "img",
+                    colors: colorsList
                 });
             }
         }
-        return results;
+        return {
+            items: results,
+            lastPage: lastPageMatch ? Math.max(1, parseInt(lastPageMatch[1], 10) || 1) : 1,
+            total: totalMatch ? (parseInt(totalMatch[1], 10) || results.length) : results.length
+        };
+    }
+
+    function parseWallhavenDetail(raw) {
+        if (!raw) return null;
+        let uploaderM = raw.match(/"uploader"\s*:\s*\{[^}]*"username"\s*:\s*"([^"]+)"/);
+        let viewsM = raw.match(/"views"\s*:\s*(\d+)/);
+        let favsM = raw.match(/"favorites"\s*:\s*(\d+)/);
+        let sizeM = raw.match(/"file_size"\s*:\s*(\d+)/);
+        let purityM = raw.match(/"purity"\s*:\s*"([^"]+)"/);
+        let catM = raw.match(/"category"\s*:\s*"([^"]+)"/);
+        let ratioM = raw.match(/"ratio"\s*:\s*"([^"]+)"/);
+        let colorsM = raw.match(/"colors"\s*:\s*\[([^\]]*)\]/);
+        let colorsList = [];
+        if (colorsM && colorsM[1]) {
+            let hexes = colorsM[1].match(/#[0-9a-fA-F]{6}/g) || [];
+            for (let i = 0; i < hexes.length; i++) colorsList.push(hexes[i].toLowerCase());
+        }
+        let tagsList = [];
+        let tagsIdx = raw.indexOf('"tags"');
+        if (tagsIdx >= 0) {
+            let tagsSlice = raw.slice(tagsIdx);
+            let nameRegex = /"name"\s*:\s*"([^"]+)"/g;
+            let m;
+            while ((m = nameRegex.exec(tagsSlice)) !== null && tagsList.length < 18) {
+                let tagVal = m[1].replace(/\\\//g, "/").toLowerCase();
+                if (tagsList.indexOf(tagVal) === -1) tagsList.push(tagVal);
+            }
+        }
+        return {
+            loaded: true,
+            loading: false,
+            error: "",
+            uploader: uploaderM ? uploaderM[1] : "anon",
+            fileSize: sizeM ? root.formatBytes(sizeM[1]) : "",
+            purity: purityM ? purityM[1].toLowerCase() : "sfw",
+            category: catM ? catM[1].toLowerCase() : "general",
+            views: viewsM ? (parseInt(viewsM[1], 10) || 0) : 0,
+            favorites: favsM ? (parseInt(favsM[1], 10) || 0) : 0,
+            ratio: ratioM ? ratioM[1] : "",
+            colors: colorsList,
+            tags: tagsList
+        };
+    }
+
+    function openWallpaperDetails(item) {
+        if (!item || !item.id) return;
+        root.selectedDetailItem = item;
+        root.detailMeta = {
+            loaded: false,
+            loading: true,
+            error: "",
+            uploader: "",
+            fileSize: "",
+            purity: "",
+            category: "",
+            views: 0,
+            favorites: 0,
+            ratio: item.ratio || "",
+            colors: Array.isArray(item.colors) ? item.colors : [],
+            tags: []
+        };
+        let req = new XMLHttpRequest();
+        let url = "https://wallhaven.cc/api/v1/w/" + encodeURIComponent(item.id);
+        req.open("GET", url);
+        if (root.onlineApiKey.trim() !== "") {
+            req.setRequestHeader("X-API-Key", root.onlineApiKey.trim());
+        }
+        req.timeout = 10000;
+        req.ontimeout = () => {
+            root.detailMeta = Object.assign({}, root.detailMeta, { loading: false, error: "timed out loading metadata" });
+        };
+        req.onerror = () => {
+            root.detailMeta = Object.assign({}, root.detailMeta, { loading: false, error: "network error" });
+        };
+        req.onreadystatechange = () => {
+            if (req.readyState === XMLHttpRequest.DONE) {
+                if (req.status === 200) {
+                    let parsed = root.parseWallhavenDetail(req.responseText);
+                    if (parsed) root.detailMeta = parsed;
+                    else root.detailMeta = Object.assign({}, root.detailMeta, { loading: false, error: "failed to parse metadata" });
+                } else {
+                    root.detailMeta = Object.assign({}, root.detailMeta, {
+                        loading: false,
+                        error: req.status === 401 ? "api key required for nsfw details" : ("api status " + req.status)
+                    });
+                }
+            }
+        };
+        req.send();
     }
 
     function fetchWallhaven(query, sort, page, resolution) {
+        root.onlineShowSavedOnly = false;
         root.isOnlineLoading = true;
+        root.onlineErrorText = "";
         let req = new XMLHttpRequest();
         let q = (query !== undefined && query !== null) ? query.trim() : root.onlineQuery;
         let s = sort || root.onlineSorting || "date_added";
@@ -251,23 +513,54 @@ Rectangle {
         let params = [];
         if (q !== "") params.push("q=" + encodeURIComponent(q));
         params.push("sorting=" + encodeURIComponent(s));
+        params.push("order=" + encodeURIComponent(root.onlineOrder || "desc"));
+        if (s === "toplist") params.push("topRange=" + encodeURIComponent(root.onlineTopRange || "1M"));
         params.push("page=" + p);
         params.push("categories=" + encodeURIComponent(root.onlineCategories || "111"));
-        params.push("purity=100");
+        params.push("purity=" + encodeURIComponent(root.onlinePurity || "100"));
 
         if (r !== "" && r.toLowerCase() !== "any") {
             params.push("resolutions=" + encodeURIComponent(r));
         }
+        if (root.onlineAtleast !== "") {
+            params.push("atleast=" + encodeURIComponent(root.onlineAtleast));
+        }
+        if (root.onlineRatios !== "") {
+            params.push("ratios=" + encodeURIComponent(root.onlineRatios));
+        }
+        if (root.onlineColor !== "") {
+            params.push("colors=" + encodeURIComponent(root.onlineColor));
+        }
+
+        root.saveWallhavenConf();
 
         req.open("GET", "https://wallhaven.cc/api/v1/search?" + params.join("&"));
-        req.timeout = 10000;
-        req.ontimeout = () => { root.isOnlineLoading = false; };
-        req.onerror = () => { root.isOnlineLoading = false; };
+        if (root.onlineApiKey.trim() !== "") {
+            req.setRequestHeader("X-API-Key", root.onlineApiKey.trim());
+        }
+        req.timeout = 12000;
+        req.ontimeout = () => {
+            root.isOnlineLoading = false;
+            root.onlineErrorText = "wallhaven request timed out";
+        };
+        req.onerror = () => {
+            root.isOnlineLoading = false;
+            root.onlineErrorText = "network error contacting wallhaven";
+        };
         req.onreadystatechange = () => {
             if (req.readyState === XMLHttpRequest.DONE) {
                 root.isOnlineLoading = false;
                 if (req.status === 200) {
-                    root.onlineWallpapers = root.parseWallhavenResponse(req.responseText);
+                    let parsed = root.parseWallhavenResponse(req.responseText);
+                    root.onlineWallpapers = parsed.items;
+                    root.onlineTotalPages = parsed.lastPage;
+                    root.onlineTotalCount = parsed.total;
+                } else if (req.status === 401) {
+                    root.onlineErrorText = "nsfw purity requires a valid wallhaven api key (click shield icon)";
+                } else if (req.status === 429) {
+                    root.onlineErrorText = "wallhaven rate limit hit (45 req/min) — wait a few seconds";
+                } else {
+                    root.onlineErrorText = "wallhaven api returned status " + req.status;
                 }
             }
         };
@@ -666,8 +959,14 @@ Rectangle {
         property bool isSelected: false
         property bool isSavedLocal: false
         property bool allowDownload: false
+        property bool allowDetails: false
+        property bool allowFavorite: false
+        property bool isFavorite: false
+        property var colorsPreview: []
         signal applyRequested()
         signal downloadRequested()
+        signal detailsRequested()
+        signal favoriteRequested()
 
         color: "transparent"
 
@@ -799,8 +1098,15 @@ Rectangle {
                 id: cardMouse
                 anchors.fill: parent
                 hoverEnabled: true
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
                 cursorShape: Qt.PointingHandCursor
-                onClicked: cardRoot.applyRequested()
+                onClicked: (mouse) => {
+                    if (mouse.button === Qt.RightButton && cardRoot.allowDetails) {
+                        cardRoot.detailsRequested();
+                    } else {
+                        cardRoot.applyRequested();
+                    }
+                }
             }
 
             RowLayout {
@@ -808,7 +1114,7 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: 8
-                spacing: 6
+                spacing: 4
                 z: 3
 
                 Text {
@@ -819,6 +1125,91 @@ Rectangle {
                     font.weight: Font.Medium
                     color: Theme.on_surface
                     elide: Text.ElideRight
+                }
+
+                // subtle wallhaven palette preview dots
+                Row {
+                    spacing: 2
+                    visible: Array.isArray(cardRoot.colorsPreview) && cardRoot.colorsPreview.length > 0 && !cardMouse.containsMouse
+
+                    Repeater {
+                        model: Array.isArray(cardRoot.colorsPreview) ? cardRoot.colorsPreview.slice(0, 4) : []
+                        delegate: Rectangle {
+                            required property string modelData
+                            width: 7
+                            height: 7
+                            radius: Theme.radiusPill
+                            color: modelData
+                            border.color: Theme.alpha("#000000", 0.35)
+                            border.width: 1
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: 22
+                    height: 22
+                    radius: Theme.radiusPill
+                    color: favMouse.containsMouse || cardRoot.isFavorite ? Theme.alpha(Theme.error, 0.85) : Theme.alpha(Theme.surface, 0.82)
+                    border.color: cardRoot.isFavorite ? Theme.error : Theme.widgetBorder
+                    border.width: 1
+                    visible: cardRoot.allowFavorite && (cardMouse.containsMouse || cardRoot.isFavorite)
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: Theme.iconHeart
+                        font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
+                        font.pixelSize: Theme.fontSizeXs
+                        color: favMouse.containsMouse || cardRoot.isFavorite ? Theme.on_primary : Theme.on_surface
+                    }
+
+                    MouseArea {
+                        id: favMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: cardRoot.favoriteRequested()
+                    }
+
+                    CustomTooltip {
+                        anchorItem: parent
+                        active: favMouse.containsMouse
+                        text: cardRoot.isFavorite ? "remove bookmark" : "bookmark wallpaper"
+                    }
+                }
+
+                Rectangle {
+                    width: 22
+                    height: 22
+                    radius: Theme.radiusPill
+                    color: infoMouse.containsMouse ? Theme.primary : Theme.alpha(Theme.surface, 0.82)
+                    border.color: Theme.widgetBorder
+                    border.width: 1
+                    visible: cardRoot.allowDetails && cardMouse.containsMouse
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: Theme.iconEye
+                        font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
+                        font.pixelSize: Theme.fontSizeXs
+                        color: infoMouse.containsMouse ? Theme.on_primary : Theme.on_surface
+                    }
+
+                    MouseArea {
+                        id: infoMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: cardRoot.detailsRequested()
+                    }
+
+                    CustomTooltip {
+                        anchorItem: parent
+                        active: infoMouse.containsMouse
+                        text: "details, palette & similar"
+                    }
                 }
 
                 Rectangle {
@@ -845,6 +1236,12 @@ Rectangle {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: cardRoot.downloadRequested()
+                    }
+
+                    CustomTooltip {
+                        anchorItem: parent
+                        active: dlMouse.containsMouse
+                        text: "download to library"
                     }
                 }
             }
@@ -950,57 +1347,73 @@ Rectangle {
         targetRelativeX: 0
         targetRelativeY: 0
 
-        content: ColumnLayout {
+        content: Item {
+            id: wpContentWrap
             anchors.fill: parent
-            spacing: Theme.popupSpacing
 
-            // top header
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 10
-
-                Rectangle {
-                    width: 34
-                    height: 34
-                    radius: Theme.radiusMd
-                    color: Theme.primary_overlay
-                    border.color: Theme.alpha(Theme.primary, 0.35)
-                    border.width: 1
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: Theme.iconWallpaper
-                        font.family: Theme.fontIcon
-                        font.variableAxes: Theme.iconAxes
-                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
-                        color: Theme.primary
-                    }
+            Keys.onEscapePressed: (ev) => {
+                if (root.selectedDetailItem && root.selectedDetailItem.id) {
+                    root.selectedDetailItem = null;
+                    ev.accepted = true;
                 }
+            }
 
-                ColumnLayout {
-                    spacing: 1
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: Theme.popupSpacing
 
-                    Text {
-                        text: "wallpapers & aesthetics"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeMd
-                        font.weight: Font.Bold
-                        color: Theme.on_surface
-                    }
+                // top header
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
 
-                    Text {
-                        text: {
-                            if (root.batchStatusText !== "") return root.batchStatusText;
-                            if (root.activeTab === "local") return localView.filteredLocalWps.length + " wallpapers in local gallery";
-                            if (root.activeTab === "online") return root.onlineWallpapers.length > 0 ? (root.onlineWallpapers.length + " wallhaven results (page " + root.onlinePage + ")") : "explore wallhaven community gallery";
-                            if (root.activeTab === "live") return root.localLiveWallpapers.length + " local animated & video wallpapers";
-                            return "matugen palette, awww transitions & mpvpaper";
+                    Rectangle {
+                        width: 34
+                        height: 34
+                        radius: Theme.radiusMd
+                        color: Theme.primary_overlay
+                        border.color: Theme.alpha(Theme.primary, 0.35)
+                        border.width: 1
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: Theme.iconWallpaper
+                            font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
+                            font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
+                            color: Theme.primary
                         }
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        color: root.batchStatusText !== "" ? Theme.primary : Theme.on_surface_variant
                     }
-                }
+
+                    ColumnLayout {
+                        spacing: 1
+
+                        Text {
+                            text: "wallpapers & aesthetics"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeMd
+                            font.weight: Font.Bold
+                            color: Theme.on_surface
+                        }
+
+                        Text {
+                            text: {
+                                if (root.batchStatusText !== "") return root.batchStatusText;
+                                if (root.activeTab === "local") return localView.filteredLocalWps.length + " wallpapers in local gallery";
+                                if (root.activeTab === "online") {
+                                    if (root.onlineShowSavedOnly) return root.wallhavenFavs.length + " bookmarked wallhaven picks";
+                                    return root.onlineWallpapers.length > 0
+                                        ? (root.onlineWallpapers.length + " results • page " + root.onlinePage + " / " + root.onlineTotalPages + (root.onlineTotalCount > 0 ? (" (" + root.onlineTotalCount + " total)") : ""))
+                                        : "explore wallhaven community gallery";
+                                }
+                                if (root.activeTab === "live") return root.localLiveWallpapers.length + " local animated & video wallpapers";
+                                return "matugen palette, awww transitions & mpvpaper";
+                            }
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            color: root.batchStatusText !== "" ? Theme.primary : Theme.on_surface_variant
+                        }
+                    }
 
                 Item { Layout.fillWidth: true }
 
@@ -1458,14 +1871,15 @@ Rectangle {
                 visible: root.activeTab === "online"
                 spacing: 8
 
+                // row 1: search query, exact resolution, api key & bookmarks
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 8
+                    spacing: 6
 
                     SearchField {
                         id: onlineSearchField
                         text: root.onlineQuery
-                        placeholder: "search wallhaven (anime, cyberpunk, nature, minimal...)"
+                        placeholder: "search tags, @user, like:id, or keywords..."
                         onSubmitted: (val) => fetchWallhaven(val, root.onlineSorting, 1, resField.text)
                         onCleared: fetchWallhaven("", root.onlineSorting, 1, resField.text)
                     }
@@ -1473,7 +1887,7 @@ Rectangle {
                     SearchField {
                         id: resField
                         Layout.fillWidth: false
-                        Layout.preferredWidth: 165
+                        Layout.preferredWidth: 132
                         text: root.onlineResolution
                         icon: Theme.iconWorkspaces
                         placeholder: "any (" + root.nativeRes + ")"
@@ -1485,62 +1899,274 @@ Rectangle {
                     Chip {
                         label: "native"
                         chipHeight: 36
-                        selected: root.onlineResolution === root.nativeRes
+                        selected: root.onlineResolution === root.nativeRes && !root.onlineShowSavedOnly
                         inactiveBg: Theme.cardBg
                         onClicked: {
                             resField.text = root.nativeRes;
                             fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, root.nativeRes);
                         }
                     }
+
+                    IconButton {
+                        icon: Theme.iconShield
+                        iconSize: Theme.fontSizeSm
+                        highlighted: root.showApiKeyRow || root.onlineApiKey.trim() !== ""
+                        tooltip: root.onlineApiKey.trim() !== "" ? "wallhaven api key configured (click to edit)" : "add wallhaven api key (needed for nsfw)"
+                        onClicked: root.showApiKeyRow = !root.showApiKeyRow
+                    }
+
+                    Chip {
+                        icon: Theme.iconHeart
+                        label: "favs (" + root.wallhavenFavs.length + ")"
+                        chipHeight: 36
+                        selected: root.onlineShowSavedOnly
+                        inactiveBg: Theme.cardBg
+                        onClicked: {
+                            root.onlineShowSavedOnly = !root.onlineShowSavedOnly;
+                            if (!root.onlineShowSavedOnly && root.onlineWallpapers.length === 0) {
+                                fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
+                            }
+                        }
+                    }
                 }
 
+                // optional collapsible api key strip (persisted in wallhaven.conf)
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 44
+                    visible: root.showApiKeyRow
+                    radius: Theme.radiusMd
+                    color: Theme.cardBg
+                    border.color: Theme.cardBorder
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        spacing: 6
+
+                        Text {
+                            text: "api key"
+                            font.family: Theme.fontMono
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: Font.Bold
+                            color: Theme.primary
+                            Layout.leftMargin: 4
+                        }
+
+                        SearchField {
+                            id: apiKeyField
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 30
+                            icon: Theme.iconShield
+                            text: root.onlineApiKey
+                            placeholder: "paste personal wallhaven api key (wallhaven.cc/settings/account)..."
+                            monoFont: true
+                            onSubmitted: (val) => {
+                                root.onlineApiKey = val.trim();
+                                root.saveWallhavenConf();
+                                root.showApiKeyRow = false;
+                                if (root.activeTab === "online") fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
+                            }
+                        }
+
+                        Chip {
+                            label: "save"
+                            chipHeight: 28
+                            selected: true
+                            onClicked: {
+                                root.onlineApiKey = apiKeyField.text.trim();
+                                root.saveWallhavenConf();
+                                root.showApiKeyRow = false;
+                                fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
+                            }
+                        }
+
+                        Chip {
+                            label: "clear"
+                            chipHeight: 28
+                            onClicked: {
+                                apiKeyField.text = "";
+                                root.onlineApiKey = "";
+                                if (root.onlinePurity === "111" || root.onlinePurity === "001" || root.onlinePurity === "101") {
+                                    root.onlinePurity = "100";
+                                    purityDropdown.currentValue = "100";
+                                }
+                                root.saveWallhavenConf();
+                                root.showApiKeyRow = false;
+                            }
+                        }
+                    }
+                }
+
+                // row 2: floating Dropdown filters (sorting, order, range, category, purity, ratio, min res, color) + pager
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: 5
 
-                    Repeater {
+                    Dropdown {
+                        id: sortDropdown
+                        Layout.preferredWidth: 102
+                        menuMinWidth: 165
+                        icon: Theme.iconFilter
+                        currentValue: root.onlineSorting
                         model: [
-                            { label: "latest", val: "date_added" },
-                            { label: "toplist", val: "toplist" },
-                            { label: "hot", val: "hot" },
-                            { label: "views", val: "views" },
-                            { label: "random", val: "random" }
+                            { label: "latest", value: "date_added" },
+                            { label: "relevance", value: "relevance" },
+                            { label: "toplist", value: "toplist" },
+                            { label: "hot", value: "hot" },
+                            { label: "views", value: "views" },
+                            { label: "favorites", value: "favorites" },
+                            { label: "random", value: "random" }
                         ]
+                        onSelected: (val) => {
+                            if (val !== root.onlineSorting || root.onlineShowSavedOnly) {
+                                fetchWallhaven(onlineSearchField.text, val, 1, resField.text);
+                            }
+                        }
+                    }
 
-                        delegate: Chip {
-                            required property var modelData
-                            label: modelData.label
-                            selected: root.onlineSorting === modelData.val
-                            chipHeight: 26
-                            onClicked: fetchWallhaven(onlineSearchField.text, modelData.val, 1, resField.text)
+                    IconButton {
+                        icon: root.onlineOrder === "asc" ? Theme.iconChevronUp : Theme.iconChevronDown
+                        iconSize: Theme.fontSizeSm
+                        tooltip: "order: " + (root.onlineOrder === "asc" ? "ascending" : "descending")
+                        onClicked: {
+                            root.onlineOrder = root.onlineOrder === "desc" ? "asc" : "desc";
+                            fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
+                        }
+                    }
+
+                    Dropdown {
+                        id: topRangeDropdown
+                        visible: root.onlineSorting === "toplist"
+                        Layout.preferredWidth: 74
+                        menuMinWidth: 128
+                        currentValue: root.onlineTopRange
+                        model: [
+                            { label: "24h", value: "1d" },
+                            { label: "3 days", value: "3d" },
+                            { label: "1 week", value: "1w" },
+                            { label: "1 month", value: "1M" },
+                            { label: "3 mo", value: "3M" },
+                            { label: "6 mo", value: "6M" },
+                            { label: "1 year", value: "1y" }
+                        ]
+                        onSelected: (val) => {
+                            root.onlineTopRange = val;
+                            fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
+                        }
+                    }
+
+                    Dropdown {
+                        id: catDropdown
+                        Layout.preferredWidth: 88
+                        menuMinWidth: 155
+                        currentValue: root.onlineCategories
+                        model: [
+                            { label: "all cats", value: "111" },
+                            { label: "general", value: "100" },
+                            { label: "anime", value: "010" },
+                            { label: "people", value: "001" },
+                            { label: "gen+ani", value: "110" }
+                        ]
+                        onSelected: (val) => {
+                            root.onlineCategories = val;
+                            fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
+                        }
+                    }
+
+                    Dropdown {
+                        id: purityDropdown
+                        Layout.preferredWidth: 86
+                        menuMinWidth: 155
+                        accentColor: (root.onlinePurity === "111" || root.onlinePurity === "001") ? Theme.error : Theme.primary
+                        currentValue: root.onlinePurity
+                        model: [
+                            { label: "sfw", value: "100" },
+                            { label: "sketchy", value: "010" },
+                            { label: "sfw+skt", value: "110" },
+                            { label: "all+nsfw", value: "111", badge: root.onlineApiKey.trim() === "" ? "key" : "" }
+                        ]
+                        onSelected: (val) => {
+                            root.onlinePurity = val;
+                            if ((val === "111" || val === "001") && root.onlineApiKey.trim() === "") {
+                                root.showApiKeyRow = true;
+                            }
+                            fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
+                        }
+                    }
+
+                    Dropdown {
+                        id: ratioDropdown
+                        Layout.preferredWidth: 86
+                        menuMinWidth: 145
+                        currentValue: root.onlineRatios
+                        model: [
+                            { label: "ratio: any", value: "" },
+                            { label: "16:9", value: "16x9" },
+                            { label: "16:10", value: "16x10" },
+                            { label: "21:9", value: "21x9" },
+                            { label: "32:9", value: "32x9" },
+                            { label: "landscape", value: "landscape" },
+                            { label: "portrait", value: "portrait" }
+                        ]
+                        onSelected: (val) => {
+                            root.onlineRatios = val;
+                            fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
+                        }
+                    }
+
+                    Dropdown {
+                        id: atleastDropdown
+                        Layout.preferredWidth: 88
+                        menuMinWidth: 150
+                        currentValue: root.onlineAtleast
+                        model: [
+                            { label: "min: any", value: "" },
+                            { label: "native", value: root.nativeRes },
+                            { label: "1080p+", value: "1920x1080" },
+                            { label: "1440p+", value: "2560x1440" },
+                            { label: "4k+", value: "3840x2160" }
+                        ]
+                        onSelected: (val) => {
+                            root.onlineAtleast = val;
+                            if (val !== "" && resField.text === root.nativeRes) resField.text = "";
+                            fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
+                        }
+                    }
+
+                    Dropdown {
+                        id: colorDropdown
+                        Layout.preferredWidth: 92
+                        menuMinWidth: 170
+                        currentValue: root.onlineColor
+                        model: [
+                            { label: "color", value: "" },
+                            { label: "crimson", value: "cc0000", swatch: "#cc0000" },
+                            { label: "rose", value: "ea4c88", swatch: "#ea4c88" },
+                            { label: "purple", value: "663399", swatch: "#663399" },
+                            { label: "blue", value: "0066cc", swatch: "#0066cc" },
+                            { label: "cyan", value: "66cccc", swatch: "#66cccc" },
+                            { label: "green", value: "77cc33", swatch: "#77cc33" },
+                            { label: "gold", value: "ffcc33", swatch: "#ffcc33" },
+                            { label: "orange", value: "ff6600", swatch: "#ff6600" },
+                            { label: "espresso", value: "663300", swatch: "#663300" },
+                            { label: "black", value: "000000", swatch: "#000000" },
+                            { label: "slate", value: "666666", swatch: "#666666" },
+                            { label: "white", value: "ffffff", swatch: "#ffffff" }
+                        ]
+                        onSelected: (val) => {
+                            root.onlineColor = val;
+                            fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
                         }
                     }
 
                     Item { Layout.fillWidth: true }
 
-                    Repeater {
-                        model: [
-                            { label: "all", val: "111" },
-                            { label: "gen", val: "100" },
-                            { label: "anime", val: "010" },
-                            { label: "ppl", val: "001" }
-                        ]
-
-                        delegate: Chip {
-                            required property var modelData
-                            label: modelData.label
-                            selected: root.onlineCategories === modelData.val
-                            chipHeight: 26
-                            onClicked: {
-                                root.onlineCategories = modelData.val;
-                                fetchWallhaven(onlineSearchField.text, root.onlineSorting, 1, resField.text);
-                            }
-                        }
-                    }
-
                     Chip {
                         icon: Theme.iconChevronLeft
-                        chipHeight: 26
+                        chipHeight: 28
+                        visible: !root.onlineShowSavedOnly
                         opacity: root.onlinePage > 1 ? 1.0 : 0.4
                         onClicked: {
                             if (root.onlinePage > 1 && !root.isOnlineLoading) {
@@ -1550,8 +2176,9 @@ Rectangle {
                     }
 
                     Rectangle {
-                        Layout.preferredHeight: 26
-                        Layout.preferredWidth: pageText.implicitWidth + 18
+                        Layout.preferredHeight: 28
+                        Layout.preferredWidth: pageText.implicitWidth + 14
+                        visible: !root.onlineShowSavedOnly
                         radius: Theme.radiusPill
                         color: Theme.widgetBg
                         border.color: Theme.widgetBorder
@@ -1560,7 +2187,7 @@ Rectangle {
                         Text {
                             id: pageText
                             anchors.centerIn: parent
-                            text: "page " + root.onlinePage
+                            text: root.onlinePage + "/" + root.onlineTotalPages
                             font.family: Theme.fontMono
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Font.Bold
@@ -1570,9 +2197,11 @@ Rectangle {
 
                     Chip {
                         icon: Theme.iconChevronRight
-                        chipHeight: 26
+                        chipHeight: 28
+                        visible: !root.onlineShowSavedOnly
+                        opacity: root.onlinePage < root.onlineTotalPages ? 1.0 : 0.4
                         onClicked: {
-                            if (!root.isOnlineLoading) {
+                            if (!root.isOnlineLoading && root.onlinePage < root.onlineTotalPages) {
                                 fetchWallhaven(onlineSearchField.text, root.onlineSorting, root.onlinePage + 1, resField.text);
                             }
                         }
@@ -1587,8 +2216,8 @@ Rectangle {
                     boundsBehavior: Flickable.StopAtBounds
                     cellWidth: width / 3
                     cellHeight: cellWidth * 0.65
-                    model: root.onlineWallpapers
-                    visible: !root.isOnlineLoading && root.onlineWallpapers.length > 0
+                    model: root.displayedOnlineWallpapers
+                    visible: !root.isOnlineLoading && root.displayedOnlineWallpapers.length > 0
 
                     WheelHandler {
                         orientation: Qt.Vertical
@@ -1606,18 +2235,30 @@ Rectangle {
                         tagAccent: modelData?.fileType === "png"
                         isSavedLocal: root.hasLocalWallpaper(modelData?.fullUrl || modelData?.id)
                         allowDownload: true
+                        allowDetails: true
+                        allowFavorite: true
+                        isFavorite: root.isFavWallhaven(modelData?.id)
+                        colorsPreview: Array.isArray(modelData?.colors) ? modelData.colors : []
                         onApplyRequested: if (WallpaperService?.setWallpaper) WallpaperService.setWallpaper(modelData.fullUrl)
                         onDownloadRequested: root.downloadUrls([modelData.fullUrl])
+                        onDetailsRequested: root.openWallpaperDetails(modelData)
+                        onFavoriteRequested: root.toggleFavWallhaven(modelData)
                     }
                 }
 
                 EmptyState {
-                    visible: root.isOnlineLoading || root.onlineWallpapers.length === 0
+                    visible: root.isOnlineLoading || root.displayedOnlineWallpapers.length === 0
                     loading: root.isOnlineLoading
-                    icon: Theme.iconGlobe
-                    message: root.isOnlineLoading
-                        ? ("fetching " + (root.onlineSorting === "date_added" ? "latest" : root.onlineSorting) + (root.onlineResolution ? (" " + root.onlineResolution) : "") + " wallpapers...")
-                        : "no wallpapers found\ntry adjusting your search query or resolution"
+                    icon: root.onlineErrorText !== "" ? Theme.iconClose : (root.onlineShowSavedOnly ? Theme.iconHeart : Theme.iconGlobe)
+                    message: {
+                        if (root.isOnlineLoading) {
+                            return "fetching " + (root.onlineSorting === "date_added" ? "latest" : root.onlineSorting)
+                                + (root.onlineResolution ? (" " + root.onlineResolution) : "") + " wallpapers...";
+                        }
+                        if (root.onlineErrorText !== "") return root.onlineErrorText;
+                        if (root.onlineShowSavedOnly) return "no bookmarked wallhaven picks yet\nhover any card and click the heart icon to save it here";
+                        return "no wallpapers found\ntry clearing exact resolution or adjusting filters";
+                    }
                 }
             }
 
@@ -1907,6 +2548,84 @@ Rectangle {
                                                 if (WallpaperService?.applyColor) WallpaperService.applyColor(modelData);
                                             }
                                         }
+                                    }
+                                }
+                            }
+                        }
+
+                        GroupLabel { text: "active matugen palette (click to copy hex)" }
+
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: 4
+                            columnSpacing: 6
+                            rowSpacing: 6
+
+                            Repeater {
+                                model: [
+                                    { name: "primary", col: String(Theme.primary), fg: Theme.on_primary },
+                                    { name: "secondary", col: String(Theme.secondary), fg: Theme.on_secondary },
+                                    { name: "tertiary", col: String(Theme.tertiary), fg: Theme.on_surface },
+                                    { name: "source", col: String(Theme.source_color || Theme.primary), fg: Theme.on_primary },
+                                    { name: "surface", col: String(Theme.surface), fg: Theme.on_surface },
+                                    { name: "container", col: String(Theme.surface_container_high), fg: Theme.on_surface },
+                                    { name: "outline", col: String(Theme.outline), fg: Theme.background },
+                                    { name: "error", col: String(Theme.error), fg: Theme.on_primary }
+                                ]
+
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 30
+                                    radius: Theme.radiusSm
+                                    color: swatchMa.containsMouse ? Theme.widgetHover : Theme.widgetBg
+                                    border.color: swatchMa.containsMouse ? modelData.col : Theme.widgetBorder
+                                    border.width: 1
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 5
+                                        spacing: 6
+
+                                        Rectangle {
+                                            width: 16
+                                            height: 16
+                                            radius: Theme.radiusPill
+                                            color: modelData.col
+                                            border.color: Theme.alpha(Theme.on_surface, 0.25)
+                                            border.width: 1
+                                        }
+
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: modelData.name
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSizeXs
+                                            color: Theme.on_surface
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            text: String(modelData.col).toLowerCase()
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: Theme.fontSizeXs - 1
+                                            color: Theme.on_surface_variant
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: swatchMa
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.copyColorHex(modelData.col)
+                                    }
+
+                                    CustomTooltip {
+                                        anchorItem: parent
+                                        active: swatchMa.containsMouse
+                                        text: modelData.name + ": " + String(modelData.col).toLowerCase()
+                                        subtext: "click to copy hex"
                                     }
                                 }
                             }
@@ -2472,5 +3191,306 @@ Rectangle {
                 }
             }
         }
+
+        // wallhaven wallpaper details, palette & similar search overlay
+        Rectangle {
+            id: detailsOverlay
+            anchors.fill: parent
+            z: 60
+            visible: root.selectedDetailItem !== null && Boolean(root.selectedDetailItem?.id)
+            radius: Theme.radiusMd
+            color: Theme.alpha(Theme.background, 0.86)
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: root.selectedDetailItem = null
+            }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 28, 610)
+                height: Math.min(parent.height - 28, 495)
+                radius: Theme.radiusLg
+                color: Theme.surface
+                border.color: Theme.primary
+                border.width: 1
+
+                MouseArea {
+                    anchors.fill: parent
+                    // catch clicks inside card so scrim doesn't dismiss
+                }
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 14
+                    spacing: 10
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Rectangle {
+                            width: 28
+                            height: 28
+                            radius: Theme.radiusPill
+                            color: Theme.primary_overlay
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: Theme.iconGlobe
+                                font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
+                                font.pixelSize: Theme.fontSizeSm
+                                color: Theme.primary
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+
+                            Text {
+                                text: "wallhaven #" + (root.selectedDetailItem?.id ?? "")
+                                font.family: Theme.fontMono
+                                font.pixelSize: Theme.fontSizeMd
+                                font.weight: Font.Bold
+                                color: Theme.on_surface
+                            }
+
+                            Text {
+                                text: {
+                                    if (root.detailMeta?.loading) return "fetching full metadata, palette & tags...";
+                                    if (root.detailMeta?.error) return root.detailMeta.error;
+                                    let parts = [];
+                                    if (root.selectedDetailItem?.resolution) parts.push(root.selectedDetailItem.resolution);
+                                    if (root.detailMeta?.fileSize) parts.push(root.detailMeta.fileSize);
+                                    if (root.detailMeta?.category) parts.push(root.detailMeta.category);
+                                    if (root.detailMeta?.purity) parts.push(root.detailMeta.purity);
+                                    if (root.detailMeta?.uploader) parts.push("by @" + root.detailMeta.uploader);
+                                    return parts.join(" • ");
+                                }
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeXs
+                                color: root.detailMeta?.error ? Theme.error : Theme.on_surface_variant
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                        }
+
+                        IconButton {
+                            icon: Theme.iconHeart
+                            iconSize: Theme.fontSizeSm
+                            highlighted: root.isFavWallhaven(root.selectedDetailItem?.id)
+                            tooltip: root.isFavWallhaven(root.selectedDetailItem?.id) ? "remove bookmark" : "bookmark pick"
+                            onClicked: root.toggleFavWallhaven(root.selectedDetailItem)
+                        }
+
+                        IconButton {
+                            icon: Theme.iconClose
+                            iconSize: Theme.fontSizeSm
+                            tooltip: "close details"
+                            onClicked: root.selectedDetailItem = null
+                        }
+                    }
+
+                    // hero preview image + overlay stats
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 205
+                        radius: Theme.radiusMd
+                        color: Theme.surface_container_high
+                        border.color: Theme.cardBorder
+                        border.width: 1
+                        clip: true
+
+                        Image {
+                            anchors.fill: parent
+                            source: root.selectedDetailItem?.thumbUrl || root.selectedDetailItem?.fullUrl || ""
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                        }
+
+                        Row {
+                            anchors.bottom: parent.bottom
+                            anchors.left: parent.left
+                            anchors.margins: 8
+                            spacing: 6
+                            visible: root.detailMeta?.loaded ?? false
+
+                            Rectangle {
+                                height: 22
+                                width: viewsLbl.implicitWidth + 14
+                                radius: Theme.radiusPill
+                                color: Theme.alpha(Theme.surface, 0.85)
+                                border.color: Theme.widgetBorder
+                                border.width: 1
+
+                                Text {
+                                    id: viewsLbl
+                                    anchors.centerIn: parent
+                                    text: (root.detailMeta?.views ?? 0) + " views"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontSizeXs
+                                    color: Theme.on_surface
+                                }
+                            }
+
+                            Rectangle {
+                                height: 22
+                                width: favsLbl.implicitWidth + 14
+                                radius: Theme.radiusPill
+                                color: Theme.alpha(Theme.surface, 0.85)
+                                border.color: Theme.widgetBorder
+                                border.width: 1
+
+                                Text {
+                                    id: favsLbl
+                                    anchors.centerIn: parent
+                                    text: (root.detailMeta?.favorites ?? 0) + " likes"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontSizeXs
+                                    color: Theme.on_surface
+                                }
+                            }
+                        }
+                    }
+
+                    // extracted wallhaven palette (click copies hex, seed chip sets matugen seed)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+                        visible: Array.isArray(root.detailMeta?.colors) && root.detailMeta.colors.length > 0
+
+                        Text {
+                            text: "palette:"
+                            font.family: Theme.fontMono
+                            font.pixelSize: Theme.fontSizeXs
+                            color: Theme.on_surface_variant
+                        }
+
+                        Repeater {
+                            model: Array.isArray(root.detailMeta?.colors) ? root.detailMeta.colors : []
+                            delegate: Rectangle {
+                                required property string modelData
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 26
+                                radius: Theme.radiusSm
+                                color: modelData
+                                border.color: detColMa.containsMouse ? Theme.on_surface : Theme.alpha("#000000", 0.35)
+                                border.width: detColMa.containsMouse ? 2 : 1
+
+                                MouseArea {
+                                    id: detColMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: (m) => {
+                                        if (m.button === Qt.RightButton) {
+                                            if (WallpaperService?.applyColor) WallpaperService.applyColor(modelData);
+                                            root.batchStatusText = "matugen seed set to " + modelData;
+                                            batchStatusResetTimer.restart();
+                                        } else {
+                                            root.copyColorHex(modelData);
+                                        }
+                                    }
+                                }
+
+                                CustomTooltip {
+                                    anchorItem: parent
+                                    active: detColMa.containsMouse
+                                    text: modelData
+                                    subtext: "left-click copy • right-click matugen seed"
+                                }
+                            }
+                        }
+                    }
+
+                    // clickable tags
+                    Flickable {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        contentHeight: tagsFlow.implicitHeight
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        Flow {
+                            id: tagsFlow
+                            width: parent.width
+                            spacing: 6
+
+                            Repeater {
+                                model: Array.isArray(root.detailMeta?.tags) ? root.detailMeta.tags : []
+                                delegate: Chip {
+                                    required property string modelData
+                                    label: "#" + modelData
+                                    chipHeight: 26
+                                    inactiveBg: Theme.widgetBg
+                                    onClicked: {
+                                        onlineSearchField.text = modelData;
+                                        root.selectedDetailItem = null;
+                                        root.fetchWallhaven(modelData, "relevance", 1, resField.text);
+                                    }
+                                }
+                            }
+
+                            Text {
+                                visible: !root.detailMeta?.loading && (!root.detailMeta?.tags || root.detailMeta.tags.length === 0)
+                                text: "no public tags returned for this wallpaper"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeXs
+                                color: Theme.on_surface_variant
+                            }
+                        }
+                    }
+
+                    // bottom action bar
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Chip {
+                            icon: Theme.iconSearch
+                            label: "find similar (like:" + (root.selectedDetailItem?.id ?? "") + ")"
+                            chipHeight: 34
+                            inactiveBg: Theme.widgetBg
+                            onClicked: {
+                                let simQuery = "like:" + root.selectedDetailItem.id;
+                                onlineSearchField.text = simQuery;
+                                resField.text = "";
+                                root.selectedDetailItem = null;
+                                root.fetchWallhaven(simQuery, "relevance", 1, "");
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        Chip {
+                            icon: Theme.iconDownload
+                            label: root.hasLocalWallpaper(root.selectedDetailItem?.fullUrl || root.selectedDetailItem?.id) ? "saved" : "save local"
+                            chipHeight: 34
+                            inactiveBg: Theme.widgetBg
+                            onClicked: {
+                                if (root.selectedDetailItem?.fullUrl) root.downloadUrls([root.selectedDetailItem.fullUrl]);
+                            }
+                        }
+
+                        Chip {
+                            icon: Theme.iconCheck
+                            label: "apply wallpaper"
+                            chipHeight: 34
+                            selected: true
+                            onClicked: {
+                                if (root.selectedDetailItem?.fullUrl && WallpaperService?.setWallpaper) {
+                                    WallpaperService.setWallpaper(root.selectedDetailItem.fullUrl);
+                                    root.selectedDetailItem = null;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     }
 }

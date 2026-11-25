@@ -7,33 +7,26 @@ import Quickshell.Widgets
 import Quickshell.Hyprland
 import Quickshell.Services.Notifications
 
-Rectangle {
+BarPill {
     id: root
-
-    property var barScreen: null
-    property var barMonitor: null
 
     readonly property int notifCount: NotificationService?.trackedNotifications?.values?.length ?? NotificationService?.trackedNotifications?.count ?? 0
     readonly property bool isDnd: Settings?.dnd ?? false
-    readonly property int pillSize: Theme.barHeight - 8
+
+    active: popup.open
+    hovered: notifMouse.containsMouse
+    pressed: notifMouse.pressed
+    activeBg: Theme.widgetActive
+    activeBorder: Theme.alpha(Theme.primary, 0.55)
+    normalBorder: root.isDnd ? Theme.alpha(Theme.tertiary, 0.7) : Theme.barPillBorder
+    hoverBorder: normalBorder
 
     implicitWidth: {
         if (Theme.isVertical) return root.pillSize;
         if (root.notifCount === 0 && !Theme.isTextIconSet) return root.pillSize;
         return Math.max(root.pillSize, notifRow.implicitWidth + 20);
     }
-    implicitHeight: root.pillSize
-    radius: Theme.barWidgetRadius
-    color: popup.open
-        ? Theme.widgetActive
-        : (notifMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
-    border.color: root.isDnd
-        ? Theme.alpha(Theme.tertiary, 0.7)
-        : (popup.open ? Theme.alpha(Theme.primary, 0.55) : Theme.barPillBorder)
-    border.width: (root.isDnd || popup.open || Theme.barPillBorder.a > 0) ? 1 : 0
 
-    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
 
     /*

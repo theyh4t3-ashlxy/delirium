@@ -7,11 +7,8 @@ import "../services"
 import Quickshell
 import Quickshell.Networking
 
-Rectangle {
+BarPill {
     id: root
-
-    property var barScreen: null
-    property var barMonitor: null
 
     readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
     readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
@@ -47,26 +44,17 @@ Rectangle {
         return list;
     }
 
-    implicitWidth: {
-        if (Theme.isVertical) return Theme.barHeight - 8;
-        if (netMouse.containsMouse || popup.open) return netRow.implicitWidth + 20;
-        return Theme.barHeight - 8;
-    }
-    implicitHeight: Theme.barHeight - 8
-    radius: Theme.barWidgetRadius
-
-    color: {
-        if (netMouse.pressed) return Theme.widgetActive;
-        if (popup.open) return Theme.primary_overlay;
-        if (netMouse.containsMouse) return Theme.barPillHover;
-        return Theme.barPillBg;
-    }
-    border.color: popup.open ? Theme.primary : Theme.barPillBorder
-    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+    active: popup.open
+    hovered: netMouse.containsMouse
+    pressed: netMouse.pressed
     clip: true
 
-    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+    implicitWidth: {
+        if (Theme.isVertical) return pillSize;
+        if (netMouse.containsMouse || popup.open) return netRow.implicitWidth + 20;
+        return pillSize;
+    }
+
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
 
     function updatePopupPosition() {

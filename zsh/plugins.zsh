@@ -44,8 +44,28 @@ _load_plugin "zsh-users/zsh-autosuggestions"
 _load_plugin "zsh-users/zsh-syntax-highlighting"
 _load_plugin "zsh-users/zsh-history-substring-search"
 
-# autosuggestion ghost colors
-export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=${MATUGEN_OUTLINE:-8}"
+# autosuggestion ghost colors & syntax highlighting (live ANSI slots)
+export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=8"
+ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
+
+if (( $+ZSH_HIGHLIGHT_STYLES )); then
+    ZSH_HIGHLIGHT_STYLES[default]='none'
+    ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=1,bold'
+    ZSH_HIGHLIGHT_STYLES[reserved-word]='fg=5,bold'
+    ZSH_HIGHLIGHT_STYLES[alias]='fg=6'
+    ZSH_HIGHLIGHT_STYLES[builtin]='fg=4'
+    ZSH_HIGHLIGHT_STYLES[function]='fg=4'
+    ZSH_HIGHLIGHT_STYLES[command]='fg=4,bold'
+    ZSH_HIGHLIGHT_STYLES[precommand]='fg=5,underline'
+    ZSH_HIGHLIGHT_STYLES[commandseparator]='fg=8'
+    ZSH_HIGHLIGHT_STYLES[path]='fg=6,underline'
+    ZSH_HIGHLIGHT_STYLES[globbing]='fg=13'
+    ZSH_HIGHLIGHT_STYLES[single-quoted-argument]='fg=2'
+    ZSH_HIGHLIGHT_STYLES[double-quoted-argument]='fg=2'
+    ZSH_HIGHLIGHT_STYLES[single-hyphen-option]='fg=5'
+    ZSH_HIGHLIGHT_STYLES[double-hyphen-option]='fg=5'
+    ZSH_HIGHLIGHT_STYLES[comment]='fg=8,italic'
+fi
 
 # arrow keys & vi keys for digging up your past mistakes
 if (( $+functions[history-substring-search-up] )); then
@@ -56,8 +76,8 @@ if (( $+functions[history-substring-search-up] )); then
     bindkey -M vicmd 'k' history-substring-search-up
     bindkey -M vicmd 'j' history-substring-search-down
 
-    export HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_FOUND="fg=${MATUGEN_PRIMARY:-cyan},bold"
-    export HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_NOT_FOUND="fg=${MATUGEN_ERROR:-red},bold"
+    export HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_FOUND="fg=4,bold"
+    export HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_NOT_FOUND="fg=1,bold"
 fi
 
 # nuke the loader from memory

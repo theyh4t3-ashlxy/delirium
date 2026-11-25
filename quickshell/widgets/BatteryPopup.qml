@@ -447,6 +447,105 @@ PopupPanel {
             }
         }
 
+        // display brightness card (BrightnessService inline slider + quick chips)
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: brightCol.implicitHeight + 20
+            radius: Theme.radiusLg
+            color: Theme.cardBg
+            border.color: Theme.cardBorder
+            border.width: 1
+
+            ColumnLayout {
+                id: brightCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.margins: 10
+                spacing: 8
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Text {
+                        text: Theme.iconSun
+                        font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
+                        font.pixelSize: Theme.fontSizeSm
+                        color: Theme.primary
+                    }
+
+                    Text {
+                        text: "display brightness"
+                        font.family: Theme.fontDisplay
+                        font.pixelSize: Theme.fontSizeXs
+                        font.weight: Theme.fontWeightBold
+                        color: Theme.textSecondary
+                        Layout.fillWidth: true
+                    }
+
+                    Text {
+                        text: (BrightnessService?.percent ?? 0) + "%"
+                        font.family: Theme.fontMono
+                        font.pixelSize: Theme.fontSizeXs
+                        font.weight: Theme.fontWeightBold
+                        color: Theme.primary
+                    }
+                }
+
+                Slider {
+                    Layout.fillWidth: true
+                    from: 1
+                    to: 100
+                    stepSize: 1
+                    showValue: false
+                    value: BrightnessService?.percent ?? 50
+                    accentColor: Theme.primary
+                    onMoved: (val) => BrightnessService.setBrightnessPercent(Math.round(val))
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Repeater {
+                        model: [25, 50, 75, 100]
+
+                        delegate: Rectangle {
+                            required property int modelData
+                            readonly property bool isCur: Math.abs((BrightnessService?.percent ?? 0) - modelData) <= 3
+                            Layout.fillWidth: true
+                            height: 24
+                            radius: Theme.radiusPill
+                            color: isCur
+                                ? Theme.primary_overlay
+                                : (bChipMouse.containsMouse ? Theme.widgetHover : Theme.widgetBg)
+                            border.color: isCur ? Theme.alpha(Theme.primary, 0.65) : Theme.widgetBorder
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData + "%"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 10
+                                font.weight: isCur ? Theme.fontWeightBold : Theme.fontWeightMedium
+                                color: isCur ? Theme.primary : Theme.textSecondary
+                            }
+
+                            MouseArea {
+                                id: bChipMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: BrightnessService.setBrightnessPercent(modelData)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // power profile daemon card
         Rectangle {
             Layout.fillWidth: true

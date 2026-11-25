@@ -23,6 +23,10 @@ local -a commands=(
     'download:download image or video and apply'
     'stop:stop live video wallpapers (mpvpaper)'
     'kill:alias for stop'
+    'pause:pause animated gif in awww'
+    'unpause:resume animated gif in awww'
+    'toggle-pause:toggle awww pause'
+    'clear-cache:clear awww image cache'
     'get:print current wallpaper path'
 )
 

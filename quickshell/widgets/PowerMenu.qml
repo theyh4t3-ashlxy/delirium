@@ -6,23 +6,15 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
 
-Rectangle {
+BarPill {
     id: root
 
-    property var barScreen: null
-    property var barMonitor: null
-
-    implicitWidth: (Theme?.isVertical ?? false) ? ((Theme?.barHeight ?? 48) - 8) : (pwrRow.implicitWidth + 24)
-    implicitHeight: (Theme?.barHeight ?? 48) - 8
-    radius: Theme.barWidgetRadius
-    color: popup.open
-        ? Theme.error_overlay
-        : (pwrMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
-    border.color: popup.open ? Theme.error : Theme.barPillBorder
-    border.width: (popup.open || Theme.barPillBorderWidth > 0) ? 1 : 0
-
-    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+    active: popup.open
+    hovered: pwrMouse.containsMouse
+    pressed: pwrMouse.pressed
+    activeBg: Theme.error_overlay
+    activeBorder: Theme.error
+    implicitWidth: (Theme?.isVertical ?? false) ? pillSize : (pwrRow.implicitWidth + 24)
 
     Row {
         id: pwrRow

@@ -8,8 +8,9 @@ import Quickshell.Widgets
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
 import "../controls"
+import "../theme/confFormat.mjs" as ConfFmt
 
-Rectangle {
+BarPill {
     id: root
 
     // Native PipeWire audio peak monitor
@@ -82,8 +83,14 @@ Rectangle {
     }
 
     readonly property bool isCollapsed: (!root.hasTrack || root.compactMode) && !npMouse.containsMouse && !popup.open
-    readonly property int pillSize: Theme.barHeight - 8
     readonly property int hPad: Math.round(Theme.widgetPaddingH * Theme.paddingScaleMult) + 4
+
+    active: popup.open
+    hovered: npMouse.containsMouse
+    pressed: npMouse.pressed
+    activeBg: Theme.widgetActive
+    activeBorder: Theme.alpha(root.artAccent, 0.55)
+    clip: true
 
     implicitWidth: {
         if (Theme.isVertical) return root.pillSize;
@@ -92,21 +99,18 @@ Rectangle {
         }
         return row.implicitWidth + (root.hPad * 2);
     }
-    implicitHeight: root.pillSize
-    radius: Theme.barWidgetRadius
-    color: popup.open
-        ? Theme.widgetActive
-        : (npMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
-    border.color: popup.open ? Theme.alpha(root.artAccent, 0.55) : Theme.barPillBorder
-    border.width: (popup.open || Theme.barPillBorder.a > 0) ? 1 : 0
-    clip: true
 
-    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
 
     property real trackPosition: root.player?.position ?? 0
-    property real wavePhase: 0.0
+    property var spectrumBands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    readonly property string spectrumScript: Qt.resolvedUrl("../scripts/spectrum.py").toString().replace(/^file:\/\//, "")
+
+    onIsPlayingChanged: {
+        if (!isPlaying) {
+            root.spectrumBands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        }
+    }
 
     Connections {
         target: root.player
@@ -115,15 +119,35 @@ Rectangle {
         }
     }
 
-    // Smooth timer for seekbar + animated spectrum phase
+    // Real PipeWire sink monitor 24-band FFT (only alive while playing + visible, drops flat to 0 on silence)
+    Process {
+        id: spectrumProc
+        command: ["python3", root.spectrumScript]
+        running: root.isPlaying && (Settings?.mediaWaveVisualizer ?? true) && (popup.open || (!Theme.isVertical && !root.isCollapsed))
+        stdout: SplitParser {
+            onRead: (data) => {
+                let line = (data || "").trim();
+                if (!line) return;
+                let parts = line.split(",");
+                if (parts.length !== 24) return;
+                let next = [];
+                for (let i = 0; i < 24; i++) {
+                    let v = parseInt(parts[i], 10);
+                    next.push(isNaN(v) ? 0 : Math.max(0, Math.min(1, v / 99.0)));
+                }
+                root.spectrumBands = next;
+            }
+        }
+    }
+
+    // Smooth timer for seekbar timestamps only
     Timer {
         id: tracker
-        interval: popup.open ? 60 : 400
-        running: root.isPlaying && (popup.open || (Settings?.mediaWaveVisualizer ?? true))
+        interval: popup.open ? 120 : 500
+        running: root.isPlaying && popup.open
         repeat: true
         onTriggered: {
             if (root.player && popup.open) root.trackPosition = root.player.position ?? 0;
-            root.wavePhase = (root.wavePhase + 0.32) % (Math.PI * 20);
         }
     }
 
@@ -165,6 +189,199 @@ Rectangle {
             root.player.loopState = MprisLoopState.Track;
         } else {
             root.player.loopState = MprisLoopState.None;
+        }
+    }
+
+    property string activeTab: "player" // "player" | "lyrics"
+    property string lyricsSource: "none" // "custom" | "sidecar" | "lrclib" | "file" | "none"
+    property string lyricsPath: ""
+    property string lyricsRaw: ""
+    property bool lyricsLoading: false
+    property bool isEditingLyrics: false
+    property bool showLyricsPicker: false
+    property string pickerCwd: ""
+    property var pickerEntries: []
+    property string lyricsStatusMsg: ""
+    property string lastLyricsTrackKey: ""
+
+    readonly property string lyricsScript: Qt.resolvedUrl("../scripts/lyrics.py").toString().replace(/^file:\/\//, "")
+    readonly property string currentTrackKey: (player?.trackArtist || "") + "::" + (player?.trackTitle || "")
+
+    readonly property var parsedLrc: parseLrcContent(lyricsRaw)
+    readonly property int activeLrcIndex: {
+        if (!parsedLrc || !parsedLrc.timed || !parsedLrc.lines || parsedLrc.lines.length === 0) return -1;
+        let pos = root.trackPosition + 0.15;
+        let active = -1;
+        for (let i = 0; i < parsedLrc.lines.length; i++) {
+            if (parsedLrc.lines[i].time <= pos) active = i;
+            else break;
+        }
+        return active;
+    }
+
+    onCurrentTrackKeyChanged: {
+        root.isEditingLyrics = false;
+        root.showLyricsPicker = false;
+        if (popup.open && root.activeTab === "lyrics" && root.hasTrack) {
+            loadLyrics(false);
+        } else {
+            root.lastLyricsTrackKey = "";
+            root.lyricsSource = "none";
+            root.lyricsPath = "";
+            root.lyricsRaw = "";
+        }
+    }
+
+    function setPlaybackSpeed(rateVal) {
+        if (!root.player) return;
+        let r = Math.max(0.25, Math.min(2.0, Number(rateVal) || 1.0));
+        try {
+            root.player.rate = r;
+        } catch (e) {}
+        let id = root.player.identity || "";
+        if (id) {
+            Quickshell.execDetached(["playerctl", "--player=" + id.toLowerCase(), "rate", String(r)]);
+        }
+    }
+
+    function parseLrcContent(raw) {
+        let s = (raw || "").replace(/\r\n/g, "\n");
+        if (!s.trim()) return { timed: false, lines: [] };
+        let rows = s.split("\n");
+        let timedLines = [];
+        let plainLines = [];
+        const tagRe = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
+
+        for (let i = 0; i < rows.length; i++) {
+            let line = rows[i];
+            let tags = [];
+            let m;
+            tagRe.lastIndex = 0;
+            while ((m = tagRe.exec(line)) !== null) {
+                let mins = parseInt(m[1], 10);
+                let secs = parseInt(m[2], 10);
+                let frac = m[3] ? parseInt(m[3].padEnd(3, "0").slice(0, 3), 10) : 0;
+                tags.push(mins * 60 + secs + frac / 1000.0);
+            }
+            let txt = line.replace(tagRe, "").trim();
+            if (tags.length > 0) {
+                for (let j = 0; j < tags.length; j++) {
+                    if (txt !== "") timedLines.push({ time: tags[j], text: txt });
+                }
+            } else {
+                // skip metadata header tags like [ar:...], [ti:...], [by:...]
+                if (!/^\[(ar|ti|al|au|length|by|offset|re|ve):/i.test(line.trim())) {
+                    plainLines.push({ time: -1, text: line });
+                }
+            }
+        }
+        if (timedLines.length > 0) {
+            timedLines.sort((a, b) => a.time - b.time);
+            return { timed: true, lines: timedLines };
+        }
+        return { timed: false, lines: plainLines };
+    }
+
+    function flashLyricsStatus(msg) {
+        root.lyricsStatusMsg = msg;
+        lyricsStatusTimer.restart();
+    }
+
+    function ensureLyricsLoaded() {
+        if (!root.hasTrack) return;
+        if (root.lastLyricsTrackKey !== root.currentTrackKey || (root.lyricsRaw === "" && root.lyricsSource === "none")) {
+            loadLyrics(false);
+        }
+    }
+
+    function loadLyrics(forceOnline) {
+        if (!root.hasTrack) {
+            root.lyricsRaw = "";
+            root.lyricsSource = "none";
+            root.lyricsPath = "";
+            return;
+        }
+        let artist = root.player?.trackArtist || "";
+        let title = root.player?.trackTitle || "";
+        let trackUrl = root.player?.metadata?.["xesam:url"] ? String(root.player.metadata["xesam:url"]) : "";
+        root.lastLyricsTrackKey = root.currentTrackKey;
+        root.lyricsLoading = true;
+        lyricsProc.command = ["python3", root.lyricsScript, "lookup", artist, title, trackUrl, forceOnline ? "1" : "0"];
+        lyricsProc.running = false;
+        lyricsProc.running = true;
+    }
+
+    function saveCustomLyrics(rawText) {
+        if (!root.hasTrack) return;
+        let artist = root.player?.trackArtist || "";
+        let title = root.player?.trackTitle || "";
+        root.lyricsLoading = true;
+        lyricsProc.command = ["python3", root.lyricsScript, "save", artist, title, rawText || ""];
+        lyricsProc.running = false;
+        lyricsProc.running = true;
+        root.isEditingLyrics = false;
+        root.flashLyricsStatus("saved custom .lrc");
+    }
+
+    function clearCustomLyrics() {
+        if (!root.hasTrack) return;
+        let artist = root.player?.trackArtist || "";
+        let title = root.player?.trackTitle || "";
+        root.lyricsLoading = true;
+        lyricsProc.command = ["python3", root.lyricsScript, "delete", artist, title];
+        lyricsProc.running = false;
+        lyricsProc.running = true;
+        root.flashLyricsStatus("removed custom override");
+    }
+
+    function browseLyricsDir(dirPath) {
+        pickerProc.command = ["python3", root.lyricsScript, "browse", dirPath || ""];
+        pickerProc.running = false;
+        pickerProc.running = true;
+    }
+
+    function loadLyricsFile(filePath) {
+        if (!filePath) return;
+        root.lyricsLoading = true;
+        lyricsProc.command = ["python3", root.lyricsScript, "read", filePath];
+        lyricsProc.running = false;
+        lyricsProc.running = true;
+        root.showLyricsPicker = false;
+        root.isEditingLyrics = false;
+        root.lastLyricsTrackKey = root.currentTrackKey;
+        root.flashLyricsStatus("loaded local file");
+    }
+
+    Timer {
+        id: lyricsStatusTimer
+        interval: 2200
+        onTriggered: root.lyricsStatusMsg = ""
+    }
+
+    Process {
+        id: lyricsProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let kv = ConfFmt.parseFlatConf(text || "");
+                root.lyricsSource = kv.source ? ConfFmt.unescapeField(kv.source) : "none";
+                root.lyricsPath = kv.path ? ConfFmt.unescapeField(kv.path) : "";
+                root.lyricsRaw = kv.content ? ConfFmt.unescapeField(kv.content) : "";
+                root.lyricsLoading = false;
+                if (root.isEditingLyrics) {
+                    lyricsEditorInput.text = root.lyricsRaw;
+                }
+            }
+        }
+    }
+
+    Process {
+        id: pickerProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let kv = ConfFmt.parseFlatConf(text || "");
+                if (kv.cwd) root.pickerCwd = ConfFmt.unescapeField(kv.cwd);
+                root.pickerEntries = ConfFmt.parseRecords(text || "", "entry");
+            }
         }
     }
 
@@ -217,9 +434,9 @@ Rectangle {
             width: Math.min(implicitWidth, root.compactMode ? 100 : 170)
         }
 
-        // Bar mini equalizer
+        // Bar mini equalizer (4 frequency bands from PipeWire monitor, dead-flat when silent or paused)
         Row {
-            visible: root.isPlaying && (Settings?.mediaWaveVisualizer ?? true) && !Theme.isVertical && !root.isCollapsed
+            visible: root.hasTrack && (Settings?.mediaWaveVisualizer ?? true) && !Theme.isVertical && !root.isCollapsed
             anchors.verticalCenter: parent.verticalCenter
             spacing: 2
             height: 12
@@ -228,24 +445,27 @@ Rectangle {
                 model: 4
                 Rectangle {
                     required property int index
+                    readonly property real bandEnergy: {
+                        if (!root.isPlaying) return 0;
+                        let b = (root.spectrumBands && root.spectrumBands.length === 24)
+                            ? Math.max(root.spectrumBands[index * 6 + 1] ?? 0, root.spectrumBands[index * 6 + 3] ?? 0)
+                            : 0;
+                        if (b > 0.01) return b;
+                        let p = (typeof peakMonitor !== "undefined" && peakMonitor.peak !== undefined) ? peakMonitor.peak : 0;
+                        return p > 0.01 ? p : 0;
+                    }
                     width: 2
                     radius: 1
                     color: root.artAccent
                     anchors.verticalCenter: parent.verticalCenter
 
-                    height: {
-                        if (!root.isPlaying) return 2;
-                        let p = (typeof peakMonitor !== "undefined" && peakMonitor.peak !== undefined) ? peakMonitor.peak : 0;
-                        let wave = Math.abs(Math.sin(root.wavePhase + index * 1.1));
-                        if (p > 0.01) {
-                            return Math.max(3, Math.min(12, Math.round((p * 9) + (wave * 5))));
-                        }
-                        return Math.max(3, Math.round(3 + wave * 5));
-                    }
+                    height: (!root.isPlaying || bandEnergy <= 0.01)
+                        ? 2
+                        : Math.max(3, Math.min(12, Math.round(2 + bandEnergy * 10)))
 
                     Behavior on height {
                         NumberAnimation {
-                            duration: Theme.animFast
+                            duration: 75
                             easing.type: Theme.animColorEasing
                         }
                     }
@@ -312,10 +532,17 @@ Rectangle {
 
     PopupPanel {
         id: popup
+        wantsFocus: root.activeTab === "lyrics" && root.isEditingLyrics
         cardWidth: 400
         cardHeight: Math.max(Theme.popupMinHeight, Math.min(Theme.popupMaxHeight, mediaContentLayout.implicitHeight + (Theme.popupPadding * 2)))
         onOpenChanged: {
-            if (!open) root.dropdownOpen = false;
+            if (!open) {
+                root.dropdownOpen = false;
+                root.isEditingLyrics = false;
+                root.showLyricsPicker = false;
+            } else if (root.activeTab === "lyrics") {
+                root.ensureLyricsLoaded();
+            }
         }
 
         content: ColumnLayout {
@@ -323,20 +550,80 @@ Rectangle {
             anchors.fill: parent
             spacing: Theme.popupSpacing
 
-            // Header + player switcher pill
+            // Header + view tabs + player switcher pill
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 8
+                spacing: 6
 
                 Text {
                     text: root.isPlaying && Theme.iconSet === "kaomoji"
-                        ? "media playback " + Theme.kaoDJ
-                        : "media playback"
+                        ? "media " + Theme.kaoDJ
+                        : "media"
                     font.family: Theme.fontDisplay
                     font.pixelSize: Theme.fontSizeLg
                     font.weight: Theme.fontWeightBold
                     color: Theme.textPrimary
                     Layout.fillWidth: true
+                }
+
+                // player | lyrics segmented switcher
+                Rectangle {
+                    radius: Theme.radiusPill
+                    color: Theme.widgetBg
+                    border.color: Theme.widgetBorder
+                    border.width: 1
+                    implicitHeight: 26
+                    implicitWidth: tabRow.implicitWidth + 6
+
+                    Row {
+                        id: tabRow
+                        anchors.centerIn: parent
+                        spacing: 2
+
+                        Repeater {
+                            model: [
+                                { id: "player", label: "player" },
+                                { id: "lyrics", label: "lyrics" }
+                            ]
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                readonly property bool isCur: root.activeTab === modelData.id
+                                height: 20
+                                implicitWidth: tTxt.implicitWidth + 14
+                                radius: Theme.radiusPill
+                                color: isCur ? root.artAccent : (tMouse.containsMouse ? Theme.pillHover : "transparent")
+
+                                Behavior on color { ColorAnimation { duration: Theme.animFast } }
+
+                                Text {
+                                    id: tTxt
+                                    anchors.centerIn: parent
+                                    text: modelData.label
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.weight: isCur ? Theme.fontWeightBold : Theme.fontWeightMedium
+                                    color: isCur ? Theme.on_primary : Theme.textSecondary
+                                }
+
+                                MouseArea {
+                                    id: tMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        root.activeTab = modelData.id;
+                                        if (modelData.id === "lyrics") {
+                                            root.ensureLyricsLoaded();
+                                        } else {
+                                            root.isEditingLyrics = false;
+                                            root.showLyricsPicker = false;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Rectangle {
@@ -345,7 +632,7 @@ Rectangle {
                     color: switchHover.containsMouse ? Theme.pillHover : Theme.pillBg
                     border.color: switchHover.containsMouse ? Theme.alpha(root.artAccent, 0.5) : Theme.pillBorder
                     border.width: (switchHover.containsMouse || Theme.pillBorder.a > 0) ? 1 : 0
-                    implicitWidth: switchRow.implicitWidth + 18
+                    implicitWidth: switchRow.implicitWidth + 16
                     implicitHeight: 26
 
                     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
@@ -405,7 +692,7 @@ Rectangle {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: Theme.popupSpacing
-                visible: root.player !== null && root.hasTrack
+                visible: root.activeTab === "player" && root.player !== null && root.hasTrack
 
                 // Cohesive Hero Card with integrated ambient spectrum backdrop
                 ClippingRectangle {
@@ -442,38 +729,24 @@ Rectangle {
                                 Layout.alignment: Qt.AlignBottom
                                 radius: 2
 
-                                readonly property real env: {
-                                    let norm = index / 23.0;
-                                    return Math.sin(norm * Math.PI) * 0.72 + 0.28;
-                                }
-
-                                readonly property real chPeak: {
-                                    let pList = (typeof peakMonitor !== "undefined" && peakMonitor.peaks && peakMonitor.peaks.length > 0)
-                                        ? peakMonitor.peaks
-                                        : [];
-                                    if (pList.length >= 2) {
-                                        let mix = index / 23.0;
-                                        return (pList[0] * (1.0 - mix)) + (pList[1] * mix);
+                                readonly property real bandVal: {
+                                    if (!root.isPlaying) return 0.0;
+                                    if (root.spectrumBands && root.spectrumBands.length === 24) {
+                                        let v = root.spectrumBands[index] ?? 0;
+                                        if (v > 0.008) return v;
                                     }
-                                    return (typeof peakMonitor !== "undefined" && peakMonitor.peak !== undefined) ? peakMonitor.peak : 0;
+                                    return 0.0;
                                 }
 
-                                height: {
-                                    if (!root.isPlaying) return 3;
-                                    let p = chPeak;
-                                    let ripple = Math.sin((index * 0.65) + root.wavePhase) * 0.3 + Math.cos((index * 1.2) - root.wavePhase * 0.7) * 0.2;
-                                    if (p > 0.008) {
-                                        let target = (p * env * 38) + (Math.abs(ripple) * 14 * Math.min(1.0, p * 3.5));
-                                        return Math.max(3, Math.min(42, Math.round(target)));
-                                    }
-                                    return Math.max(3, Math.round(3 + Math.abs(ripple) * 5));
-                                }
+                                height: (!root.isPlaying || bandVal <= 0.008)
+                                    ? 3
+                                    : Math.max(3, Math.min(42, Math.round(3 + bandVal * 39)))
 
-                                color: chPeak > 0.55 ? Theme.tertiary : root.artAccent
+                                color: bandVal > 0.62 ? Theme.tertiary : root.artAccent
 
                                 Behavior on height {
                                     NumberAnimation {
-                                        duration: 80
+                                        duration: 75
                                         easing.type: Theme.animColorEasing
                                     }
                                 }
@@ -782,13 +1055,601 @@ Rectangle {
                         }
                     }
                 }
+
+                // Playback speed selector pills
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Text {
+                        text: "speed"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 10
+                        color: Theme.textSecondary
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Repeater {
+                        model: [0.75, 1.0, 1.25, 1.5]
+
+                        delegate: Rectangle {
+                            required property real modelData
+                            readonly property real curRate: root.player?.rate ?? 1.0
+                            readonly property bool isCur: Math.abs(curRate - modelData) < 0.04
+                            height: 22
+                            implicitWidth: spdTxt.implicitWidth + 14
+                            radius: Theme.radiusPill
+                            color: isCur
+                                ? Theme.alpha(root.artAccent, 0.22)
+                                : (spdMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                            border.color: isCur ? root.artAccent : Theme.pillBorder
+                            border.width: 1
+
+                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+
+                            Text {
+                                id: spdTxt
+                                anchors.centerIn: parent
+                                text: modelData === 1.0 ? "1x" : (modelData + "x")
+                                font.family: Theme.fontMono
+                                font.pixelSize: 10
+                                font.weight: isCur ? Font.Bold : Font.Medium
+                                color: isCur ? root.artAccent : Theme.textSecondary
+                            }
+
+                            MouseArea {
+                                id: spdMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.setPlaybackSpeed(modelData)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Lyrics Tab View (local custom .lrc / sidecar / lrclib.net + built-in picker & editor)
+            ColumnLayout {
+                id: lyricsSection
+                Layout.fillWidth: true
+                Layout.preferredHeight: 330
+                spacing: 8
+                visible: root.activeTab === "lyrics"
+
+                // toolbar row: source badge + pick / edit / fetch / clear
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    Rectangle {
+                        height: 22
+                        implicitWidth: srcTxt.implicitWidth + 12
+                        radius: Theme.radiusPill
+                        color: root.lyricsSource === "custom"
+                            ? Theme.alpha(root.artAccent, 0.20)
+                            : Theme.surface_container_highest
+                        border.color: root.lyricsSource === "custom" ? root.artAccent : Theme.outline_variant
+                        border.width: 1
+
+                        Text {
+                            id: srcTxt
+                            anchors.centerIn: parent
+                            text: {
+                                if (root.lyricsStatusMsg !== "") return root.lyricsStatusMsg;
+                                if (root.lyricsLoading) return "loading...";
+                                if (root.lyricsSource === "custom") return "custom .lrc";
+                                if (root.lyricsSource === "sidecar") return "sidecar .lrc";
+                                if (root.lyricsSource === "lrclib") return "lrclib.net";
+                                if (root.lyricsSource === "file") return "picked file";
+                                return "no lyrics";
+                            }
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            font.weight: Font.Bold
+                            color: (root.lyricsSource === "custom" || root.lyricsStatusMsg !== "") ? root.artAccent : Theme.textSecondary
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Repeater {
+                        model: [
+                            { id: "pick", label: "pick .lrc", vis: true, active: root.showLyricsPicker },
+                            { id: "edit", label: root.isEditingLyrics ? "view" : "edit", vis: root.hasTrack, active: root.isEditingLyrics },
+                            { id: "fetch", label: "fetch", vis: root.hasTrack, active: false },
+                            { id: "savequick", label: "save", vis: root.hasTrack && (root.lyricsSource === "file" || root.lyricsSource === "lrclib") && root.lyricsRaw !== "" && !root.isEditingLyrics, active: true },
+                            { id: "clear", label: "reset", vis: root.hasTrack && root.lyricsSource === "custom", active: false }
+                        ]
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            visible: modelData.vis
+                            height: 22
+                            implicitWidth: lyrBtnTxt.implicitWidth + 12
+                            radius: Theme.radiusPill
+                            color: modelData.active
+                                ? Theme.alpha(root.artAccent, 0.22)
+                                : (lyrBtnMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                            border.color: modelData.active ? root.artAccent : Theme.pillBorder
+                            border.width: 1
+
+                            Text {
+                                id: lyrBtnTxt
+                                anchors.centerIn: parent
+                                text: modelData.label
+                                font.family: Theme.fontMono
+                                font.pixelSize: 9
+                                font.weight: modelData.active ? Font.Bold : Font.Medium
+                                color: modelData.active ? root.artAccent : Theme.textPrimary
+                            }
+
+                            MouseArea {
+                                id: lyrBtnMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (modelData.id === "pick") {
+                                        root.showLyricsPicker = !root.showLyricsPicker;
+                                        root.isEditingLyrics = false;
+                                        if (root.showLyricsPicker) root.browseLyricsDir(root.pickerCwd);
+                                    } else if (modelData.id === "edit") {
+                                        root.showLyricsPicker = false;
+                                        root.isEditingLyrics = !root.isEditingLyrics;
+                                        if (root.isEditingLyrics) {
+                                            lyricsEditorInput.text = root.lyricsRaw;
+                                            Qt.callLater(() => lyricsEditorInput.forceActiveFocus());
+                                        }
+                                    } else if (modelData.id === "fetch") {
+                                        root.showLyricsPicker = false;
+                                        root.isEditingLyrics = false;
+                                        root.loadLyrics(true);
+                                    } else if (modelData.id === "savequick") {
+                                        root.saveCustomLyrics(root.lyricsRaw);
+                                    } else if (modelData.id === "clear") {
+                                        root.clearCustomLyrics();
+                                        root.loadLyrics(true);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Built-in .lrc / .txt file picker
+                Rectangle {
+                    visible: root.showLyricsPicker
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: Theme.radiusMd
+                    color: Theme.cardBg
+                    border.color: Theme.cardBorder
+                    border.width: 1
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        spacing: 6
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 4
+
+                            Repeater {
+                                model: [
+                                    { label: "saved", dir: (Quickshell.env("XDG_DATA_HOME") || ((Quickshell.env("HOME") || "") + "/.local/share")) + "/quickshell/lyrics" },
+                                    { label: "music", dir: (Quickshell.env("HOME") || "") + "/Music" },
+                                    { label: "dl", dir: (Quickshell.env("HOME") || "") + "/Downloads" },
+                                    { label: "home", dir: Quickshell.env("HOME") || "" }
+                                ]
+
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    height: 20
+                                    implicitWidth: dirQtxt.implicitWidth + 10
+                                    radius: Theme.radiusPill
+                                    color: dirQMouse.containsMouse ? Theme.primary_overlay : Theme.pillBg
+                                    border.color: Theme.pillBorder
+                                    border.width: 1
+
+                                    Text {
+                                        id: dirQtxt
+                                        anchors.centerIn: parent
+                                        text: modelData.label
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: 9
+                                        color: Theme.textPrimary
+                                    }
+
+                                    MouseArea {
+                                        id: dirQMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.browseLyricsDir(modelData.dir)
+                                    }
+                                }
+                            }
+
+                            Item { Layout.fillWidth: true }
+                        }
+
+                        Text {
+                            text: root.pickerCwd || "~"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            color: Theme.textSecondary
+                            elide: Text.ElideMiddle
+                            Layout.fillWidth: true
+                        }
+
+                        Flickable {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            contentWidth: width
+                            contentHeight: pickerCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: pickerCol
+                                width: parent.width
+                                spacing: 3
+
+                                Repeater {
+                                    model: root.pickerEntries
+
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        readonly property bool isDir: modelData.isDir === "true" || modelData.isDir === true
+                                        Layout.fillWidth: true
+                                        height: 26
+                                        radius: Theme.radiusSm
+                                        color: pickRowMouse.containsMouse ? Theme.widgetHover : "transparent"
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.leftMargin: 6
+                                            anchors.rightMargin: 6
+                                            spacing: 6
+
+                                            Text {
+                                                text: isDir ? Theme.iconFolder : Theme.iconNote
+                                                font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
+                                                font.pixelSize: 12
+                                                color: isDir ? root.artAccent : Theme.textSecondary
+                                            }
+
+                                            Text {
+                                                text: modelData.name
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: 10
+                                                color: Theme.textPrimary
+                                                elide: Text.ElideMiddle
+                                                Layout.fillWidth: true
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: pickRowMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (isDir) root.browseLyricsDir(modelData.path);
+                                                else root.loadLyricsFile(modelData.path);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Inline editable lyrics buffer (fix typos / grammar / save custom .lrc)
+                Rectangle {
+                    visible: !root.showLyricsPicker && root.isEditingLyrics
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: Theme.radiusMd
+                    color: Theme.cardBg
+                    border.color: lyricsEditorInput.activeFocus ? root.artAccent : Theme.cardBorder
+                    border.width: 1
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        spacing: 8
+
+                        Flickable {
+                            id: editFlick
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            contentWidth: width
+                            contentHeight: Math.max(height, lyricsEditorInput.implicitHeight + 12)
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            TextEdit {
+                                id: lyricsEditorInput
+                                width: editFlick.width
+                                height: Math.max(editFlick.height, implicitHeight)
+                                wrapMode: TextEdit.Wrap
+                                selectByMouse: true
+                                font.family: Theme.fontMono
+                                font.pixelSize: 11
+                                color: Theme.textPrimary
+                                selectionColor: Theme.primary_container
+                                selectedTextColor: Theme.on_primary_container
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                text: "saves to ~/.local/share/quickshell/lyrics/"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 8
+                                color: Theme.textSecondary
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+
+                            Rectangle {
+                                height: 26
+                                implicitWidth: cnlTxt.implicitWidth + 16
+                                radius: Theme.radiusPill
+                                color: cnlMouse.containsMouse ? Theme.pillHover : Theme.pillBg
+                                border.color: Theme.pillBorder
+                                border.width: 1
+
+                                Text {
+                                    id: cnlTxt
+                                    anchors.centerIn: parent
+                                    text: "cancel"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    color: Theme.textPrimary
+                                }
+
+                                MouseArea {
+                                    id: cnlMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.isEditingLyrics = false
+                                }
+                            }
+
+                            Rectangle {
+                                height: 26
+                                implicitWidth: savTxt.implicitWidth + 18
+                                radius: Theme.radiusPill
+                                color: savMouse.containsMouse ? Theme.stateHover(root.artAccent, Theme.on_primary) : root.artAccent
+
+                                Text {
+                                    id: savTxt
+                                    anchors.centerIn: parent
+                                    text: "save custom .lrc"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.weight: Font.Bold
+                                    color: Theme.on_primary
+                                }
+
+                                MouseArea {
+                                    id: savMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.saveCustomLyrics(lyricsEditorInput.text)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Synced / Plain Lyrics Reader
+                Rectangle {
+                    visible: !root.showLyricsPicker && !root.isEditingLyrics
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: Theme.radiusMd
+                    color: Theme.cardBg
+                    border.color: Theme.cardBorder
+                    border.width: 1
+                    clip: true
+
+                    Item {
+                        anchors.fill: parent
+                        visible: !root.hasTrack || root.lyricsLoading || root.parsedLrc.lines.length === 0
+
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 8
+                            width: parent.width - 32
+
+                            Text {
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                text: !root.hasTrack
+                                    ? "no active track"
+                                    : (root.lyricsLoading ? "looking up lyrics..." : "no lyrics found for this track")
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSm
+                                color: Theme.textSecondary
+                                wrapMode: Text.Wrap
+                            }
+
+                            Row {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                spacing: 8
+                                visible: root.hasTrack && !root.lyricsLoading
+
+                                Rectangle {
+                                    height: 26
+                                    implicitWidth: empPickTxt.implicitWidth + 16
+                                    radius: Theme.radiusPill
+                                    color: Theme.pillBg
+                                    border.color: Theme.pillBorder
+                                    border.width: 1
+
+                                    Text {
+                                        id: empPickTxt
+                                        anchors.centerIn: parent
+                                        text: "browse .lrc"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: 10
+                                        color: Theme.textPrimary
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            root.showLyricsPicker = true;
+                                            root.browseLyricsDir(root.pickerCwd);
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 26
+                                    implicitWidth: empWriteTxt.implicitWidth + 16
+                                    radius: Theme.radiusPill
+                                    color: root.artAccent
+
+                                    Text {
+                                        id: empWriteTxt
+                                        anchors.centerIn: parent
+                                        text: "write / paste"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: 10
+                                        font.weight: Font.Bold
+                                        color: Theme.on_primary
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            root.isEditingLyrics = true;
+                                            lyricsEditorInput.text = root.lyricsRaw;
+                                            Qt.callLater(() => lyricsEditorInput.forceActiveFocus());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    NumberAnimation {
+                        id: lrcScrollAnim
+                        target: lyricsScroller
+                        property: "contentY"
+                        duration: 200
+                        easing.type: Easing.OutCubic
+                    }
+
+                    Connections {
+                        target: root
+                        function onActiveLrcIndexChanged() {
+                            if (root.activeTab !== "lyrics" || root.isEditingLyrics || root.showLyricsPicker) return;
+                            if (lyricsScroller.moving || lyricsScroller.dragging) return;
+                            let idx = root.activeLrcIndex;
+                            if (idx < 0 || idx >= lrcRep.count) return;
+                            let item = lrcRep.itemAt(idx);
+                            if (!item) return;
+                            let maxY = Math.max(0, lyricsScroller.contentHeight - lyricsScroller.height);
+                            let dest = Math.max(0, Math.min(maxY, item.y - (lyricsScroller.height * 0.35)));
+                            lrcScrollAnim.stop();
+                            lrcScrollAnim.to = dest;
+                            lrcScrollAnim.start();
+                        }
+                    }
+
+                    Flickable {
+                        id: lyricsScroller
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        visible: root.hasTrack && !root.lyricsLoading && root.parsedLrc.lines.length > 0
+                        contentWidth: width
+                        contentHeight: lrcCol.implicitHeight
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        Column {
+                            id: lrcCol
+                            width: lyricsScroller.width
+                            spacing: root.parsedLrc.timed ? 4 : 6
+
+                            Repeater {
+                                id: lrcRep
+                                model: root.parsedLrc.lines
+
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    required property int index
+                                    readonly property bool isCurrent: root.parsedLrc.timed && index === root.activeLrcIndex
+                                    readonly property bool isPast: root.parsedLrc.timed && root.activeLrcIndex > index
+
+                                    width: lrcCol.width
+                                    implicitHeight: lrcLineTxt.implicitHeight + 8
+                                    radius: Theme.radiusSm
+                                    color: isCurrent
+                                        ? Theme.alpha(root.artAccent, 0.16)
+                                        : (lrcLineMouse.containsMouse && modelData.time >= 0 ? Theme.widgetHover : "transparent")
+
+                                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+
+                                    Text {
+                                        id: lrcLineTxt
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.leftMargin: 6
+                                        anchors.rightMargin: 6
+                                        text: modelData.text
+                                        wrapMode: Text.Wrap
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: isCurrent ? Theme.fontSizeMd : Theme.fontSizeSm
+                                        font.weight: isCurrent ? Font.Bold : Font.Normal
+                                        color: isCurrent
+                                            ? root.artAccent
+                                            : (isPast ? Theme.on_surface_variant : Theme.textPrimary)
+                                        opacity: isPast ? 0.65 : 1.0
+                                    }
+
+                                    MouseArea {
+                                        id: lrcLineMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: modelData.time >= 0
+                                        cursorShape: modelData.time >= 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        onClicked: {
+                                            if (modelData.time >= 0 && root.player && (root.player.canSeek ?? true)) {
+                                                root.player.position = modelData.time;
+                                                root.trackPosition = modelData.time;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Cohesive Empty State Card
             Rectangle {
                 Layout.fillWidth: true
                 implicitHeight: emptyCol.implicitHeight + 28
-                visible: root.player === null || !root.hasTrack
+                visible: root.activeTab === "player" && (root.player === null || !root.hasTrack)
                 radius: Theme.radiusLg
                 color: Theme.cardBg
                 border.color: Theme.cardBorder

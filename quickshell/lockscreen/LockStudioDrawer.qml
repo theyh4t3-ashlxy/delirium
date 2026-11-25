@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import ".."
 import "../controls"
+import "../services"
 
 Rectangle {
     id: optionsCard
@@ -12,6 +13,14 @@ Rectangle {
     property var lockSurface: null
     property var statusBarItem: null
     property var burstAnim: null
+
+    function fmtIdleSecs(sec: int): string {
+        let s = Math.max(0, Math.round(sec));
+        if (s < 60) return s + "s";
+        let m = Math.floor(s / 60);
+        let rem = s % 60;
+        return rem === 0 ? (m + "m") : (m + "m " + rem + "s");
+    }
 
     readonly property bool hasInputFocus: customQuoteInput.activeFocus
 
@@ -274,8 +283,8 @@ Rectangle {
                         anchors.top: statusBarItem ? statusBarItem.bottom : parent.top
                         anchors.right: statusBarItem ? statusBarItem.right : parent.right
                         anchors.topMargin: 10
-                        width: 380
-                        height: Math.min(parent.height - 110, optionsLayout.implicitHeight + (Theme.popupPadding * 2))
+                        width: 416
+                        height: Math.min(parent.height - 104, optionsLayout.implicitHeight + (Theme.popupPadding * 2))
                         radius: root.uiRadiusLg
                         color: root.uiPopupBg
                         border.color: root.uiPopupBorder
@@ -286,6 +295,19 @@ Rectangle {
                         transformOrigin: Item.TopRight
                         clip: true
                         z: 100
+
+                        // frosted top rim highlight
+                        Rectangle {
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.topMargin: 1
+                            anchors.leftMargin: 14
+                            anchors.rightMargin: 14
+                            height: 1
+                            color: Theme.alpha("#ffffff", root.isLight ? 0.45 : 0.16)
+                            z: 5
+                        }
 
                         Behavior on opacity { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
                         Behavior on scale { NumberAnimation { duration: Theme.expressiveFast; easing.type: Theme.animEasingEntrance } }
@@ -418,14 +440,15 @@ Rectangle {
 
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    spacing: 5
+                                    spacing: 4
 
                                     Repeater {
                                         model: [
                                             { id: "layout",  label: "layout",  icon: Theme.iconGrid },
                                             { id: "clock",   label: "clock",   icon: Theme.iconClock },
                                             { id: "vibe",    label: "vibe",    icon: Theme.iconPalette },
-                                            { id: "widgets", label: "widgets", icon: Theme.iconSettings }
+                                            { id: "widgets", label: "cards",   icon: Theme.iconSettings },
+                                            { id: "idle",    label: "idle",    icon: Theme.iconCoffee }
                                         ]
                                         delegate: OptChip {
                                             required property var modelData
@@ -589,6 +612,62 @@ Rectangle {
                                         checked: root.freeDragMode
                                         onToggled: root.freeDragMode = !root.freeDragMode
                                     }
+
+                                    Text {
+                                        text: root.fmtText("lock & unlock transition")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: root.uiTextSecondary
+                                    }
+
+                                    GridLayout {
+                                        Layout.fillWidth: true
+                                        columns: 3
+                                        columnSpacing: 4
+                                        rowSpacing: 4
+
+                                        Repeater {
+                                            model: [
+                                                { id: "blur-dissolve", lbl: "dissolve" },
+                                                { id: "slide-up",      lbl: "slide up" },
+                                                { id: "zoom-snap",     lbl: "zoom snap" },
+                                                { id: "curtain-fade",  lbl: "curtain" },
+                                                { id: "editorial-stagger", lbl: "stagger" }
+                                            ]
+                                            delegate: OptChip {
+                                                required property var modelData
+                                                label: modelData.lbl
+                                                selected: root.lockTransition === modelData.id
+                                                onClicked: {
+                                                    root.lockTransition = modelData.id;
+                                                    root.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Repeater {
+                                            model: [
+                                                { id: "snappy",    lbl: "fast" },
+                                                { id: "smooth",    lbl: "smooth" },
+                                                { id: "cinematic", lbl: "cinematic" }
+                                            ]
+                                            delegate: OptChip {
+                                                required property var modelData
+                                                label: modelData.lbl
+                                                selected: root.lockAnimSpeed === modelData.id
+                                                onClicked: {
+                                                    root.lockAnimSpeed = modelData.id;
+                                                    root.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
 
                                 // tab 2: clock design, date format, text casing, password mask
@@ -635,6 +714,55 @@ Rectangle {
                                                 selected: root.clockStyle === modelData
                                                 onClicked: {
                                                     root.clockStyle = modelData;
+                                                    root.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        text: root.fmtText("clock typeface & weight")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: root.uiTextSecondary
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Repeater {
+                                            model: [
+                                                { id: "display", lbl: "display" },
+                                                { id: "sans",    lbl: "sans" },
+                                                { id: "mono",    lbl: "mono" },
+                                                { id: "serif",   lbl: "serif" }
+                                            ]
+                                            delegate: OptChip {
+                                                required property var modelData
+                                                label: modelData.lbl
+                                                selected: root.clockFont === modelData.id
+                                                onClicked: {
+                                                    root.clockFont = modelData.id;
+                                                    root.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Repeater {
+                                            model: ["light", "bold", "black"]
+                                            delegate: OptChip {
+                                                required property string modelData
+                                                label: modelData
+                                                selected: root.clockWeight === modelData
+                                                onClicked: {
+                                                    root.clockWeight = modelData;
                                                     root.saveSandbox();
                                                 }
                                             }
@@ -830,6 +958,191 @@ Rectangle {
                                             icon: Theme.iconSun
                                             selected: root.backdropMode === "light"
                                             onClicked: { root.backdropMode = "light"; root.saveSandbox(); }
+                                        }
+                                    }
+
+                                    Text {
+                                        text: root.fmtText("backdrop overlay texture")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: root.uiTextSecondary
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 5
+
+                                        Repeater {
+                                            model: ["none", "dots", "grid"]
+                                            delegate: OptChip {
+                                                required property string modelData
+                                                label: modelData
+                                                selected: root.backdropTexture === modelData
+                                                onClicked: { root.backdropTexture = modelData; root.saveSandbox(); }
+                                            }
+                                        }
+                                    }
+
+                                    // built-in lockscreen wallpaper picker + custom matugen palette
+                                    Text {
+                                        text: root.fmtText("lock wallpaper & matugen palette")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: root.uiTextSecondary
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 5
+
+                                        OptChip {
+                                            label: "sync desktop"
+                                            icon: Theme.iconWallpaper
+                                            selected: root.wallpaperSync
+                                            onClicked: {
+                                                root.wallpaperSync = true;
+                                                root.syncPaletteWithDesktop = true;
+                                                root.saveSandbox();
+                                            }
+                                        }
+                                        OptChip {
+                                            label: "custom pick"
+                                            icon: Theme.iconPalette
+                                            selected: !root.wallpaperSync
+                                            onClicked: {
+                                                root.wallpaperSync = false;
+                                                if (root.localWallpaperOverride === "") {
+                                                    let wp = root.pickRandomWallpaperInMemory();
+                                                    if (wp) root.localWallpaperOverride = wp;
+                                                }
+                                                if (!root.syncPaletteWithDesktop && root.localWallpaperOverride !== "") {
+                                                    root.extractLockPalette(root.localWallpaperOverride);
+                                                }
+                                                root.saveSandbox();
+                                            }
+                                        }
+                                    }
+
+                                    Flickable {
+                                        visible: !root.wallpaperSync && (WallpaperService?.wallpaperList?.length ?? 0) > 0
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 62
+                                        contentWidth: thumbStrip.implicitWidth
+                                        clip: true
+                                        boundsBehavior: Flickable.StopAtBounds
+
+                                        Row {
+                                            id: thumbStrip
+                                            spacing: 6
+                                            height: 60
+
+                                            Repeater {
+                                                model: (WallpaperService?.wallpaperList ?? []).slice(0, 24)
+                                                delegate: Rectangle {
+                                                    required property var modelData
+                                                    readonly property string wpPath: modelData?.path ?? ""
+                                                    readonly property string wpThumb: modelData?.thumb || modelData?.path || ""
+                                                    readonly property bool isCur: root.localWallpaperOverride === wpPath
+                                                    width: 92
+                                                    height: 58
+                                                    radius: root.uiRadiusSm
+                                                    color: root.uiWidgetBg
+                                                    border.color: isCur ? root.uiAccent : (wpItemMa.containsMouse ? Theme.alpha(root.uiAccent, 0.55) : root.uiWidgetBorder)
+                                                    border.width: isCur ? 2 : 1
+                                                    clip: true
+
+                                                    Image {
+                                                        anchors.fill: parent
+                                                        source: parent.wpThumb !== "" ? ("file://" + parent.wpThumb) : ""
+                                                        sourceSize: Qt.size(140, 90)
+                                                        fillMode: Image.PreserveAspectCrop
+                                                        asynchronous: true
+                                                    }
+
+                                                    MouseArea {
+                                                        id: wpItemMa
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        enabled: !root.studioLocked
+                                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                                                        onClicked: {
+                                                            root.wallpaperSync = false;
+                                                            root.localWallpaperOverride = parent.wpPath;
+                                                            if (!root.syncPaletteWithDesktop) {
+                                                                root.extractLockPalette(parent.wpPath);
+                                                            }
+                                                            root.saveSandbox();
+                                                            lockSurface.claimSurfaceFocus();
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    SandboxToggleRow {
+                                        visible: !root.wallpaperSync && root.localWallpaperOverride !== ""
+                                        icon: Theme.iconPalette
+                                        label: root.isExtractingPalette ? "extracting matugen palette..." : "matugen colors from lock wallpaper"
+                                        checked: !root.syncPaletteWithDesktop
+                                        onToggled: {
+                                            root.syncPaletteWithDesktop = !root.syncPaletteWithDesktop;
+                                            if (!root.syncPaletteWithDesktop && root.localWallpaperOverride !== "") {
+                                                root.extractLockPalette(root.localWallpaperOverride);
+                                            }
+                                            root.saveSandbox();
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        visible: !root.wallpaperSync && !root.syncPaletteWithDesktop && root.localWallpaperOverride !== ""
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Repeater {
+                                            model: [
+                                                { id: "scheme-tonal-spot", lbl: "tonal" },
+                                                { id: "scheme-vibrant",    lbl: "vibrant" },
+                                                { id: "scheme-expressive", lbl: "expressive" },
+                                                { id: "scheme-monochrome", lbl: "mono" }
+                                            ]
+                                            delegate: OptChip {
+                                                required property var modelData
+                                                label: modelData.lbl
+                                                selected: root.lockMatugenScheme === modelData.id
+                                                onClicked: {
+                                                    root.lockMatugenScheme = modelData.id;
+                                                    root.extractLockPalette(root.localWallpaperOverride);
+                                                    root.saveSandbox();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        visible: root.useCustomLockPalette
+                                        Layout.fillWidth: true
+                                        spacing: 5
+
+                                        Repeater {
+                                            model: [
+                                                root.lockPalPrimary,
+                                                root.lockPalSecondary,
+                                                root.lockPalTertiary,
+                                                root.lockPalContainer,
+                                                root.lockPalSurface
+                                            ]
+                                            delegate: Rectangle {
+                                                required property string modelData
+                                                Layout.fillWidth: true
+                                                Layout.preferredHeight: 16
+                                                radius: root.uiRadiusPill
+                                                color: modelData !== "" ? modelData : "transparent"
+                                                border.color: Theme.alpha(root.uiTextPrimary, 0.25)
+                                                border.width: 1
+                                            }
                                         }
                                     }
 
@@ -1157,6 +1470,163 @@ Rectangle {
                                         label: "auto-zen screensaver after 30s idle"
                                         checked: root.autoZenIdle
                                         onToggled: { root.autoZenIdle = !root.autoZenIdle; root.saveSandbox(); }
+                                    }
+                                }
+
+                                // tab 5: idle timers & security pam controls
+                                ColumnLayout {
+                                    visible: root.studioTab === "idle"
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Text {
+                                        text: root.fmtText("automatic idle timeouts")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: root.uiTextSecondary
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconSun
+                                        label: "auto dim display when idle"
+                                        checked: Settings?.idleDimEnabled ?? true
+                                        onToggled: {
+                                            if (Settings) {
+                                                Settings.idleDimEnabled = !Settings.idleDimEnabled;
+                                                if (Settings.save) Settings.save();
+                                            }
+                                        }
+                                    }
+
+                                    SandboxSlider {
+                                        visible: Settings?.idleDimEnabled ?? true
+                                        label: "dim delay"
+                                        icon: Theme.iconClock
+                                        from: 30
+                                        to: 600
+                                        stepSize: 30
+                                        value: Settings?.idleDimSeconds ?? 150
+                                        displayText: optionsCard.fmtIdleSecs(Settings?.idleDimSeconds ?? 150)
+                                        onMoved: (v) => {
+                                            if (Settings) {
+                                                Settings.idleDimSeconds = Math.round(v);
+                                                if (Settings.save) Settings.save();
+                                            }
+                                        }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconLock
+                                        label: "auto lock screen on idle"
+                                        checked: Settings?.idleLockEnabled ?? true
+                                        onToggled: {
+                                            if (Settings) {
+                                                Settings.idleLockEnabled = !Settings.idleLockEnabled;
+                                                if (Settings.save) Settings.save();
+                                            }
+                                        }
+                                    }
+
+                                    SandboxSlider {
+                                        visible: Settings?.idleLockEnabled ?? true
+                                        label: "lock delay"
+                                        icon: Theme.iconClock
+                                        from: 30
+                                        to: 1800
+                                        stepSize: 30
+                                        value: Settings?.idleLockSeconds ?? 300
+                                        displayText: optionsCard.fmtIdleSecs(Settings?.idleLockSeconds ?? 300)
+                                        onMoved: (v) => {
+                                            if (Settings) {
+                                                Settings.idleLockSeconds = Math.round(v);
+                                                if (Settings.save) Settings.save();
+                                            }
+                                        }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconEyeOff
+                                        label: "turn display off (dpms)"
+                                        checked: Settings?.idleDpmsEnabled ?? true
+                                        onToggled: {
+                                            if (Settings) {
+                                                Settings.idleDpmsEnabled = !Settings.idleDpmsEnabled;
+                                                if (Settings.save) Settings.save();
+                                            }
+                                        }
+                                    }
+
+                                    SandboxSlider {
+                                        visible: Settings?.idleDpmsEnabled ?? true
+                                        label: "screen off delay"
+                                        icon: Theme.iconClock
+                                        from: 30
+                                        to: 2400
+                                        stepSize: 30
+                                        value: Settings?.idleDpmsSeconds ?? 330
+                                        displayText: optionsCard.fmtIdleSecs(Settings?.idleDpmsSeconds ?? 330)
+                                        onMoved: (v) => {
+                                            if (Settings) {
+                                                Settings.idleDpmsSeconds = Math.round(v);
+                                                if (Settings.save) Settings.save();
+                                            }
+                                        }
+                                    }
+
+                                    SandboxToggleRow {
+                                        icon: Theme.iconSuspend
+                                        label: "auto suspend when idle"
+                                        checked: Settings?.idleSuspendEnabled ?? true
+                                        onToggled: {
+                                            if (Settings) {
+                                                Settings.idleSuspendEnabled = !Settings.idleSuspendEnabled;
+                                                if (Settings.save) Settings.save();
+                                            }
+                                        }
+                                    }
+
+                                    SandboxSlider {
+                                        visible: Settings?.idleSuspendEnabled ?? true
+                                        label: "suspend delay"
+                                        icon: Theme.iconClock
+                                        from: 60
+                                        to: 3600
+                                        stepSize: 60
+                                        value: Settings?.idleSuspendSeconds ?? 600
+                                        displayText: optionsCard.fmtIdleSecs(Settings?.idleSuspendSeconds ?? 600)
+                                        onMoved: (v) => {
+                                            if (Settings) {
+                                                Settings.idleSuspendSeconds = Math.round(v);
+                                                if (Settings.save) Settings.save();
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        text: root.fmtText("pam authentication service")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: root.uiTextSecondary
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Repeater {
+                                            model: ["login", "hyprlock", "system-auth"]
+                                            delegate: OptChip {
+                                                required property string modelData
+                                                label: modelData
+                                                selected: root.pamService === modelData
+                                                onClicked: {
+                                                    root.pamService = modelData;
+                                                    root.saveSandbox();
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

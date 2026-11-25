@@ -3,27 +3,20 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import ".."
 import "../controls"
+import "../theme/confFormat.mjs" as ConfFmt
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 
-Rectangle {
+BarPill {
     id: root
 
-    implicitWidth: Theme.isVertical ? (Theme.barHeight - 8) : (noteRow.implicitWidth + 20)
-    implicitHeight: Theme.barHeight - 8
-    radius: Theme.barWidgetRadius
-    color: popup.open ? Theme.primary_overlay : (nMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
-    border.color: popup.open ? Theme.primary : Theme.barPillBorder
-    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+    active: popup.open
+    hovered: nMouse.containsMouse
+    pressed: nMouse.pressed
+    implicitWidth: Theme.isVertical ? pillSize : (noteRow.implicitWidth + 20)
     visible: Settings.showQuickNotes
-
-    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
-
-    property var barScreen: null
-    property var barMonitor: null
     property int activeIndex: 0
     property int lastCursorPos: 0
     property bool isSyncingEditor: false
@@ -43,8 +36,31 @@ Rectangle {
     property int noteLineCount: 1
 
     readonly property string dataDir: (Quickshell.env("XDG_DATA_HOME") || ((Quickshell.env("HOME") || "") + "/.local/share")) + "/quickshell"
-    readonly property string notesFilePath: dataDir + "/notes.json"
-    readonly property string tasksFilePath: dataDir + "/tasks.json"
+    readonly property string notesFilePath: dataDir + "/notes.conf"
+    readonly property string tasksFilePath: dataDir + "/tasks.conf"
+
+    Process {
+        id: pasteClipProc
+        command: ["wl-paste", "--no-newline"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let clip = text || "";
+                if (!clip) return;
+                if (root.activeTab === "notes") {
+                    if (notesModel.count > root.activeIndex) {
+                        let pos = Math.max(0, Math.min(noteArea.text.length, root.lastCursorPos));
+                        noteArea.insert(pos, clip);
+                        root.lastCursorPos = pos + clip.length;
+                        noteArea.forceActiveFocus();
+                        noteArea.cursorPosition = root.lastCursorPos;
+                    }
+                } else {
+                    taskInput.text = taskInput.text ? (taskInput.text + " " + clip.replace(/\s+/g, " ").trim()) : clip.replace(/\s+/g, " ").trim();
+                    taskInput.forceActiveFocus();
+                }
+            }
+        }
+    }
 
     ListModel { id: notesModel }
     ListModel { id: tasksModel }
@@ -183,7 +199,7 @@ Rectangle {
                 createDefaultNotes();
                 return;
             }
-            let parsed = JSON.parse(raw);
+            let parsed = ConfFmt.parseRecords(raw, "note");
             if (Array.isArray(parsed) && parsed.length > 0) {
                 for (let i = 0; i < parsed.length; i++) {
                     notesModel.append({
@@ -229,7 +245,7 @@ Rectangle {
             });
         }
         root.isSavingNotes = true;
-        notesFile.setText(JSON.stringify(arr));
+        notesFile.setText(ConfFmt.serializeRecords(arr, "note", ["title", "content"]));
         writeGuardTimer.restart();
         root.savedFeedback = true;
         savedBadgeTimer.restart();
@@ -273,16 +289,15 @@ Rectangle {
                 createDefaultTasks();
                 return;
             }
-            let parsed = JSON.parse(raw);
-            let items = Array.isArray(parsed) ? parsed : (parsed.tasks || []);
+            let items = ConfFmt.parseRecords(raw, "task");
             if (Array.isArray(items) && items.length > 0) {
                 for (let i = 0; i < items.length; i++) {
                     tasksModel.append({
-                        id: items[i].id || (Date.now() + i),
+                        id: Number(items[i].id) || (Date.now() + i),
                         text: items[i].text || "",
-                        done: Boolean(items[i].done),
+                        done: items[i].done === true || items[i].done === "true",
                         priority: items[i].priority || "normal",
-                        createdAt: items[i].createdAt || Date.now()
+                        createdAt: Number(items[i].createdAt) || Date.now()
                     });
                 }
                 root.rebuildFilteredTasks();
@@ -341,7 +356,7 @@ Rectangle {
             });
         }
         root.isSavingTasks = true;
-        tasksFile.setText(JSON.stringify(arr));
+        tasksFile.setText(ConfFmt.serializeRecords(arr, "task", ["id", "text", "done", "priority", "createdAt"]));
         writeGuardTimer.restart();
         root.savedFeedback = true;
         savedBadgeTimer.restart();
@@ -750,6 +765,9 @@ Rectangle {
                         if (root.activeTab === "notes") {
                             if (notesModel.count > root.activeIndex) {
                                 Quickshell.clipboardText = noteArea.text;
+                                if (noteArea.text.length > 0) {
+                                    Quickshell.execDetached(["wl-copy", "--", noteArea.text]);
+                                }
                                 root.copiedFeedback = true;
                                 copyTimer.restart();
                             }
@@ -760,10 +778,24 @@ Rectangle {
                                 let tag = item.priority === "urgent" ? "[!] " : (item.priority === "low" ? "[low] " : "");
                                 lines.push("- [" + (item.done ? "x" : " ") + "] " + tag + item.text);
                             }
-                            Quickshell.clipboardText = lines.join("\n");
+                            let joined = lines.join("\n");
+                            Quickshell.clipboardText = joined;
+                            if (joined.length > 0) {
+                                Quickshell.execDetached(["wl-copy", "--", joined]);
+                            }
                             root.copiedFeedback = true;
                             copyTimer.restart();
                         }
+                    }
+                }
+
+                MiniChip {
+                    icon: Theme.iconClipboard
+                    label: "paste"
+                    onClicked: {
+                        popup.pinned = true;
+                        pasteClipProc.running = false;
+                        pasteClipProc.running = true;
                     }
                 }
 

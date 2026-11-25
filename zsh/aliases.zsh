@@ -80,11 +80,9 @@ hash -d dots="$HOME/.local/share/dotfiles"
 hash -d hypr="$HOME/.local/share/dotfiles/hypr"
 hash -d qs="$HOME/.local/share/dotfiles/quickshell"
 hash -d nix="$HOME/.local/share/dotfiles/nixos"
+hash -d btop="$HOME/.local/share/dotfiles/btop"
 hash -d wp="$HOME/.wallpapers"
 hash -d conf="$HOME/.config"
-
-# nmtui with dark palette
-alias nmtui='NEWT_COLORS="root=black,black:border=gray,black:window=black,black:title=lightgray,black:button=black,cyan:actbutton=cyan,black:compactbutton=black,gray:checkbox=black,gray:actcheckbox=cyan,black:entry=white,black:label=gray,black:listbox=lightgray,black:actlistbox=black,cyan:textbox=lightgray,black:acttextbox=black,cyan:helpline=gray,black:roottext=gray,black" command nmtui'
 
 # antigravity cli fallback
 if (( ! $+commands[agy] )); then
@@ -95,21 +93,22 @@ fi
 alias reload="exec zsh"
 alias sz="source \${ZDOTDIR:-\$HOME/.config/zsh}/sources.zsh"
 
-# explain last exit code with dry humiliation
+# explain last exit code (falls back to $_GP_EXIT recorded by prompt hook)
 why() {
-    local code="${1:-$?}"
+    local code="${1:-${_GP_EXIT:-$?}}"
     case "$code" in
-        0)   print -P "%F{green}󰄲 exit 0:%f nothing failed. you're panicking over a success." ;;
-        1)   print -P "%F{red}󰅚 exit 1:%f general failure. something choked and died without telling you why." ;;
-        2)   print -P "%F{red}󰅚 exit 2:%f syntax or misuse error. you fed bad arguments to a tool with zero patience." ;;
-        126) print -P "%F{red}󰅚 exit 126:%f permission denied. binary isn't executable or your kernel hates you." ;;
-        127) print -P "%F{red}󰅚 exit 127:%f command not found. you hallucinated a utility that doesn't exist." ;;
-        130) print -P "%F{yellow}󰀦 exit 130:%f sigint. you mashed ctrl+c in a blind panic." ;;
-        134) print -P "%F{red}󰅚 exit 134:%f sigabrt. program aborted itself in disgust." ;;
-        137) print -P "%F{red}󰅚 exit 137:%f sigkill / oom. the linux kernel took your process out back and shot it." ;;
-        139) print -P "%F{red}󰅚 exit 139:%f segfault. null pointer dereference. your memory is in shards." ;;
-        143) print -P "%F{yellow}󰀦 exit 143:%f sigterm. polite murder by systemd or process manager." ;;
-        *)   print -P "%F{red}󰅚 exit $code:%f esoteric failure code. consult a priest or stackoverflow." ;;
+        0)   print -P "%F{2}󰄲 exit 0:%f nothing failed. clean run." ;;
+        1)   print -P "%F{1}󰅚 exit 1:%f general failure. something exited non-zero without specifics." ;;
+        2)   print -P "%F{1}󰅚 exit 2:%f misuse / bad arguments or missing flag." ;;
+        126) print -P "%F{1}󰅚 exit 126:%f permission denied. file exists but isn't executable." ;;
+        127) print -P "%F{1}󰅚 exit 127:%f command not found in PATH." ;;
+        130) print -P "%F{3}󰀦 exit 130:%f sigint (ctrl+c)." ;;
+        134) print -P "%F{1}󰅚 exit 134:%f sigabrt. process aborted itself." ;;
+        137) print -P "%F{1}󰅚 exit 137:%f sigkill (killed or out of memory)." ;;
+        139) print -P "%F{1}󰅚 exit 139:%f sigsegv (segmentation fault)." ;;
+        141) print -P "%F{3}󰀦 exit 141:%f sigpipe (downstream reader closed pipe early)." ;;
+        143) print -P "%F{3}󰀦 exit 143:%f sigterm (graceful kill requested)." ;;
+        *)   print -P "%F{1}󰅚 exit $code:%f non-zero status returned." ;;
     esac
 }
 alias ouch="why"
@@ -122,20 +121,7 @@ alias qs-reload="cli reload"
 please() {
     local last_cmd=$(fc -ln -1 | sed 's/^[[:space:]]*//')
     if [[ -n "$last_cmd" ]]; then
-        print -P "%F{yellow}󰀦 escalating with sudo:%f %F{cyan}sudo $last_cmd%f"
+        print -P "%F{3}󰀦 escalating with sudo:%f %F{6}sudo $last_cmd%f"
         eval "sudo $last_cmd"
     fi
-}
-
-# compile all zsh configs to zwc bytecode to keep startup sub-4ms
-compile-zsh() {
-    local zdir="${ZDOTDIR:-$HOME/.config/zsh}"
-    print -P "%F{cyan}󰄛 compiling zsh bytecode cache in $zdir...%f"
-    local count=0
-    for f in "$zdir"/*.zsh; do
-        if [[ -f "$f" ]]; then
-            zcompile -R "$f" && (( count++ ))
-        fi
-    done
-    print -P "%F{green}󰄲 compiled $count files into .zwc bytecode%f"
 }

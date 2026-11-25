@@ -30,8 +30,7 @@ Item {
         return Math.max(0.0, Math.min(1.0, (value - from) / (to - from)));
     }
 
-    // Material 3 Expressive spring relaxation: when paused, sine wave straightens out to flat line
-    property real currentAmplitude: (playing && wavy) ? (waveAmplitude * (1.0 + (audioPeak * 0.35))) : 0.0
+    property real currentAmplitude: (playing && wavy && audioPeak > 0.002) ? (waveAmplitude * (1.0 + (audioPeak * 0.35))) : (playing && wavy ? waveAmplitude * 0.55 : 0.0)
     Behavior on currentAmplitude {
         NumberAnimation {
             duration: Theme.expressiveDefault
@@ -49,7 +48,7 @@ Item {
         to: Math.PI * 2
         duration: 2200
         loops: Animation.Infinite
-        running: root.playing && root.wavy && root.visible && root.currentAmplitude > 0.05
+        running: root.playing && root.wavy && root.visible && root.currentAmplitude > 0.1
     }
 
     onPhaseChanged: canvas.requestPaint()

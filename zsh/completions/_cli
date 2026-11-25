@@ -4,25 +4,34 @@ local curcontext="$curcontext" state line
 typeset -A opt_args
 
 local -a commands=(
+    'doctor:run desktop, matugen, ANSI, btop, and zsh health diagnostics'
+    'theme:show active wallpaper, mode/scheme, and ANSI color blocks'
+    'palette:alias for theme'
+    'logs:tail active quickshell or Brain_Shell runtime log'
     'shell:switch or toggle active shell (quickshell <-> brain_shell)'
     'qs:shortcut to switch to standard quickshell'
-    'bs:shortcut to switch to brain_shell'
+    'bs:shortcut to switch to Brain_Shell'
     'reload:gracefully reload active shell'
     'restart:gracefully reload active shell'
     'kill:kill running shell instances'
     'stop:kill running shell instances'
-    'status:show active shell, pids, and memory'
+    'status:show active shell, pids, theme mode, and memory'
     'info:show active shell info'
     'launcher:toggle app launcher'
-    'dashboard:toggle dashboard / control center'
+    'dashboard:toggle dashboard / quicksettings'
+    'quicksettings:toggle quicksettings'
     'notifs:toggle notification center'
+    'dnd:toggle do not disturb'
     'clip:toggle clipboard history'
     'files:open preferred file manager'
+    'wp:roll wallpaper or pass subcommands to wp'
     'wall:roll random wallpaper & regenerate tokens'
     'audio:toggle volume / audio control'
-    'mixer:toggle audio mixer'
+    'media:toggle now playing popup'
+    'capture:open screen capture studio'
     'screenshot:capture screenshot'
     'record:screen recording controls'
+    'caffeine:toggle sleep inhibitor popup'
     'lock:lock session'
     'power:open power menu'
     'keybinds:view keybindings cheatsheet'
@@ -44,7 +53,7 @@ case $state in
             shell|switch|toggle|t)
                 local -a targets=(
                     'qs:standard quickshell'
-                    'bs:brain_shell'
+                    'bs:Brain_Shell'
                     'toggle:toggle between shells'
                     'restart:restart active shell'
                 )
@@ -56,8 +65,27 @@ case $state in
                     'region:record selected region'
                     'window:record active window'
                     'stop:stop active recording'
+                    'discard:discard active recording'
                 )
                 _describe -t rec_cmds 'record action' rec_cmds
+                ;;
+            wp|wallpaper|wall|w)
+                local -a wp_cmds=(
+                    'status:show active wallpaper & palette'
+                    'dark:switch to dark mode'
+                    'light:switch to light mode'
+                    'toggle:toggle dark/light mode'
+                    'random:roll random local wallpaper'
+                    'wh:roll online wallpaper from wallhaven'
+                    'scheme:switch matugen scheme'
+                    'reload:reapply current wallpaper & colors'
+                    'scan:rescan wallpaper folders'
+                )
+                _describe -t wp_cmds 'wp action' wp_cmds
+                ;;
+            logs|log)
+                local -a log_opts=('-f:follow log stream' '40:last 40 lines' '100:last 100 lines')
+                _describe -t log_opts 'log option' log_opts
                 ;;
             files|fm|e)
                 _directories
@@ -65,11 +93,14 @@ case $state in
             act|action)
                 local -a acts=(
                     'launcher:app launcher'
-                    'dashboard:dashboard'
+                    'dashboard:quicksettings / dashboard'
                     'notifs:notifications'
+                    'dnd:do not disturb'
                     'clipboard:clipboard manager'
+                    'capture:screen capture panel'
                     'files:file manager'
                     'wallpaper:roll wallpaper'
+                    'caffeine:sleep inhibitor'
                     'powermenu:power menu'
                     'keybinds:cheatsheet'
                     'welcome:welcome wizard'

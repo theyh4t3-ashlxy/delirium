@@ -84,21 +84,28 @@ ClippingRectangle {
                                             return peakMonitor?.peak ?? 0;
                                         }
 
-                                        height: {
-                                            if (!lockSurface.playerIsPlaying) return 3;
-                                            let p = chPeak;
-                                            let ripple = Math.sin((index * 0.65) + root.wavePhase) * 0.3 + Math.cos((index * 1.2) - root.wavePhase * 0.7) * 0.2;
-                                            if (p > 0.008) {
-                                                let target = (p * env * 36) + (Math.abs(ripple) * 12 * Math.min(1.0, p * 3.5));
-                                                return Math.max(3, Math.min(40, Math.round(target)));
+                                        readonly property real spectrumAmp: {
+                                            if (!lockSurface.playerIsPlaying) return 0.0;
+                                            let bands = root?.spectrumBands;
+                                            if (bands && bands.length === 24) {
+                                                return bands[index] || 0.0;
                                             }
-                                            return Math.max(3, Math.round(3 + Math.abs(ripple) * 5));
+                                            return 0.0;
                                         }
 
-                                        color: chPeak > 0.55 ? Theme.tertiary : lockSurface.artAccent
+                                        height: {
+                                            if (!lockSurface.playerIsPlaying || spectrumAmp <= 0.015) return 2;
+                                            return Math.max(2, Math.min(42, Math.round(2 + spectrumAmp * 38)));
+                                        }
+                                        opacity: (!lockSurface.playerIsPlaying || spectrumAmp <= 0.015) ? 0.28 : (0.55 + spectrumAmp * 0.45)
+
+                                        color: spectrumAmp > 0.65 ? (root?.uiTertiary ?? Theme.tertiary) : lockSurface.artAccent
 
                                         Behavior on height {
-                                            NumberAnimation { duration: 75; easing.type: Theme.animColorEasing }
+                                            NumberAnimation { duration: 55; easing.type: Theme.animColorEasing }
+                                        }
+                                        Behavior on opacity {
+                                            NumberAnimation { duration: 90 }
                                         }
                                     }
                                 }

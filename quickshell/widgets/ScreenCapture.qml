@@ -3,19 +3,76 @@ import QtQuick
 import QtQuick.Layouts
 import ".."
 import "../controls"
+import "../theme/confFormat.mjs" as ConfFmt
 import Quickshell
+import Quickshell.Io
 import Quickshell.Hyprland
 
-Rectangle {
+BarPill {
     id: root
 
-    property var barScreen: null
-    property var barMonitor: null
     property bool isRecording: typeof ScreenRecService !== "undefined" ? (ScreenRecService?.isRecording ?? false) : false
     property string activeAudio: typeof ScreenRecService !== "undefined" ? (ScreenRecService?.activeAudio ?? "both") : "both"
     property int captureDelaySec: 0
     property int countdownRemaining: 0
     property string pendingTarget: ""
+    property bool showSettings: false
+    property var recentCaptures: []
+    property string copiedCapturePath: ""
+
+    Timer {
+        id: copiedCaptureTimer
+        interval: 1200
+        onTriggered: root.copiedCapturePath = ""
+    }
+
+    Process {
+        id: recentProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let recs = ConfFmt.parseRecords(text || "", "cap");
+                root.recentCaptures = Array.isArray(recs) ? recs : [];
+            }
+        }
+    }
+
+    function refreshRecentCaptures() {
+        let shotDir = Settings?.screenshotDir || ((Quickshell.env("HOME") || "") + "/Pictures/Screenshots");
+        let recDir = ScreenRecService?.outputDirectory || ((Quickshell.env("HOME") || "") + "/Videos/Recordings");
+        let py = "import os, sys\n" +
+            "def esc(s): return s.replace('\\\\','\\\\\\\\').replace('\\n','\\\\n').replace('=','\\\\e').replace(',','\\\\c').replace(';','\\\\s').replace('|','\\\\p')\n" +
+            "items = []\n" +
+            "img_ext = {'.png','.jpg','.jpeg','.webp','.bmp'}\n" +
+            "vid_ext = {'.mp4','.mkv','.webm','.mov'}\n" +
+            "for d, kind_hint in [(sys.argv[1], 'img'), (sys.argv[2], 'vid')]:\n" +
+            "  if not d or not os.path.isdir(d): continue\n" +
+            "  try:\n" +
+            "    for e in os.scandir(d):\n" +
+            "      if not e.is_file(): continue\n" +
+            "      ext = os.path.splitext(e.name)[1].lower()\n" +
+            "      if ext in img_ext: k = 'image'\n" +
+            "      elif ext in vid_ext: k = 'video'\n" +
+            "      else: continue\n" +
+            "      items.append((e.stat().st_mtime, k, e.path, e.name))\n" +
+            "  except Exception: pass\n" +
+            "items.sort(key=lambda x: x[0], reverse=True)\n" +
+            "items = items[:10]\n" +
+            "print(f'count={len(items)}')\n" +
+            "for i, (_, k, p, n) in enumerate(items):\n" +
+            "  print(f'cap.{i}.kind={k}')\n" +
+            "  print(f'cap.{i}.path={esc(p)}')\n" +
+            "  print(f'cap.{i}.name={esc(n)}')\n";
+        recentProc.command = ["python3", "-c", py, shotDir, recDir];
+        recentProc.running = false;
+        recentProc.running = true;
+    }
+
+    Connections {
+        target: ScreenRecService
+        function onIsRecordingChanged() {
+            if (!ScreenRecService.isRecording) root.refreshRecentCaptures();
+        }
+    }
 
     readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
     readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
@@ -35,33 +92,21 @@ Rectangle {
         return null;
     }
 
-    implicitWidth: {
-        if (Theme.isVertical) return Theme.barHeight - 8;
-        if (root.isRecording || countdownTimer.running) return recRow.implicitWidth + 20;
-        if (Theme.isTextIconSet) return iconRow.implicitWidth + 20;
-        return Theme.barHeight - 8;
-    }
-    implicitHeight: Theme.barHeight - 8
-    radius: Theme.barWidgetRadius
-
-    color: {
-        if (cMouse.pressed) return Theme.widgetActive;
-        if (root.isRecording) return Theme.error_overlay;
-        if (countdownTimer.running) return Theme.warn_overlay;
-        if (popup.open) return Theme.primary_overlay;
-        if (cMouse.containsMouse) return Theme.barPillHover;
-        return Theme.barPillBg;
-    }
-    border.color: {
-        if (root.isRecording) return Theme.error;
-        if (countdownTimer.running) return Theme.warn;
-        return popup.open ? Theme.primary : Theme.barPillBorder;
-    }
-    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+    active: popup.open
+    alert: root.isRecording
+    hovered: cMouse.containsMouse
+    pressed: cMouse.pressed
+    normalBg: countdownTimer.running ? Theme.warn_overlay : Theme.barPillBg
+    normalBorder: countdownTimer.running ? Theme.warn : Theme.barPillBorder
     clip: true
 
-    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+    implicitWidth: {
+        if (Theme.isVertical) return pillSize;
+        if (root.isRecording || countdownTimer.running) return recRow.implicitWidth + 20;
+        if (Theme.isTextIconSet) return iconRow.implicitWidth + 20;
+        return pillSize;
+    }
+
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
 
     Timer {
@@ -372,19 +417,25 @@ Rectangle {
         id: popup
         screen: root.targetScreen
         cardWidth: 390
-        cardHeight: Math.round(captureLayout.implicitHeight + (Theme.popupPadding * 2))
+        cardHeight: Math.min(Theme.popupMaxHeight ?? 620, Math.round(captureLayout.implicitHeight + (Theme.popupPadding * 2)))
         targetRelativeX: 0
         targetRelativeY: 0
+        onOpenChanged: {
+            if (open) {
+                root.showSettings = false;
+                root.refreshRecentCaptures();
+            }
+        }
 
         content: ColumnLayout {
             id: captureLayout
             anchors.fill: parent
             spacing: Theme.popupSpacing
 
-            // header with icon badge, rotating flavor quote, and status pill
+            // header with icon badge, rotating flavor quote, status pill, and settings toggle
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 10
+                spacing: 8
 
                 Rectangle {
                     width: 34
@@ -409,7 +460,7 @@ Rectangle {
                     spacing: 1
 
                     Text {
-                        text: "screen capture & recorder"
+                        text: root.showSettings ? "capture & overlay settings" : "screen capture & recorder"
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeMd
                         font.weight: Font.Bold
@@ -417,7 +468,9 @@ Rectangle {
                     }
 
                     Text {
-                        text: Theme.getFlavor("screenshot", "gpu accelerated • native wayland")
+                        text: root.showSettings
+                            ? "selection guides, snapping, flash & border styling"
+                            : Theme.getFlavor("screenshot", "gpu accelerated • native wayland")
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface_variant
@@ -444,10 +497,151 @@ Rectangle {
                         color: root.isRecording ? Theme.error : (countdownTimer.running ? Theme.warn : Theme.primary)
                     }
                 }
+
+                IconButton {
+                    icon: root.showSettings ? Theme.iconClose : Theme.iconSettings
+                    iconSize: Theme.fontSizeMd
+                    highlighted: root.showSettings
+                    tooltip: root.showSettings ? "back to capture" : "overlay & capture settings"
+                    onClicked: root.showSettings = !root.showSettings
+                }
+            }
+
+            // capture & selection overlay settings drawer (moved out of QuickSettings)
+            Rectangle {
+                visible: root.showSettings
+                Layout.fillWidth: true
+                implicitHeight: Math.min(430, capSetCol.implicitHeight + 18)
+                radius: Theme.radiusMd
+                color: Theme.cardBg
+                border.color: Theme.cardBorder
+                border.width: 1
+                clip: true
+
+                Flickable {
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    contentWidth: width
+                    contentHeight: capSetCol.implicitHeight
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    ColumnLayout {
+                        id: capSetCol
+                        width: parent.width
+                        spacing: 8
+
+                        Repeater {
+                            model: [
+                                { key: "screenshotWindowSnapping", title: "window snapping", sub: "snap selection box to hovered hyprland windows" },
+                                { key: "screenshotFreeze", title: "freeze display frame", sub: "pause screen frame while dragging selection" },
+                                { key: "screenshotFlash", title: "shutter flash", sub: "visual flash feedback on capture" },
+                                { key: "screenshotNotify", title: "desktop notification", sub: "notify with preview thumbnail after saving" },
+                                { key: "screenshotShowCrosshair", title: "hairline crosshairs", sub: "alignment crosshair lines tracking cursor" },
+                                { key: "screenshotShowBadge", title: "dimension badge", sub: "show [w x h] and hovered class badge" },
+                                { key: "screenshotShowHandles", title: "corner accent handles", sub: "draw selection corner markers" }
+                            ]
+
+                            delegate: RowLayout {
+                                required property var modelData
+                                readonly property bool checkedVal: Boolean(Settings ? Settings[modelData.key] : false)
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 1
+
+                                    Text {
+                                        text: modelData.title
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Font.DemiBold
+                                        color: Theme.on_surface
+                                    }
+
+                                    Text {
+                                        text: modelData.sub
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        color: Theme.on_surface_variant
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
+                                }
+
+                                ToggleSwitch {
+                                    checked: parent.checkedVal
+                                    onToggled: {
+                                        if (Settings) {
+                                            Settings[modelData.key] = !parent.checkedVal;
+                                            if (Settings.save) Settings.save();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 1
+                            color: Theme.widgetBorder
+                        }
+
+                        Slider {
+                            Layout.fillWidth: true
+                            label: "overlay dim"
+                            unit: "%"
+                            from: 10
+                            to: 90
+                            stepSize: 5
+                            value: Math.round((Settings?.screenshotDimOpacity ?? 0.5) * 100)
+                            onMoved: (val) => {
+                                if (Settings) {
+                                    Settings.screenshotDimOpacity = val / 100.0;
+                                    if (Settings.save) Settings.save();
+                                }
+                            }
+                        }
+
+                        Slider {
+                            Layout.fillWidth: true
+                            label: "selection border width"
+                            unit: "px"
+                            from: 1
+                            to: 6
+                            stepSize: 1
+                            value: Settings?.screenshotBorderWidth ?? 2
+                            onMoved: (val) => {
+                                if (Settings) {
+                                    Settings.screenshotBorderWidth = Math.round(val);
+                                    if (Settings.save) Settings.save();
+                                }
+                            }
+                        }
+
+                        Slider {
+                            Layout.fillWidth: true
+                            label: "selection corner radius"
+                            unit: "px"
+                            from: 0
+                            to: 20
+                            stepSize: 2
+                            value: Settings?.screenshotBorderRadius ?? 8
+                            onMoved: (val) => {
+                                if (Settings) {
+                                    Settings.screenshotBorderRadius = Math.round(val);
+                                    if (Settings.save) Settings.save();
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // screenshot card
             Rectangle {
+                visible: !root.showSettings
                 Layout.fillWidth: true
                 implicitHeight: shotCol.implicitHeight + 20
                 radius: Theme.radiusMd
@@ -571,6 +765,7 @@ Rectangle {
 
             // screen recording card
             Rectangle {
+                visible: !root.showSettings
                 Layout.fillWidth: true
                 implicitHeight: recCol.implicitHeight + 20
                 radius: Theme.radiusMd
@@ -790,8 +985,249 @@ Rectangle {
                 }
             }
 
+            // recent captures gallery
+            Rectangle {
+                visible: !root.showSettings
+                Layout.fillWidth: true
+                implicitHeight: recentCol.implicitHeight + 18
+                radius: Theme.radiusMd
+                color: Theme.cardBg
+                border.color: Theme.cardBorder
+                border.width: 1
+
+                ColumnLayout {
+                    id: recentCol
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    spacing: 6
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Text {
+                            text: Theme.iconHistory
+                            font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
+                            font.pixelSize: Theme.fontSizeSm
+                            color: Theme.primary
+                        }
+
+                        Text {
+                            text: "recent captures (" + root.recentCaptures.length + ")"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: Font.Bold
+                            color: Theme.on_surface
+                            Layout.fillWidth: true
+                        }
+
+                        IconButton {
+                            icon: Theme.iconRefresh
+                            iconSize: 12
+                            implicitWidth: 22
+                            implicitHeight: 22
+                            tooltip: "refresh gallery"
+                            onClicked: root.refreshRecentCaptures()
+                        }
+                    }
+
+                    Text {
+                        visible: root.recentCaptures.length === 0
+                        text: "no recent screenshots or recordings found"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 10
+                        color: Theme.on_surface_variant
+                        Layout.fillWidth: true
+                    }
+
+                    Flickable {
+                        visible: root.recentCaptures.length > 0
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 82
+                        contentWidth: recentStrip.implicitWidth
+                        contentHeight: 82
+                        flickableDirection: Flickable.HorizontalFlick
+                        clip: true
+
+                        Row {
+                            id: recentStrip
+                            height: 82
+                            spacing: 6
+
+                            Repeater {
+                                model: root.recentCaptures
+
+                                delegate: Rectangle {
+                                    id: capTile
+                                    required property var modelData
+                                    readonly property bool isImg: modelData.kind === "image"
+                                    readonly property bool justCopied: root.copiedCapturePath === modelData.path
+
+                                    width: 118
+                                    height: 78
+                                    radius: Theme.radiusSm
+                                    color: Theme.surface_container_highest
+                                    border.color: justCopied
+                                        ? Theme.primary
+                                        : (tileMouse.containsMouse ? Theme.alpha(Theme.primary, 0.7) : Theme.widgetBorder)
+                                    border.width: 1
+                                    clip: true
+
+                                    Image {
+                                        anchors.fill: parent
+                                        visible: capTile.isImg
+                                        source: capTile.isImg ? ("file://" + capTile.modelData.path) : ""
+                                        fillMode: Image.PreserveAspectCrop
+                                        asynchronous: true
+                                        smooth: true
+                                    }
+
+                                    Column {
+                                        anchors.centerIn: parent
+                                        visible: !capTile.isImg
+                                        spacing: 2
+                                        width: parent.width - 12
+
+                                        Text {
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            text: Theme.iconPlay
+                                            font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
+                                            font.pixelSize: Theme.fontSizeMd
+                                            color: Theme.primary
+                                        }
+
+                                        Text {
+                                            width: parent.width
+                                            text: capTile.modelData.name
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 8
+                                            color: Theme.on_surface
+                                            elide: Text.ElideMiddle
+                                            horizontalAlignment: Text.AlignHCenter
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: tileMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: (mouse) => {
+                                            let p = capTile.modelData.path;
+                                            if (!p) return;
+                                            if (mouse.button === Qt.MiddleButton || mouse.button === Qt.RightButton || !capTile.isImg) {
+                                                Quickshell.execDetached(["xdg-open", p]);
+                                            } else {
+                                                let ext = p.split('.').pop().toLowerCase();
+                                                let mime = (ext === "jpg" || ext === "jpeg") ? "image/jpeg" : ("image/" + (ext || "png"));
+                                                Quickshell.execDetached(["sh", "-c", "wl-copy --type \"$1\" < \"$2\"", "--", mime, p]);
+                                                root.copiedCapturePath = p;
+                                                copiedCaptureTimer.restart();
+                                            }
+                                        }
+                                    }
+
+                                    // bottom overlay label
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        height: 18
+                                        color: Theme.alpha(Theme.scrim, 0.72)
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            width: parent.width - 8
+                                            text: capTile.justCopied
+                                                ? "copied!"
+                                                : (tileMouse.containsMouse ? (capTile.isImg ? "click: copy" : "click: open") : capTile.modelData.name)
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 8
+                                            font.weight: capTile.justCopied ? Font.Bold : Font.Normal
+                                            color: capTile.justCopied ? Theme.primary : Theme.on_surface
+                                            elide: Text.ElideMiddle
+                                            horizontalAlignment: Text.AlignHCenter
+                                        }
+                                    }
+
+                                    // top-right open & delete buttons on hover
+                                    Row {
+                                        anchors.top: parent.top
+                                        anchors.right: parent.right
+                                        anchors.margins: 4
+                                        spacing: 3
+                                        visible: tileMouse.containsMouse || openBtnMouse.containsMouse || rmBtnMouse.containsMouse
+
+                                        Rectangle {
+                                            width: 18
+                                            height: 18
+                                            radius: 9
+                                            color: openBtnMouse.containsMouse ? Theme.primary : Theme.alpha(Theme.scrim, 0.75)
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: Theme.iconExternalLink
+                                                font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
+                                                font.pixelSize: 10
+                                                color: openBtnMouse.containsMouse ? Theme.on_primary : Theme.on_surface
+                                            }
+
+                                            MouseArea {
+                                                id: openBtnMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: Quickshell.execDetached(["xdg-open", capTile.modelData.path])
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            width: 18
+                                            height: 18
+                                            radius: 9
+                                            color: rmBtnMouse.containsMouse ? Theme.error : Theme.alpha(Theme.scrim, 0.75)
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: Theme.iconClose
+                                                font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
+                                                font.pixelSize: 10
+                                                color: rmBtnMouse.containsMouse ? Theme.on_error : Theme.on_surface
+                                            }
+
+                                            MouseArea {
+                                                id: rmBtnMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    Quickshell.execDetached(["rm", "-f", "--", capTile.modelData.path]);
+                                                    refreshAfterDeleteTimer.restart();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Timer {
+                        id: refreshAfterDeleteTimer
+                        interval: 120
+                        onTriggered: root.refreshRecentCaptures()
+                    }
+                }
+            }
+
             // quick folder footer actions
             RowLayout {
+                visible: !root.showSettings
                 Layout.fillWidth: true
                 spacing: 8
 

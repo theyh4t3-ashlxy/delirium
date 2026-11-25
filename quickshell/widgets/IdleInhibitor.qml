@@ -5,23 +5,14 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 
-Rectangle {
+BarPill {
     id: cafRoot
 
-    property var barScreen: null
-    property var barMonitor: null
-
-    implicitWidth: Theme.isVertical ? Theme.barHeight - 8 : cafRow.implicitWidth + 24
-    implicitHeight: Theme.barHeight - 8
-    radius: Theme.barWidgetRadius
-    color: cafRoot.active ? Theme.primary_overlay : (cafMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
-    border.color: cafRoot.active ? Theme.alpha(Theme.primary, 0.55) : Theme.barPillBorder
-    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
-
-    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
-
-    readonly property bool active: !IdleService.enabled
+    active: !IdleService.enabled
+    hovered: cafMouse.containsMouse
+    pressed: cafMouse.pressed
+    activeBorder: Theme.alpha(Theme.primary, 0.55)
+    implicitWidth: Theme.isVertical ? pillSize : cafRow.implicitWidth + 24
 
     function toggleInhibit() {
         IdleService.enabled = !IdleService.enabled;

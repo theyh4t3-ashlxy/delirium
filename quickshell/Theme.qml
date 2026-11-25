@@ -126,11 +126,9 @@ Singleton {
     readonly property real adaptiveAlphaBoost:   (cfg?.adaptiveTransparency ?? true) ? (wallpaperVibrancy * 0.08) : 0.0
     readonly property real adaptiveSurfaceAlpha: Math.min(1.0, surfaceOpacity + adaptiveAlphaBoost)
 
-    // matugen hex tokens + live custom color overrides from QuickSettings
-    readonly property bool hasCustomColors: cfg?.customColorsEnabled ?? false
-
+    // matugen hex tokens
     readonly property color matugenPrimary:            palColor("primary", "#0062a1")
-    readonly property color primary:                   (hasCustomColors && (cfg?.customActive ?? "") !== "") ? cfg.customActive : matugenPrimary
+    readonly property color primary:                   matugenPrimary
     readonly property color accent:                    primary
     readonly property color on_primary:                palColor("on-primary", "#ffffff")
     readonly property color primary_container:         palColor("primary-container", "#d0e4ff")
@@ -152,31 +150,31 @@ Singleton {
     readonly property color on_error_container:        palColor("on-error-container", "#410002")
 
     readonly property color matugenBg:                 palColor("background", "#f8f9ff")
-    readonly property color background:                (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : matugenBg
+    readonly property color background:                matugenBg
     readonly property color on_background:             palColor("on-background", "#161c24")
 
     readonly property color matugenSurface:            palColor("surface", "#f8f9ff")
-    readonly property color surface:                   (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : matugenSurface
+    readonly property color surface:                   matugenSurface
     readonly property color matugenOnSurface:          palColor("on-surface", "#161c24")
-    readonly property color on_surface:                (hasCustomColors && (cfg?.customText ?? "") !== "") ? cfg.customText : matugenOnSurface
+    readonly property color on_surface:                matugenOnSurface
     readonly property color surface_variant:           palColor("surface-variant", "#dde3ee")
     readonly property color matugenOnSurfaceVariant:   palColor("on-surface-variant", "#414750")
-    readonly property color on_surface_variant:        (hasCustomColors && (cfg?.customSubtext ?? "") !== "") ? cfg.customSubtext : matugenOnSurfaceVariant
+    readonly property color on_surface_variant:        matugenOnSurfaceVariant
     readonly property color textPrimary:               on_surface
     readonly property color textSecondary:             on_surface_variant
 
-    readonly property color surface_container_lowest:  (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : palColor("surface-container-lowest", "#ffffff")
-    readonly property color surface_container_low:     (hasCustomColors && (cfg?.customBg ?? "") !== "") ? cfg.customBg : palColor("surface-container-low", "#eef4ff")
+    readonly property color surface_container_lowest:  palColor("surface-container-lowest", "#ffffff")
+    readonly property color surface_container_low:     palColor("surface-container-low", "#eef4ff")
     readonly property color surface_container:         palColor("surface-container", "#e8eefa")
-    readonly property color surface_container_high:    (hasCustomColors && (cfg?.customWidgetBg ?? "") !== "") ? cfg.customWidgetBg : palColor("surface-container-high", "#e2e8f4")
+    readonly property color surface_container_high:    palColor("surface-container-high", "#e2e8f4")
     readonly property color surface_container_highest: palColor("surface-container-highest", "#dde3ee")
 
     readonly property color surface_dim:               palColor("surface-dim", "#d4dae5")
     readonly property color surface_bright:            palColor("surface-bright", "#f8f9ff")
 
     readonly property color matugenOutline:            palColor("outline", "#717881")
-    readonly property color outline:                   (hasCustomColors && (cfg?.customBorder ?? "") !== "") ? cfg.customBorder : matugenOutline
-    readonly property color outline_variant:           (hasCustomColors && (cfg?.customBorder ?? "") !== "") ? cfg.customBorder : palColor("outline-variant", "#c1c7d2")
+    readonly property color outline:                   matugenOutline
+    readonly property color outline_variant:           palColor("outline-variant", "#c1c7d2")
 
     readonly property color shadow:                    palColor("shadow", "#000000")
     readonly property color scrim:                     palColor("scrim", "#000000")
@@ -361,10 +359,7 @@ Singleton {
 
     readonly property var _styleCtx: ({
         isLightMode: root.isLightMode,
-        hasCustomColors: root.hasCustomColors,
         cfg: root.cfg,
-        customWidgetBg: root.cfg?.customWidgetBg ?? "",
-        customBorder: root.cfg?.customBorder ?? "",
         adaptiveAlphaBoost: root.adaptiveAlphaBoost,
         primary: root.primary,
         primary_container: root.primary_container,

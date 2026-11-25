@@ -5,10 +5,10 @@ PREFS_FILE="${ZDOTDIR:-$HOME/.config/zsh}/user_prefs.conf"
 # single source of truth for stock defaults
 typeset -ga DEFAULT_PREFS=(
     "SHOW_FASTFETCH=false"
-    "SHOW_GREETING_ROAST=false"
+    "SHOW_SESSION_CHECKIN=false"
     "SHOW_GIT_PROMPT=true"
     "SHOW_CMD_TIMER=true"
-    "ENABLE_PSYCHO_ROASTS=true"
+    "ENABLE_SYNTAX_CRITIC=true"
     "PROMPT_STYLE=two-line"
     "PROMPT_SYMBOL=❯"
     "PROMPT_ACCENT=primary"
@@ -19,6 +19,7 @@ typeset -ga DEFAULT_PREFS=(
     "PREFERRED_FILE_MANAGER=yazi"
     "SHOW_PROMPT_BANTER=true"
     "SHOW_TIMESTAMP=true"
+    "TRANSIENT_PROMPT=false"
 )
 
 _open_file_manager() {
@@ -54,12 +55,19 @@ _init_prefs() {
 # initialize if missing
 [[ ! -f "$PREFS_FILE" ]] && _init_prefs
 
-# load preferences into shell scope
+# load preferences into shell scope & migrate legacy variable names cleanly
 source "$PREFS_FILE" 2>/dev/null || true
+if [[ -n "${SHOW_GREETING_ROAST:-}" && -z "${SHOW_SESSION_CHECKIN:-}" ]]; then
+    SHOW_SESSION_CHECKIN="$SHOW_GREETING_ROAST"
+    sed -i 's|^SHOW_GREETING_ROAST=|SHOW_SESSION_CHECKIN=|' "$PREFS_FILE" 2>/dev/null || true
+fi
+if [[ -n "${ENABLE_PSYCHO_ROASTS:-}" && -z "${ENABLE_SYNTAX_CRITIC:-}" ]]; then
+    ENABLE_SYNTAX_CRITIC="$ENABLE_PSYCHO_ROASTS"
+    sed -i 's|^ENABLE_PSYCHO_ROASTS=|ENABLE_SYNTAX_CRITIC=|' "$PREFS_FILE" 2>/dev/null || true
+fi
 
 _reload_prompt() {
-    (( $+functions[set_prompt_colors] )) && set_prompt_colors 2>/dev/null
-    (( $+functions[build_prompt] )) && build_prompt 2>/dev/null
+    (( $+functions[_gp_reload] )) && _gp_reload 2>/dev/null || true
 }
 
 _save_pref() {
@@ -110,9 +118,9 @@ settings() {
                 "init        (init.lua root entrypoint)"
                 "keybinds    (custom IJKL home row binds, insert mode, shortcuts)"
                 "options     (tabs, line numbers, smoothscroll, split settings)"
-                "roast       (grim reality neovim roaster)"
+                "roast       (neovim home-row critic)"
                 "cheatsheet  (interactive floating cheatsheet)"
-                "colors      (catppuccin theme & highlight overrides)"
+                "colors      (ANSI highlight overrides)"
                 "lazy        (lazy.lua package manager bootstrap)"
                 "lsp         (language server configurations)"
                 "treesitter  (syntax treesitter parsers & indent)"
@@ -199,8 +207,8 @@ settings() {
                 "tools       (modern cli tool enhancements - bat, eza, fzf)"
                 "exports     (environment variables, path, default pager)"
                 "core        (history, completion, directory options)"
-                "functions   (custom utility functions & helpers)"
-                "roast       (command typo psychological roaster)"
+                "functions   (custom utility functions & git helpers)"
+                "critic      (command typo syntax critic & session check-in)"
                 "help        (quick cheatsheet & reference guide)"
                 "prefs       (raw user_prefs.conf key-value pairs)"
                 "directory   (browse ~/.local/share/dotfiles/zsh in file manager)"
@@ -216,7 +224,7 @@ settings() {
                     exports|export|env)     target_file="$zsh_dir/exports.zsh" ;;
                     core)                   target_file="$zsh_dir/core.zsh" ;;
                     functions|func)         target_file="$zsh_dir/functions.zsh" ;;
-                    roast|roasts)           target_file="$zsh_dir/roast.zsh" ;;
+                    critic|roast|roasts)    target_file="$zsh_dir/roast.zsh" ;;
                     help)                   target_file="$zsh_dir/help.zsh" ;;
                     prefs|user)             target_file="$PREFS_FILE" ;;
                     dir|directory|all)
@@ -246,7 +254,7 @@ settings() {
                     exports)    target_file="$zsh_dir/exports.zsh" ;;
                     core)       target_file="$zsh_dir/core.zsh" ;;
                     functions)  target_file="$zsh_dir/functions.zsh" ;;
-                    roast)      target_file="$zsh_dir/roast.zsh" ;;
+                    critic)     target_file="$zsh_dir/roast.zsh" ;;
                     help)       target_file="$zsh_dir/help.zsh" ;;
                     prefs)      target_file="$PREFS_FILE" ;;
                     directory)
@@ -433,7 +441,19 @@ settings() {
             return 0
             ;;
         micro)
-            ${EDITOR:-micro} "$HOME/.config/micro/settings.json"
+            ${EDITOR:-nvim} "$HOME/.config/micro/settings.json"
+            return 0
+            ;;
+        btop)
+            ${EDITOR:-nvim} "$HOME/.local/share/dotfiles/btop/btop.conf"
+            return 0
+            ;;
+        kitty)
+            ${EDITOR:-nvim} "$HOME/.local/share/dotfiles/kitty/kitty.conf"
+            return 0
+            ;;
+        matugen)
+            ${EDITOR:-nvim} "$HOME/.local/share/dotfiles/matugen/config.toml"
             return 0
             ;;
         list|show)
@@ -502,14 +522,19 @@ settings() {
             print -P "%F{green}󰄲 execution timer -> %B${SHOW_CMD_TIMER}%b%f"
             return 0
             ;;
-        roasts|roast)
-            [[ -n "$arg" ]] && _save_pref "ENABLE_PSYCHO_ROASTS" "$arg" || _toggle_pref "ENABLE_PSYCHO_ROASTS"
-            print -P "%F{green}󰄲 typo psychological roaster -> %B${ENABLE_PSYCHO_ROASTS}%b%f"
+        critic|roasts|roast)
+            [[ -n "$arg" ]] && _save_pref "ENABLE_SYNTAX_CRITIC" "$arg" || _toggle_pref "ENABLE_SYNTAX_CRITIC"
+            print -P "%F{green}󰄲 syntax critic -> %B${ENABLE_SYNTAX_CRITIC}%b%f"
             return 0
             ;;
-        greeting)
-            [[ -n "$arg" ]] && _save_pref "SHOW_GREETING_ROAST" "$arg" || _toggle_pref "SHOW_GREETING_ROAST"
-            print -P "%F{green}󰄲 existential greeting on open -> %B${SHOW_GREETING_ROAST}%b%f"
+        checkin|greeting)
+            [[ -n "$arg" ]] && _save_pref "SHOW_SESSION_CHECKIN" "$arg" || _toggle_pref "SHOW_SESSION_CHECKIN"
+            print -P "%F{green}󰄲 session check-in on open -> %B${SHOW_SESSION_CHECKIN}%b%f"
+            return 0
+            ;;
+        transient)
+            [[ -n "$arg" ]] && _save_pref "TRANSIENT_PROMPT" "$arg" || _toggle_pref "TRANSIENT_PROMPT"
+            print -P "%F{green}󰄲 transient prompt collapse -> %B${TRANSIENT_PROMPT}%b%f"
             return 0
             ;;
         fastfetch)
@@ -542,19 +567,20 @@ settings() {
         focus)
             _save_pref "KAOMOJI_SET" "none"
             _save_pref "SHOW_PROMPT_BANTER" "false"
-            _save_pref "SHOW_GREETING_ROAST" "false"
-            _save_pref "ENABLE_PSYCHO_ROASTS" "false"
+            _save_pref "SHOW_SESSION_CHECKIN" "false"
+            _save_pref "ENABLE_SYNTAX_CRITIC" "false"
             _save_pref "SHOW_FASTFETCH" "false"
             _save_pref "SHOW_CMD_TIMER" "false"
             _save_pref "SHOW_TIMESTAMP" "false"
-            print -P "%F{green}󰄲 focus mode enabled (zero distractions, zero kaomoji)%f"
+            _save_pref "TRANSIENT_PROMPT" "true"
+            print -P "%F{green}󰄲 focus mode enabled (zero distractions, transient prompt)%f"
             return 0
             ;;
         aesthetic|rice)
             _save_pref "KAOMOJI_SET" "reactive"
             _save_pref "SHOW_PROMPT_BANTER" "true"
-            _save_pref "SHOW_GREETING_ROAST" "true"
-            _save_pref "ENABLE_PSYCHO_ROASTS" "true"
+            _save_pref "SHOW_SESSION_CHECKIN" "true"
+            _save_pref "ENABLE_SYNTAX_CRITIC" "true"
             _save_pref "SHOW_CMD_TIMER" "true"
             _save_pref "SHOW_TIMESTAMP" "true"
             print -P "%F{magenta}󰄛 aesthetic mode enabled (full personality restored)%f"
@@ -578,24 +604,25 @@ settings() {
 
     while true; do
         items=(
-            "󰈙 edit config files (nvim / hypr / zsh / qs / micro)"
+            "󰈙 edit config files (nvim / hypr / zsh / qs / btop / kitty / matugen)"
             "󰞷 prompt style: [${PROMPT_STYLE:-two-line}]"
             "󰊠 prompt symbol: [${PROMPT_SYMBOL:-❯}]"
             "󰏘 prompt symbol accent: [${PROMPT_ACCENT:-primary}]"
             "󰄛 kaomoji mood set: [${KAOMOJI_SET:-reactive}]"
+            "󰁕 transient prompt collapse: [${TRANSIENT_PROMPT:-false}]"
             "󰏘 default editor: [${PREFERRED_EDITOR:-micro}]"
             "󰉋 preferred file manager: [${PREFERRED_FILE_MANAGER:-yazi}]"
             " git details in prompt: [${SHOW_GIT_PROMPT:-true}]"
             "󰁕 execution timer in prompt: [${SHOW_CMD_TIMER:-true}]"
             "󰉋 auto-listing (ls) on cd: [${AUTO_LS:-false}]"
             "󰄛 fastfetch on open: [${SHOW_FASTFETCH:-false}]"
-            "󰄛 existential greeting on open: [${SHOW_GREETING_ROAST:-false}]"
-            "󰅚 psychological roaster on typo: [${ENABLE_PSYCHO_ROASTS:-true}]"
+            "󰄛 session check-in on open: [${SHOW_SESSION_CHECKIN:-false}]"
+            "󰅚 syntax critic on typo: [${ENABLE_SYNTAX_CRITIC:-true}]"
             "󰄲 prompt banter on wide screen: [${SHOW_PROMPT_BANTER:-true}]"
             "󰥔 prompt clock/time: [${SHOW_TIMESTAMP:-true}]"
             "󰌌 keybinding mode: [${KEY_BIND_MODE:-vi}]"
             "󰄲 focus mode: distraction-free preset"
-            "󰄛 aesthetic mode: full rice preset"
+            "󰄛 aesthetic mode: full personality preset"
             "󰄲 view help cheatsheet"
             "󰚰 recompile zsh bytecode (.zwc speedup)"
             "󰀦 purge .zwc bytecode cache (reset)"
@@ -612,17 +639,23 @@ settings() {
                     "hyprland     (~/.local/share/dotfiles/hypr/ -> binds, anims, rules...)" \
                     "zsh          (~/.local/share/dotfiles/zsh/  -> aliases, prompt, tools...)" \
                     "quickshell   (~/.local/share/dotfiles/quickshell/ -> shell.qml, Theme.qml...)" \
+                    "btop         (~/.local/share/dotfiles/btop/btop.conf)" \
+                    "kitty        (~/.local/share/dotfiles/kitty/kitty.conf)" \
+                    "matugen      (~/.local/share/dotfiles/matugen/config.toml & templates)" \
                     "nixos        (~/.local/share/dotfiles/nixos/ -> configuration.nix, flake...)" \
                     "micro        (~/.config/micro/settings.json)" \
                     "dotfiles     (open ~/.local/share/dotfiles in file manager)" \
-                    | fzf --header="[choose config category to navigate]" --reverse --height=45%)
+                    | fzf --header="[choose config category to navigate]" --reverse --height=50%)
                 case "$f_choice" in
                     *"neovim"*)     settings nvim ;;
                     *"hyprland"*)   settings hypr ;;
                     *"zsh"*)        settings zsh ;;
                     *"quickshell"*) settings qs ;;
+                    *"btop"*)       settings btop ;;
+                    *"kitty"*)      settings kitty ;;
+                    *"matugen"*)    settings matugen ;;
                     *"nixos"*)      settings nixos ;;
-                    *"micro"*)      ${EDITOR:-micro} "$HOME/.config/micro/settings.json" ;;
+                    *"micro"*)      ${EDITOR:-nvim} "$HOME/.config/micro/settings.json" ;;
                     *"dotfiles"*)   _open_file_manager "$HOME/.local/share/dotfiles" ;;
                 esac
                 ;;
@@ -694,30 +727,32 @@ settings() {
                     | fzf --header="[choose your prompt arrow color accent]" --reverse --height=40%)
                 [[ -n "$acc_choice" ]] && _save_pref "PROMPT_ACCENT" "${acc_choice%% *}"
                 ;;
+            *"transient prompt"*)            _toggle_pref "TRANSIENT_PROMPT" ;;
             *"git details"*)               _toggle_pref "SHOW_GIT_PROMPT" ;;
             *"execution timer"*)           _toggle_pref "SHOW_CMD_TIMER" ;;
             *"auto-listing"*)              _toggle_pref "AUTO_LS" ;;
             *"fastfetch"*)                 _toggle_pref "SHOW_FASTFETCH" ;;
-            *"existential greeting"*)      _toggle_pref "SHOW_GREETING_ROAST" ;;
-            *"psychological roaster"*)      _toggle_pref "ENABLE_PSYCHO_ROASTS" ;;
+            *"session check-in"*)          _toggle_pref "SHOW_SESSION_CHECKIN" ;;
+            *"syntax critic"*)             _toggle_pref "ENABLE_SYNTAX_CRITIC" ;;
             *"prompt banter"*)             _toggle_pref "SHOW_PROMPT_BANTER" ;;
             *"prompt clock"*)              _toggle_pref "SHOW_TIMESTAMP" ;;
             *"focus mode"*)
                 _save_pref "KAOMOJI_SET" "none"
                 _save_pref "SHOW_PROMPT_BANTER" "false"
-                _save_pref "SHOW_GREETING_ROAST" "false"
-                _save_pref "ENABLE_PSYCHO_ROASTS" "false"
+                _save_pref "SHOW_SESSION_CHECKIN" "false"
+                _save_pref "ENABLE_SYNTAX_CRITIC" "false"
                 _save_pref "SHOW_FASTFETCH" "false"
                 _save_pref "SHOW_CMD_TIMER" "false"
                 _save_pref "SHOW_TIMESTAMP" "false"
-                print -Pn "\n%F{green}󰄲 focus mode enabled (zero distractions, zero kaomoji). press enter...%f"
+                _save_pref "TRANSIENT_PROMPT" "true"
+                print -Pn "\n%F{green}󰄲 focus mode enabled (zero distractions, transient prompt). press enter...%f"
                 read -r </dev/tty 2>/dev/null || true
                 ;;
             *"aesthetic mode"*)
                 _save_pref "KAOMOJI_SET" "reactive"
                 _save_pref "SHOW_PROMPT_BANTER" "true"
-                _save_pref "SHOW_GREETING_ROAST" "true"
-                _save_pref "ENABLE_PSYCHO_ROASTS" "true"
+                _save_pref "SHOW_SESSION_CHECKIN" "true"
+                _save_pref "ENABLE_SYNTAX_CRITIC" "true"
                 _save_pref "SHOW_CMD_TIMER" "true"
                 _save_pref "SHOW_TIMESTAMP" "true"
                 print -Pn "\n%F{magenta}󰄛 aesthetic mode enabled (full personality restored). press enter...%f"
@@ -731,6 +766,18 @@ settings() {
                     _save_pref "KEY_BIND_MODE" "emacs"
                     bindkey -e
                 fi
+                for _km in emacs viins; do
+                    bindkey -M "$_km" '^[[H'    beginning-of-line
+                    bindkey -M "$_km" '^[OH'    beginning-of-line
+                    bindkey -M "$_km" '^[[F'    end-of-line
+                    bindkey -M "$_km" '^[OF'    end-of-line
+                    bindkey -M "$_km" '^[[3~'   delete-char
+                    bindkey -M "$_km" '^?'      backward-delete-char
+                    bindkey -M "$_km" '^[[1;5D' backward-word
+                    bindkey -M "$_km" '^[[1;5C' forward-word
+                    bindkey -M "$_km" '^X^E'    edit-command-line
+                done
+                unset _km
                 ;;
             *"view help cheatsheet"*)
                 (( $+functions[dots_help] )) && dots_help || (( $+functions[help] )) && help

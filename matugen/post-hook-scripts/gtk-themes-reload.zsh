@@ -3,10 +3,12 @@
 
 # 1. Detect active light/dark mode
 mode="dark"
-if [[ -f "$HOME/.config/quickshell/settings.conf" ]]; then
-    cfg_mode=$(grep -E '^\s*matugenMode\s*=' "$HOME/.config/quickshell/settings.conf" 2>/dev/null | head -n 1 | cut -d'"' -f2)
-    [[ "$cfg_mode" == "light" || "$cfg_mode" == "dark" ]] && mode="$cfg_mode"
-fi
+for cfg_path in "$HOME/.local/state/quickshell/settings.conf" "$HOME/.config/quickshell/settings.conf"; do
+    if [[ -f "$cfg_path" ]]; then
+        cfg_mode=$(grep -E '^\s*matugenMode\s*=' "$cfg_path" 2>/dev/null | head -n 1 | cut -d'=' -f2 | tr -d '"\r ')
+        [[ "$cfg_mode" == "light" || "$cfg_mode" == "dark" ]] && mode="$cfg_mode" && break
+    fi
+done
 
 # Validate against compiled matugen background luminance if available
 if [[ -f "$HOME/.config/gtk-4.0/matugen.css" ]]; then

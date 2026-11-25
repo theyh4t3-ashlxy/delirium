@@ -1,5 +1,7 @@
+// Dropdown.qml — floating native PopupWindow overlay dropdown (no layout push or container clipping)
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import ".."
 
 Item {
@@ -7,24 +9,21 @@ Item {
 
     property string label: ""
     property string icon: ""
+    property string placeholder: "select..."
     property var model: []
     property int currentIndex: 0
     property var currentValue: null
     property bool expanded: false
-    property int maxVisibleItems: 6
+    property int maxVisibleItems: 7
+    property int menuMinWidth: 0
     property color accentColor: Theme.primary
 
     signal activated(int index, var value)
     signal selected(var value)
 
     implicitWidth: 200
-    implicitHeight: headerButton.height + (root.expanded ? (menuContainer.implicitHeight + 4) : 0)
+    implicitHeight: headerButton.height
 
-    Behavior on implicitHeight {
-        NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing }
-    }
-
-    // Helper functions to normalize model data
     function getItemLabel(item, idx) {
         if (item === null || item === undefined) return "";
         if (typeof item === "string" || typeof item === "number") return String(item);
@@ -48,7 +47,47 @@ Item {
         return "";
     }
 
-    // Synchronize currentValue and currentIndex
+    function getItemSwatch(item) {
+        if (typeof item === "object" && item !== null && item.swatch) return item.swatch;
+        return "";
+    }
+
+    function getItemBadge(item) {
+        if (typeof item === "object" && item !== null && item.badge) return item.badge;
+        return "";
+    }
+
+    function selectIndex(idx) {
+        if (!root.model || idx < 0 || idx >= root.model.length) return;
+        let val = root.getItemValue(root.model[idx], idx);
+        root.currentIndex = idx;
+        root.currentValue = val;
+        root.activated(idx, val);
+        root.selected(val);
+        root.expanded = false;
+    }
+
+    function updateMenuAnchor() {
+        if (!headerButton.QsWindow || !headerButton.QsWindow.window || !headerButton.QsWindow.contentItem) return;
+        let win = headerButton.QsWindow.window;
+        let contentItem = headerButton.QsWindow.contentItem;
+        let pos = contentItem.mapFromItem(headerButton, 0, 0);
+        let menuW = Math.max(headerButton.width, root.menuMinWidth);
+        let menuH = menuCard.implicitHeight > 0 ? menuCard.implicitHeight : 120;
+        let winW = win.width > 0 ? win.width : 1920;
+        let winH = win.height > 0 ? win.height : 1080;
+
+        let targetX = Math.max(6, Math.min(winW - menuW - 6, Math.round(pos.x)));
+        let targetY = Math.round(pos.y + headerButton.height + 4);
+        if (targetY + menuH > winH - 8 && pos.y - menuH - 4 >= 6) {
+            targetY = Math.round(pos.y - menuH - 4);
+        }
+
+        menuWin.anchor.window = win;
+        menuWin.anchor.rect.x = targetX;
+        menuWin.anchor.rect.y = targetY;
+    }
+
     onCurrentValueChanged: {
         if (root.model && root.model.length > 0) {
             for (let i = 0; i < root.model.length; i++) {
@@ -67,7 +106,15 @@ Item {
         }
     }
 
-    // Header Button
+    onExpandedChanged: {
+        if (expanded) {
+            updateMenuAnchor();
+            Qt.callLater(() => {
+                if (menuCard) menuCard.forceActiveFocus();
+            });
+        }
+    }
+
     Rectangle {
         id: headerButton
         anchors.top: parent.top
@@ -76,13 +123,19 @@ Item {
         height: 32
         radius: Theme.widgetRadius
         color: headerMouse.pressed
-            ? Theme.surface_container_highest
-            : (headerMouse.containsMouse ? Theme.surface_container_high : Theme.surface_container)
+            ? Theme.widgetActive
+            : (headerMouse.containsMouse ? Theme.widgetHover : Theme.widgetBg)
         border.width: 1
-        border.color: root.expanded ? root.accentColor : (headerMouse.containsMouse ? Theme.outline : Theme.outline_variant)
+        border.color: root.expanded ? root.accentColor : (headerMouse.containsMouse ? Theme.outline : Theme.widgetBorder)
 
         Behavior on color { ColorAnimation { duration: Theme.animFast } }
         Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
+
+        readonly property var curItem: (root.model && root.currentIndex >= 0 && root.currentIndex < root.model.length)
+            ? root.model[root.currentIndex]
+            : null
+        readonly property string curSwatch: root.getItemSwatch(curItem)
+        readonly property string curIcon: root.getItemIcon(curItem) || root.icon
 
         RowLayout {
             anchors.fill: parent
@@ -90,9 +143,19 @@ Item {
             anchors.rightMargin: 10
             spacing: 6
 
+            Rectangle {
+                visible: headerButton.curSwatch !== ""
+                width: 11
+                height: 11
+                radius: 6
+                color: headerButton.curSwatch !== "" ? headerButton.curSwatch : "transparent"
+                border.color: Theme.outline_variant
+                border.width: 1
+            }
+
             Text {
-                visible: root.icon !== ""
-                text: root.icon
+                visible: headerButton.curSwatch === "" && headerButton.curIcon !== ""
+                text: headerButton.curIcon
                 font.family: Theme.fontIcon
                 font.variableAxes: Theme.iconAxes
                 font.pixelSize: Theme.fontSizeSm
@@ -110,16 +173,13 @@ Item {
 
             Text {
                 Layout.fillWidth: true
-                text: {
-                    if (root.model && root.currentIndex >= 0 && root.currentIndex < root.model.length) {
-                        return root.getItemLabel(root.model[root.currentIndex], root.currentIndex);
-                    }
-                    return "Select...";
-                }
+                text: headerButton.curItem !== null
+                    ? root.getItemLabel(headerButton.curItem, root.currentIndex)
+                    : root.placeholder
                 font.family: Theme.fontSans
                 font.pixelSize: Theme.fontSizeSm
                 font.weight: Font.DemiBold
-                color: Theme.on_surface
+                color: headerButton.curItem !== null ? Theme.on_surface : Theme.on_surface_variant
                 elide: Text.ElideRight
             }
 
@@ -131,9 +191,7 @@ Item {
                 color: root.expanded ? root.accentColor : Theme.on_surface_variant
                 rotation: root.expanded ? 180 : 0
 
-                Behavior on rotation {
-                    NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing }
-                }
+                Behavior on rotation { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
                 Behavior on color { ColorAnimation { duration: Theme.animFast } }
             }
         }
@@ -147,108 +205,156 @@ Item {
         }
     }
 
-    // Expanding Items List
-    Rectangle {
-        id: menuContainer
-        anchors.top: headerButton.bottom
-        anchors.topMargin: 4
-        anchors.left: parent.left
-        anchors.right: parent.right
-        clip: true
-        visible: height > 0
-        height: root.expanded ? Math.min(root.maxVisibleItems * 30 + 8, itemsList.contentHeight + 8) : 0
-        implicitHeight: Math.min(root.maxVisibleItems * 30 + 8, itemsList.contentHeight + 8)
-        radius: Theme.widgetRadius
-        color: Theme.surface_container
-        border.width: 1
-        border.color: Theme.outline_variant
+    PopupWindow {
+        id: menuWin
+        visible: root.expanded
+        grabFocus: true
+        color: "transparent"
+        implicitWidth: Math.max(headerButton.width, root.menuMinWidth)
+        implicitHeight: menuCard.implicitHeight
 
-        Behavior on height {
-            NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing }
+        onVisibleChanged: {
+            if (visible) root.updateMenuAnchor();
+            else if (root.expanded) root.expanded = false;
+        }
+        onImplicitHeightChanged: {
+            if (visible) root.updateMenuAnchor();
         }
 
-        Flickable {
-            id: itemsList
-            anchors.fill: parent
-            anchors.margins: 4
-            contentHeight: itemsCol.implicitHeight
-            flickableDirection: Flickable.VerticalFlick
-            boundsBehavior: Flickable.StopAtBounds
-            clip: true
+        Rectangle {
+            id: menuCard
+            width: menuWin.implicitWidth
+            implicitHeight: Math.min(root.maxVisibleItems * 30 + 10, itemsCol.implicitHeight + 10)
+            radius: Theme.radiusMd
+            color: Theme.popupBg
+            border.width: 1
+            border.color: Theme.alpha(root.accentColor, 0.55)
+            focus: root.expanded
 
-            Column {
-                id: itemsCol
-                width: parent.width
-                spacing: 2
+            opacity: menuWin.visible ? 1.0 : 0.0
+            scale: menuWin.visible ? 1.0 : 0.96
+            Behavior on opacity { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+            Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
 
-                Repeater {
-                    model: root.model ?? []
+            Keys.onPressed: (event) => {
+                if (event.key === Qt.Key_Escape) {
+                    root.expanded = false;
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Down) {
+                    if (root.model && root.model.length > 0) {
+                        root.currentIndex = Math.min(root.model.length - 1, root.currentIndex + 1);
+                    }
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Up) {
+                    if (root.model && root.model.length > 0) {
+                        root.currentIndex = Math.max(0, root.currentIndex - 1);
+                    }
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    root.selectIndex(root.currentIndex);
+                    event.accepted = true;
+                }
+            }
 
-                    delegate: Rectangle {
-                        id: itemDelegate
-                        required property var modelData
-                        required property int index
+            Flickable {
+                id: itemsList
+                anchors.fill: parent
+                anchors.margins: 5
+                contentWidth: width
+                contentHeight: itemsCol.implicitHeight
+                flickableDirection: Flickable.VerticalFlick
+                boundsBehavior: Flickable.StopAtBounds
+                clip: true
 
-                        readonly property bool isSelected: root.currentIndex === index
-                        readonly property string itemLabel: root.getItemLabel(modelData, index)
-                        readonly property var itemVal: root.getItemValue(modelData, index)
-                        readonly property string itemIcon: root.getItemIcon(modelData)
+                Column {
+                    id: itemsCol
+                    width: itemsList.width
+                    spacing: 2
 
-                        width: itemsCol.width
-                        height: 28
-                        radius: Theme.radiusSm
-                        color: isSelected
-                            ? Theme.primary_container
-                            : (itemMouse.containsMouse ? Theme.surface_container_high : "transparent")
+                    Repeater {
+                        model: root.model ?? []
 
-                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                        delegate: Rectangle {
+                            id: itemDelegate
+                            required property var modelData
+                            required property int index
 
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 8
-                            anchors.rightMargin: 8
-                            spacing: 6
+                            readonly property bool isSelected: root.currentIndex === index
+                            readonly property string itemLabel: root.getItemLabel(modelData, index)
+                            readonly property string itemIcon: root.getItemIcon(modelData)
+                            readonly property string itemSwatch: root.getItemSwatch(modelData)
+                            readonly property string itemBadge: root.getItemBadge(modelData)
 
-                            Text {
-                                visible: itemDelegate.itemIcon !== ""
-                                text: itemDelegate.itemIcon
-                                font.family: Theme.fontIcon
-                                font.variableAxes: Theme.iconAxes
-                                font.pixelSize: Theme.fontSizeSm
-                                color: itemDelegate.isSelected ? Theme.on_primary_container : Theme.on_surface_variant
+                            width: itemsCol.width
+                            height: 28
+                            radius: Theme.radiusSm
+                            color: isSelected
+                                ? Theme.primary_overlay
+                                : (itemMouse.containsMouse ? Theme.widgetHover : "transparent")
+                            border.color: isSelected ? Theme.alpha(root.accentColor, 0.45) : "transparent"
+                            border.width: 1
+
+                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                spacing: 6
+
+                                Rectangle {
+                                    visible: itemDelegate.itemSwatch !== ""
+                                    width: 12
+                                    height: 12
+                                    radius: 6
+                                    color: itemDelegate.itemSwatch !== "" ? itemDelegate.itemSwatch : "transparent"
+                                    border.color: Theme.outline_variant
+                                    border.width: 1
+                                }
+
+                                Text {
+                                    visible: itemDelegate.itemSwatch === "" && itemDelegate.itemIcon !== ""
+                                    text: itemDelegate.itemIcon
+                                    font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
+                                    font.pixelSize: Theme.fontSizeSm
+                                    color: itemDelegate.isSelected ? root.accentColor : Theme.on_surface_variant
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: itemDelegate.itemLabel
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: Theme.fontSizeSm
+                                    font.weight: itemDelegate.isSelected ? Font.DemiBold : Font.Normal
+                                    color: itemDelegate.isSelected ? root.accentColor : Theme.on_surface
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    visible: itemDelegate.itemBadge !== ""
+                                    text: itemDelegate.itemBadge
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 9
+                                    color: Theme.on_surface_variant
+                                }
+
+                                Text {
+                                    visible: itemDelegate.isSelected
+                                    text: Theme.iconCheck
+                                    font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
+                                    font.pixelSize: Theme.fontSizeXs
+                                    color: root.accentColor
+                                }
                             }
 
-                            Text {
-                                Layout.fillWidth: true
-                                text: itemDelegate.itemLabel
-                                font.family: Theme.fontSans
-                                font.pixelSize: Theme.fontSizeSm
-                                font.weight: itemDelegate.isSelected ? Font.DemiBold : Font.Normal
-                                color: itemDelegate.isSelected ? Theme.on_primary_container : Theme.on_surface
-                                elide: Text.ElideRight
-                            }
-
-                            Text {
-                                visible: itemDelegate.isSelected
-                                text: Theme.iconCheck
-                                font.family: Theme.fontIcon
-                                font.variableAxes: Theme.iconAxes
-                                font.pixelSize: Theme.fontSizeXs
-                                color: Theme.on_primary_container
-                            }
-                        }
-
-                        MouseArea {
-                            id: itemMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                root.currentIndex = itemDelegate.index;
-                                root.currentValue = itemDelegate.itemVal;
-                                root.activated(itemDelegate.index, itemDelegate.itemVal);
-                                root.selected(itemDelegate.itemVal);
-                                root.expanded = false;
+                            MouseArea {
+                                id: itemMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.selectIndex(itemDelegate.index)
                             }
                         }
                     }

@@ -6,7 +6,7 @@ import "../controls"
 import Quickshell
 import Quickshell.Hyprland
 
-Rectangle {
+BarPill {
     id: wsContainer
 
     readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
@@ -15,27 +15,18 @@ Rectangle {
     // extra padding on the ends of the pill so the outer dots don't hug the curved caps
     readonly property int trackPadding: Math.max(Theme.workspaceWidgetPadding * 2, 10)
 
+    active: popup.open
+    hovered: wsMouse.containsMouse
+    pressed: wsMouse.pressed
+
     implicitWidth: Theme.isVertical
-        ? (Theme.barHeight - 8)
+        ? pillSize
         : (wsRow.implicitWidth + trackPadding * 2)
     implicitHeight: Theme.isVertical
         ? (wsCol.implicitHeight + trackPadding * 2)
-        : (Theme.barHeight - 8)
+        : pillSize
 
     readonly property int dotRadius: Theme.barWidgetRadius === 0 ? 1 : (Theme.barWidgetRadius < 12 ? Math.min(4, Theme.barWidgetRadius) : Theme.radiusPill)
-
-    radius: Theme.barWidgetRadius
-    color: {
-        if (wsMouse.pressed) return Theme.widgetActive;
-        if (popup.open) return Theme.primary_overlay;
-        if (wsMouse.containsMouse) return Theme.barPillHover;
-        return Theme.barPillBg;
-    }
-    border.color: popup.open ? Theme.primary : Theme.barPillBorder
-    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
-
-    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
     property var workspaceList: []
     property var workspaceMap: ({})
@@ -650,9 +641,21 @@ Rectangle {
                                         }
 
                                         Text {
-                                            text: isCurrent
-                                                ? "active workspace"
-                                                : (hasWindows ? (winCount + (winCount === 1 ? " window" : " windows")) : "empty")
+                                            readonly property string appSummary: {
+                                                let wins = Hyprland.toplevels?.values ?? [];
+                                                let names = [];
+                                                for (let i = 0; i < wins.length; i++) {
+                                                    let t = wins[i];
+                                                    let wsid = t?.workspace?.id ?? t?.lastIpcObject?.workspace?.id ?? -1;
+                                                    if (wsid !== wsId) continue;
+                                                    let cls = t?.lastIpcObject?.class || t?.lastIpcObject?.initialClass || t?.wayland?.appId || t?.title || "";
+                                                    if (cls) names.push(String(cls).toLowerCase().replace(/^.*\./, ""));
+                                                }
+                                                return names.slice(0, 3).join(", ");
+                                            }
+                                            text: appSummary !== ""
+                                                ? appSummary
+                                                : (isCurrent ? "active workspace" : (hasWindows ? (winCount + (winCount === 1 ? " window" : " windows")) : "empty"))
                                             font.family: Theme.fontMono
                                             font.pixelSize: Theme.fontSizeXs
                                             color: isCurrent ? Theme.primary : Theme.on_surface_variant
@@ -688,11 +691,17 @@ Rectangle {
                                     id: cardMouse
                                     anchors.fill: parent
                                     hoverEnabled: true
-                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: (mouse) => {
                                         if (mouse.button === Qt.RightButton) {
                                             wsContainer.moveWindowToWs(wsId, false);
+                                            return;
+                                        }
+                                        if (mouse.button === Qt.MiddleButton) {
+                                            wsContainer.moveWindowToWs(wsId, true);
+                                            popup.pinned = false;
+                                            popup.open = false;
                                             return;
                                         }
                                         wsContainer.dispatchWs(wsId);

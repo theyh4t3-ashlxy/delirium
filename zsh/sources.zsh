@@ -24,7 +24,7 @@ if [[ -o interactive && -t 0 && -t 1 ]]; then
         fastfetch
     fi
 
-    if [[ "${SHOW_GREETING_ROAST:-false}" == "true" ]]; then
-        (( $+functions[greeting_roast] )) && greeting_roast
+    if [[ "${SHOW_SESSION_CHECKIN:-${SHOW_GREETING_ROAST:-false}}" == "true" ]]; then
+        (( $+functions[session_checkin] )) && session_checkin
     fi
 fi

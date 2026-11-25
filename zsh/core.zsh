@@ -105,28 +105,36 @@ zclean() {
 alias zwc="zrecompile"
 alias unzwc="zclean"
 alias recompile="zrecompile"
+alias compile-zsh="zrecompile"
 
-# keys that actually work when i press them
-bindkey -e
+# keys that actually work when i press them (respect KEY_BIND_MODE from user_prefs.conf)
+KEYTIMEOUT=5
+if [[ "${KEY_BIND_MODE:-vi}" == "vi" ]]; then
+    bindkey -v
+else
+    bindkey -e
+fi
 
-bindkey '^[[H'  beginning-of-line      # home
-bindkey '^[[F'  end-of-line            # end
-bindkey '^[[3~' delete-char            # delete
-bindkey '^?'    backward-delete-char   # backspace
-
-# subword movement: stop at path and flag delimiters (/, _, -, .) instead of whole words
-autoload -U select-word-style && select-word-style bash
-
-# ctrl + left/right to skip words at lightspeed
-bindkey '^[[1;5D' backward-word
-bindkey '^[[1;5C' forward-word
-
-# magic url escaping (auto-escape ?, &, = when pasting urls without quotes)
+# bind standard navigation + ctrl-arrow + edit-command-line across both emacs & viins
 autoload -Uz bracketed-paste-magic && zle -N bracketed-paste bracketed-paste-magic
 autoload -Uz url-quote-magic && zle -N self-insert url-quote-magic
+autoload -Uz select-word-style && select-word-style bash
+autoload -Uz edit-command-line && zle -N edit-command-line
 
-# emergency ctrl+x ctrl+e escape hatch into micro
-autoload -z edit-command-line
-zle -N edit-command-line
-bindkey "^X^E" edit-command-line
+for _km in emacs viins; do
+    bindkey -M "$_km" '^[[H'    beginning-of-line
+    bindkey -M "$_km" '^[OH'    beginning-of-line
+    bindkey -M "$_km" '^[[F'    end-of-line
+    bindkey -M "$_km" '^[OF'    end-of-line
+    bindkey -M "$_km" '^[[3~'   delete-char
+    bindkey -M "$_km" '^?'      backward-delete-char
+    bindkey -M "$_km" '^[[1;5D' backward-word
+    bindkey -M "$_km" '^[[1;5C' forward-word
+    bindkey -M "$_km" '^X^E'    edit-command-line
+done
+unset _km
+
+# avoid leaving autosuggest ghost fragments during bracketed paste
+typeset -ga ZSH_AUTOSUGGEST_CLEAR_WIDGETS
+ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
 

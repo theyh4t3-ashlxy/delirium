@@ -1,14 +1,13 @@
 import QtQuick
 import ".."
+import "../controls"
 import Quickshell
 import Quickshell.Services.UPower
 import Quickshell.Hyprland
 
-Rectangle {
+BarPill {
     id: container
 
-    property var barScreen: null
-    property var barMonitor: null
     property var device: UPower.displayDevice
 
     readonly property bool isVertical: Theme?.isVertical ?? false
@@ -23,15 +22,12 @@ Rectangle {
 
     visible: (Settings?.showBattery ?? true) && (device?.ready ?? false) && (device?.isPresent ?? false)
 
-    implicitWidth: isVertical ? ((Theme?.barHeight ?? 48) - 8) : (contentRow.implicitWidth + 16)
-    implicitHeight: (Theme?.barHeight ?? 48) - 8
-    radius: Theme?.barWidgetRadius ?? 999
-    color: isLow ? Theme.error_overlay : (bMouse.containsMouse ? Theme.barPillHover : Theme.barPillBg)
-    border.color: isLow ? Theme.error : (Theme?.barPillBorder ?? "transparent")
-    border.width: (isLow || (Theme?.barPillBorderWidth ?? 0) > 0) ? 1 : 0
+    active: batPopup.open
+    alert: isLow
+    hovered: bMouse.containsMouse
+    pressed: bMouse.pressed
+    implicitWidth: isVertical ? pillSize : (contentRow.implicitWidth + 16)
 
-    Behavior on color { ColorAnimation { duration: Theme.animFast ?? 150 } }
-    Behavior on border.color { ColorAnimation { duration: Theme.animFast ?? 150 } }
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast ?? 150; easing.type: Theme.animEasing ?? Easing.OutQuad } }
 
     Row {

@@ -107,7 +107,7 @@ PanelWindow {
         "launcher": "tools", "wallpaper": "tools", "quickNotes": "tools", "clipboard": "tools", "idleInhibitor": "tools",
         "workspaces": "nav", "layout": "nav", "layoutSwitcher": "nav",
         "windowTitle": "context",
-        "clock": "center", "dynamicNotch": "center", "notch": "center", "notifications": "center",
+        "clock": "center", "notifications": "center",
         "media": "media", "screenCapture": "media", "capture": "media",
         "systemTray": "status", "network": "status", "bluetooth": "status", "volume": "status", "battery": "status",
         "quickSettings": "session", "powerMenu": "session"
@@ -348,19 +348,16 @@ PanelWindow {
         }
     }
 
-    Component { id: compLauncher; Rectangle {
+    Component { id: compLauncher; BarPill {
         id: launcherPill
         visible: Settings?.showLauncher ?? true
-        implicitWidth: root.isVertical ? (Theme.barHeight - 8) : Math.max(36, launcherText.implicitWidth + 16)
-        implicitHeight: root.isVertical ? Math.max(36, launcherText.implicitHeight + 12) : (Theme.barHeight - 8)
+        active: root.launcherPopup.open
+        hovered: lMouse.containsMouse
+        pressed: lMouse.pressed
+        implicitWidth: root.isVertical ? pillSize : Math.max(36, launcherText.implicitWidth + 16)
+        implicitHeight: root.isVertical ? Math.max(36, launcherText.implicitHeight + 12) : pillSize
         width: implicitWidth
         height: implicitHeight
-        radius: Theme.barWidgetRadius
-        color: lMouse.pressed ? Theme.widgetActive : lMouse.containsMouse ? Theme.barPillHover : (root.launcherPopup.open ? Theme.primary_overlay : Theme.barPillBg)
-        border.color: root.launcherPopup.open ? Theme.primary : Theme.barPillBorder
-        border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
-        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-        Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
         Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
         Text {
             id: launcherText
@@ -423,7 +420,6 @@ PanelWindow {
     Component { id: compQuickSettings; QuickSettings { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compPowerMenu; PowerMenu {} }
     Component { id: compScreenCapture; ScreenCapture { barScreen: root.screen; barMonitor: root.hyprMonitor } }
-    Component { id: compDynamicNotch; DynamicNotch { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compLayout; LayoutSwitcher { barScreen: root.screen; barMonitor: root.hyprMonitor } }
 
     function getModuleComponent(modId) {
@@ -433,7 +429,6 @@ PanelWindow {
         if (modId === "layout" || modId === "layoutSwitcher") return compLayout;
         if (modId === "windowTitle") return compWindowTitle;
         if (modId === "clock") return compClock;
-        if (modId === "dynamicNotch" || modId === "notch") return compDynamicNotch;
         if (modId === "media") return compMedia;
         if (modId === "quickNotes") return compQuickNotes;
         if (modId === "clipboard") return compClipboard;
@@ -457,7 +452,6 @@ PanelWindow {
         if (modId === "layout" || modId === "layoutSwitcher") return Settings?.showLayoutSwitcher ?? true;
         if (modId === "windowTitle") return (Settings?.showWindowTitle ?? true) && !root.isVertical;
         if (modId === "clock") return Settings?.showClock ?? true;
-        if (modId === "dynamicNotch" || modId === "notch") return Settings?.showDynamicNotch ?? true;
         if (modId === "media") return Settings?.showMedia ?? true;
         if (modId === "quickNotes") return Settings?.showQuickNotes ?? true;
         if (modId === "clipboard") return Settings?.showClipboard ?? true;

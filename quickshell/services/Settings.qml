@@ -2,6 +2,7 @@
 pragma Singleton
 import QtQuick
 import ".."
+import "../theme/confFormat.mjs" as ConfFmt
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
@@ -39,17 +40,15 @@ QtObject {
     property bool barScrollWorkspaces: true
     property string workspaceMode: "slide"
 
-    property bool customColorsEnabled: false
-    property string customBg: ""
-    property string customActive: ""
-    property string customText: ""
-    property string customSubtext: ""
-    property string customBorder: ""
-    property string customWidgetBg: ""
+    property bool idleDimEnabled: true
+    property int idleDimSeconds: 150
+    property bool idleLockEnabled: true
+    property int idleLockSeconds: 300
+    property bool idleDpmsEnabled: true
+    property int idleDpmsSeconds: 330
+    property bool idleSuspendEnabled: true
+    property int idleSuspendSeconds: 600
 
-    property bool showDynamicNotch: true
-    property bool dynamicNotchEnabled: true
-    property string dynamicNotchMode: "auto"
     property int bentoGap: 8
     property bool bentoHoverLift: true
     property bool barIslandMode: true
@@ -57,8 +56,6 @@ QtObject {
     property string barGrouping: "clusters"    // "clusters" | "zones" | "none"
     property string barDividers: "line"        // "line" | "dot" | "none"
     property bool adaptiveTransparency: true
-    property bool dynamicNotchFlared: false
-    property int notchFlareRadius: 16
     property bool showLayoutSwitcher: true
 
     signal requestLayoutSwitcherToggle()
@@ -453,16 +450,14 @@ QtObject {
     onSurfaceOpacityChanged: queueSave()
     onCornerFilletsChanged: queueSave()
     onCornerSmoothingChanged: queueSave()
-    onCustomColorsEnabledChanged: queueSave()
-    onCustomBgChanged: queueSave()
-    onCustomActiveChanged: queueSave()
-    onCustomTextChanged: queueSave()
-    onCustomSubtextChanged: queueSave()
-    onCustomBorderChanged: queueSave()
-    onCustomWidgetBgChanged: queueSave()
-    onShowDynamicNotchChanged: queueSave()
-    onDynamicNotchEnabledChanged: queueSave()
-    onDynamicNotchModeChanged: queueSave()
+    onIdleDimEnabledChanged: queueSave()
+    onIdleDimSecondsChanged: queueSave()
+    onIdleLockEnabledChanged: queueSave()
+    onIdleLockSecondsChanged: queueSave()
+    onIdleDpmsEnabledChanged: queueSave()
+    onIdleDpmsSecondsChanged: queueSave()
+    onIdleSuspendEnabledChanged: queueSave()
+    onIdleSuspendSecondsChanged: queueSave()
     onBentoGapChanged: queueSave()
     onBentoHoverLiftChanged: queueSave()
     onBarIslandModeChanged: queueSave()
@@ -480,8 +475,6 @@ QtObject {
     onHasCompletedWelcomeChanged: queueSave()
     onShowShellTabChanged: queueSave()
     onAdaptiveTransparencyChanged: queueSave()
-    onDynamicNotchFlaredChanged: queueSave()
-    onNotchFlareRadiusChanged: queueSave()
 
     onRequestWelcomeToggle: showWelcomeWizard = !showWelcomeWizard
     onRequestWelcomeOpen: showWelcomeWizard = true
@@ -547,9 +540,9 @@ QtObject {
         { key: "lockscreenWallpaperSync", type: "bool", def: true },
         { key: "lockscreenWallpaper", type: "string", def: "" },
         { key: "lockscreenShowMedia", type: "bool", def: true },
-        { key: "barModulesLeft", type: "json", def: ["launcher", "wallpaper", "workspaces", "layout", "windowTitle"] },
-        { key: "barModulesCenter", type: "json", def: ["clock", "notifications"] },
-        { key: "barModulesRight", type: "json", def: ["media", "screenCapture", "systemTray", "volume", "battery", "quickSettings", "powerMenu"] },
+        { key: "barModulesLeft", type: "list", def: ["launcher", "wallpaper", "workspaces", "layout", "windowTitle"] },
+        { key: "barModulesCenter", type: "list", def: ["clock", "notifications"] },
+        { key: "barModulesRight", type: "list", def: ["media", "screenCapture", "systemTray", "volume", "battery", "quickSettings", "powerMenu"] },
         { key: "iconSet", type: "string", def: "material" },
         { key: "clockFormat", type: "string", def: "HH:mm" },
         { key: "dateFormat", type: "string", def: "ddd, MMM d" },
@@ -562,7 +555,7 @@ QtObject {
         { key: "materialFilled", type: "bool", def: false },
         { key: "fontScale", type: "float", def: 1.0 },
         { key: "fontWeight", type: "string", def: "regular" },
-        { key: "networkAliases", type: "json", def: ({}) },
+        { key: "networkAliases", type: "map", def: ({}) },
         { key: "screenshotDir", type: "string", def: "~/Pictures/Screenshots" },
         { key: "screenshotDefaultAction", type: "string", def: "both" },
         { key: "screenshotWindowSnapping", type: "bool", def: true },
@@ -620,27 +613,38 @@ QtObject {
         { key: "surfaceOpacity", type: "float", def: 0.90 },
         { key: "cornerFillets", type: "bool", def: true },
         { key: "cornerSmoothing", type: "float", def: 0.7 },
-        { key: "customColorsEnabled", type: "bool", def: false },
-        { key: "customBg", type: "string", def: "" },
-        { key: "customActive", type: "string", def: "" },
-        { key: "customText", type: "string", def: "" },
-        { key: "customSubtext", type: "string", def: "" },
-        { key: "customBorder", type: "string", def: "" },
-        { key: "customWidgetBg", type: "string", def: "" },
-        { key: "showDynamicNotch", type: "bool", def: true },
-        { key: "dynamicNotchEnabled", type: "bool", def: true },
-        { key: "dynamicNotchMode", type: "string", def: "auto" },
+        { key: "idleDimEnabled", type: "bool", def: true },
+        { key: "idleDimSeconds", type: "int", def: 150 },
+        { key: "idleLockEnabled", type: "bool", def: true },
+        { key: "idleLockSeconds", type: "int", def: 300 },
+        { key: "idleDpmsEnabled", type: "bool", def: true },
+        { key: "idleDpmsSeconds", type: "int", def: 330 },
+        { key: "idleSuspendEnabled", type: "bool", def: true },
+        { key: "idleSuspendSeconds", type: "int", def: 600 },
         { key: "bentoGap", type: "int", def: 8 },
         { key: "bentoHoverLift", type: "bool", def: true },
         { key: "barIslandMode", type: "bool", def: true },
         { key: "barWidgetChrome", type: "string", def: "grouped" },
         { key: "barGrouping", type: "string", def: "clusters" },
         { key: "barDividers", type: "string", def: "line" },
-        { key: "launcherCustomCategories", type: "json", def: [] },
-        { key: "adaptiveTransparency", type: "bool", def: true },
-        { key: "dynamicNotchFlared", type: "bool", def: false },
-        { key: "notchFlareRadius", type: "int", def: 16 }
+        { key: "launcherCustomCategories", type: "categories", def: [] },
+        { key: "adaptiveTransparency", type: "bool", def: true }
     ]
+
+    function normalizeZoneList(arr, isCenter) {
+        let out = [];
+        let hadNotch = false;
+        for (let i = 0; i < arr.length; i++) {
+            let m = String(arr[i] || "").trim();
+            if (!m) continue;
+            if (m === "dynamicNotch" || m === "notch") { hadNotch = true; continue; }
+            if (out.indexOf(m) === -1) out.push(m);
+        }
+        if (isCenter && hadNotch && out.indexOf("clock") === -1) {
+            out.unshift("clock");
+        }
+        return out;
+    }
 
     function loadObject(data) {
         if (!data) return;
@@ -669,15 +673,24 @@ QtObject {
             } else if (item.type === "bool") {
                 let b = (v === true || v === "true");
                 if (root[item.key] !== b) root[item.key] = b;
-            } else if (item.type === "json") {
-                try {
-                    let obj = typeof v === "string" ? JSON.parse(v) : v;
-                    if (obj && (typeof obj === "object" || Array.isArray(obj))) {
-                        if (JSON.stringify(root[item.key]) !== JSON.stringify(obj)) {
-                            root[item.key] = obj;
-                        }
-                    }
-                } catch(e) {}
+            } else if (item.type === "list") {
+                let arr = ConfFmt.parseList(v);
+                if (item.key === "barModulesLeft" || item.key === "barModulesCenter" || item.key === "barModulesRight") {
+                    arr = root.normalizeZoneList(arr, item.key === "barModulesCenter");
+                }
+                if (ConfFmt.serializeList(root[item.key]) !== ConfFmt.serializeList(arr)) {
+                    root[item.key] = arr;
+                }
+            } else if (item.type === "map") {
+                let obj = ConfFmt.parseKvMap(v);
+                if (ConfFmt.serializeKvMap(root[item.key]) !== ConfFmt.serializeKvMap(obj)) {
+                    root[item.key] = obj;
+                }
+            } else if (item.type === "categories") {
+                let cats = ConfFmt.parseCategories(v);
+                if (ConfFmt.serializeCategories(root[item.key]) !== ConfFmt.serializeCategories(cats)) {
+                    root[item.key] = cats;
+                }
             }
         }
     }
@@ -896,8 +909,12 @@ QtObject {
             let val = root[item.key] !== undefined ? root[item.key] : item.def;
             if (item.type === "string") {
                 lines.push(item.key + '="' + val + '"');
-            } else if (item.type === "json") {
-                lines.push(item.key + "='" + JSON.stringify(val ?? item.def) + "'");
+            } else if (item.type === "list") {
+                lines.push(item.key + "=" + ConfFmt.serializeList(val ?? item.def));
+            } else if (item.type === "map") {
+                lines.push(item.key + "=" + ConfFmt.serializeKvMap(val ?? item.def));
+            } else if (item.type === "categories") {
+                lines.push(item.key + "=" + ConfFmt.serializeCategories(val ?? item.def));
             } else {
                 lines.push(item.key + "=" + val);
             }
@@ -917,7 +934,9 @@ QtObject {
         root._loading = true;
         for (let i = 0; i < _schema.length; i++) {
             let item = _schema[i];
-            root[item.key] = (item.type === "json") ? (Array.isArray(item.def) ? item.def.slice() : Object.assign({}, item.def)) : item.def;
+            root[item.key] = (item.type === "list" || item.type === "categories")
+                ? item.def.slice()
+                : (item.type === "map" ? Object.assign({}, item.def) : item.def);
         }
         root.showScreenCapture = true;
         root.showWelcomeWizard = false;
@@ -964,7 +983,6 @@ QtObject {
         barGrouping = "clusters";
         barWidgetChrome = "grouped";
         barDividers = "line";
-        dynamicNotchFlared = false;
     }
 
     function dispatchCloseWindow() {

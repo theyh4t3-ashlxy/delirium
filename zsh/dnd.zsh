@@ -1,29 +1,31 @@
-# dnd: do not disturb mode controller
+# dnd: do not disturb mode controller (synced with quickshell state settings.conf)
 
 dnd() {
     local arg="${1:-toggle}"
-    local conf_file="$HOME/.config/quickshell/settings.conf"
-    [[ ! -f "$conf_file" ]] && touch "$conf_file"
+    local state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell"
+    local conf_file="$state_dir/settings.conf"
+    [[ -d "$state_dir" ]] || mkdir -p "$state_dir"
+    [[ -f "$conf_file" ]] || touch "$conf_file"
 
     local current_dnd="false"
-    if grep -q "^dnd=true" "$conf_file" 2>/dev/null; then
+    if grep -Eq '^dnd=(true|1)\s*$' "$conf_file" 2>/dev/null; then
         current_dnd="true"
     fi
 
     case "$arg" in
         on|enable|1)
-            if grep -q "^dnd=" "$conf_file"; then
-                sed -i "s|^dnd=.*|dnd=true|" "$conf_file"
+            if grep -q '^dnd=' "$conf_file"; then
+                sed -i 's|^dnd=.*|dnd=true|' "$conf_file"
             else
-                echo "dnd=true" >> "$conf_file"
+                print -r -- 'dnd=true' >> "$conf_file"
             fi
             print -P "%F{magenta}󰂛 dnd enabled%f - %F{dim}notification toasts silenced%f"
             ;;
         off|disable|0)
-            if grep -q "^dnd=" "$conf_file"; then
-                sed -i "s|^dnd=.*|dnd=false|" "$conf_file"
+            if grep -q '^dnd=' "$conf_file"; then
+                sed -i 's|^dnd=.*|dnd=false|' "$conf_file"
             else
-                echo "dnd=false" >> "$conf_file"
+                print -r -- 'dnd=false' >> "$conf_file"
             fi
             print -P "%F{green}󰂚 dnd disabled%f - %F{dim}notification toasts active%f"
             ;;
