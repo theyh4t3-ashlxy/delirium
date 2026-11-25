@@ -81,7 +81,7 @@ CURR_WALL_SYMLINK = Path.home() / ".curr_wall"
 CURR_WALL_STATIC = Path.home() / ".curr_wall_static.jpg"
 CACHE_WALLPAPER = APP_CACHE_DIR / "current_wallpaper"
 GLOBAL_CACHE_WALLPAPER = XDG_CACHE_HOME / "current_wallpaper"
-FALLBACK_WALLPAPER = WALLPAPERS_DIR / "hyprland" / "hypr.png"
+FALLBACK_WALLPAPER = WALLPAPERS_DIR / "hyprland" / "hyprland.png"
 
 DEFAULT_SETTINGS = {
     "currentWallpaper": str(FALLBACK_WALLPAPER),
@@ -655,8 +655,8 @@ def resolve_wallpaper_path(path_str: Optional[str] = None) -> Optional[str]:
 
   candidates = [
       FALLBACK_WALLPAPER,
-      WALLPAPERS_DIR / "endermanch" / "img0.jpg",
-      WALLPAPERS_DIR / "endermanch" / "Bliss.png",
+      WALLPAPERS_DIR / "windows" / "10" / "win10-1809-img0_3840x2160.jpg",
+      WALLPAPERS_DIR / "windows" / "xp" / "bliss.png",
   ]
   for c in candidates:
     if c.is_file():
