@@ -89,6 +89,8 @@ Rectangle {
             Text {
                 text: root.barPos + " dock"
                 font.family: Theme.fontMono
+                font.variableAxes: Theme.monoAxes
+                font.weight: Theme.monoWeightRegular
                 font.pixelSize: Theme.fontSizeXs
                 color: Theme.on_surface_variant
                 anchors.centerIn: parent

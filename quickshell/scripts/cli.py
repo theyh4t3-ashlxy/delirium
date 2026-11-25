@@ -613,8 +613,8 @@ def dispatch_action(action_name: str, args: Optional[List[str]] = None):
         "calendar": ("dashboard-home", "toggle", "calendar", "toggle"),
         "caffeine": ("focus-toggle", "toggle", "caffeine", "toggle"),
         "idle": ("focus-toggle", "toggle", "idle", "toggle"),
-        "vpn": ("vpn-toggle", "toggle", "quicksettings", "toggle"),
-        "hotspot": ("hotspot-toggle", "toggle", "quicksettings", "toggle"),
+        "vpn": ("vpn-toggle", "toggle", "network", "vpn"),
+        "hotspot": ("hotspot-toggle", "toggle", "network", "hotspot"),
         "focus": ("focus-toggle", "toggle", "notifs", "dnd"),
         "dnd": ("focus-toggle", "toggle", "notifs", "dnd"),
         "config": ("dashboard-config", "toggle", "quicksettings", "toggle"),
@@ -630,6 +630,44 @@ def dispatch_action(action_name: str, args: Optional[List[str]] = None):
         "sandbox": ("sandbox", "toggle", "sandbox", "toggle"),
         "motion": ("sandbox", "toggle", "sandbox", "toggle"),
     }
+
+    if act in ("screenshot", "ss") and not is_bs:
+        sub = args[0].lower() if args else "open"
+        if sub in ("open", "close", "toggle", "region", "window", "full", "annotate", "picker"):
+            send_ipc("screenshot", sub)
+        elif sub in ("pin", "pinlast"):
+            send_ipc("screenshot", "pinLast")
+        elif sub in ("clearpins", "unpin"):
+            send_ipc("screenshot", "clearPins")
+        elif sub in ("last", "editlast", "edit"):
+            if len(args) > 1:
+                send_ipc("screenshot", "editFile", extra_args=[args[1]])
+            else:
+                send_ipc("screenshot", "editLast")
+        elif sub in ("clip", "clipboard"):
+            send_ipc("screenshot", "editClipboard")
+        elif sub == "delay":
+            sec = args[1] if len(args) > 1 else "3"
+            send_ipc("screenshot", "delay", extra_args=[sec])
+        else:
+            send_ipc("screenshot", "toggle")
+        return
+
+    if act in ("studio", "barstudio") and not is_bs:
+        sub = args[0].lower() if args else "toggle"
+        if sub in ("layout", "style", "widgets", "motion"):
+            send_ipc("studio", "tab", extra_args=[sub])
+        elif sub in ("open", "close", "toggle"):
+            send_ipc("studio", sub)
+        else:
+            send_ipc("studio", "toggle", extra_args=args)
+        return
+
+    if act in ("sandbox", "motion") and not is_bs:
+        sub = args[0].lower() if args else "toggle"
+        meth = sub if sub in ("open", "close", "toggle") else "toggle"
+        send_ipc("sandbox", meth)
+        return
 
     if act in ipc_map:
         bs_target, bs_meth, qs_target, qs_meth = ipc_map[act]
@@ -780,10 +818,13 @@ def print_help():
   cli files | fm | e [dir]          launch preferred file manager (yazi / dolphin)
   cli wp [subcmd...] | wall         roll wallpaper or pass commands directly to wp
   cli audio | media | nowplaying    toggle audio or now playing popup
-  cli capture | ss | record [sub]   screen capture panel, screenshot, or recording
+  cli capture | record [sub]        screen capture panel or recording
+  cli ss [region|window|full|annotate|picker|delay <s>|pin|edit|clip]  screenshot studio
   cli lock | power                  lock session or open power menu
   cli caffeine | idle               toggle sleep inhibitor popup
   cli keybinds | welcome            view keybindings cheatsheet or welcome wizard
+  cli studio [layout|style|widgets|motion]  open bar studio on a specific tab
+  cli motion | sandbox              jump straight to bar studio motion lab
   cli act <action> [args]           dispatch arbitrary shell action
   cli ipc [args...]                 raw pass-through to quickshell ipc
 

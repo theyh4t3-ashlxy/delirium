@@ -421,6 +421,7 @@ Scope {
                                 Text {
                                     text: "authentication required"
                                     font.family: Theme.fontDisplay
+                                    font.variableAxes: Theme.displayAxes
                                     font.pixelSize: Theme.fontSizeMd
                                     font.weight: Theme.fontWeightBold
                                     color: Theme.textPrimary
@@ -449,6 +450,8 @@ Scope {
                                                 ? dialogState.flow.actionId
                                                 : "org.freedesktop.policykit.exec"
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
+                                            font.weight: Theme.monoWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: (actSubMouse.containsMouse || dialogState.showDetails)
                                                 ? Theme.primary
@@ -513,8 +516,9 @@ Scope {
                                         Text {
                                             text: dialogState.activeIdentityName
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: Theme.fontSizeXs
-                                            font.weight: Theme.fontWeightBold
+                                            font.weight: Theme.monoWeightBold
                                             color: Theme.textPrimary
                                         }
                                     }
@@ -578,6 +582,8 @@ Scope {
                         Layout.fillWidth: true
                         text: dialogState.cleanPromptMessage
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeSm
                         color: Theme.textSecondary
                         wrapMode: Text.WordWrap
@@ -614,8 +620,9 @@ Scope {
                                 Text {
                                     text: dialogState.shortCommand
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: Theme.fontSizeSm
-                                    font.weight: Theme.fontWeightBold
+                                    font.weight: Theme.monoWeightBold
                                     color: Theme.textPrimary
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
@@ -645,8 +652,9 @@ Scope {
                                         Text {
                                             text: dialogState.copiedKey === "cmd" ? "copied" : "copy cmd"
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: Theme.fontSizeXs
-                                            font.weight: Theme.fontWeightBold
+                                            font.weight: Theme.monoWeightBold
                                             color: Theme.primary
                                         }
                                     }
@@ -666,6 +674,8 @@ Scope {
                                 visible: dialogState.extractedCommand !== dialogState.shortCommand
                                 text: dialogState.extractedCommand
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.on_surface_disabled
                                 elide: Text.ElideMiddle
@@ -697,14 +707,17 @@ Scope {
                                 Text {
                                     text: "action id:"
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Theme.fontWeightBold
+                                    font.weight: Theme.monoWeightBold
                                     color: Theme.textSecondary
                                 }
 
                                 Text {
                                     text: dialogState.flow?.actionId || "n/a"
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.weight: Theme.monoWeightRegular
                                     font.pixelSize: Theme.fontSizeXs
                                     color: Theme.textPrimary
                                     elide: Text.ElideMiddle
@@ -734,8 +747,9 @@ Scope {
                                         Text {
                                             text: dialogState.copiedKey === "id" ? "copied" : "copy id"
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: Theme.fontSizeXs
-                                            font.weight: Theme.fontWeightBold
+                                            font.weight: Theme.monoWeightBold
                                             color: Theme.primary
                                         }
                                     }
@@ -759,14 +773,17 @@ Scope {
                                 Text {
                                     text: "cookie:"
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Theme.fontWeightBold
+                                    font.weight: Theme.monoWeightBold
                                     color: Theme.textSecondary
                                 }
 
                                 Text {
                                     text: dialogState.flow?.cookie ?? ""
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.weight: Theme.monoWeightRegular
                                     font.pixelSize: Theme.fontSizeXs
                                     color: Theme.on_surface_disabled
                                     elide: Text.ElideMiddle
@@ -803,6 +820,7 @@ Scope {
                                     ? dialogState.feedbackMessage.toLowerCase()
                                     : "waiting for fingerprint or security key..."
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeXs
                                 font.weight: Theme.fontWeightBold
                                 color: Theme.primary
@@ -864,6 +882,8 @@ Scope {
                                 passwordCharacter: "•"
                                 passwordMaskDelay: 0
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
                                 font.pixelSize: Theme.fontSizeMd
                                 color: Theme.textPrimary
                                 selectionColor: Theme.primary_container
@@ -881,6 +901,8 @@ Scope {
                                         return prompt !== "" ? (prompt + "...") : "enter password...";
                                     }
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.weight: Theme.fontWeightRegular
                                     font.pixelSize: Theme.fontSizeSm
                                     color: Theme.on_surface_disabled
                                     visible: pwInput.text.length === 0
@@ -921,8 +943,9 @@ Scope {
                                     anchors.centerIn: parent
                                     text: "caps"
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Theme.fontWeightBold
+                                    font.weight: Theme.monoWeightBold
                                     color: Theme.warn
                                 }
                             }
@@ -961,6 +984,7 @@ Scope {
                             ? dialogState.feedbackMessage.toLowerCase()
                             : ("authentication failed" + (dialogState.attemptCount > 1 ? (" (" + dialogState.attemptCount + " tries)") : " — try again"))
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Theme.fontWeightMedium
                         color: dialogState.isError ? Theme.error : Theme.primary
@@ -977,6 +1001,8 @@ Scope {
                             visible: win.dragOffsetX !== 0 || win.dragOffsetY !== 0
                             text: "double-click header to center"
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.on_surface_disabled
                         }
@@ -1001,6 +1027,7 @@ Scope {
                                 anchors.centerIn: parent
                                 text: "cancel (esc)"
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeXs
                                 font.weight: Theme.fontWeightDemiBold
                                 color: Theme.textSecondary
@@ -1046,6 +1073,7 @@ Scope {
                                 Text {
                                     text: dialogState.isSubmitting ? "verifying..." : "authenticate"
                                     font.family: Theme.fontDisplay
+                                    font.variableAxes: Theme.displayAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightBold
                                     color: Theme.on_primary

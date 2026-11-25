@@ -1,48 +1,50 @@
 # quickshell
 
-welcome to the asylum. this is the crown jewel of the desktop: a qml and c++ layer-shell monstrosity engineered to make electron developers cry and waybar users question their life choices.
+a custom wayland desktop shell in qml and python because standard bars assume healthy batteries, single-monitor geometry, and zero curiosity about what is happening inside sysfs underneath an icon.
 
-we threw backward compatibility into an active volcano. nerd font glyphs are dead to us; we migrated to google's official material symbols because life is too short for broken private-use-area codepoints and guessing which font patch broke your volume icon.
+nothing here runs on electron. one null reference inside a popup anchor still drops the session cleanly onto `tty1`. icon lookup resolves straight through google material symbols, font awesome 6, and `SegoeIcons.ttf` instead of patched private-use codepoints that silently swap icons between font rebuilds.
 
-## what this thing actually controls
-everything between your wallpaper and your retinas:
-- **the chameleon status bar**: docks top, bottom, left, or right dynamically without restarting the compositor. supports hover expansions, pill groupings with spring physics, and hot-reloading widget layouts dispatched straight from `BarStudio`.
-- **liquid concave screen corners**: sharp 90-degree monitor corners are an aesthetic hate crime. rendered via wayland layer-shell subsurfaces with mathematical cubic bezier curves and empty input region masks (`mask: Region {}`) so clicks pass straight through the transparency instead of trapping your cursor in blind rage.
-- **recording & screencap powerhouse**: live screen capture drawer with countdown timers, persistent pulsating recording pills, mic/desktop audio routing chips, satty annotation integration, and right-click instant discard.
-- **pam-authenticated layer-shell vault**: native security surface with zero flickering. features real-time pipewire audio peak wave monitors, extensionless key-value state persistence (`~/.config/quickshell/lockscreen/state`), dynamic stack ordering, and unhinged developer nihilism quotes while you type credentials at 4:18 am.
-- **freedesktop toast notifications**: native wayland surfaces that glide onto your screen like silk, display rich action buttons, handle swipe-to-dismiss drag physics, and vanish without leaking zombie surfaces.
-- **app launcher with fuzzy search**: directory-filtered app grid, inline math calculation, and persistent pinned apps saved to flat state files.
-- **bar studio**: a live in-engine visual editor that lets you drag, drop, and rearrange widgets between left, center, and right sections without writing a single line of json or restarting quickshell.
-- **zero `.json` architecture**: json has been sentenced to death. all configurations, presets, and state files use flat `.conf` or extensionless key-value definitions.
+## subsystems
 
-## architecture map
-- `shell.qml`: root orchestrator. spawns bars, overlays, and registers ipc endpoints (`notifs`, `lock`, `studio`, `caffeine`). do not touch unless you enjoy staring into tty1 text purgatory.
-- `Theme.qml`: dynamic material design token bible. generated on the fly by matugen from wallpaper colors. defines palette tokens, radii, motion constants, and official material symbol codepoints.
-- `settings.conf`: gitignored. quickshell writes live state to `~/.local/state/quickshell/settings.conf` and falls back to the repo copy on a fresh clone via `fallbackConfPath` in `Settings.qml`. stores bar edge, widget layout, theme mode, and font settings. do not commit changes to this file; they will not be tracked.
-- `bar/StatusBar.qml`: the status bar engine. dynamic edge anchoring, pill layout expansion, liquid corner docking.
-- `corners/`:
-  - `ScreenCorners.qml`: monitor boundary anchors with continuous border lines and input passthrough masks.
-  - `ConcaveCorner.qml`: high-performance canvas element rendering inverted bezier fillets with configurable tension.
-- `widgets/`: modular desktop pills, sliders, drawers, and panels (launcher, clock, battery, network, bluetooth, volume, clipboard, mpris, powermenu, screencapture, quicknotes).
-- `services/`: system state singletons (audio, network, battery, notifications, settings, presets, screen recording) talking directly to dbus, pipewire, and sysfs.
-- `controls/`: custom design system components built from scratch (icon buttons, toggle switches, popup panels, kinetic flick lists) because qtquick controls 2 looks like a corporate intranet dashboard from 2007.
-- `presets/`: native `.conf` presets (`catalog.conf`, `default.conf`, `minimal.conf`, `island.conf`) mapping 1:1 with the settings engine.
-- `scripts/`: zero-dependency python and zsh backend daemons handling battery sysfs probes, color picking, session actions, clipboard history, and desktop lifecycle control.
+- **adaptive status bar (`bar/StatusBar.qml`)**: docks dynamically to any monitor edge (`top`, `bottom`, `left`, `right`) without dropping wayland surfaces. supports per-zone clustering, floating islands, continuous bezier bar scoops, and live layout mutation pushed from `BarStudio`.
+- **bar studio (`widgets/BarStudio.qml`, `presets.py`)**: four-tab configuration host (`layout`, `bar style`, `widgets`, `motion lab`). reorder widgets across zones, swap between nine material-derived presets (`solid`, `glass`, `frosted`, `translucent`, `tinted`, `outlined`, `oled`, `monochrome`, `islands`) stored as flat `.conf` manifests, save custom presets, and stress-test spring physics against a synthetic preview bar while listening to your GPU wake up.
+- **variable font engine (`scripts/fonts.py`, `Theme.qml`)**: scans `fc-list` and parses binary SFNT `fvar` tables directly out of font files so typography controls drive real weight (`wght`), width, and optical size axes (`Segoe UI Variable`, `Google Sans Flex`, `JetBrains Mono`) instead of letting Qt fake bold weights by smearing pixels horizontally.
+- **screenshot studio & redaction (`ScreenshotOverlay.qml`, `ScreenshotHud.qml`, `ScreenshotPinLayer.qml`, `scripts/screenshot.py`)**: region, window, fullscreen, delayed capture, magnifier loupe, pixel eyedropper, floating screen reference pins, ImageMagick `prettify` framing, and canvas annotations (`pen`, `highlighter`, `arrow`, `rect`, `ellipse`, `step`, `text`). ships three destructive redaction modes (`mosaic`, `blur`, `solid`) for obliterating identifying details out of an image before forwarding evidence to someone whose voice already makes your teeth ache.
+- **thermal, power & battery telemetry (`Battery.qml`, `BatteryPopup.qml`, `scripts/battery.py`)**: stopped trusting `powerprofilesctl` to report honestly on thinkpad silicon (`BAT0` currently sits at `43.6 / 52.5 Wh`, `83.1%` capacity). reads and writes `tlp`, ACPI `platform_profile`, `intel_pstate` (`no_turbo`), sysfs charge start/stop thresholds, and the local `fanctl` daemon directly so `"performance"` stops sitting grayed out while the `i7-1260P` bakes behind a false `BD PROCHOT` lock.
+- **network, vpn, hotspot & qr (`NetworkStatus.qml`, `scripts/network.py`)**: three-tab network panel (`wi-fi`, `vpn`, `hotspot`) pulling live ipv4, gateway, dns, and sysfs rx/tx telemetry. deletes saved network credentials cleanly, turns up a local ap hotspot with persisted credentials, and draws a pure-python byte-mode qr matrix onto qml `Canvas` so phones connect cleanly without speaking passphrases inside quiet rooms.
+- **clock, weather & pomodoro (`Clock.qml`, `TimerService.qml`, `scripts/weather.py`)**: fetches open-meteo conditions, feels-like temp, humidity, wind, and daily extremes cached in `$XDG_RUNTIME_DIR/quickshell_weather_cache.json`. couples an interactive calendar and custom countdowns with a `25m focus / 5m break` pomodoro loop functioning primarily as an external nerve prompt to unclench your jaw and check whether sensation still reaches your feet.
+- **notifications, tray & osd (`Notifications.qml`, `NotificationService.qml`, `SystemTray.qml`, `OSD.qml`)**: wayland alert layer with drag-dismiss physics, live search, `uniqueApps` filter chips, and timed DND quarantine presets (`30m`, `1h`, `2h`, `off`) with a ticking countdown so you can sever outside human contact on a strict clock without wondering who gave up waiting. power profile toggles, idle inhibit, and DND route straight to the OSD pill; tray collapse persists via `Settings.trayCollapsed`.
+- **bluetooth & power state (`Bluetooth.qml`, `PowerMenu.qml`)**: adds paired-only filtering, discoverable state control, trust/pair actions, and PipeWire BlueZ codec switching (`hi-fi a2dp` vs `mic hfp`) over `pw-dump` and `wpctl`. power menu presents a six-card keyboard grid (`1–6`, arrows, `Enter`, `Escape`) ending in `hibernate` so dirty RAM pages serialize onto swap and preserve the exact posture of whatever hole you collapsed in without losing state.
+- **pam lockscreen (`lockscreen/`)**: layer-shell auth guard rendering live pipewire spectrum bars and curated quotes while verifying PAM passwords in total isolation.
+- **zero `.json` state**: json does not exist anywhere in configuration or runtime persistence. settings, presets, and caches read and write flat key-value `.conf` records through `theme/confFormat.mjs`.
 
-## how to drive it from the terminal
+## layout map
+
+- `shell.qml`: root entrypoint registering global IPC handlers (`notifs`, `lock`, `studio`, `caffeine`, `network`, `wifi`, `screenshot`, `record`, etc.).
+- `Theme.qml`: singleton watching `~/.config/quickshell/palette.css` on disk and recomputing color tokens, corner radii, material symbols, and variable font axes without restarting the shell.
+- `settings.conf`: tracked repo baseline, symlinked read-only or fallen back onto via `fallbackConfPath` in `Settings.qml`. live state mutations write exclusively to `~/.local/state/quickshell/settings.conf` so dragging one opacity slider never dirties `git status`.
+- `bar/`: `StatusBar.qml` edge-docking surface host and `pill` containers.
+- `corners/`: `ScreenCorners.qml` and `ConcaveCorner.qml` rendering wayland subsurfaces with cubic bezier fillets and empty `Region {}` input masks so clicks pass cleanly underneath.
+- `controls/`: hand-written design primitives (`PopupPanel`, `Slider`, `SliderRow`, `ToggleRow`, `ChoiceGrid`, `ScreenshotActions`) built to replace qtquick controls' default office-intranet styling.
+- `widgets/`: modular pills, popups, studios, and overlays.
+- `services/`: singletons coordinating dbus, pipewire, sysfs, hyprland ipc, notification queues, timers, and captures.
+- `presets/`: material `.conf` manifests (`catalog.conf` + built-in style sheets scanned by `presets.py`).
+- `scripts/`: python and zsh helpers (`cli.py`, `battery.py`, `network.py`, `screenshot.py`, `weather.py`, `fonts.py`, `presets.py`, `wallpaper.py`, `clipboard.py`, `session.py`, `spectrum.py`, `lyrics.py`).
+
+## cli surface
+
 ```zsh
-# inspect active shell status and memory footprint
-cli status
+cli status                    # process state, uptime, and memory usage
+cli reload                    # tear down orphaned layer surfaces and spawn cleanly
+cli shell toggle              # swap shell runtime
 
-# gracefully reload without surface conflicts or zombie layers
-cli reload
-
-# hot-swap between quickshell and legacy shells
-cli shell toggle
-
-# toggle desktop drawers and popups
-cli launcher
-cli quicksettings
-cli notifs
-cli files
+cli launcher                  # app drawer
+cli studio                    # bar layout studio
+cli quicksettings             # appearance & system toggles
+cli notifs                    # notification queue
+cli dnd                       # toggle do-not-disturb
+cli vpn                       # open network popup on vpn tab
+cli hotspot                   # open network popup on hotspot tab
+cli ss [region|window|full]   # screenshot studio overlay
+cli files                     # file manager
 ```

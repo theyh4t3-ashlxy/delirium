@@ -109,6 +109,8 @@ Item {
                         id: searchInput
                         Layout.fillWidth: true
                         font.family: Theme.fontSans
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeSm
                         color: Theme.on_surface
                         clip: true
@@ -120,6 +122,8 @@ Item {
                             visible: parent.text === "" && !parent.activeFocus
                             text: "Search keybinds, actions, or keys..."
                             font.family: Theme.fontSans
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeSm
                             color: Theme.on_surface_variant
                             anchors.verticalCenter: parent.verticalCenter
@@ -151,8 +155,9 @@ Item {
                     anchors.centerIn: parent
                     text: root.filteredBinds.length + " binds"
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
                     font.pixelSize: Theme.fontSizeXs
-                    font.weight: Font.DemiBold
+                    font.weight: Theme.monoWeightBold
                     color: Theme.primary
                 }
             }
@@ -207,8 +212,9 @@ Item {
                             anchors.centerIn: parent
                             text: modelData.label
                             font.family: Theme.fontSans
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
-                            font.weight: isSelected ? Font.DemiBold : Font.Normal
+                            font.weight: isSelected ? Theme.fontWeightDemiBold : Theme.fontWeightRegular
                             color: isSelected ? Theme.on_primary_container : Theme.on_surface
                         }
 
@@ -280,8 +286,9 @@ Item {
                                     Layout.fillWidth: true
                                     text: modelData.desc
                                     font.family: Theme.fontSans
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeSm
-                                    font.weight: Font.Medium
+                                    font.weight: Theme.fontWeightMedium
                                     color: Theme.on_surface
                                     elide: Text.ElideRight
                                 }
@@ -290,6 +297,8 @@ Item {
                                     Layout.fillWidth: true
                                     text: modelData.action
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.weight: Theme.monoWeightRegular
                                     font.pixelSize: Theme.fontSizeXs
                                     color: Theme.on_surface_variant
                                     elide: Text.ElideRight
@@ -317,8 +326,9 @@ Item {
                                             anchors.centerIn: parent
                                             text: modelData
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: Theme.fontSizeXs
-                                            font.weight: Font.Bold
+                                            font.weight: Theme.monoWeightBold
                                             color: modelData === "WIN" ? Theme.primary : Theme.on_surface
                                         }
                                     }
@@ -359,6 +369,8 @@ Item {
                             Layout.alignment: Qt.AlignHCenter
                             text: "No keybinds match \"" + root.searchQuery + "\""
                             font.family: Theme.fontSans
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeSm
                             color: Theme.on_surface_variant
                         }

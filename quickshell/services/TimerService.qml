@@ -12,6 +12,13 @@ Singleton {
     property bool timerRunning: false
     property bool timerPaused: false
 
+    // Pomodoro cycle engine
+    property bool pomodoroActive: false
+    property string pomodoroPhase: "focus" // focus | break
+    property int pomodoroCycles: 0
+    property int _pomoFocusMin: 25
+    property int _pomoBreakMin: 5
+
     property int stopwatchElapsed: 0
     property bool stopwatchRunning: false
 
@@ -35,10 +42,29 @@ Singleton {
 
     function startTimer(seconds) {
         let s = (typeof seconds === "number" && seconds > 0) ? seconds : 300;
+        pomodoroActive = false;
         timerTotal = s;
         timerRemaining = s;
         timerRunning = true;
         timerPaused = false;
+    }
+
+    function startPomodoro(focusMin, breakMin) {
+        _pomoFocusMin = Math.max(1, Math.round(focusMin || Settings?.pomodoroFocusMin || 25));
+        _pomoBreakMin = Math.max(1, Math.round(breakMin || Settings?.pomodoroBreakMin || 5));
+        pomodoroActive = true;
+        pomodoroPhase = "focus";
+        timerTotal = _pomoFocusMin * 60;
+        timerRemaining = timerTotal;
+        timerRunning = true;
+        timerPaused = false;
+    }
+
+    function stopPomodoro() {
+        pomodoroActive = false;
+        pomodoroPhase = "focus";
+        pomodoroCycles = 0;
+        resetTimer();
     }
 
     function pauseTimer() {
@@ -60,6 +86,8 @@ Singleton {
             pauseTimer();
         } else if (timerPaused && timerRemaining > 0) {
             resumeTimer();
+        } else if (pomodoroActive) {
+            startPomodoro(_pomoFocusMin, _pomoBreakMin);
         } else {
             startTimer(timerTotal > 0 ? timerTotal : 300);
         }
@@ -69,16 +97,25 @@ Singleton {
         timerRunning = false;
         timerPaused = false;
         timerRemaining = 0;
+        if (pomodoroActive) {
+            pomodoroActive = false;
+            pomodoroPhase = "focus";
+        }
+    }
+
+    function addTimerSeconds(addSec) {
+        let s = Math.round(addSec || 0);
+        if (s <= 0) return;
+        if (timerRunning || timerPaused) {
+            timerRemaining += s;
+            timerTotal += s;
+        } else {
+            startTimer(s);
+        }
     }
 
     function addTimerMinutes(mins) {
-        let addSec = (mins || 1) * 60;
-        if (timerRunning || timerPaused) {
-            timerRemaining += addSec;
-            timerTotal += addSec;
-        } else {
-            startTimer(addSec);
-        }
+        addTimerSeconds((mins || 1) * 60);
     }
 
     function startStopwatch() {
@@ -107,12 +144,26 @@ Singleton {
             if (root.timerRunning) {
                 if (root.timerRemaining > 1) {
                     root.timerRemaining -= 1;
+                } else if (root.pomodoroActive) {
+                    if (root.pomodoroPhase === "focus") {
+                        root.pomodoroCycles += 1;
+                        root.pomodoroPhase = "break";
+                        root.timerTotal = root._pomoBreakMin * 60;
+                        root.timerRemaining = root.timerTotal;
+                        root._sendNotification("Focus Complete", "Take a " + root._pomoBreakMin + "m break (cycle #" + root.pomodoroCycles + ")");
+                    } else {
+                        root.pomodoroPhase = "focus";
+                        root.timerTotal = root._pomoFocusMin * 60;
+                        root.timerRemaining = root.timerTotal;
+                        root._sendNotification("Break Over", "Back to focus for " + root._pomoFocusMin + "m");
+                    }
+                    root.timerFinished();
                 } else {
                     root.timerRemaining = 0;
                     root.timerRunning = false;
                     root.timerPaused = false;
                     root.timerFinished();
-                    root._sendFinishedNotification();
+                    root._sendNotification("Timer Finished", "Your timer has completed");
                 }
             }
             if (root.stopwatchRunning) {
@@ -121,9 +172,9 @@ Singleton {
         }
     }
 
-    function _sendFinishedNotification() {
+    function _sendNotification(title, body) {
         try {
-            Quickshell.execDetached(["notify-send", "-a", "Quickshell", "-i", "alarm", "Timer Finished", "Your timer has completed!"]);
+            Quickshell.execDetached(["notify-send", "-a", "Quickshell", "-i", "alarm", title, body]);
         } catch (e) {}
     }
 }

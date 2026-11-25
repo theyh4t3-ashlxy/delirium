@@ -12,6 +12,46 @@ BarPill {
 
     readonly property int notifCount: NotificationService?.trackedNotifications?.values?.length ?? NotificationService?.trackedNotifications?.count ?? 0
     readonly property bool isDnd: Settings?.dnd ?? false
+    readonly property int dndSec: NotificationService?.dndRemainingSec ?? 0
+
+    property string searchQuery: ""
+    property string activeAppFilter: ""
+    property bool showDndTimers: false
+
+    readonly property var rawNotifs: NotificationService?.trackedNotifications?.values ? [...NotificationService.trackedNotifications.values] : []
+    readonly property var uniqueApps: {
+        let seen = {};
+        let apps = [];
+        for (let i = 0; i < rawNotifs.length; i++) {
+            let n = rawNotifs[i];
+            if (!n) continue;
+            let app = String(n.appName || n.desktopEntry || "system").toLowerCase().trim();
+            if (app && !seen[app]) {
+                seen[app] = true;
+                apps.push(app);
+            }
+        }
+        return apps;
+    }
+
+    readonly property var filteredNotifs: {
+        let q = root.searchQuery.trim().toLowerCase();
+        let appF = root.activeAppFilter.trim().toLowerCase();
+        let out = [];
+        for (let i = 0; i < rawNotifs.length; i++) {
+            let n = rawNotifs[i];
+            if (!n) continue;
+            let app = String(n.appName || n.desktopEntry || "system").toLowerCase().trim();
+            if (appF !== "" && app !== appF) continue;
+            if (q !== "") {
+                let sum = String(n.summary || "").toLowerCase();
+                let body = String(n.body || "").toLowerCase();
+                if (!sum.includes(q) && !body.includes(q) && !app.includes(q)) continue;
+            }
+            out.push(n);
+        }
+        return out;
+    }
 
     active: popup.open
     hovered: notifMouse.containsMouse
@@ -29,10 +69,6 @@ BarPill {
 
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animNormal; easing.type: Theme.animEasing } }
 
-    /*
-    try the raw dbus image/icon first (including image://qsimage/ pixmaps),
-    then let Theme.resolveAppIcon hunt down the .desktop entry if the app was lazy
-    */
     function resolveNotifIcon(notif): string {
         if (!notif) return "";
         let candidates = [notif.image, notif.appIcon];
@@ -42,11 +78,11 @@ BarPill {
             if (img.startsWith("image://") || img.startsWith("file://")) return img;
             if (img.startsWith("/")) return "file://" + img;
             if (Quickshell?.hasThemeIcon && Quickshell.hasThemeIcon(img)) {
-                return Quickshell.iconPath(img);
+                return Quickshell.iconPath(img) || "";
             }
             let lower = img.toLowerCase();
             if (Quickshell?.hasThemeIcon && Quickshell.hasThemeIcon(lower)) {
-                return Quickshell.iconPath(lower);
+                return Quickshell.iconPath(lower) || "";
             }
         }
 
@@ -55,6 +91,17 @@ BarPill {
             if (fallback) return fallback;
         }
         return "";
+    }
+
+    function formatDndRemaining(sec) {
+        let s = Math.max(0, Math.round(sec || 0));
+        let m = Math.ceil(s / 60);
+        if (m >= 60) {
+            let h = Math.floor(m / 60);
+            let rm = m % 60;
+            return rm > 0 ? (h + "h " + rm + "m") : (h + "h");
+        }
+        return m + "m";
     }
 
     Row {
@@ -83,13 +130,13 @@ BarPill {
             visible: root.notifCount > 0 && !Theme.isVertical
             text: root.notifCount.toString()
             font.family: Theme.fontMono
+            font.variableAxes: Theme.monoAxes
             font.pixelSize: Theme.fontSizeXs
-            font.weight: Theme.fontWeightBold
+            font.weight: Theme.monoWeightBold
             color: root.isDnd ? Theme.tertiary : Theme.primary
         }
     }
 
-    // update coordinates without accidentally forcing popup.open = true on hover
     function syncAnchor() {
         if (!root.visible || (root.width <= 0 && root.height <= 0)) {
             popup.targetRelativeX = 0;
@@ -151,9 +198,7 @@ BarPill {
             }
         }
 
-        function onCloseRequested() {
-            root.closePopup();
-        }
+        function onCloseRequested() { root.closePopup(); }
     }
 
     HoverFlyoutHandler {
@@ -172,6 +217,7 @@ BarPill {
             if (mouse.button === Qt.LeftButton) {
                 root.togglePopup();
             } else if (mouse.button === Qt.RightButton || mouse.button === Qt.MiddleButton) {
+                NotificationService?.setDndForMinutes(root.isDnd ? 0 : 0);
                 if (typeof Settings !== "undefined" && Settings) {
                     Settings.dnd = !Settings.dnd;
                 }
@@ -181,13 +227,20 @@ BarPill {
 
     PopupPanel {
         id: popup
+        wantsFocus: true
         screen: root.barScreen
-        cardWidth: 400
-        cardHeight: 480
+        cardWidth: 410
+        cardHeight: 510
+
+        onOpenChanged: {
+            if (!open) {
+                root.showDndTimers = false;
+            }
+        }
 
         content: ColumnLayout {
             anchors.fill: parent
-            spacing: Theme.popupSpacing
+            spacing: 8
 
             RowLayout {
                 Layout.fillWidth: true
@@ -220,22 +273,34 @@ BarPill {
                     Text {
                         text: "notifications"
                         font.family: Theme.fontDisplay
+                        font.variableAxes: Theme.displayAxes
                         font.pixelSize: Theme.fontSizeMd
                         font.weight: Theme.fontWeightBold
                         color: Theme.textPrimary
                     }
 
                     Text {
-                        text: root.isDnd
-                            ? "do not disturb active"
-                            : (root.notifCount > 0 ? (root.notifCount + " unread") : "inbox zero")
+                        text: {
+                            if (root.isDnd && root.dndSec > 0) return "dnd active • " + root.formatDndRemaining(root.dndSec) + " left";
+                            if (root.isDnd) return "do not disturb active";
+                            return root.notifCount > 0 ? (root.notifCount + " unread") : "inbox zero";
+                        }
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
+                        font.weight: Theme.monoWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: root.isDnd ? Theme.tertiary : Theme.textSecondary
                     }
                 }
 
-                // squishy dnd toggle pill
+                IconButton {
+                    icon: Theme.iconClock
+                    iconSize: Theme.fontSizeSm
+                    highlighted: root.showDndTimers || root.dndSec > 0
+                    tooltip: "timed do not disturb"
+                    onClicked: root.showDndTimers = !root.showDndTimers
+                }
+
                 Rectangle {
                     Layout.preferredHeight: 28
                     Layout.preferredWidth: dndChipRow.implicitWidth + 16
@@ -250,7 +315,6 @@ BarPill {
 
                     Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
                     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-                    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                     RowLayout {
                         id: dndChipRow
@@ -268,6 +332,7 @@ BarPill {
                         Text {
                             text: root.isDnd ? "dnd on" : "dnd off"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: root.isDnd ? Theme.fontWeightBold : Theme.fontWeightMedium
                             color: root.isDnd ? Theme.tertiary : Theme.textSecondary
@@ -280,6 +345,7 @@ BarPill {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
+                            if (NotificationService) NotificationService.dndRemainingSec = 0;
                             if (Settings) Settings.dnd = !Settings.dnd;
                         }
                     }
@@ -291,6 +357,8 @@ BarPill {
                     tooltip: "clear all"
                     visible: root.notifCount > 0
                     onClicked: {
+                        root.activeAppFilter = "";
+                        root.searchQuery = "";
                         if (NotificationService?.clearAll) NotificationService.clearAll();
                     }
                 }
@@ -300,6 +368,170 @@ BarPill {
                     iconSize: Theme.fontSizeXs
                     tooltip: "close panel"
                     onClicked: root.closePopup()
+                }
+            }
+
+            // timed DND selector bar
+            RowLayout {
+                visible: root.showDndTimers
+                Layout.fillWidth: true
+                spacing: 6
+
+                Text {
+                    text: "silence for:"
+                    font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
+                    font.pixelSize: 10
+                    color: Theme.on_surface_variant
+                }
+
+                Repeater {
+                    model: [
+                        { label: "30m", mins: 30 },
+                        { label: "1h", mins: 60 },
+                        { label: "2h", mins: 120 },
+                        { label: "off", mins: 0 }
+                    ]
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        readonly property bool isCur: modelData.mins === 0
+                            ? (!root.isDnd)
+                            : (root.isDnd && Math.abs((root.dndSec / 60) - modelData.mins) < 2)
+                        Layout.fillWidth: true
+                        height: 24
+                        radius: Theme.radiusPill
+                        color: isCur ? Theme.tertiary_overlay : (dtMouse.containsMouse ? Theme.widgetHover : Theme.cardBg)
+                        border.color: isCur ? Theme.tertiary : Theme.cardBorder
+                        border.width: 1
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: modelData.label
+                            font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.pixelSize: 10
+                            font.weight: isCur ? Theme.monoWeightBold : Theme.monoWeightRegular
+                            color: isCur ? Theme.tertiary : Theme.on_surface
+                        }
+
+                        MouseArea {
+                            id: dtMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: NotificationService?.setDndForMinutes(modelData.mins)
+                        }
+                    }
+                }
+            }
+
+            // search & app filter strip (shown whenever notifications exist)
+            ColumnLayout {
+                visible: root.notifCount > 0 || root.searchQuery !== ""
+                Layout.fillWidth: true
+                spacing: 6
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 30
+                    radius: Theme.radiusSm
+                    color: Theme.surface_container_highest
+                    border.color: notifSearchIn.activeFocus ? Theme.primary : Theme.widgetBorder
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 6
+                        spacing: 6
+
+                        Text {
+                            text: Theme.iconSearch
+                            font.family: Theme.fontIcon
+                            font.variableAxes: Theme.iconAxes
+                            font.pixelSize: Theme.fontSizeXs
+                            color: notifSearchIn.activeFocus ? Theme.primary : Theme.on_surface_variant
+                        }
+
+                        TextInput {
+                            id: notifSearchIn
+                            Layout.fillWidth: true
+                            verticalAlignment: TextInput.AlignVCenter
+                            font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.pixelSize: Theme.fontSizeXs
+                            color: Theme.on_surface
+                            selectByMouse: true
+                            onTextChanged: root.searchQuery = text
+
+                            Text {
+                                anchors.fill: parent
+                                verticalAlignment: Text.AlignVCenter
+                                text: "filter notifications or app..."
+                                font: parent.font
+                                color: Theme.on_surface_disabled
+                                visible: parent.text === ""
+                            }
+                        }
+
+                        IconButton {
+                            visible: notifSearchIn.text !== ""
+                            icon: Theme.iconClose
+                            iconSize: 10
+                            implicitWidth: 20
+                            implicitHeight: 20
+                            onClicked: notifSearchIn.text = ""
+                        }
+                    }
+                }
+
+                Flickable {
+                    visible: root.uniqueApps.length > 1
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 24
+                    contentWidth: appChipRow.implicitWidth
+                    contentHeight: 24
+                    flickableDirection: Flickable.HorizontalFlick
+                    clip: true
+
+                    Row {
+                        id: appChipRow
+                        height: 24
+                        spacing: 5
+
+                        Repeater {
+                            model: [""].concat(root.uniqueApps)
+
+                            delegate: Rectangle {
+                                required property string modelData
+                                readonly property bool isSel: root.activeAppFilter === modelData
+                                height: 22
+                                implicitWidth: appTxt.implicitWidth + 14
+                                radius: Theme.radiusPill
+                                color: isSel ? Theme.primary_overlay : Theme.cardBg
+                                border.color: isSel ? Theme.primary : Theme.cardBorder
+                                border.width: 1
+
+                                Text {
+                                    id: appTxt
+                                    anchors.centerIn: parent
+                                    text: modelData === "" ? ("all (" + root.rawNotifs.length + ")") : modelData
+                                    font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.pixelSize: 9
+                                    font.weight: isSel ? Theme.monoWeightBold : Theme.monoWeightRegular
+                                    color: isSel ? Theme.primary : Theme.on_surface_variant
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.activeAppFilter = modelData
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -320,8 +552,8 @@ BarPill {
                     clip: true
                     spacing: 8
                     boundsBehavior: Flickable.StopAtBounds
-                    visible: root.notifCount > 0
-                    model: NotificationService?.trackedNotifications
+                    visible: root.filteredNotifs.length > 0
+                    model: root.filteredNotifs
 
                     delegate: Rectangle {
                         id: notifCard
@@ -338,7 +570,6 @@ BarPill {
                         }
 
                         width: notifListView.width
-                        // avoid anchors.fill on col so wrapped text never causes a QML binding loop
                         implicitHeight: col.implicitHeight + 22
                         radius: Theme.radiusLg
                         color: isCritical
@@ -352,7 +583,6 @@ BarPill {
                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                         Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                        // middle-click anywhere on the card to yeet it
                         MouseArea {
                             id: cardMouse
                             anchors.fill: parent
@@ -369,7 +599,6 @@ BarPill {
                             }
                         }
 
-                        // left urgency/accent bar
                         Rectangle {
                             anchors.left: parent.left
                             anchors.leftMargin: 4
@@ -381,8 +610,6 @@ BarPill {
                             radius: Theme.radiusPill
                             color: notifCard.cardAccent
                             opacity: notifCard.isCritical || cardMouse.containsMouse ? 1.0 : 0.55
-
-                            Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
                         }
 
                         ColumnLayout {
@@ -407,19 +634,20 @@ BarPill {
                                     border.color: Theme.widgetBorder
                                     border.width: 1
 
-                                    IconImage {
-                                        id: notifIconImg
+                                    Loader {
                                         anchors.centerIn: parent
-                                        width: 16
-                                        height: 16
-                                        implicitSize: 16
-                                        source: notifCard.resolvedIcon
-                                        visible: source !== "" && status !== Image.Error
+                                        active: notifCard.resolvedIcon !== ""
+                                        sourceComponent: IconImage {
+                                            width: 16
+                                            height: 16
+                                            implicitSize: 16
+                                            source: notifCard.resolvedIcon
+                                        }
                                     }
 
                                     Text {
                                         anchors.centerIn: parent
-                                        visible: !notifIconImg.visible
+                                        visible: notifCard.resolvedIcon === ""
                                         text: notifCard.isCritical ? Theme.iconFlame : Theme.iconBell
                                         font.family: Theme.fontIcon
                                         font.variableAxes: Theme.iconAxes
@@ -431,8 +659,9 @@ BarPill {
                                 Text {
                                     text: (notifCard.modelData?.appName || notifCard.modelData?.desktopEntry || "system").toLowerCase()
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Theme.fontWeightBold
+                                    font.weight: Theme.monoWeightBold
                                     color: notifCard.cardAccent
                                     Layout.fillWidth: true
                                     elide: Text.ElideRight
@@ -452,8 +681,9 @@ BarPill {
                                         anchors.centerIn: parent
                                         text: "urgent"
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: Theme.monoWeightBold
                                         color: Theme.error
                                     }
                                 }
@@ -475,6 +705,7 @@ BarPill {
                             Text {
                                 text: (notifCard.modelData?.summary ?? "").toLowerCase()
                                 font.family: Theme.fontDisplay
+                                font.variableAxes: Theme.displayAxes
                                 font.pixelSize: Theme.fontSizeSm
                                 font.weight: Theme.fontWeightBold
                                 color: Theme.textPrimary
@@ -484,9 +715,10 @@ BarPill {
                             }
 
                             Text {
-                                // strip stray html tags that chat apps love shoving into notification bodies
                                 text: (notifCard.modelData?.body ?? "").replace(/<[^>]*>/g, "").toLowerCase()
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.textSecondary
                                 Layout.fillWidth: true
@@ -543,6 +775,7 @@ BarPill {
                                             anchors.margins: 4
                                             text: (modelData?.text ?? "action").toLowerCase()
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightBold
                                             color: actMouse.pressed
@@ -569,7 +802,6 @@ BarPill {
                     }
                 }
 
-                // tiny scrollbar thumb so you know how many pings you're ignoring
                 Rectangle {
                     anchors.right: parent.right
                     anchors.top: parent.top
@@ -591,10 +823,10 @@ BarPill {
                     }
                 }
 
-                // zen empty state when nobody is bothering you
+                // empty state
                 Rectangle {
                     anchors.fill: parent
-                    visible: root.notifCount === 0
+                    visible: root.filteredNotifs.length === 0
                     radius: Theme.radiusLg
                     color: Theme.cardBg
                     border.color: Theme.cardBorder
@@ -627,8 +859,9 @@ BarPill {
                         }
 
                         Text {
-                            text: root.isDnd ? "do not disturb enabled" : "all caught up"
+                            text: root.notifCount > 0 ? "no matching notifications" : (root.isDnd ? "do not disturb enabled" : "all caught up")
                             font.family: Theme.fontDisplay
+                            font.variableAxes: Theme.displayAxes
                             font.pixelSize: Theme.fontSizeSm
                             font.weight: Theme.fontWeightBold
                             color: Theme.textPrimary
@@ -636,10 +869,14 @@ BarPill {
                         }
 
                         Text {
-                            text: root.isDnd
-                                ? Theme.getFlavor("dnd_on", "notifications are silenced right now")
-                                : Theme.getFlavor("notifs_empty", "zero unread notifications in the queue")
+                            text: root.notifCount > 0
+                                ? "clear search or app filter to view unread items"
+                                : (root.isDnd
+                                    ? Theme.getFlavor("dnd_on", "notifications are silenced right now")
+                                    : Theme.getFlavor("notifs_empty", "zero unread notifications in the queue"))
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textSecondary
                             horizontalAlignment: Text.AlignHCenter
@@ -665,6 +902,8 @@ BarPill {
                 Text {
                     text: "right-click bar icon to toggle dnd"
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.textSecondary
                     Layout.fillWidth: true
@@ -674,6 +913,8 @@ BarPill {
                     visible: root.notifCount > 0
                     text: "mid-click card to dismiss"
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
+                    font.weight: Theme.monoWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.textSecondary
                     opacity: 0.75

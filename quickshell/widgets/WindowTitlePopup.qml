@@ -189,6 +189,7 @@ PopupPanel {
                     Layout.fillWidth: true
                     text: (root.winClass.length > 0 ? root.winClass : "desktop").toLowerCase()
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
                     font.pixelSize: Theme.fontSizeMd
                     font.weight: Theme.fontWeightBold
                     color: Theme.on_surface
@@ -201,6 +202,8 @@ PopupPanel {
                         ? (root.isPinned ? "pinned & floating" : "focused window")
                         : Theme.getVibe(Theme.kaoEmpty, "no active window", "no active window")
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.on_surface_variant
                     elide: Text.ElideRight
@@ -223,6 +226,7 @@ PopupPanel {
                     anchors.centerIn: parent
                     text: root.isPinned ? "pinned" : (root.isWindowFloating ? "floating" : "tiled")
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
                     font.pixelSize: Theme.fontSizeXs
                     font.weight: Theme.fontWeightMedium
                     color: root.isWindowFloating ? Theme.on_secondary_container : Theme.on_surface_variant
@@ -248,6 +252,8 @@ PopupPanel {
                 Text {
                     text: root.activeTop ? "window title" : "status"
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.on_surface_variant
                 }
@@ -258,6 +264,7 @@ PopupPanel {
                         ? root.winTitle
                         : Theme.getFlavor("system", "no window focused")).toLowerCase()
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
                     font.pixelSize: Theme.fontSizeSm
                     font.weight: Theme.fontWeightMedium
                     color: root.activeTop ? Theme.on_surface : Theme.on_surface_variant
@@ -362,6 +369,7 @@ PopupPanel {
                         Text {
                             text: actionBtn.modelData.label
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: actionBtn.modelData.danger ? Theme.fontWeightBold : Theme.fontWeightMedium
                             color: actionBtn.fgColor
@@ -394,8 +402,9 @@ PopupPanel {
             Text {
                 text: "ws:"
                 font.family: Theme.fontMono
+                font.variableAxes: Theme.monoAxes
                 font.pixelSize: 10
-                font.weight: Font.Bold
+                font.weight: Theme.monoWeightBold
                 color: Theme.on_surface_variant
             }
 
@@ -420,8 +429,9 @@ PopupPanel {
                         anchors.centerIn: parent
                         text: modelData
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
                         font.pixelSize: 10
-                        font.weight: isCurWs ? Font.Bold : Font.Medium
+                        font.weight: isCurWs ? Theme.monoWeightBold : Theme.monoWeightMedium
                         color: isCurWs ? Theme.on_primary : Theme.on_surface
                     }
 
@@ -451,8 +461,9 @@ PopupPanel {
             Text {
                 text: "open windows (" + root.filteredToplevels.length + ")"
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: Theme.fontSizeXs
-                font.weight: Font.Bold
+                font.weight: Theme.fontWeightBold
                 color: Theme.primary
             }
 
@@ -461,6 +472,8 @@ PopupPanel {
             Text {
                 text: "mid-click: close"
                 font.family: Theme.fontMono
+                font.variableAxes: Theme.monoAxes
+                font.weight: Theme.monoWeightRegular
                 font.pixelSize: 9
                 color: Theme.on_surface_variant
             }
@@ -494,6 +507,8 @@ PopupPanel {
                     Layout.fillHeight: true
                     verticalAlignment: TextInput.AlignVCenter
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.on_surface
                     selectByMouse: true
@@ -540,6 +555,8 @@ PopupPanel {
                     visible: root.filteredToplevels.length === 0
                     text: "no matching windows"
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.on_surface_variant
                     Layout.alignment: Qt.AlignHCenter
@@ -608,8 +625,9 @@ PopupPanel {
                             Text {
                                 text: wRow.wTitle.toLowerCase()
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeXs
-                                font.weight: wRow.isFocused ? Font.Bold : Font.Normal
+                                font.weight: wRow.isFocused ? Theme.fontWeightBold : Theme.fontWeightRegular
                                 color: wRow.isFocused ? Theme.primary : Theme.on_surface
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
@@ -627,6 +645,8 @@ PopupPanel {
                                     anchors.centerIn: parent
                                     text: "ws " + wRow.wWs
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.weight: Theme.monoWeightRegular
                                     font.pixelSize: 9
                                     color: Theme.on_surface_variant
                                 }

@@ -67,8 +67,9 @@ Rectangle {
                         Layout.fillWidth: true
                         text: root.title
                         font.family: Theme.fontSans
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeSm
-                        font.weight: Font.DemiBold
+                        font.weight: Theme.fontWeightDemiBold
                         color: Theme.on_surface
                         elide: Text.ElideRight
                     }
@@ -78,6 +79,8 @@ Rectangle {
                         visible: root.subtitle !== ""
                         text: root.subtitle
                         font.family: Theme.fontSans
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface_variant
                         elide: Text.ElideRight
@@ -96,8 +99,9 @@ Rectangle {
                         anchors.centerIn: parent
                         text: root.badge
                         font.family: Theme.fontSans
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Medium
+                        font.weight: Theme.fontWeightMedium
                         color: Theme.on_primary_container
                     }
                 }

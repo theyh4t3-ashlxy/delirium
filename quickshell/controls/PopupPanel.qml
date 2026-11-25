@@ -204,8 +204,8 @@ PanelWindow {
 
             ShapePath {
                 fillColor: Qt.rgba(0, 0, 0, 0.28 * root.morphProgress)
-                strokeColor: Theme.barStyle === "cyber-neon" ? Theme.glassGlow : Qt.rgba(0, 0, 0, 0.20 * root.morphProgress)
-                strokeWidth: Theme.barStyle === "cyber-neon" ? 4 : 3
+                strokeColor: Theme.isOutlined ? Theme.glassGlow : Qt.rgba(0, 0, 0, 0.20 * root.morphProgress)
+                strokeWidth: Theme.isOutlined ? 4 : 3
                 capStyle: ShapePath.RoundCap
                 joinStyle: ShapePath.RoundJoin
 
@@ -251,8 +251,8 @@ PanelWindow {
 
             ShapePath {
                 fillColor: Qt.rgba(0, 0, 0, 0.28 * root.morphProgress)
-                strokeColor: Theme.barStyle === "cyber-neon" ? Theme.glassGlow : Qt.rgba(0, 0, 0, 0.20 * root.morphProgress)
-                strokeWidth: Theme.barStyle === "cyber-neon" ? 4 : 3
+                strokeColor: Theme.isOutlined ? Theme.glassGlow : Qt.rgba(0, 0, 0, 0.20 * root.morphProgress)
+                strokeWidth: Theme.isOutlined ? 4 : 3
                 capStyle: ShapePath.RoundCap
                 joinStyle: ShapePath.RoundJoin
 
@@ -296,8 +296,8 @@ PanelWindow {
 
             ShapePath {
                 fillColor: Qt.rgba(0, 0, 0, 0.28 * root.morphProgress)
-                strokeColor: Theme.barStyle === "cyber-neon" ? Theme.glassGlow : Qt.rgba(0, 0, 0, 0.20 * root.morphProgress)
-                strokeWidth: Theme.barStyle === "cyber-neon" ? 4 : 3
+                strokeColor: Theme.isOutlined ? Theme.glassGlow : Qt.rgba(0, 0, 0, 0.20 * root.morphProgress)
+                strokeWidth: Theme.isOutlined ? 4 : 3
                 capStyle: ShapePath.RoundCap
                 joinStyle: ShapePath.RoundJoin
 
@@ -343,8 +343,8 @@ PanelWindow {
 
             ShapePath {
                 fillColor: Qt.rgba(0, 0, 0, 0.28 * root.morphProgress)
-                strokeColor: Theme.barStyle === "cyber-neon" ? Theme.glassGlow : Qt.rgba(0, 0, 0, 0.20 * root.morphProgress)
-                strokeWidth: Theme.barStyle === "cyber-neon" ? 4 : 3
+                strokeColor: Theme.isOutlined ? Theme.glassGlow : Qt.rgba(0, 0, 0, 0.20 * root.morphProgress)
+                strokeWidth: Theme.isOutlined ? 4 : 3
                 capStyle: ShapePath.RoundCap
                 joinStyle: ShapePath.RoundJoin
 
@@ -388,8 +388,8 @@ PanelWindow {
 
             ShapePath {
                 fillColor: Qt.rgba(0, 0, 0, 0.28 * root.morphProgress)
-                strokeColor: Theme.barStyle === "cyber-neon" ? Theme.glassGlow : Qt.rgba(0, 0, 0, 0.20 * root.morphProgress)
-                strokeWidth: Theme.barStyle === "cyber-neon" ? 4 : 3
+                strokeColor: Theme.isOutlined ? Theme.glassGlow : Qt.rgba(0, 0, 0, 0.20 * root.morphProgress)
+                strokeWidth: Theme.isOutlined ? 4 : 3
                 capStyle: ShapePath.RoundCap
                 joinStyle: ShapePath.RoundJoin
 

@@ -14,6 +14,15 @@ QtObject {
         if (!root.enabled) {
             Quickshell.execDetached(["brightnessctl", "-r"]);
         }
+        if (typeof Settings !== "undefined" && Settings?._initialized) {
+            Settings.requestOsdShow(
+                "caffeine",
+                Theme.iconCoffee,
+                root.enabled ? 0 : 100,
+                root.enabled ? "off" : "awake",
+                root.enabled ? "system auto-sleep enabled" : "sleep inhibited (caffeine on)"
+            );
+        }
     }
 
     // Must be assigned to a property inside QtObject!

@@ -9,7 +9,7 @@ import Quickshell.Hyprland
 BarPill {
     id: wsContainer
 
-    readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
+    readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isIslands
     readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
 
     // extra padding on the ends of the pill so the outer dots don't hug the curved caps
@@ -496,14 +496,17 @@ BarPill {
                     Text {
                         text: "workspaces & scratchpad"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeMd
-                        font.weight: Font.Bold
+                        font.weight: Theme.fontWeightBold
                         color: Theme.on_surface
                     }
 
                     Text {
                         text: "left-click to focus • right-click to send active window"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface_variant
                         elide: Text.ElideRight
@@ -524,8 +527,9 @@ BarPill {
                         anchors.centerIn: parent
                         text: "ws " + wsContainer.currentWsId
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
+                        font.weight: Theme.monoWeightBold
                         color: Theme.primary
                     }
                 }
@@ -619,8 +623,9 @@ BarPill {
                                         Text {
                                             text: wsId
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: Theme.fontSizeSm
-                                            font.weight: Font.Bold
+                                            font.weight: Theme.monoWeightBold
                                             color: isCurrent ? Theme.on_primary : (hasWindows ? Theme.primary : Theme.on_surface_variant)
                                             anchors.centerIn: parent
                                         }
@@ -633,8 +638,9 @@ BarPill {
                                         Text {
                                             text: "workspace " + wsId
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeSm
-                                            font.weight: isCurrent ? Font.Bold : Font.DemiBold
+                                            font.weight: isCurrent ? Theme.fontWeightBold : Theme.fontWeightDemiBold
                                             color: isCurrent ? Theme.primary : Theme.on_surface
                                             elide: Text.ElideRight
                                             Layout.fillWidth: true
@@ -657,6 +663,8 @@ BarPill {
                                                 ? appSummary
                                                 : (isCurrent ? "active workspace" : (hasWindows ? (winCount + (winCount === 1 ? " window" : " windows")) : "empty"))
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
+                                            font.weight: Theme.monoWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: isCurrent ? Theme.primary : Theme.on_surface_variant
                                             elide: Text.ElideRight
@@ -744,8 +752,9 @@ BarPill {
                     Text {
                         text: "go to scratchpad"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
+                        font.weight: Theme.fontWeightBold
                         color: Theme.on_surface
                         Layout.fillWidth: true
                     }
@@ -755,6 +764,8 @@ BarPill {
                             ? (wsContainer.scratchpadWindows + (wsContainer.scratchpadWindows === 1 ? " stashed window" : " stashed windows"))
                             : "right-click to stash window"
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
+                        font.weight: Theme.monoWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: wsContainer.scratchpadWindows > 0 ? Theme.primary : Theme.on_surface_variant
                     }

@@ -93,8 +93,9 @@ PopupPanel {
                 Text {
                     text: "caffeine & sleep inhibitor"
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
                     font.pixelSize: Theme.fontSizeMd
-                    font.weight: Font.Bold
+                    font.weight: Theme.fontWeightBold
                     color: Theme.on_surface
                 }
 
@@ -103,6 +104,8 @@ PopupPanel {
                         ? (root.hasTimer ? ("active • " + root.formatTime(root.remainingSecs) + " left") : "active indefinitely")
                         : "system idle sleep enabled"
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: !IdleService.enabled ? Theme.primary : Theme.on_surface_variant
                 }
@@ -119,8 +122,9 @@ PopupPanel {
                     anchors.centerIn: parent
                     text: !IdleService.enabled ? "awake" : "sleepable"
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
                     font.pixelSize: 10
-                    font.weight: Font.Bold
+                    font.weight: Theme.fontWeightBold
                     color: !IdleService.enabled ? Theme.on_primary_container : Theme.on_surface_variant
                 }
             }
@@ -143,6 +147,8 @@ PopupPanel {
                 Text {
                     text: "keep system awake for:"
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.on_surface_variant
                 }
@@ -174,8 +180,9 @@ PopupPanel {
                                 anchors.centerIn: parent
                                 text: modelData.label
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeXs
-                                font.weight: Font.Medium
+                                font.weight: Theme.fontWeightMedium
                                 color: (!IdleService.enabled && ((modelData.val === 0 && !root.hasTimer) || (root.hasTimer && Math.round(root.remainingSecs/60) === modelData.val)))
                                     ? Theme.on_primary : Theme.on_surface
                             }
@@ -199,8 +206,9 @@ PopupPanel {
                         anchors.centerIn: parent
                         text: IdleService.enabled ? "sleep active (click to inhibit)" : "turn off inhibitor (allow sleep)"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: 10
-                        font.weight: Font.Medium
+                        font.weight: Theme.fontWeightMedium
                         color: IdleService.enabled ? Theme.on_primary_container : Theme.on_surface
                     }
 
@@ -244,6 +252,8 @@ PopupPanel {
                     Text {
                         text: "blank screen"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface
                     }
@@ -282,6 +292,8 @@ PopupPanel {
                     Text {
                         text: "lock now"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface
                     }
@@ -328,8 +340,9 @@ PopupPanel {
                     Text {
                         text: "auto idle schedule"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
+                        font.weight: Theme.fontWeightBold
                         color: Theme.on_surface
                         Layout.fillWidth: true
                     }
@@ -337,6 +350,8 @@ PopupPanel {
                     Text {
                         text: root.showTimeouts ? "hide" : "edit"
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
+                        font.weight: Theme.monoWeightRegular
                         font.pixelSize: 10
                         color: Theme.primary
                     }
@@ -359,6 +374,8 @@ PopupPanel {
                         "sleep " + ((Settings?.idleSuspendEnabled ?? true) ? root.formatDurationShort(Settings?.idleSuspendSeconds ?? 600) : "off")
                     ].join(" • ")
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
+                    font.weight: Theme.monoWeightRegular
                     font.pixelSize: 10
                     color: Theme.on_surface_variant
                     elide: Text.ElideRight
@@ -392,8 +409,9 @@ PopupPanel {
                                 anchors.centerIn: parent
                                 text: parent.parent.isOn ? "on" : "off"
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
                                 font.pixelSize: 9
-                                font.weight: Font.Bold
+                                font.weight: Theme.monoWeightBold
                                 color: parent.parent.isOn ? Theme.primary : Theme.on_surface_variant
                             }
 
@@ -408,6 +426,8 @@ PopupPanel {
                             Layout.fillWidth: true
                             text: modelData.label
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: parent.isOn ? Theme.on_surface : Theme.on_surface_disabled
                         }
@@ -426,8 +446,9 @@ PopupPanel {
                             horizontalAlignment: Text.AlignHCenter
                             text: root.formatDurationShort(parent.curSec)
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
+                            font.weight: Theme.monoWeightBold
                             color: parent.isOn ? Theme.primary : Theme.on_surface_disabled
                         }
 

@@ -78,7 +78,41 @@ export function getBatteryColor(pct, isCharging, t) {
     return t.on_surface;
 }
 
-const PURE_BLACK = {
+const BAR_STYLE_ALIASES = Object.freeze({
+    "regular": "solid",
+    "glass-frost": "frosted",
+    "accent-glow": "tinted",
+    "cyber-neon": "outlined",
+    "pure-black": "oled",
+    "bento-floating": "islands"
+});
+
+export const BAR_STYLES = Object.freeze([
+    { id: "solid",       label: "solid",       desc: "opaque surface container matching active palette" },
+    { id: "glass",       label: "glass",       desc: "low-alpha smoked surface with top highlight" },
+    { id: "frosted",     label: "frosted",     desc: "higher-density glass with firmer border contrast" },
+    { id: "translucent", label: "translucent", desc: "balanced semi-transparent panel over wallpaper" },
+    { id: "tinted",      label: "tinted",      desc: "primary container fill with subtle accent halo" },
+    { id: "outlined",    label: "outlined",    desc: "high-contrast backing with primary accent strokes" },
+    { id: "oled",        label: "oled",        desc: "neutral pitch dark or pure white monochrome contrast" },
+    { id: "monochrome",  label: "monochrome",  desc: "flat matte tonal surface with subtle rules" },
+    { id: "islands",     label: "islands",     desc: "detached floating zone capsules with gap spacing" }
+]);
+
+/** Normalize legacy `barStyle` names (`regular`, `cyber-neon`, etc.) to current IDs. */
+export function normalizeBarStyle(bs) {
+    const s = String(bs ?? "solid").trim().toLowerCase();
+    return BAR_STYLE_ALIASES[s] ?? (s || "solid");
+}
+
+/** Normalize legacy `cornerColorMode` values (`pure-black` -> `oled`). */
+export function normalizeCornerColorMode(cm) {
+    const s = String(cm ?? "bar").trim().toLowerCase();
+    if (s === "pure-black") return "oled";
+    return s || "bar";
+}
+
+const OLED_PALETTE = {
     barBg:            ["#ffffff", "#000000"],
     barBorderColor:   ["#e0e0e0", "#1f1f1f"],
     widgetBg:         ["#f2f2f2", "#0a0a0a"],
@@ -96,161 +130,162 @@ const PURE_BLACK = {
 
 const ROLE_RULES = {
     barBg: {
-        regular:          (t, a) => a(t.surface_container_low, 0.95),
-        glass:            (t, a) => a(t.surface_container_lowest, Math.min(1.0, (t.isLightMode ? 0.68 : 0.40) + t.adaptiveAlphaBoost)),
-        "glass-frost":    (t, a) => a(t.surface_container_lowest, Math.min(1.0, (t.isLightMode ? 0.78 : 0.55) + t.adaptiveAlphaBoost)),
-        "cyber-neon":     (t, a) => t.isLightMode ? a(t.surface_container_lowest, 0.94) : a("#050508", 0.94),
-        "bento-floating": (t, a) => a(t.surface_container_low, Math.min(1.0, 0.88 + t.adaptiveAlphaBoost)),
-        translucent:      (t, a) => a(t.surface_container_low, Math.min(1.0, (t.isLightMode ? 0.80 : 0.70) + t.adaptiveAlphaBoost)),
-        "accent-glow":    (t, a) => a(t.surface_container_lowest, 0.90),
-        monochrome:       (t)    => t.surface_container_highest,
-        fallback:         (t)    => t.surface_container_low
+        solid:       (t, a) => a(t.surface_container_low, 0.95),
+        glass:       (t, a) => a(t.surface_container_lowest, Math.min(1.0, (t.isLightMode ? 0.68 : 0.40) + t.adaptiveAlphaBoost)),
+        frosted:     (t, a) => a(t.surface_container_lowest, Math.min(1.0, (t.isLightMode ? 0.78 : 0.55) + t.adaptiveAlphaBoost)),
+        outlined:    (t, a) => t.isLightMode ? a(t.surface_container_lowest, 0.94) : a("#050508", 0.94),
+        islands:     (t, a) => a(t.surface_container_low, Math.min(1.0, 0.88 + t.adaptiveAlphaBoost)),
+        translucent: (t, a) => a(t.surface_container_low, Math.min(1.0, (t.isLightMode ? 0.80 : 0.70) + t.adaptiveAlphaBoost)),
+        tinted:      (t, a) => a(t.surface_container_lowest, 0.90),
+        monochrome:  (t)    => t.surface_container_highest,
+        fallback:    (t)    => t.surface_container_low
     },
     barBorderColor: {
-        regular:          (t, a) => a(t.outline_variant, 0.40),
-        glass:            (t, a) => t.isLightMode ? a(t.outline_variant, 0.52) : t.rgba(1, 1, 1, 0.16),
-        "glass-frost":    (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.24),
-        "cyber-neon":     (t)    => t.primary,
-        "bento-floating": (t, a) => a(t.outline_variant, 0.45),
-        "accent-glow":    (t)    => t.primary,
-        translucent:      (t, a) => a(t.outline_variant, 0.35),
-        fallback:         (t, a) => a(t.outline_variant, 0.50)
+        solid:       (t, a) => a(t.outline_variant, 0.40),
+        glass:       (t, a) => t.isLightMode ? a(t.outline_variant, 0.52) : t.rgba(1, 1, 1, 0.16),
+        frosted:     (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.24),
+        outlined:    (t)    => t.primary,
+        islands:     (t, a) => a(t.outline_variant, 0.45),
+        tinted:      (t)    => t.primary,
+        translucent: (t, a) => a(t.outline_variant, 0.35),
+        fallback:    (t, a) => a(t.outline_variant, 0.50)
     },
     widgetBg: {
-        regular:          (t, a) => a(t.surface_container_high, t.isLightMode ? 0.75 : 0.60),
-        glass:            (t, a) => a(t.surface_container_high, t.isLightMode ? 0.55 : 0.28),
-        "glass-frost":    (t, a) => a(t.surface_container_high, t.isLightMode ? 0.68 : 0.38),
-        "cyber-neon":     (t, a) => a(t.surface_container_lowest, 0.85),
-        "bento-floating": (t, a) => a(t.surface_container_high, t.isLightMode ? 0.65 : 0.50),
-        translucent:      (t, a) => a(t.surface_container_high, t.isLightMode ? 0.58 : 0.40),
-        "accent-glow":    (t, a) => a(t.primary_container, 0.65),
-        monochrome:       (t)    => t.surface_container_high,
-        fallback:         (t)    => t.surface_container_low
+        solid:       (t, a) => a(t.surface_container_high, t.isLightMode ? 0.75 : 0.60),
+        glass:       (t, a) => a(t.surface_container_high, t.isLightMode ? 0.55 : 0.28),
+        frosted:     (t, a) => a(t.surface_container_high, t.isLightMode ? 0.68 : 0.38),
+        outlined:    (t, a) => a(t.surface_container_lowest, 0.85),
+        islands:     (t, a) => a(t.surface_container_high, t.isLightMode ? 0.65 : 0.50),
+        translucent: (t, a) => a(t.surface_container_high, t.isLightMode ? 0.58 : 0.40),
+        tinted:      (t, a) => a(t.primary_container, 0.65),
+        monochrome:  (t)    => t.surface_container_high,
+        fallback:    (t)    => t.surface_container_low
     },
     widgetHover: {
-        regular:          (t, a) => a(t.surface_container_highest, 0.85),
-        glass:            (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.72 : 0.48),
-        "glass-frost":    (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.82 : 0.60),
-        "cyber-neon":     (t, a) => a(t.primary_container, 0.50),
-        "bento-floating": (t, a) => a(t.surface_container_highest, 0.70),
-        translucent:      (t, a) => a(t.surface_container_highest, 0.65),
-        "accent-glow":    (t, a) => a(t.primary, 0.35),
-        monochrome:       (t)    => t.surface_container_highest,
-        fallback:         (t)    => t.surface_container_highest
+        solid:       (t, a) => a(t.surface_container_highest, 0.85),
+        glass:       (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.72 : 0.48),
+        frosted:     (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.82 : 0.60),
+        outlined:    (t, a) => a(t.primary_container, 0.50),
+        islands:     (t, a) => a(t.surface_container_highest, 0.70),
+        translucent: (t, a) => a(t.surface_container_highest, 0.65),
+        tinted:      (t, a) => a(t.primary, 0.35),
+        monochrome:  (t)    => t.surface_container_highest,
+        fallback:    (t)    => t.surface_container_highest
     },
     widgetActive: {
-        regular:          (t, a) => a(t.primary_container, 0.90),
-        glass:            (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.85 : 0.65),
-        "glass-frost":    (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.90 : 0.80),
-        "cyber-neon":     (t, a) => a(t.primary, 0.45),
-        "bento-floating": (t, a) => a(t.surface_container_highest, 0.90),
-        translucent:      (t, a) => a(t.surface_container_highest, 0.85),
-        "accent-glow":    (t, a) => a(t.primary, 0.55),
-        monochrome:       (t, a) => a(t.on_surface, 0.20),
-        fallback:         (t)    => t.surface_container_highest
+        solid:       (t, a) => a(t.primary_container, 0.90),
+        glass:       (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.85 : 0.65),
+        frosted:     (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.90 : 0.80),
+        outlined:    (t, a) => a(t.primary, 0.45),
+        islands:     (t, a) => a(t.surface_container_highest, 0.90),
+        translucent: (t, a) => a(t.surface_container_highest, 0.85),
+        tinted:      (t, a) => a(t.primary, 0.55),
+        monochrome:  (t, a) => a(t.on_surface, 0.20),
+        fallback:    (t)    => t.surface_container_highest
     },
     widgetBorder: {
-        regular:          (t, a) => a(t.outline_variant, 0.40),
-        glass:            (t, a) => t.isLightMode ? a(t.outline_variant, 0.52) : t.rgba(1, 1, 1, 0.12),
-        "glass-frost":    (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.20),
-        "cyber-neon":     (t, a) => a(t.primary, 0.60),
-        "bento-floating": (t, a) => a(t.outline_variant, 0.40),
-        translucent:      (t, a) => a(t.outline_variant, 0.35),
-        "accent-glow":    (t, a) => a(t.primary, 0.70),
-        monochrome:       (t, a) => a(t.outline, 0.40),
-        fallback:         (t, a) => a(t.outline_variant, 0.50)
+        solid:       (t, a) => a(t.outline_variant, 0.40),
+        glass:       (t, a) => t.isLightMode ? a(t.outline_variant, 0.52) : t.rgba(1, 1, 1, 0.12),
+        frosted:     (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.20),
+        outlined:    (t, a) => a(t.primary, 0.60),
+        islands:     (t, a) => a(t.outline_variant, 0.40),
+        translucent: (t, a) => a(t.outline_variant, 0.35),
+        tinted:      (t, a) => a(t.primary, 0.70),
+        monochrome:  (t, a) => a(t.outline, 0.40),
+        fallback:    (t, a) => a(t.outline_variant, 0.50)
     },
     popupBg: {
-        regular:          (t, a) => a(t.surface_container_low, 0.96),
-        glass:            (t, a) => a(t.surface_container_lowest, Math.min(1.0, (t.isLightMode ? 0.86 : 0.60) + t.adaptiveAlphaBoost)),
-        "glass-frost":    (t, a) => a(t.surface_container_lowest, Math.min(1.0, (t.isLightMode ? 0.92 : 0.75) + t.adaptiveAlphaBoost)),
-        "cyber-neon":     (t, a) => t.isLightMode ? a(t.surface_container_lowest, 0.96) : a("#07070b", 0.96),
-        "bento-floating": (t, a) => a(t.surface_container_low, Math.min(1.0, 0.92 + t.adaptiveAlphaBoost)),
-        translucent:      (t, a) => a(t.surface_container_low, Math.min(1.0, (t.isLightMode ? 0.88 : 0.80) + t.adaptiveAlphaBoost)),
-        "accent-glow":    (t, a) => a(t.surface_container_lowest, 0.95),
-        monochrome:       (t)    => t.surface_container_low,
-        fallback:         (t)    => t.surface_container_low
+        solid:       (t, a) => a(t.surface_container_low, 0.96),
+        glass:       (t, a) => a(t.surface_container_lowest, Math.min(1.0, (t.isLightMode ? 0.86 : 0.60) + t.adaptiveAlphaBoost)),
+        frosted:     (t, a) => a(t.surface_container_lowest, Math.min(1.0, (t.isLightMode ? 0.92 : 0.75) + t.adaptiveAlphaBoost)),
+        outlined:    (t, a) => t.isLightMode ? a(t.surface_container_lowest, 0.96) : a("#07070b", 0.96),
+        islands:     (t, a) => a(t.surface_container_low, Math.min(1.0, 0.92 + t.adaptiveAlphaBoost)),
+        translucent: (t, a) => a(t.surface_container_low, Math.min(1.0, (t.isLightMode ? 0.88 : 0.80) + t.adaptiveAlphaBoost)),
+        tinted:      (t, a) => a(t.surface_container_lowest, 0.95),
+        monochrome:  (t)    => t.surface_container_low,
+        fallback:    (t)    => t.surface_container_low
     },
     popupBorderColor: {
-        regular:          (t, a) => a(t.outline_variant, 0.45),
-        glass:            (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.18),
-        "glass-frost":    (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.26),
-        "cyber-neon":     (t)    => t.primary,
-        "bento-floating": (t, a) => a(t.outline_variant, 0.50),
-        "accent-glow":    (t, a) => a(t.primary, 0.85),
-        translucent:      (t, a) => a(t.outline_variant, 0.40),
-        monochrome:       (t, a) => a(t.outline, 0.45),
-        fallback:         (t, a) => a(t.outline_variant, 0.50)
+        solid:       (t, a) => a(t.outline_variant, 0.45),
+        glass:       (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.18),
+        frosted:     (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.26),
+        outlined:    (t)    => t.primary,
+        islands:     (t, a) => a(t.outline_variant, 0.50),
+        tinted:      (t, a) => a(t.primary, 0.85),
+        translucent: (t, a) => a(t.outline_variant, 0.40),
+        monochrome:  (t, a) => a(t.outline, 0.45),
+        fallback:    (t, a) => a(t.outline_variant, 0.50)
     },
     cardBg: {
-        regular:          (t, a) => a(t.surface_container_high, t.isLightMode ? 0.85 : 0.75),
-        glass:            (t, a) => a(t.surface_container_high, t.isLightMode ? 0.65 : 0.30),
-        "glass-frost":    (t, a) => a(t.surface_container_high, t.isLightMode ? 0.76 : 0.45),
-        "cyber-neon":     (t, a) => a(t.surface_container_low, 0.75),
-        "bento-floating": (t, a) => a(t.surface_container_high, t.isLightMode ? 0.75 : 0.60),
-        translucent:      (t, a) => a(t.surface_container_high, t.isLightMode ? 0.68 : 0.50),
-        "accent-glow":    (t, a) => a(t.primary_container, 0.45),
-        monochrome:       (t)    => t.surface_container_high,
-        fallback:         (t)    => t.surface_container_high
+        solid:       (t, a) => a(t.surface_container_high, t.isLightMode ? 0.85 : 0.75),
+        glass:       (t, a) => a(t.surface_container_high, t.isLightMode ? 0.65 : 0.30),
+        frosted:     (t, a) => a(t.surface_container_high, t.isLightMode ? 0.76 : 0.45),
+        outlined:    (t, a) => a(t.surface_container_low, 0.75),
+        islands:     (t, a) => a(t.surface_container_high, t.isLightMode ? 0.75 : 0.60),
+        translucent: (t, a) => a(t.surface_container_high, t.isLightMode ? 0.68 : 0.50),
+        tinted:      (t, a) => a(t.primary_container, 0.45),
+        monochrome:  (t)    => t.surface_container_high,
+        fallback:    (t)    => t.surface_container_high
     },
     cardBorder: {
-        regular:          (t, a) => a(t.outline_variant, 0.35),
-        glass:            (t, a) => t.isLightMode ? a(t.outline_variant, 0.52) : t.rgba(1, 1, 1, 0.12),
-        "glass-frost":    (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.20),
-        "cyber-neon":     (t, a) => a(t.primary, 0.50),
-        "bento-floating": (t, a) => a(t.outline_variant, 0.35),
-        translucent:      (t, a) => a(t.outline_variant, 0.30),
-        "accent-glow":    (t, a) => a(t.primary, 0.60),
-        monochrome:       (t, a) => a(t.outline, 0.35),
-        fallback:         (t, a) => a(t.outline_variant, 0.40)
+        solid:       (t, a) => a(t.outline_variant, 0.35),
+        glass:       (t, a) => t.isLightMode ? a(t.outline_variant, 0.52) : t.rgba(1, 1, 1, 0.12),
+        frosted:     (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.20),
+        outlined:    (t, a) => a(t.primary, 0.50),
+        islands:     (t, a) => a(t.outline_variant, 0.35),
+        translucent: (t, a) => a(t.outline_variant, 0.30),
+        tinted:      (t, a) => a(t.primary, 0.60),
+        monochrome:  (t, a) => a(t.outline, 0.35),
+        fallback:    (t, a) => a(t.outline_variant, 0.40)
     },
     pillBg: {
-        regular:          (t, a) => a(t.surface_container_high, t.isLightMode ? 0.78 : 0.65),
-        glass:            (t, a) => a(t.surface_container_high, t.isLightMode ? 0.62 : 0.25),
-        "glass-frost":    (t, a) => a(t.surface_container_high, t.isLightMode ? 0.74 : 0.35),
-        "cyber-neon":     (t, a) => a(t.surface_container_low, 0.60),
-        "bento-floating": (t, a) => a(t.surface_container_high, t.isLightMode ? 0.68 : 0.50),
-        translucent:      (t, a) => a(t.surface_container_high, t.isLightMode ? 0.62 : 0.45),
-        "accent-glow":    (t, a) => a(t.primary, 0.22),
-        monochrome:       (t)    => t.surface_container,
-        fallback:         (t)    => t.surface_container_high
+        solid:       (t, a) => a(t.surface_container_high, t.isLightMode ? 0.78 : 0.65),
+        glass:       (t, a) => a(t.surface_container_high, t.isLightMode ? 0.62 : 0.25),
+        frosted:     (t, a) => a(t.surface_container_high, t.isLightMode ? 0.74 : 0.35),
+        outlined:    (t, a) => a(t.surface_container_low, 0.60),
+        islands:     (t, a) => a(t.surface_container_high, t.isLightMode ? 0.68 : 0.50),
+        translucent: (t, a) => a(t.surface_container_high, t.isLightMode ? 0.62 : 0.45),
+        tinted:      (t, a) => a(t.primary, 0.22),
+        monochrome:  (t)    => t.surface_container,
+        fallback:    (t)    => t.surface_container_high
     },
     pillHover: {
-        regular:          (t, a) => a(t.surface_container_highest, 0.85),
-        glass:            (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.78 : 0.45),
-        "glass-frost":    (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.85 : 0.55),
-        "cyber-neon":     (t, a) => a(t.primary_container, 0.40),
-        "bento-floating": (t, a) => a(t.surface_container_highest, 0.65),
-        translucent:      (t, a) => a(t.surface_container_highest, 0.70),
-        "accent-glow":    (t, a) => a(t.primary, 0.40),
-        monochrome:       (t)    => t.surface_container_highest,
-        fallback:         (t)    => t.surface_container_highest
+        solid:       (t, a) => a(t.surface_container_highest, 0.85),
+        glass:       (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.78 : 0.45),
+        frosted:     (t, a) => a(t.surface_container_highest, t.isLightMode ? 0.85 : 0.55),
+        outlined:    (t, a) => a(t.primary_container, 0.40),
+        islands:     (t, a) => a(t.surface_container_highest, 0.65),
+        translucent: (t, a) => a(t.surface_container_highest, 0.70),
+        tinted:      (t, a) => a(t.primary, 0.40),
+        monochrome:  (t)    => t.surface_container_highest,
+        fallback:    (t)    => t.surface_container_highest
     },
     pillBorder: {
-        regular:          (t, a) => a(t.outline_variant, 0.35),
-        glass:            (t, a) => t.isLightMode ? a(t.outline_variant, 0.52) : t.rgba(1, 1, 1, 0.14),
-        "glass-frost":    (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.22),
-        "cyber-neon":     (t, a) => a(t.primary, 0.75),
-        "bento-floating": (t, a) => a(t.outline_variant, 0.30),
-        translucent:      (t, a) => a(t.outline_variant, 0.25),
-        "accent-glow":    (t, a) => a(t.primary, 0.85),
-        monochrome:       (t, a) => a(t.outline, 0.35),
-        fallback:         (t)    => t.rgba(0, 0, 0, 0)
+        solid:       (t, a) => a(t.outline_variant, 0.35),
+        glass:       (t, a) => t.isLightMode ? a(t.outline_variant, 0.52) : t.rgba(1, 1, 1, 0.14),
+        frosted:     (t, a) => t.isLightMode ? a(t.outline_variant, 0.65) : t.rgba(1, 1, 1, 0.22),
+        outlined:    (t, a) => a(t.primary, 0.75),
+        islands:     (t, a) => a(t.outline_variant, 0.30),
+        translucent: (t, a) => a(t.outline_variant, 0.25),
+        tinted:      (t, a) => a(t.primary, 0.85),
+        monochrome:  (t, a) => a(t.outline, 0.35),
+        fallback:    (t)    => t.rgba(0, 0, 0, 0)
     }
 };
 
 /** Resolve surface/border role color for the active `barStyle` preset `bs`. */
 export function getStyleColor(role, bs, t) {
+    const style = normalizeBarStyle(bs);
     const rules = ROLE_RULES[role];
     if (!rules) return t.surface_container_low;
 
-    if (bs === "pure-black" && PURE_BLACK[role]) {
-        const pair = PURE_BLACK[role];
+    if (style === "oled" && OLED_PALETTE[role]) {
+        const pair = OLED_PALETTE[role];
         const hex = t.isLightMode ? pair[0] : pair[1];
         return parseHexColor(hex, t.rgba);
     }
 
     const alphaFn = (c, op) => alpha(c, op, t.rgba);
-    const fn = rules[bs] ?? rules.fallback;
+    const fn = rules[style] ?? rules.fallback;
     return fn(t, alphaFn);
 }

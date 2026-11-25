@@ -2,6 +2,9 @@ import QtQuick
 import QtQuick.Layouts
 import ".."
 import "../controls"
+import "../theme/confFormat.mjs" as ConfFmt
+import Quickshell
+import Quickshell.Io
 
 BarPill {
     id: clockRoot
@@ -22,21 +25,111 @@ BarPill {
     Behavior on width { NumberAnimation { duration: Theme?.animFast ?? 150; easing.type: Theme?.animEasing ?? Easing.OutQuad } }
 
     property date now: new Date()
-    // breaking date parts out prevents the calendar from recreating 42 delegates every tick
     readonly property int todayYear: now.getFullYear()
     readonly property int todayMonth: now.getMonth()
     readonly property int todayDate: now.getDate()
 
     property int selectedYear: todayYear
     property int selectedMonth: todayMonth // 0-11
+    property int focusedDay: todayDate
+    property int focusedMonth: todayMonth
+    property int focusedYear: todayYear
+
+    // weather telemetry via scripts/weather.py
+    readonly property string weatherScript: decodeURIComponent(Qt.resolvedUrl("../scripts/weather.py").toString().replace(/^file:\/\//, ""))
+    property bool weatherLoading: false
+    property bool weatherOk: false
+    property string weatherCity: ""
+    property real weatherTempC: 0
+    property real weatherTempF: 0
+    property real weatherFeelsC: 0
+    property real weatherFeelsF: 0
+    property real weatherHighC: 0
+    property real weatherHighF: 0
+    property real weatherLowC: 0
+    property real weatherLowF: 0
+    property int weatherHumidity: 0
+    property real weatherWindKmh: 0
+    property int weatherCode: 0
+    property string weatherCond: ""
+    property bool weatherIsDay: true
+    property string weatherError: ""
+    property real _lastWeatherFetchMs: 0
+    property bool editingCity: false
+
+    function parseKv(text) {
+        let raw = ConfFmt.parseFlatConf(text || "");
+        let out = {};
+        for (let k in raw) out[k] = ConfFmt.unescapeField(raw[k]);
+        return out;
+    }
+
+    function refreshWeather(force) {
+        if (!(Settings?.weatherEnabled ?? true)) return;
+        let nowMs = Date.now();
+        if (!force && weatherOk && (nowMs - _lastWeatherFetchMs) < 600000) return;
+        if (weatherProc.running) {
+            if (!force) return;
+            weatherProc.running = false;
+        }
+        weatherLoading = true;
+        let args = ["python3", weatherScript];
+        if (force) args.push("--force");
+        if (Settings?.weatherLocation && Settings.weatherLocation.trim() !== "") {
+            args.push(Settings.weatherLocation.trim());
+        }
+        weatherProc.command = args;
+        weatherProc.running = true;
+    }
+
+    Process {
+        id: weatherProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                clockRoot.weatherLoading = false;
+                let kv = clockRoot.parseKv(text);
+                if (kv.ok === "true") {
+                    clockRoot.weatherOk = true;
+                    clockRoot.weatherError = "";
+                    clockRoot.weatherCity = kv.city || "local";
+                    clockRoot.weatherTempC = parseFloat(kv.temp_c || "0") || 0;
+                    clockRoot.weatherTempF = parseFloat(kv.temp_f || "0") || 0;
+                    clockRoot.weatherFeelsC = parseFloat(kv.feels_c || "0") || 0;
+                    clockRoot.weatherFeelsF = parseFloat(kv.feels_f || "0") || 0;
+                    clockRoot.weatherHighC = parseFloat(kv.high_c || "0") || 0;
+                    clockRoot.weatherHighF = parseFloat(kv.high_f || "0") || 0;
+                    clockRoot.weatherLowC = parseFloat(kv.low_c || "0") || 0;
+                    clockRoot.weatherLowF = parseFloat(kv.low_f || "0") || 0;
+                    clockRoot.weatherHumidity = parseInt(kv.humidity || "0", 10) || 0;
+                    clockRoot.weatherWindKmh = parseFloat(kv.wind_kmh || "0") || 0;
+                    clockRoot.weatherCode = parseInt(kv.code || "0", 10) || 0;
+                    clockRoot.weatherCond = kv.cond || "clear";
+                    clockRoot.weatherIsDay = kv.is_day !== "false";
+                    clockRoot._lastWeatherFetchMs = Date.now();
+                } else {
+                    clockRoot.weatherOk = false;
+                    clockRoot.weatherError = kv.error || "weather unavailable";
+                }
+            }
+        }
+    }
 
     Timer {
         interval: 1000
         running: true
         repeat: true
-        onTriggered: {
-            clockRoot.now = new Date();
-        }
+        onTriggered: clockRoot.now = new Date()
+    }
+
+    Timer {
+        interval: 900000
+        running: Settings?.weatherEnabled ?? true
+        repeat: true
+        onTriggered: clockRoot.refreshWeather(false)
+    }
+
+    Component.onCompleted: {
+        if (Settings?.weatherEnabled ?? true) refreshWeather(false);
     }
 
     function getDayOfYear(d) {
@@ -46,17 +139,23 @@ BarPill {
         return Math.floor(diff / 86400000);
     }
 
+    function getSelectedDayHint() {
+        let today = new Date(todayYear, todayMonth, todayDate);
+        let sel = new Date(focusedYear, focusedMonth, focusedDay);
+        let diffDays = Math.round((sel - today) / 86400000);
+        if (diffDays === 0) return Math.round(((now.getHours() * 60 + now.getMinutes()) / 1440) * 100) + "% day elapsed";
+        let label = Qt.formatDate(sel, "ddd, MMM d").toLowerCase();
+        if (diffDays === 1) return label + " • tomorrow";
+        if (diffDays === -1) return label + " • yesterday";
+        return label + " • " + (diffDays > 0 ? ("in " + diffDays + "d") : (Math.abs(diffDays) + "d ago"));
+    }
+
     function getClockMoodIcon(hrs) {
         if (!Theme) return "";
-        if (hrs < 6) {
-            return Theme?.iconMoon ?? "\u263E";
-        } else if (hrs < 12) {
-            return Theme?.iconCoffee ?? "\u2615";
-        } else if (hrs < 18) {
-            return Theme?.iconSun ?? "\u2600";
-        } else {
-            return Theme?.iconMusic ?? "\u266B";
-        }
+        if (hrs < 6) return Theme?.iconMoon ?? "\u263E";
+        if (hrs < 12) return Theme?.iconCoffee ?? "\u2615";
+        if (hrs < 18) return Theme?.iconSun ?? "\u2600";
+        return Theme?.iconMusic ?? "\u266B";
     }
 
     Row {
@@ -72,8 +171,7 @@ BarPill {
             anchors.verticalCenter: parent.verticalCenter
             text: {
                 if (Theme?.isVertical ?? false) return "";
-                let hrs = clockRoot.now.getHours();
-                return clockRoot.getClockMoodIcon(hrs);
+                return clockRoot.getClockMoodIcon(clockRoot.now.getHours());
             }
             visible: text !== "" && !(Theme?.isVertical ?? false)
             font.family: Theme?.fontIcon ?? "sans-serif"
@@ -97,9 +195,7 @@ BarPill {
                         let h = clockRoot.now.getHours() % 12;
                         if (h === 0) h = 12;
                         let m = clockRoot.now.getMinutes();
-                        let hStr = (h < 10 ? "0" : "") + h;
-                        let mStr = (m < 10 ? "0" : "") + m;
-                        return hStr + "\n" + mStr;
+                        return ((h < 10 ? "0" : "") + h) + "\n" + ((m < 10 ? "0" : "") + m);
                     }
                     return Qt.formatDateTime(clockRoot.now, "HH\nmm");
                 }
@@ -115,9 +211,23 @@ BarPill {
                 return (dateStr !== "") ? (dateStr + "  " + timeStr) : timeStr;
             }
             font.family: Theme?.fontFamily ?? "sans-serif"
+            font.variableAxes: Theme?.sansAxes ?? ({})
             font.pixelSize: (Theme?.isVertical ?? false) ? 10 : (Theme?.fontSizeMd ?? 14)
-            font.weight: Font.Medium
+            font.weight: Theme?.fontWeightMedium ?? Font.Medium
             color: calPopup.open ? Theme.primary : Theme.on_surface
+        }
+
+        // compact weather temp pill on hover when loaded
+        Text {
+            visible: !(Theme?.isVertical ?? false) && clkMouse.containsMouse && clockRoot.weatherOk
+            anchors.verticalCenter: parent.verticalCenter
+            readonly property bool useF: (Settings?.weatherUnit || "F").toUpperCase() === "F"
+            text: Math.round(useF ? clockRoot.weatherTempF : clockRoot.weatherTempC) + "°" + (useF ? "f" : "c")
+            font.family: Theme?.fontMono ?? "monospace"
+            font.variableAxes: Theme?.monoAxes ?? ({})
+            font.pixelSize: Theme?.fontSizeXs ?? 10
+            font.weight: Theme?.monoWeightBold ?? Font.Bold
+            color: Theme.primary
         }
 
         Row {
@@ -147,11 +257,13 @@ BarPill {
                 text: {
                     if (typeof TimerService === "undefined" || !TimerService) return "";
                     if (TimerService.stopwatchRunning) return TimerService.stopwatchDisplay;
-                    return TimerService.timerDisplay;
+                    let prefix = TimerService.pomodoroActive ? (TimerService.pomodoroPhase === "focus" ? "p·" : "b·") : "";
+                    return prefix + TimerService.timerDisplay;
                 }
                 font.family: Theme?.fontMono ?? "monospace"
+                font.variableAxes: Theme?.monoAxes ?? ({})
                 font.pixelSize: Theme?.fontSizeSm ?? 11
-                font.weight: Font.Bold
+                font.weight: Theme?.monoWeightBold ?? Font.Bold
                 color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService?.timerRemaining <= 30) ? Theme.error : Theme.primary
             }
         }
@@ -192,6 +304,9 @@ BarPill {
                 if (calPopup.open) {
                     clockRoot.selectedYear = clockRoot.todayYear;
                     clockRoot.selectedMonth = clockRoot.todayMonth;
+                    clockRoot.focusedYear = clockRoot.todayYear;
+                    clockRoot.focusedMonth = clockRoot.todayMonth;
+                    clockRoot.focusedDay = clockRoot.todayDate;
                 }
             } else if (mouse.button === Qt.RightButton) {
                 if (Settings) {
@@ -213,16 +328,11 @@ BarPill {
         }
 
         onWheel: (wheel) => {
-            if (wheel.angleDelta.y === 0) return;
-            if (!Settings) return;
+            if (wheel.angleDelta.y === 0 || !Settings) return;
             const formats = ["ddd, MMM d", "MMM d, yyyy", "yyyy-MM-dd", "ddd, d MMM", "MM/dd"];
             let idx = formats.indexOf(Settings.dateFormat);
             if (idx === -1) idx = 0;
-            if (wheel.angleDelta.y > 0) {
-                idx = (idx + 1) % formats.length;
-            } else {
-                idx = (idx - 1 + formats.length) % formats.length;
-            }
+            idx = wheel.angleDelta.y > 0 ? ((idx + 1) % formats.length) : ((idx - 1 + formats.length) % formats.length);
             Settings.dateFormat = formats[idx];
             Settings.showBarDate = true;
         }
@@ -231,36 +341,34 @@ BarPill {
     Connections {
         target: Settings
         function onRequestClockToggle() {
-            let pos = clockRoot.mapToItem(null, 0, 0);
-            if (pos) {
-                calPopup.targetRelativeX = pos.x + (clockRoot.width / 2);
-                calPopup.targetRelativeY = pos.y + (clockRoot.height / 2);
-            }
+            clockRoot.updatePopupPos();
             calPopup.open = !calPopup.open;
             if (calPopup.open) {
                 clockRoot.selectedYear = clockRoot.todayYear;
                 clockRoot.selectedMonth = clockRoot.todayMonth;
+                clockRoot.focusedYear = clockRoot.todayYear;
+                clockRoot.focusedMonth = clockRoot.todayMonth;
+                clockRoot.focusedDay = clockRoot.todayDate;
             }
         }
         function onRequestClockOpen() {
-            let pos = clockRoot.mapToItem(null, 0, 0);
-            if (pos) {
-                calPopup.targetRelativeX = pos.x + (clockRoot.width / 2);
-                calPopup.targetRelativeY = pos.y + (clockRoot.height / 2);
-            }
+            clockRoot.updatePopupPos();
             calPopup.open = true;
             clockRoot.selectedYear = clockRoot.todayYear;
             clockRoot.selectedMonth = clockRoot.todayMonth;
+            clockRoot.focusedYear = clockRoot.todayYear;
+            clockRoot.focusedMonth = clockRoot.todayMonth;
+            clockRoot.focusedDay = clockRoot.todayDate;
         }
-        function onRequestClockClose() {
-            calPopup.open = false;
-        }
+        function onRequestClockClose() { calPopup.open = false; }
+        function onWeatherLocationChanged() { clockRoot.refreshWeather(true); }
     }
 
     PopupPanel {
         id: calPopup
-        cardWidth: 360
-        cardHeight: Math.max(Theme?.popupMinHeight ?? 280, Math.min(Theme?.popupMaxHeight ?? 560, calContentLayout.implicitHeight + ((Theme?.popupPadding ?? 12) * 2)))
+        wantsFocus: true
+        cardWidth: 380
+        cardHeight: Math.max(Theme?.popupMinHeight ?? 300, Math.min(Theme?.popupMaxHeight ?? 680, calContentLayout.implicitHeight + ((Theme?.popupPadding ?? 12) * 2)))
         targetRelativeX: {
             let pt = clockRoot.mapToItem(null, 0, 0);
             return pt ? (pt.x + (clockRoot.width / 2)) : (clockRoot.x + (clockRoot.width / 2));
@@ -273,15 +381,17 @@ BarPill {
         onOpenChanged: {
             if (open) {
                 activeTab = "calendar";
+                clockRoot.editingCity = false;
+                clockRoot.refreshWeather(false);
             }
         }
 
         content: ColumnLayout {
             id: calContentLayout
             anchors.fill: parent
-            spacing: Theme?.widgetSpacing ?? 10
+            spacing: Theme?.widgetSpacing ?? 8
 
-            // Segmented Header Tab Bar: Calendar (Default & First) | Timer (Second)
+            // Segmented Header Tab Bar
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 8
@@ -289,7 +399,6 @@ BarPill {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 32
-                    implicitHeight: 32
                     radius: Theme?.radiusPill ?? 16
                     color: calPopup.activeTab === "calendar" ? Theme.primary : Theme.cardBg
                     border.color: calPopup.activeTab === "calendar" ? Theme.primary : Theme.widgetBorder
@@ -308,8 +417,9 @@ BarPill {
                         Text {
                             text: "calendar"
                             font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
+                            font.variableAxes: Theme?.sansAxes ?? ({})
                             font.pixelSize: Theme?.fontSizeSm ?? 12
-                            font.weight: Font.DemiBold
+                            font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
                             color: calPopup.activeTab === "calendar" ? Theme.on_primary : Theme.on_surface
                         }
                     }
@@ -323,7 +433,6 @@ BarPill {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 32
-                    implicitHeight: 32
                     radius: Theme?.radiusPill ?? 16
                     color: calPopup.activeTab === "timer" ? Theme.primary : Theme.cardBg
                     border.color: calPopup.activeTab === "timer" ? Theme.primary : Theme.widgetBorder
@@ -340,10 +449,11 @@ BarPill {
                             color: calPopup.activeTab === "timer" ? Theme.on_primary : Theme.on_surface
                         }
                         Text {
-                            text: "timer"
+                            text: "timer & pomo"
                             font.family: Theme?.fontSans ?? Theme?.fontFamily ?? "sans-serif"
+                            font.variableAxes: Theme?.sansAxes ?? ({})
                             font.pixelSize: Theme?.fontSizeSm ?? 12
-                            font.weight: Font.DemiBold
+                            font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
                             color: calPopup.activeTab === "timer" ? Theme.on_primary : Theme.on_surface
                         }
                     }
@@ -355,18 +465,17 @@ BarPill {
                 }
             }
 
-            // Calendar View (First)
+            // ================= CALENDAR + WEATHER TAB =================
             ColumnLayout {
                 id: calendarSection
                 Layout.fillWidth: true
-                spacing: Theme?.widgetSpacing ?? 10
+                spacing: 8
                 visible: calPopup.activeTab === "calendar"
 
-                // Calendar Header: Current Date & Time
+                // Header Date & Live Clock Card
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 64
-                    implicitHeight: 64
+                    Layout.preferredHeight: 62
                     radius: Theme.widgetRadius
                     color: Theme.cardBg
                     border.color: Theme.widgetBorder
@@ -374,7 +483,7 @@ BarPill {
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.margins: 12
+                        anchors.margins: 11
                         spacing: 12
 
                         ColumnLayout {
@@ -388,15 +497,18 @@ BarPill {
                                         : "dddd, MMMM d, yyyy";
                                     return Qt.formatDateTime(clockRoot.now, dFmt).toLowerCase();
                                 }
-                                font.family: Theme.fontFamily
+                                font.family: Theme.fontDisplay
+                                font.variableAxes: Theme.displayAxes
                                 font.pixelSize: Theme.fontSizeSm
-                                font.weight: Font.Bold
+                                font.weight: Theme.fontWeightBold
                                 color: Theme.on_surface
                             }
 
                             Text {
                                 text: "day " + clockRoot.getDayOfYear(clockRoot.now) + " of " + clockRoot.now.getFullYear()
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: 10
                                 color: Theme.on_surface_variant
                             }
@@ -412,19 +524,202 @@ BarPill {
                                     return Qt.formatDateTime(clockRoot.now, is12 ? "h:mm:ss ap" : "HH:mm:ss").toLowerCase();
                                 }
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
                                 font.pixelSize: Theme.fontSizeLg
-                                font.weight: Font.Bold
+                                font.weight: Theme.monoWeightBold
                                 color: Theme.primary
                                 Layout.alignment: Qt.AlignRight
                             }
 
                             Text {
-                                text: Theme?.iconClock ?? "\uE8B5"
+                                text: "click day for offset"
+                                font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.pixelSize: 9
+                                color: Theme.on_surface_variant
+                                Layout.alignment: Qt.AlignRight
+                            }
+                        }
+                    }
+                }
+
+                // Weather Card (Open-Meteo live temp, hi/low, unit toggle & city override)
+                Rectangle {
+                    visible: Settings?.weatherEnabled ?? true
+                    Layout.fillWidth: true
+                    implicitHeight: weatherCol.implicitHeight + 16
+                    radius: Theme.widgetRadius
+                    color: Theme.cardBg
+                    border.color: Theme.widgetBorder
+                    border.width: 1
+
+                    ColumnLayout {
+                        id: weatherCol
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        spacing: 6
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            visible: !clockRoot.editingCity
+
+                            Text {
+                                text: clockRoot.weatherIsDay ? Theme.iconSun : Theme.iconMoon
                                 font.family: Theme.fontIcon
                                 font.variableAxes: Theme.iconAxes
-                                font.pixelSize: 11
+                                font.pixelSize: Theme.fontSizeLg
                                 color: Theme.primary
-                                Layout.alignment: Qt.AlignRight
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 1
+
+                                RowLayout {
+                                    spacing: 6
+                                    Text {
+                                        readonly property bool useF: (Settings?.weatherUnit || "F").toUpperCase() === "F"
+                                        text: clockRoot.weatherOk
+                                            ? (Math.round(useF ? clockRoot.weatherTempF : clockRoot.weatherTempC) + "°" + (useF ? "F" : "C") + "  •  " + clockRoot.weatherCond)
+                                            : (clockRoot.weatherLoading ? "fetching weather..." : (clockRoot.weatherError || "weather offline"))
+                                        font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightBold
+                                        color: Theme.on_surface
+                                    }
+                                }
+
+                                Text {
+                                    visible: clockRoot.weatherOk
+                                    readonly property bool useF: (Settings?.weatherUnit || "F").toUpperCase() === "F"
+                                    text: {
+                                        let fl = Math.round(useF ? clockRoot.weatherFeelsF : clockRoot.weatherFeelsC);
+                                        let hi = Math.round(useF ? clockRoot.weatherHighF : clockRoot.weatherHighC);
+                                        let lo = Math.round(useF ? clockRoot.weatherLowF : clockRoot.weatherLowC);
+                                        return clockRoot.weatherCity.toLowerCase() + " • feels " + fl + "° • h " + hi + "° / l " + lo + "° • " + clockRoot.weatherHumidity + "% rh";
+                                    }
+                                    font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.pixelSize: 9
+                                    color: Theme.on_surface_variant
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+                            }
+
+                            Rectangle {
+                                height: 22
+                                implicitWidth: 26
+                                radius: Theme.radiusPill
+                                color: Theme.surface_container_highest
+                                border.color: Theme.widgetBorder
+                                border.width: 1
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "°" + (Settings?.weatherUnit || "F").toUpperCase()
+                                    font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.pixelSize: 9
+                                    font.weight: Theme.monoWeightBold
+                                    color: Theme.primary
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (!Settings) return;
+                                        Settings.weatherUnit = (Settings.weatherUnit || "F").toUpperCase() === "F" ? "C" : "F";
+                                    }
+                                }
+                            }
+
+                            IconButton {
+                                icon: Theme.iconEdit
+                                iconSize: 11
+                                implicitWidth: 22
+                                implicitHeight: 22
+                                tooltip: "set weather city"
+                                onClicked: {
+                                    cityInput.text = Settings?.weatherLocation || "";
+                                    clockRoot.editingCity = true;
+                                    cityInput.forceActiveFocus();
+                                }
+                            }
+
+                            IconButton {
+                                icon: Theme.iconRefresh
+                                iconSize: 11
+                                implicitWidth: 22
+                                implicitHeight: 22
+                                tooltip: "refresh weather"
+                                onClicked: clockRoot.refreshWeather(true)
+                            }
+                        }
+
+                        RowLayout {
+                            visible: clockRoot.editingCity
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 28
+                                radius: Theme.radiusSm
+                                color: Theme.surface_container_highest
+                                border.color: cityInput.activeFocus ? Theme.primary : Theme.widgetBorder
+                                border.width: 1
+
+                                TextInput {
+                                    id: cityInput
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 8
+                                    anchors.rightMargin: 8
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.pixelSize: Theme.fontSizeXs
+                                    color: Theme.on_surface
+                                    selectByMouse: true
+
+                                    Text {
+                                        anchors.fill: parent
+                                        verticalAlignment: Text.AlignVCenter
+                                        text: "city name (leave blank for auto ip)..."
+                                        font: parent.font
+                                        color: Theme.on_surface_disabled
+                                        visible: parent.text === ""
+                                    }
+
+                                    onAccepted: {
+                                        if (Settings) Settings.weatherLocation = text.trim();
+                                        clockRoot.editingCity = false;
+                                        clockRoot.refreshWeather(true);
+                                    }
+                                }
+                            }
+
+                            IconButton {
+                                icon: Theme.iconCheck
+                                iconSize: 11
+                                implicitWidth: 24
+                                implicitHeight: 24
+                                onClicked: {
+                                    if (Settings) Settings.weatherLocation = cityInput.text.trim();
+                                    clockRoot.editingCity = false;
+                                    clockRoot.refreshWeather(true);
+                                }
+                            }
+
+                            IconButton {
+                                icon: Theme.iconClose
+                                iconSize: 11
+                                implicitWidth: 24
+                                implicitHeight: 24
+                                onClicked: clockRoot.editingCity = false
                             }
                         }
                     }
@@ -437,19 +732,15 @@ BarPill {
 
                     Text {
                         id: monthTitle
-                        text: {
-                            let d = new Date(clockRoot.selectedYear, clockRoot.selectedMonth, 1);
-                            return Qt.formatDate(d, "MMMM yyyy").toLowerCase();
-                        }
-                        font.family: Theme.fontFamily
+                        text: Qt.formatDate(new Date(clockRoot.selectedYear, clockRoot.selectedMonth, 1), "MMMM yyyy").toLowerCase()
+                        font.family: Theme.fontDisplay
+                        font.variableAxes: Theme.displayAxes
                         font.pixelSize: Theme.fontSizeMd
-                        font.weight: Font.Bold
+                        font.weight: Theme.fontWeightBold
                         color: Theme.primary
                     }
 
-                    Item {
-                        Layout.fillWidth: true
-                    }
+                    Item { Layout.fillWidth: true }
 
                     IconButton {
                         icon: Theme?.iconChevronLeft ?? "◀"
@@ -472,6 +763,9 @@ BarPill {
                         onClicked: {
                             clockRoot.selectedYear = clockRoot.todayYear;
                             clockRoot.selectedMonth = clockRoot.todayMonth;
+                            clockRoot.focusedYear = clockRoot.todayYear;
+                            clockRoot.focusedMonth = clockRoot.todayMonth;
+                            clockRoot.focusedDay = clockRoot.todayDate;
                         }
                     }
 
@@ -500,11 +794,10 @@ BarPill {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 1
-                    implicitHeight: 1
                     color: Theme.widgetBorder
                 }
 
-                // Days of Week Headers (Mo, Tu, We, Th, Fr, Sa, Su)
+                // Days of Week Headers
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 4
@@ -517,22 +810,22 @@ BarPill {
                             required property int index
                             Layout.fillWidth: true
                             Layout.preferredWidth: 1
-                            Layout.preferredHeight: 22
-                            implicitHeight: 22
+                            Layout.preferredHeight: 20
 
                             Text {
                                 anchors.centerIn: parent
                                 text: modelData
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
                                 font.pixelSize: 10
-                                font.weight: Font.Bold
+                                font.weight: Theme.monoWeightBold
                                 color: (index >= 5) ? Theme.primary : Theme.on_surface_variant
                             }
                         }
                     }
                 }
 
-                // Calendar Days Grid
+                // Interactive Calendar Grid
                 GridLayout {
                     Layout.fillWidth: true
                     columns: 7
@@ -566,27 +859,33 @@ BarPill {
 
                         delegate: Rectangle {
                             required property var modelData
+                            readonly property bool isSelected: modelData.currentMonth
+                                && clockRoot.focusedYear === clockRoot.selectedYear
+                                && clockRoot.focusedMonth === clockRoot.selectedMonth
+                                && clockRoot.focusedDay === modelData.day
                             Layout.fillWidth: true
                             Layout.preferredWidth: 1
-                            Layout.preferredHeight: 32
-                            implicitHeight: 32
+                            Layout.preferredHeight: 30
                             radius: Theme.radiusSm
                             color: (modelData.currentMonth && modelData.isToday)
                                 ? Theme.primary
-                                : (dayMouse.containsMouse ? Theme.surface_container_highest : "transparent")
+                                : (isSelected ? Theme.primary_overlay : (dayMouse.containsMouse ? Theme.surface_container_highest : "transparent"))
 
-                            border.color: (modelData.currentMonth && modelData.isToday) ? Theme.primary : "transparent"
+                            border.color: (modelData.currentMonth && modelData.isToday)
+                                ? Theme.primary
+                                : (isSelected ? Theme.primary : "transparent")
                             border.width: 1
 
                             Text {
                                 anchors.centerIn: parent
                                 text: modelData.day
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
                                 font.pixelSize: 11
-                                font.weight: modelData.isToday ? Font.Bold : Font.Normal
+                                font.weight: (modelData.isToday || isSelected) ? Theme.monoWeightBold : Theme.monoWeightRegular
                                 color: (modelData.currentMonth && modelData.isToday)
                                     ? Theme.on_primary
-                                    : (modelData.currentMonth ? Theme.on_surface : Theme.on_surface_disabled)
+                                    : (isSelected ? Theme.primary : (modelData.currentMonth ? Theme.on_surface : Theme.on_surface_disabled))
                             }
 
                             MouseArea {
@@ -611,6 +910,13 @@ BarPill {
                                                 clockRoot.selectedMonth++;
                                             }
                                         }
+                                        clockRoot.focusedYear = clockRoot.selectedYear;
+                                        clockRoot.focusedMonth = clockRoot.selectedMonth;
+                                        clockRoot.focusedDay = modelData.day;
+                                    } else {
+                                        clockRoot.focusedYear = clockRoot.selectedYear;
+                                        clockRoot.focusedMonth = clockRoot.selectedMonth;
+                                        clockRoot.focusedDay = modelData.day;
                                     }
                                 }
                             }
@@ -621,11 +927,10 @@ BarPill {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 1
-                    implicitHeight: 1
                     color: Theme.widgetBorder
                 }
 
-                // Footer: Day progress
+                // Footer: Selected day offset / progress + QuickNotes shortcut
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -633,7 +938,6 @@ BarPill {
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 6
-                        implicitHeight: 6
                         radius: 3
                         color: Theme.surface_container_highest
                         clip: true
@@ -649,35 +953,93 @@ BarPill {
                     }
 
                     Text {
-                        text: Math.round(((clockRoot.now.getHours() * 60 + clockRoot.now.getMinutes()) / 1440) * 100) + "% day elapsed"
+                        text: clockRoot.getSelectedDayHint()
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
                         font.pixelSize: 9
                         color: Theme.on_surface_variant
+                    }
+
+                    Rectangle {
+                        height: 20
+                        implicitWidth: noteLinkTxt.implicitWidth + 10
+                        radius: Theme.radiusPill
+                        color: noteLinkMouse.containsMouse ? Theme.primary_overlay : Theme.cardBg
+                        border.color: Theme.widgetBorder
+                        border.width: 1
+
+                        Text {
+                            id: noteLinkTxt
+                            anchors.centerIn: parent
+                            text: "notes"
+                            font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.pixelSize: 9
+                            font.weight: Theme.monoWeightBold
+                            color: Theme.primary
+                        }
+
+                        MouseArea {
+                            id: noteLinkMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                calPopup.open = false;
+                                if (Settings?.requestQuickNotesOpen) Settings.requestQuickNotesOpen();
+                            }
+                        }
                     }
                 }
             }
 
-            // Timer & Stopwatch View (Second)
+            // ================= TIMER, POMODORO & STOPWATCH TAB =================
             ColumnLayout {
                 id: timerSection
                 Layout.fillWidth: true
-                spacing: 14
+                spacing: 12
                 visible: calPopup.activeTab === "timer"
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: timerInnerLayout.implicitHeight + 32
-                    implicitHeight: timerInnerLayout.implicitHeight + 32
+                    implicitHeight: timerInnerLayout.implicitHeight + 24
                     radius: Theme.radiusMd
                     color: Theme.cardBg
-                    border.color: Theme.widgetBorder
+                    border.color: (typeof TimerService !== "undefined" && TimerService?.pomodoroActive)
+                        ? Theme.primary
+                        : Theme.widgetBorder
                     border.width: 1
 
                     ColumnLayout {
                         id: timerInnerLayout
                         anchors.fill: parent
-                        anchors.margins: 16
-                        spacing: 16
+                        anchors.margins: 12
+                        spacing: 12
+
+                        // Pomodoro phase banner when active
+                        RowLayout {
+                            Layout.fillWidth: true
+                            visible: typeof TimerService !== "undefined" && TimerService?.pomodoroActive
+
+                            Text {
+                                text: TimerService?.pomodoroPhase === "break" ? "pomodoro break" : "pomodoro focus"
+                                font.family: Theme.fontDisplay
+                                font.variableAxes: Theme.displayAxes
+                                font.pixelSize: Theme.fontSizeXs
+                                font.weight: Theme.fontWeightBold
+                                color: Theme.primary
+                                Layout.fillWidth: true
+                            }
+
+                            Text {
+                                text: "cycle #" + ((TimerService?.pomodoroCycles ?? 0) + 1)
+                                font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.pixelSize: 10
+                                font.weight: Theme.monoWeightBold
+                                color: Theme.on_surface_variant
+                            }
+                        }
 
                         // Giant Digital Readout
                         Text {
@@ -690,49 +1052,147 @@ BarPill {
                                 return TimerService.timerDisplay;
                             }
                             font.family: Theme.fontMono
-                            font.pixelSize: 46
-                            font.weight: Font.Bold
+                            font.variableAxes: Theme.monoAxes
+                            font.pixelSize: 44
+                            font.weight: Theme.monoWeightBold
                             color: (typeof TimerService !== "undefined" && TimerService?.timerRunning && TimerService.timerRemaining <= 30) ? Theme.error : Theme.primary
                         }
 
-                        // Quick Preset Chips (+1m, +5m, +15m, +25m Pomodoro)
+                        // Live timer progress bar
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 6
+                            radius: 3
+                            color: Theme.surface_container_highest
+                            visible: typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.timerPaused)
+                            clip: true
+
+                            Rectangle {
+                                width: parent.width * (TimerService?.timerProgress ?? 0)
+                                height: parent.height
+                                radius: 3
+                                color: Theme.primary
+                                Behavior on width { NumberAnimation { duration: 250 } }
+                            }
+                        }
+
+                        // Quick Preset Chips (+30s, +1m, +5m, +15m, +25m)
                         RowLayout {
-                            Layout.alignment: Qt.AlignHCenter
-                            spacing: 8
+                            Layout.fillWidth: true
+                            spacing: 6
 
                             Repeater {
                                 model: [
-                                    { label: "+1m", val: 1 },
-                                    { label: "+5m", val: 5 },
-                                    { label: "+15m", val: 15 },
-                                    { label: "+25m", val: 25 }
+                                    { label: "+30s", sec: 30 },
+                                    { label: "+1m", sec: 60 },
+                                    { label: "+5m", sec: 300 },
+                                    { label: "+15m", sec: 900 },
+                                    { label: "+25m", sec: 1500 }
                                 ]
                                 delegate: Rectangle {
-                                    Layout.preferredWidth: 68
-                                    Layout.preferredHeight: 32
-                                    implicitWidth: 68
-                                    implicitHeight: 32
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 30
                                     radius: Theme.radiusPill
-                                    color: Theme.surface_container_highest
-                                    border.color: Theme.widgetBorder
+                                    color: pChipMouse.containsMouse ? Theme.primary_overlay : Theme.surface_container_highest
+                                    border.color: pChipMouse.containsMouse ? Theme.primary : Theme.widgetBorder
                                     border.width: 1
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: modelData.label
                                         font.family: Theme.fontMono
-                                        font.pixelSize: Theme.fontSizeSm
-                                        font.weight: Font.DemiBold
+                                        font.variableAxes: Theme.monoAxes
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.monoWeightBold
                                         color: Theme.on_surface
                                     }
                                     MouseArea {
+                                        id: pChipMouse
                                         anchors.fill: parent
+                                        hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            if (typeof TimerService !== "undefined" && TimerService) {
-                                                TimerService.addTimerMinutes(modelData.val);
-                                            }
+                                        onClicked: TimerService?.addTimerSeconds(modelData.sec)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Custom duration input + Pomodoro toggle
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 30
+                                radius: Theme.radiusSm
+                                color: Theme.surface_container_highest
+                                border.color: customMinInput.activeFocus ? Theme.primary : Theme.widgetBorder
+                                border.width: 1
+
+                                TextInput {
+                                    id: customMinInput
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 8
+                                    anchors.rightMargin: 8
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.pixelSize: Theme.fontSizeXs
+                                    color: Theme.on_surface
+                                    selectByMouse: true
+
+                                    Text {
+                                        anchors.fill: parent
+                                        verticalAlignment: Text.AlignVCenter
+                                        text: "custom mins (or mm:ss)..."
+                                        font: parent.font
+                                        color: Theme.on_surface_disabled
+                                        visible: parent.text === ""
+                                    }
+
+                                    onAccepted: {
+                                        let raw = text.trim();
+                                        let sec = 0;
+                                        if (raw.indexOf(":") !== -1) {
+                                            let p = raw.split(":");
+                                            sec = (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+                                        } else {
+                                            sec = Math.round((parseFloat(raw) || 0) * 60);
                                         }
+                                        if (sec > 0) {
+                                            TimerService?.startTimer(sec);
+                                            text = "";
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                height: 30
+                                implicitWidth: pomoTxt.implicitWidth + 16
+                                radius: Theme.radiusPill
+                                color: (TimerService?.pomodoroActive ?? false) ? Theme.primary : Theme.surface_container_highest
+                                border.color: (TimerService?.pomodoroActive ?? false) ? Theme.primary : Theme.widgetBorder
+                                border.width: 1
+
+                                Text {
+                                    id: pomoTxt
+                                    anchors.centerIn: parent
+                                    text: (TimerService?.pomodoroActive ?? false) ? "stop pomo" : "pomo 25/5"
+                                    font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.pixelSize: 10
+                                    font.weight: Theme.monoWeightBold
+                                    color: (TimerService?.pomodoroActive ?? false) ? Theme.on_primary : Theme.primary
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (TimerService?.pomodoroActive) TimerService.stopPomodoro();
+                                        else TimerService?.startPomodoro(Settings?.pomodoroFocusMin ?? 25, Settings?.pomodoroBreakMin ?? 5);
                                     }
                                 }
                             }
@@ -741,14 +1201,12 @@ BarPill {
                         // Start / Pause / Reset Controls
                         RowLayout {
                             Layout.alignment: Qt.AlignHCenter
-                            spacing: 14
+                            spacing: 12
 
                             Rectangle {
-                                Layout.preferredWidth: 110
-                                Layout.preferredHeight: 40
-                                implicitWidth: 110
-                                implicitHeight: 40
-                                radius: 20
+                                Layout.preferredWidth: 112
+                                Layout.preferredHeight: 38
+                                radius: 19
                                 color: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? Theme.error : Theme.primary
 
                                 RowLayout {
@@ -764,8 +1222,9 @@ BarPill {
                                     Text {
                                         text: (typeof TimerService !== "undefined" && (TimerService?.timerRunning || TimerService?.stopwatchRunning)) ? "pause" : "start"
                                         font.family: Theme.fontSans
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeSm
-                                        font.weight: Font.Bold
+                                        font.weight: Theme.fontWeightBold
                                         color: Theme.on_primary
                                     }
                                 }
@@ -785,11 +1244,9 @@ BarPill {
                             }
 
                             Rectangle {
-                                Layout.preferredWidth: 96
-                                Layout.preferredHeight: 40
-                                implicitWidth: 96
-                                implicitHeight: 40
-                                radius: 20
+                                Layout.preferredWidth: 92
+                                Layout.preferredHeight: 38
+                                radius: 19
                                 color: Theme.surface_container_highest
                                 border.color: Theme.widgetBorder
                                 border.width: 1
@@ -798,8 +1255,9 @@ BarPill {
                                     anchors.centerIn: parent
                                     text: "reset"
                                     font.family: Theme.fontSans
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeSm
-                                    font.weight: Font.Medium
+                                    font.weight: Theme.fontWeightMedium
                                     color: Theme.on_surface
                                 }
 
@@ -819,16 +1277,16 @@ BarPill {
                         Rectangle {
                             Layout.alignment: Qt.AlignHCenter
                             Layout.preferredWidth: 180
-                            Layout.preferredHeight: 32
-                            implicitWidth: 180
-                            implicitHeight: 32
-                            radius: 16
+                            Layout.preferredHeight: 28
+                            radius: 14
                             color: Theme.surface_container_high
 
                             Text {
                                 anchors.centerIn: parent
                                 text: (typeof TimerService !== "undefined" && (TimerService?.stopwatchRunning || TimerService?.stopwatchElapsed > 0)) ? "switch to timer" : "switch to stopwatch"
                                 font.family: Theme.fontSans
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.primary
                             }

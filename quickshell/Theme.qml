@@ -8,6 +8,7 @@ import "theme/styleEngine.mjs" as StyleEngine
 import "theme/motion.mjs" as Motion
 import "theme/icons.mjs" as Icons
 import "theme/quotes.mjs" as Quotes
+import "theme/confFormat.mjs" as ConfFmt
 
 Singleton {
     id: root
@@ -59,6 +60,7 @@ Singleton {
     Component.onCompleted: {
         parsePaletteCss(paletteWatcher.text());
         if (!hyprSplashProc.running) hyprSplashProc.running = true;
+        fontInspectTimer.restart();
     }
 
     property string hyprSplash: "Read the wiki."
@@ -262,20 +264,151 @@ Singleton {
         );
     }
 
-    // --- typography & shape scales ---
+    // --- typography & variable font axes ---
     readonly property string fontSans:              cfg?.fontSans ?? cfg?.fontFamily ?? "Noto Sans"
     readonly property string fontMono:              cfg?.fontMono ?? "JetBrainsMono Nerd Font"
-    readonly property string fontDisplay:           cfg?.fontDisplay ?? fontSans
+    readonly property string fontDisplay:           (cfg?.fontDisplay && cfg.fontDisplay.trim() !== "") ? cfg.fontDisplay.trim() : fontSans
 
     readonly property var    fontFamiliesVibe:      [fontSans, "Noto Sans", "Noto Sans CJK JP"]
     readonly property string fontVibe:              fontSans
     readonly property string fontFamily:            fontSans
 
-    readonly property int    fontWeightLight:       300
-    readonly property int    fontWeightRegular:     400
-    readonly property int    fontWeightMedium:      500
-    readonly property int    fontWeightDemiBold:    600
-    readonly property int    fontWeightBold:        700
+    readonly property string fontsScriptPath: decodeURIComponent(Qt.resolvedUrl("scripts/fonts.py").toString().replace(/^file:\/\//, ""))
+
+    readonly property var _fallbackFontAxes: ({
+        "google sans flex":  { opsz: { min: 1, def: 18, max: 144 }, wdth: { min: 25, def: 100, max: 151 }, wght: { min: 1, def: 400, max: 1000 }, ROND: { min: 0, def: 0, max: 100 }, slnt: { min: -10, def: 0, max: 0 } },
+        "segoe ui variable": { wght: { min: 300, def: 400, max: 700 }, opsz: { min: 5, def: 10.5, max: 36 } },
+        "cascadia mono":     { wght: { min: 200, def: 400, max: 700 } },
+        "noto sans":         { wght: { min: 100, def: 400, max: 900 }, wdth: { min: 62.5, def: 100, max: 100 } },
+        "noto sans mono":    { wght: { min: 100, def: 400, max: 900 }, wdth: { min: 62.5, def: 100, max: 100 } },
+        "bahnschrift":       { wght: { min: 300, def: 400, max: 700 }, wdth: { min: 75, def: 100, max: 100 } },
+        "adwaita sans":      { opsz: { min: 14, def: 14, max: 32 }, wght: { min: 100, def: 400, max: 900 } }
+    })
+
+    property var _inspectedAxesByFamily: ({})
+
+    function parseAxesSpec(specStr) {
+        let out = {};
+        if (!specStr || String(specStr).trim() === "") return out;
+        let parts = String(specStr).split(";");
+        for (let i = 0; i < parts.length; i++) {
+            let p = parts[i].trim().split(":");
+            if (p.length >= 4) {
+                let tag = p[0];
+                let mn = parseFloat(p[1]), df = parseFloat(p[2]), mx = parseFloat(p[3]);
+                if (tag && !isNaN(mn) && !isNaN(df) && !isNaN(mx)) {
+                    out[tag] = { min: mn, def: df, max: mx };
+                }
+            }
+        }
+        return out;
+    }
+
+    function axesSpecForFamily(familyName) {
+        let key = String(familyName || "").trim().toLowerCase();
+        if (!key) return ({});
+        if (_inspectedAxesByFamily[key] !== undefined) return _inspectedAxesByFamily[key];
+        return _fallbackFontAxes[key] ?? ({});
+    }
+
+    property Timer fontInspectTimer: Timer {
+        interval: 40
+        repeat: false
+        onTriggered: {
+            if (fontInspectProc.running) fontInspectProc.running = false;
+            fontInspectProc.command = ["python3", root.fontsScriptPath, "inspect", root.fontSans, root.fontDisplay, root.fontMono];
+            fontInspectProc.running = true;
+        }
+    }
+
+    property Process fontInspectProc: Process {
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let recs = ConfFmt.parseRecords(text || "", "inspect");
+                if (!recs || recs.length === 0) return;
+                let next = Object.assign({}, root._inspectedAxesByFamily);
+                for (let i = 0; i < recs.length; i++) {
+                    let r = recs[i];
+                    if (r && r.family) {
+                        next[String(r.family).trim().toLowerCase()] = root.parseAxesSpec(r.axes || "");
+                    }
+                }
+                root._inspectedAxesByFamily = next;
+            }
+        }
+    }
+
+    onFontSansChanged: fontInspectTimer.restart()
+    onFontDisplayChanged: fontInspectTimer.restart()
+    onFontMonoChanged: fontInspectTimer.restart()
+
+    readonly property var    sansVarAxes:           axesSpecForFamily(fontSans)
+    readonly property var    displayVarAxes:        axesSpecForFamily(fontDisplay)
+    readonly property var    monoVarAxes:           axesSpecForFamily(fontMono)
+
+    readonly property int    _sansWghtMin:          sansVarAxes.wght ? Math.max(100, Math.round(sansVarAxes.wght.min)) : 100
+    readonly property int    _sansWghtMax:          sansVarAxes.wght ? Math.min(950, Math.round(sansVarAxes.wght.max)) : 900
+    readonly property int    _monoWghtMin:          monoVarAxes.wght ? Math.max(100, Math.round(monoVarAxes.wght.min)) : 100
+    readonly property int    _monoWghtMax:          monoVarAxes.wght ? Math.min(950, Math.round(monoVarAxes.wght.max)) : 900
+
+    function _clampSansWeight(w) {
+        return Math.max(_sansWghtMin, Math.min(_sansWghtMax, Math.round(w)));
+    }
+    function _clampMonoWeight(w) {
+        return Math.max(_monoWghtMin, Math.min(_monoWghtMax, Math.round(w)));
+    }
+
+    readonly property int    fontWeightBase:        cfg?.fontWeightValue ?? 400
+    readonly property int    _sansWeightDelta:      fontWeightBase - 400
+    readonly property int    fontWeightLight:       _clampSansWeight(300 + _sansWeightDelta)
+    readonly property int    fontWeightRegular:     _clampSansWeight(400 + _sansWeightDelta)
+    readonly property int    fontWeightMedium:      _clampSansWeight(500 + _sansWeightDelta)
+    readonly property int    fontWeightDemiBold:    _clampSansWeight(600 + _sansWeightDelta)
+    readonly property int    fontWeightBold:        _clampSansWeight(700 + _sansWeightDelta)
+
+    readonly property int    fontMonoWeightBase:    cfg?.fontMonoWeight ?? 400
+    readonly property int    _monoWeightDelta:      fontMonoWeightBase - 400
+    readonly property int    monoWeightRegular:     _clampMonoWeight(400 + _monoWeightDelta)
+    readonly property int    monoWeightMedium:      _clampMonoWeight(500 + _monoWeightDelta)
+    readonly property int    monoWeightBold:        _clampMonoWeight(700 + _monoWeightDelta)
+
+    function _buildAxes(spec, pxSize, isDisplay, isMono) {
+        if (!spec || Object.keys(spec).length === 0) return ({});
+        let axes = {};
+        if (spec.opsz !== undefined) {
+            let rawOpsz = (cfg?.fontOpticalAuto ?? true)
+                ? (Math.max(5, Number(pxSize) || 11) * (isDisplay ? 1.25 : 1.0))
+                : (cfg?.fontOpticalSize ?? spec.opsz.def);
+            axes.opsz = Math.max(spec.opsz.min, Math.min(spec.opsz.max, Math.round(rawOpsz * 10) / 10));
+        }
+        if (spec.wdth !== undefined) {
+            let rawW = isMono ? (cfg?.fontMonoWidth ?? 100.0) : (cfg?.fontWidth ?? 100.0);
+            axes.wdth = Math.max(spec.wdth.min, Math.min(spec.wdth.max, Math.round(rawW * 10) / 10));
+        }
+        if (!isMono && spec.ROND !== undefined) {
+            let rawR = cfg?.fontRoundness ?? 0.0;
+            axes.ROND = Math.max(spec.ROND.min, Math.min(spec.ROND.max, Math.round(rawR)));
+        }
+        if (!isMono && spec.slnt !== undefined) {
+            let rawS = cfg?.fontSlant ?? 0.0;
+            axes.slnt = Math.max(spec.slnt.min, Math.min(spec.slnt.max, Math.round(rawS * 10) / 10));
+        }
+        return axes;
+    }
+
+    function textAxesFor(pxSize, isDisplay): var {
+        let spec = isDisplay ? displayVarAxes : sansVarAxes;
+        return _buildAxes(spec, pxSize, Boolean(isDisplay), false);
+    }
+
+    function monoAxesFor(pxSize): var {
+        return _buildAxes(monoVarAxes, pxSize, false, true);
+    }
+
+    readonly property var    sansAxes:              textAxesFor(fontSizeSm, false)
+    readonly property var    titleAxes:             textAxesFor(fontSizeLg, true)
+    readonly property var    displayAxes:           textAxesFor(fontSizeTitle, true)
+    readonly property var    monoAxes:              monoAxesFor(fontSizeSm)
 
     readonly property real   fontScale:             cfg?.fontScale ?? 1.0
     readonly property int    fontSizeXs:            Math.round(9 * fontScale)
@@ -330,14 +463,15 @@ Singleton {
     readonly property bool   screenFrameDocked:     cfg?.screenFrameDocked ?? true
     readonly property string screenCornerMode:      cfg?.screenCornerMode ?? "all"
     readonly property string cornerColorMode:       cfg?.cornerColorMode ?? "bar"
-    readonly property string barStyle:              cfg?.barStyle ?? "glass"
+    readonly property string barStyle:              StyleEngine.normalizeBarStyle(cfg?.barStyle ?? "glass")
     readonly property int    scoopRadius:           cfg?.scoopRadius ?? 16
-    readonly property bool   isGlass:               barStyle === "glass" || barStyle === "glass-frost"
-    readonly property bool   isGlassFrost:          barStyle === "glass-frost"
-    readonly property bool   isCyberNeon:           barStyle === "cyber-neon"
-    readonly property bool   isAccentGlow:          barStyle === "accent-glow"
-    readonly property bool   isPureBlack:           barStyle === "pure-black"
-    readonly property bool   isBento:               barStyle === "bento-floating"
+    readonly property bool   isSolid:               barStyle === "solid"
+    readonly property bool   isGlass:               barStyle === "glass" || barStyle === "frosted"
+    readonly property bool   isFrosted:             barStyle === "frosted"
+    readonly property bool   isOutlined:            barStyle === "outlined"
+    readonly property bool   isTinted:              barStyle === "tinted"
+    readonly property bool   isOled:                barStyle === "oled"
+    readonly property bool   isIslands:             barStyle === "islands"
     readonly property bool   isTranslucent:         barStyle === "translucent"
     readonly property bool   isMonochrome:          barStyle === "monochrome"
     readonly property bool   isTextIconSet:         iconSet === "kaomoji" || iconSet === "text"
@@ -345,7 +479,7 @@ Singleton {
     readonly property string barWidgetChrome:       cfg?.barWidgetChrome ?? "grouped"
     readonly property string barGrouping:           cfg?.barGrouping ?? "clusters"
     readonly property string barDividers:           cfg?.barDividers ?? "line"
-    readonly property bool   isFloatingOrIsland:    Boolean(cfg?.barFloating ?? false) || isBento
+    readonly property bool   isFloatingOrIsland:    Boolean(cfg?.barFloating ?? false) || isIslands
     readonly property bool   isBarGroupedSurface:   (barGrouping === "clusters" || barGrouping === "zones") || (isFloatingOrIsland && Boolean(cfg?.barIslandMode ?? true))
     readonly property bool   isBarUnderline:        barWidgetChrome === "underline"
     readonly property bool   isBarPills:            barWidgetChrome === "pills" || (barWidgetChrome === "grouped" && !isBarGroupedSurface && !isFloatingOrIsland)
@@ -355,7 +489,7 @@ Singleton {
     readonly property int    barPillBorderWidth:    (barPillBorder === "transparent" || barPillBorder.a === 0) ? 0 : 1
     readonly property color  barDividerColor:       alpha(outline_variant, isLightMode ? 0.48 : 0.34)
     readonly property color  barClusterBg:          isFloatingOrIsland ? cardBg : alpha(widgetBg, isLightMode ? 0.72 : 0.62)
-    readonly property color  barClusterBorder:      isCyberNeon ? primary : (isGlass ? glassHighlight : cardBorder)
+    readonly property color  barClusterBorder:      isOutlined ? primary : (isGlass ? glassHighlight : cardBorder)
 
     readonly property var _styleCtx: ({
         isLightMode: root.isLightMode,
@@ -381,9 +515,9 @@ Singleton {
     readonly property color barBg:            alpha(getStyleColor("barBg", barStyle), barOpacity)
     readonly property color barBorderColor:   getStyleColor("barBorderColor", barStyle)
     readonly property color cornerFill: {
-        let cm = cfg?.cornerColorMode ?? "bar";
+        let cm = StyleEngine.normalizeCornerColorMode(cfg?.cornerColorMode ?? "bar");
         if (cm === "accent") return primary;
-        if (cm === "pure-black") return isLightMode ? "#ffffff" : "#000000";
+        if (cm === "oled") return isLightMode ? "#ffffff" : "#000000";
         if (cm === "theme") return surface_container_high;
         return barBg;
     }
@@ -659,6 +793,19 @@ Singleton {
     readonly property string iconExpand:            getIcon("\uE5D0", "\uE740", "expand")
     readonly property string iconCollapse:          getIcon("\uE94D", "\uE73F", "collapse")
     readonly property string iconKeyboard:          getIcon("\uE312", "\uEA08", "keyboard")
+    readonly property string iconUndo:              getIcon("\uE166", "\uE7A7", "undo")
+    readonly property string iconRedo:              getIcon("\uE15A", "\uE7A6", "redo")
+    readonly property string iconBrush:             getIcon("\uE746", "\uE70F", "brush")
+    readonly property string iconHighlight:         getIcon("\uF82B", "\uE76C", "highlight")
+    readonly property string iconArrow:             getIcon("\uF8CE", "\uE72A", "arrow")
+    readonly property string iconRect:              getIcon("\uE3C6", "\uE739", "rect")
+    readonly property string iconCircle:            getIcon("\uEF4A", "\uEA3A", "circle")
+    readonly property string iconBlur:              getIcon("\uE3A5", "\uE81E", "blur")
+    readonly property string iconStep:              getIcon("\uE400", "\uE8FD", "step")
+    readonly property string iconEyedropper:        getIcon("\uE3B8", "\uEF3C", "eyedropper")
+    readonly property string iconZoom:              getIcon("\uE8FF", "\uE8A3", "zoom")
+    readonly property string iconFrame:             getIcon("\uF77B", "\uE794", "frame")
+    readonly property string iconText:              getIcon("\uE264", "\uE8D2", "text")
 
     readonly property string kaoHappy:              "(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧"
     readonly property string kaoSad:                "( ╥ω╥ )"

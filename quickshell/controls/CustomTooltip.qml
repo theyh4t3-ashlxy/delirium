@@ -128,8 +128,9 @@ Item {
                     Text {
                         text: tipRoot.text
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
+                        font.weight: Theme.fontWeightBold
                         color: Theme.on_surface
                         elide: Text.ElideRight
                         Layout.maximumWidth: tipRoot.maxWidth - 28
@@ -149,6 +150,8 @@ Item {
                             anchors.centerIn: parent
                             text: tipRoot.shortcut
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: 9
                             color: Theme.primary
                         }
@@ -159,6 +162,8 @@ Item {
                     visible: tipRoot.subtext !== "" && tipRoot.subtext !== tipRoot.text
                     text: tipRoot.subtext
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: 10
                     color: Theme.on_surface_variant
                     elide: Text.ElideRight

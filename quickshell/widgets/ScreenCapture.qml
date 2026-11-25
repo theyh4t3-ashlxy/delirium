@@ -13,8 +13,9 @@ BarPill {
 
     property bool isRecording: typeof ScreenRecService !== "undefined" ? (ScreenRecService?.isRecording ?? false) : false
     property string activeAudio: typeof ScreenRecService !== "undefined" ? (ScreenRecService?.activeAudio ?? "both") : "both"
-    property int captureDelaySec: 0
-    property int countdownRemaining: 0
+    readonly property int captureDelaySec: Settings?.screenshotDelay ?? 0
+    readonly property int countdownRemaining: typeof ScreenshotService !== "undefined" ? (ScreenshotService?.countdownRemaining ?? 0) : 0
+    readonly property bool isDelayRunning: typeof ScreenshotService !== "undefined" ? (ScreenshotService?.hasPendingDelay ?? false) : false
     property string pendingTarget: ""
     property bool showSettings: false
     property var recentCaptures: []
@@ -37,14 +38,15 @@ BarPill {
     }
 
     function refreshRecentCaptures() {
-        let shotDir = Settings?.screenshotDir || ((Quickshell.env("HOME") || "") + "/Pictures/Screenshots");
+        let rawShotDir = Settings?.screenshotDir || ((Quickshell.env("HOME") || "") + "/Pictures/Screenshots");
+        let shotDir = typeof ScreenshotService !== "undefined" && ScreenshotService?.expandHome ? ScreenshotService.expandHome(rawShotDir) : rawShotDir;
         let recDir = ScreenRecService?.outputDirectory || ((Quickshell.env("HOME") || "") + "/Videos/Recordings");
         let py = "import os, sys\n" +
             "def esc(s): return s.replace('\\\\','\\\\\\\\').replace('\\n','\\\\n').replace('=','\\\\e').replace(',','\\\\c').replace(';','\\\\s').replace('|','\\\\p')\n" +
             "items = []\n" +
             "img_ext = {'.png','.jpg','.jpeg','.webp','.bmp'}\n" +
             "vid_ext = {'.mp4','.mkv','.webm','.mov'}\n" +
-            "for d, kind_hint in [(sys.argv[1], 'img'), (sys.argv[2], 'vid')]:\n" +
+            "for d, kind_hint in [(os.path.expanduser(sys.argv[1]), 'img'), (os.path.expanduser(sys.argv[2]), 'vid')]:\n" +
             "  if not d or not os.path.isdir(d): continue\n" +
             "  try:\n" +
             "    for e in os.scandir(d):\n" +
@@ -74,7 +76,14 @@ BarPill {
         }
     }
 
-    readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
+    Connections {
+        target: ScreenshotService
+        function onCaptureCompleted(info) {
+            root.refreshRecentCaptures();
+        }
+    }
+
+    readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isIslands
     readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
 
     readonly property var targetScreen: {
@@ -96,33 +105,18 @@ BarPill {
     alert: root.isRecording
     hovered: cMouse.containsMouse
     pressed: cMouse.pressed
-    normalBg: countdownTimer.running ? Theme.warn_overlay : Theme.barPillBg
-    normalBorder: countdownTimer.running ? Theme.warn : Theme.barPillBorder
+    normalBg: root.isDelayRunning ? Theme.warn_overlay : Theme.barPillBg
+    normalBorder: root.isDelayRunning ? Theme.warn : Theme.barPillBorder
     clip: true
 
     implicitWidth: {
         if (Theme.isVertical) return pillSize;
-        if (root.isRecording || countdownTimer.running) return recRow.implicitWidth + 20;
+        if (root.isRecording || root.isDelayRunning) return recRow.implicitWidth + 20;
         if (Theme.isTextIconSet) return iconRow.implicitWidth + 20;
         return pillSize;
     }
 
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-
-    Timer {
-        id: countdownTimer
-        interval: 1000
-        repeat: true
-        onTriggered: {
-            if (root.countdownRemaining > 1) {
-                root.countdownRemaining -= 1;
-            } else {
-                stop();
-                root.countdownRemaining = 0;
-                root.executeScreenshot(root.pendingTarget);
-            }
-        }
-    }
 
     // let the popup close first so it doesn't photobomb the screenshot
     Timer {
@@ -137,9 +131,12 @@ BarPill {
         popup.open = false;
         root.pendingTarget = mode;
 
-        if (root.captureDelaySec > 0) {
-            root.countdownRemaining = root.captureDelaySec;
-            countdownTimer.restart();
+        if (mode === "clip") {
+            ScreenshotService.editClipboard();
+            return;
+        }
+        if (root.captureDelaySec > 0 && mode !== "eyedropper") {
+            ScreenshotService.openDelayed(mode, root.captureDelaySec);
         } else if (wasOpen) {
             immediateShotTimer.restart();
         } else {
@@ -152,6 +149,10 @@ BarPill {
         let action = Settings?.screenshotDefaultAction || "both";
         if (mode === "fullscreen") {
             ScreenshotService.captureFullscreen(root.targetScreen, action);
+        } else if (mode === "annotate") {
+            ScreenshotService.openAnnotate();
+        } else if (mode === "eyedropper") {
+            ScreenshotService.openEyedropper();
         } else if (ScreenshotService.open) {
             ScreenshotService.open(mode);
         }
@@ -225,8 +226,9 @@ BarPill {
                 Layout.alignment: Qt.AlignHCenter
                 text: tileRoot.label
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: Theme.fontSizeXs
-                font.weight: Font.DemiBold
+                font.weight: Theme.fontWeightDemiBold
                 color: tileMouse.pressed ? (tileRoot.accentRed ? Theme.on_error : Theme.on_primary) : Theme.on_surface
             }
         }
@@ -277,8 +279,9 @@ BarPill {
             Text {
                 text: chipRoot.label
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: Theme.fontSizeXs
-                font.weight: chipRoot.selected ? Font.Bold : Font.Normal
+                font.weight: chipRoot.selected ? Theme.fontWeightBold : Theme.fontWeightRegular
                 color: chipRoot.selected ? Theme.primary : Theme.on_surface_variant
             }
         }
@@ -297,7 +300,7 @@ BarPill {
         id: iconRow
         anchors.centerIn: parent
         spacing: 6
-        visible: !root.isRecording && !countdownTimer.running
+        visible: !root.isRecording && !root.isDelayRunning
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
@@ -314,8 +317,9 @@ BarPill {
             anchors.verticalCenter: parent.verticalCenter
             text: "capture"
             font.family: Theme.fontFamily
+            font.variableAxes: Theme.sansAxes
             font.pixelSize: Theme.fontSizeSm
-            font.weight: Font.Medium
+            font.weight: Theme.fontWeightMedium
             color: Theme.on_surface
             visible: !Theme.isVertical && Theme.isTextIconSet
         }
@@ -326,7 +330,7 @@ BarPill {
         id: recRow
         anchors.centerIn: parent
         spacing: 6
-        visible: root.isRecording || countdownTimer.running
+        visible: root.isRecording || root.isDelayRunning
 
         Rectangle {
             id: pulseDot
@@ -337,7 +341,7 @@ BarPill {
 
             SequentialAnimation on opacity {
                 loops: Animation.Infinite
-                running: root.isRecording || countdownTimer.running
+                running: root.isRecording || root.isDelayRunning
                 NumberAnimation { from: 1.0; to: 0.20; duration: 650; easing.type: Easing.InOutQuad }
                 NumberAnimation { from: 0.20; to: 1.0; duration: 650; easing.type: Easing.InOutQuad }
             }
@@ -349,8 +353,9 @@ BarPill {
                 ? ("REC " + (ScreenRecService?.elapsedTimeString ?? "00:00"))
                 : (root.countdownRemaining + "s")
             font.family: Theme.fontMono
+            font.variableAxes: Theme.monoAxes
             font.pixelSize: Theme.fontSizeXs
-            font.weight: Font.Bold
+            font.weight: Theme.monoWeightBold
             color: root.isRecording ? Theme.error : Theme.warn
         }
     }
@@ -369,9 +374,8 @@ BarPill {
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
         cursorShape: Qt.PointingHandCursor
         onClicked: (mouse) => {
-            if (countdownTimer.running) {
-                countdownTimer.stop();
-                root.countdownRemaining = 0;
+            if (root.isDelayRunning) {
+                ScreenshotService.cancelDelay();
                 return;
             }
             if (mouse.button === Qt.RightButton) {
@@ -416,8 +420,8 @@ BarPill {
     PopupPanel {
         id: popup
         screen: root.targetScreen
-        cardWidth: 390
-        cardHeight: Math.min(Theme.popupMaxHeight ?? 620, Math.round(captureLayout.implicitHeight + (Theme.popupPadding * 2)))
+        cardWidth: 426
+        cardHeight: Math.min(Theme.popupMaxHeight ?? 680, Math.round(captureLayout.implicitHeight + (Theme.popupPadding * 2)))
         targetRelativeX: 0
         targetRelativeY: 0
         onOpenChanged: {
@@ -462,8 +466,9 @@ BarPill {
                     Text {
                         text: root.showSettings ? "capture & overlay settings" : "screen capture & recorder"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeMd
-                        font.weight: Font.Bold
+                        font.weight: Theme.fontWeightBold
                         color: Theme.on_surface
                     }
 
@@ -472,6 +477,8 @@ BarPill {
                             ? "selection guides, snapping, flash & border styling"
                             : Theme.getFlavor("screenshot", "gpu accelerated • native wayland")
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface_variant
                         elide: Text.ElideRight
@@ -483,18 +490,19 @@ BarPill {
                     height: 22
                     implicitWidth: statusText.implicitWidth + 14
                     radius: Theme.radiusPill
-                    color: root.isRecording ? Theme.error_overlay : (countdownTimer.running ? Theme.warn_overlay : Theme.primary_overlay)
-                    border.color: root.isRecording ? Theme.error : (countdownTimer.running ? Theme.warn : Theme.primary)
+                    color: root.isRecording ? Theme.error_overlay : (root.isDelayRunning ? Theme.warn_overlay : Theme.primary_overlay)
+                    border.color: root.isRecording ? Theme.error : (root.isDelayRunning ? Theme.warn : Theme.primary)
                     border.width: 1
 
                     Text {
                         id: statusText
                         anchors.centerIn: parent
-                        text: root.isRecording ? ("REC " + (ScreenRecService?.elapsedTimeString ?? "00:00")) : (countdownTimer.running ? (root.countdownRemaining + "s") : "ready")
+                        text: root.isRecording ? ("REC " + (ScreenRecService?.elapsedTimeString ?? "00:00")) : (root.isDelayRunning ? (root.countdownRemaining + "s") : "ready")
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
-                        color: root.isRecording ? Theme.error : (countdownTimer.running ? Theme.warn : Theme.primary)
+                        font.weight: Theme.monoWeightBold
+                        color: root.isRecording ? Theme.error : (root.isDelayRunning ? Theme.warn : Theme.primary)
                     }
                 }
 
@@ -535,6 +543,10 @@ BarPill {
                             model: [
                                 { key: "screenshotWindowSnapping", title: "window snapping", sub: "snap selection box to hovered hyprland windows" },
                                 { key: "screenshotFreeze", title: "freeze display frame", sub: "pause screen frame while dragging selection" },
+                                { key: "screenshotIncludeCursor", title: "capture cursor", sub: "include mouse pointer inside screenshots" },
+                                { key: "screenshotShowLoupe", title: "pixel loupe & hex", sub: "5x zoomed magnifier + live color coordinate readout" },
+                                { key: "screenshotPostHud", title: "post-capture preview hud", sub: "floating card for quick edit, pin, prettify & trash" },
+                                { key: "screenshotDefaultAnnotate", title: "open in studio annotate mode", sub: "expand pen, arrow, step & redact toolbar on capture" },
                                 { key: "screenshotFlash", title: "shutter flash", sub: "visual flash feedback on capture" },
                                 { key: "screenshotNotify", title: "desktop notification", sub: "notify with preview thumbnail after saving" },
                                 { key: "screenshotShowCrosshair", title: "hairline crosshairs", sub: "alignment crosshair lines tracking cursor" },
@@ -555,14 +567,17 @@ BarPill {
                                     Text {
                                         text: modelData.title
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Font.DemiBold
+                                        font.weight: Theme.fontWeightDemiBold
                                         color: Theme.on_surface
                                     }
 
                                     Text {
                                         text: modelData.sub
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
+                                        font.weight: Theme.fontWeightRegular
                                         font.pixelSize: 10
                                         color: Theme.on_surface_variant
                                         elide: Text.ElideRight
@@ -635,6 +650,234 @@ BarPill {
                                 }
                             }
                         }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 1
+                            color: Theme.widgetBorder
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                text: "format:"
+                                font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.pixelSize: Theme.fontSizeXs
+                                font.weight: Theme.fontWeightDemiBold
+                                color: Theme.on_surface
+                                Layout.fillWidth: true
+                            }
+
+                            Repeater {
+                                model: ["png", "jpg", "webp"]
+                                delegate: MiniChip {
+                                    required property string modelData
+                                    label: modelData
+                                    selected: (Settings?.screenshotFormat || "png") === modelData
+                                    onClicked: {
+                                        if (Settings) {
+                                            Settings.screenshotFormat = modelData;
+                                            if (Settings.save) Settings.save();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Slider {
+                            visible: (Settings?.screenshotFormat || "png") !== "png"
+                            Layout.fillWidth: true
+                            label: "jpg / webp quality"
+                            unit: "%"
+                            from: 60
+                            to: 100
+                            stepSize: 2
+                            value: Settings?.screenshotQuality ?? 92
+                            onMoved: (val) => {
+                                if (Settings) {
+                                    Settings.screenshotQuality = Math.round(val);
+                                    if (Settings.save) Settings.save();
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                text: "naming:"
+                                font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.pixelSize: Theme.fontSizeXs
+                                font.weight: Theme.fontWeightDemiBold
+                                color: Theme.on_surface
+                                Layout.fillWidth: true
+                            }
+
+                            Repeater {
+                                model: [
+                                    { id: "timestamp", label: "Screenshot_date" },
+                                    { id: "compact", label: "shot_compact" }
+                                ]
+                                delegate: MiniChip {
+                                    required property var modelData
+                                    label: modelData.label
+                                    selected: (Settings?.screenshotFilenamePattern || "timestamp") === modelData.id
+                                    onClicked: {
+                                        if (Settings) {
+                                            Settings.screenshotFilenamePattern = modelData.id;
+                                            if (Settings.save) Settings.save();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 1
+                            color: Theme.widgetBorder
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 1
+
+                                Text {
+                                    text: "auto-prettify captures"
+                                    font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.pixelSize: Theme.fontSizeXs
+                                    font.weight: Theme.fontWeightDemiBold
+                                    color: Theme.on_surface
+                                }
+
+                                Text {
+                                    text: "frame saved captures in gradient backdrop & shadow"
+                                    font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.pixelSize: 10
+                                    color: Theme.on_surface_variant
+                                }
+                            }
+
+                            ToggleSwitch {
+                                checked: Boolean(Settings?.screenshotPrettifyEnabled ?? false)
+                                onToggled: {
+                                    if (Settings) {
+                                        Settings.screenshotPrettifyEnabled = !Boolean(Settings.screenshotPrettifyEnabled);
+                                        if (Settings.save) Settings.save();
+                                    }
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 1
+
+                                Text {
+                                    text: "prettify drop shadow"
+                                    font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.pixelSize: Theme.fontSizeXs
+                                    font.weight: Theme.fontWeightDemiBold
+                                    color: Theme.on_surface
+                                }
+
+                                Text {
+                                    text: "soft elevated window shadow under framed shots"
+                                    font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.pixelSize: 10
+                                    color: Theme.on_surface_variant
+                                }
+                            }
+
+                            ToggleSwitch {
+                                checked: Boolean(Settings?.screenshotPrettifyShadow ?? true)
+                                onToggled: {
+                                    if (Settings) {
+                                        Settings.screenshotPrettifyShadow = !Boolean(Settings.screenshotPrettifyShadow);
+                                        if (Settings.save) Settings.save();
+                                    }
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 4
+
+                            Text {
+                                text: "backdrop:"
+                                font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.pixelSize: Theme.fontSizeXs
+                                font.weight: Theme.fontWeightDemiBold
+                                color: Theme.on_surface
+                                Layout.fillWidth: true
+                            }
+
+                            Repeater {
+                                model: ["matugen", "wallpaper", "oled", "glass"]
+                                delegate: MiniChip {
+                                    required property string modelData
+                                    label: modelData
+                                    selected: (Settings?.screenshotPrettifyStyle || "matugen") === modelData
+                                    onClicked: {
+                                        if (Settings) {
+                                            Settings.screenshotPrettifyStyle = modelData;
+                                            if (Settings.save) Settings.save();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Slider {
+                            Layout.fillWidth: true
+                            label: "prettify frame padding"
+                            unit: "px"
+                            from: 16
+                            to: 96
+                            stepSize: 4
+                            value: Settings?.screenshotPrettifyPadding ?? 48
+                            onMoved: (val) => {
+                                if (Settings) {
+                                    Settings.screenshotPrettifyPadding = Math.round(val);
+                                    if (Settings.save) Settings.save();
+                                }
+                            }
+                        }
+
+                        Slider {
+                            Layout.fillWidth: true
+                            label: "prettify inner radius"
+                            unit: "px"
+                            from: 0
+                            to: 32
+                            stepSize: 2
+                            value: Settings?.screenshotPrettifyRadius ?? 14
+                            onMoved: (val) => {
+                                if (Settings) {
+                                    Settings.screenshotPrettifyRadius = Math.round(val);
+                                    if (Settings.save) Settings.save();
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -680,8 +923,9 @@ BarPill {
                         Text {
                             text: "screenshot"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeSm
-                            font.weight: Font.Bold
+                            font.weight: Theme.fontWeightBold
                             color: Theme.on_surface
                         }
 
@@ -691,21 +935,27 @@ BarPill {
                             model: [
                                 { label: "now", sec: 0 },
                                 { label: "3s", sec: 3 },
-                                { label: "5s", sec: 5 }
+                                { label: "5s", sec: 5 },
+                                { label: "10s", sec: 10 }
                             ]
 
                             delegate: MiniChip {
                                 required property var modelData
                                 label: modelData.label
                                 selected: root.captureDelaySec === modelData.sec
-                                onClicked: root.captureDelaySec = modelData.sec
+                                onClicked: {
+                                    if (Settings) {
+                                        Settings.screenshotDelay = modelData.sec;
+                                        if (Settings.save) Settings.save();
+                                    }
+                                }
                             }
                         }
                     }
 
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 8
+                        spacing: 6
 
                         CaptureTile {
                             icon: Theme.iconCrop
@@ -724,15 +974,83 @@ BarPill {
                             label: "display"
                             onClicked: root.triggerScreenshot("fullscreen")
                         }
+
+                        CaptureTile {
+                            icon: Theme.iconEdit
+                            label: "studio"
+                            onClicked: root.triggerScreenshot("annotate")
+                        }
+
+                        CaptureTile {
+                            icon: Theme.iconEyedropper
+                            label: "pick hex"
+                            onClicked: root.triggerScreenshot("eyedropper")
+                        }
                     }
 
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 6
+                        spacing: 5
+
+                        MiniChip {
+                            icon: Theme.iconFrame
+                            label: "prettify"
+                            selected: Boolean(Settings?.screenshotPrettifyEnabled ?? false)
+                            onClicked: {
+                                if (Settings) {
+                                    Settings.screenshotPrettifyEnabled = !Boolean(Settings.screenshotPrettifyEnabled);
+                                    if (Settings.save) Settings.save();
+                                }
+                            }
+                        }
+
+                        MiniChip {
+                            icon: Theme.iconBrush
+                            label: "cursor"
+                            selected: Boolean(Settings?.screenshotIncludeCursor ?? false)
+                            onClicked: {
+                                if (Settings) {
+                                    Settings.screenshotIncludeCursor = !Boolean(Settings.screenshotIncludeCursor);
+                                    if (Settings.save) Settings.save();
+                                }
+                            }
+                        }
+
+                        MiniChip {
+                            icon: Theme.iconClipboard
+                            label: "edit clip"
+                            fillWidth: true
+                            onClicked: root.triggerScreenshot("clip")
+                        }
+
+                        MiniChip {
+                            visible: ScreenshotService.lastCapture !== null
+                            icon: Theme.iconPin
+                            label: "pin last"
+                            onClicked: {
+                                popup.open = false;
+                                ScreenshotService.pinLast();
+                            }
+                        }
+
+                        MiniChip {
+                            visible: ScreenshotService.pinnedShots.length > 0
+                            icon: Theme.iconClose
+                            label: "unpin (" + ScreenshotService.pinnedShots.length + ")"
+                            selected: true
+                            onClicked: ScreenshotService.clearPins()
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 5
 
                         Text {
                             text: "output:"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.on_surface_variant
                         }
@@ -757,6 +1075,17 @@ BarPill {
                                         if (Settings.save) Settings.save();
                                     }
                                 }
+                            }
+                        }
+
+                        MiniChip {
+                            label: String(Settings?.screenshotFormat || "png").toUpperCase()
+                            selected: (Settings?.screenshotFormat || "png") !== "png"
+                            onClicked: {
+                                if (!Settings) return;
+                                let cur = String(Settings.screenshotFormat || "png").toLowerCase();
+                                Settings.screenshotFormat = cur === "png" ? "webp" : (cur === "webp" ? "jpg" : "png");
+                                if (Settings.save) Settings.save();
                             }
                         }
                     }
@@ -804,8 +1133,9 @@ BarPill {
                         Text {
                             text: "screen recording"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeSm
-                            font.weight: Font.Bold
+                            font.weight: Theme.fontWeightBold
                             color: Theme.on_surface
                         }
 
@@ -814,6 +1144,8 @@ BarPill {
                         Text {
                             text: "60 fps • gpu-screen-recorder"
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: Math.max(8, Theme.fontSizeXs - 1)
                             color: Theme.on_surface_variant
                         }
@@ -851,8 +1183,9 @@ BarPill {
                             Text {
                                 text: "recording " + (ScreenRecService?.elapsedTimeString ?? "00:00")
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
                                 font.pixelSize: Theme.fontSizeSm
-                                font.weight: Font.Bold
+                                font.weight: Theme.monoWeightBold
                                 color: Theme.error
                                 Layout.fillWidth: true
                             }
@@ -868,8 +1201,9 @@ BarPill {
                                     anchors.centerIn: parent
                                     text: "save & stop"
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Font.Bold
+                                    font.weight: Theme.fontWeightBold
                                     // using on_error instead of #ffffff so it doesn't blind you on pastel M3 error colors
                                     color: Theme.on_error
                                 }
@@ -896,8 +1230,9 @@ BarPill {
                                     anchors.centerIn: parent
                                     text: "discard"
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Font.Medium
+                                    font.weight: Theme.fontWeightMedium
                                     color: Theme.error
                                 }
 
@@ -956,6 +1291,8 @@ BarPill {
                         Text {
                             text: "audio:"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.on_surface_variant
                         }
@@ -1016,8 +1353,9 @@ BarPill {
                         Text {
                             text: "recent captures (" + root.recentCaptures.length + ")"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
+                            font.weight: Theme.fontWeightBold
                             color: Theme.on_surface
                             Layout.fillWidth: true
                         }
@@ -1036,6 +1374,8 @@ BarPill {
                         visible: root.recentCaptures.length === 0
                         text: "no recent screenshots or recordings found"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: 10
                         color: Theme.on_surface_variant
                         Layout.fillWidth: true
@@ -1044,15 +1384,15 @@ BarPill {
                     Flickable {
                         visible: root.recentCaptures.length > 0
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 82
+                        Layout.preferredHeight: 90
                         contentWidth: recentStrip.implicitWidth
-                        contentHeight: 82
+                        contentHeight: 90
                         flickableDirection: Flickable.HorizontalFlick
                         clip: true
 
                         Row {
                             id: recentStrip
-                            height: 82
+                            height: 90
                             spacing: 6
 
                             Repeater {
@@ -1063,9 +1403,10 @@ BarPill {
                                     required property var modelData
                                     readonly property bool isImg: modelData.kind === "image"
                                     readonly property bool justCopied: root.copiedCapturePath === modelData.path
+                                    readonly property bool hoverAny: tileMouse.containsMouse || editBtnMouse.containsMouse || pinBtnMouse.containsMouse || prettyBtnMouse.containsMouse || openBtnMouse.containsMouse || rmBtnMouse.containsMouse
 
-                                    width: 118
-                                    height: 78
+                                    width: 138
+                                    height: 86
                                     radius: Theme.radiusSm
                                     color: Theme.surface_container_highest
                                     border.color: justCopied
@@ -1102,6 +1443,8 @@ BarPill {
                                             width: parent.width
                                             text: capTile.modelData.name
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
+                                            font.weight: Theme.monoWeightRegular
                                             font.pixelSize: 8
                                             color: Theme.on_surface
                                             elide: Text.ElideMiddle
@@ -1121,9 +1464,7 @@ BarPill {
                                             if (mouse.button === Qt.MiddleButton || mouse.button === Qt.RightButton || !capTile.isImg) {
                                                 Quickshell.execDetached(["xdg-open", p]);
                                             } else {
-                                                let ext = p.split('.').pop().toLowerCase();
-                                                let mime = (ext === "jpg" || ext === "jpeg") ? "image/jpeg" : ("image/" + (ext || "png"));
-                                                Quickshell.execDetached(["sh", "-c", "wl-copy --type \"$1\" < \"$2\"", "--", mime, p]);
+                                                Quickshell.execDetached(["python3", ScreenshotService.scriptPath, "copy", p]);
                                                 root.copiedCapturePath = p;
                                                 copiedCaptureTimer.restart();
                                             }
@@ -1145,27 +1486,112 @@ BarPill {
                                                 ? "copied!"
                                                 : (tileMouse.containsMouse ? (capTile.isImg ? "click: copy" : "click: open") : capTile.modelData.name)
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: 8
-                                            font.weight: capTile.justCopied ? Font.Bold : Font.Normal
+                                            font.weight: capTile.justCopied ? Theme.monoWeightBold : Theme.monoWeightRegular
                                             color: capTile.justCopied ? Theme.primary : Theme.on_surface
                                             elide: Text.ElideMiddle
                                             horizontalAlignment: Text.AlignHCenter
                                         }
                                     }
 
-                                    // top-right open & delete buttons on hover
+                                    // top-right studio edit, pin, prettify, open & delete buttons on hover
                                     Row {
                                         anchors.top: parent.top
                                         anchors.right: parent.right
                                         anchors.margins: 4
                                         spacing: 3
-                                        visible: tileMouse.containsMouse || openBtnMouse.containsMouse || rmBtnMouse.containsMouse
+                                        visible: capTile.hoverAny
 
                                         Rectangle {
-                                            width: 18
-                                            height: 18
-                                            radius: 9
-                                            color: openBtnMouse.containsMouse ? Theme.primary : Theme.alpha(Theme.scrim, 0.75)
+                                            visible: capTile.isImg
+                                            width: 19
+                                            height: 19
+                                            radius: 9.5
+                                            color: editBtnMouse.containsMouse ? Theme.primary : Theme.alpha(Theme.scrim, 0.78)
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: Theme.iconEdit
+                                                font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
+                                                font.pixelSize: 10
+                                                color: editBtnMouse.containsMouse ? Theme.on_primary : Theme.on_surface
+                                            }
+
+                                            MouseArea {
+                                                id: editBtnMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    popup.open = false;
+                                                    ScreenshotService.editFile(capTile.modelData.path);
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            visible: capTile.isImg
+                                            width: 19
+                                            height: 19
+                                            radius: 9.5
+                                            color: pinBtnMouse.containsMouse ? Theme.primary : Theme.alpha(Theme.scrim, 0.78)
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: Theme.iconPin
+                                                font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
+                                                font.pixelSize: 10
+                                                color: pinBtnMouse.containsMouse ? Theme.on_primary : Theme.on_surface
+                                            }
+
+                                            MouseArea {
+                                                id: pinBtnMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    popup.open = false;
+                                                    ScreenshotService.pinFile(capTile.modelData.path, 480, 300, root.targetScreen?.name || "");
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            visible: capTile.isImg
+                                            width: 19
+                                            height: 19
+                                            radius: 9.5
+                                            color: prettyBtnMouse.containsMouse ? Theme.primary : Theme.alpha(Theme.scrim, 0.78)
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: Theme.iconFrame
+                                                font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
+                                                font.pixelSize: 10
+                                                color: prettyBtnMouse.containsMouse ? Theme.on_primary : Theme.on_surface
+                                            }
+
+                                            MouseArea {
+                                                id: prettyBtnMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    popup.open = false;
+                                                    ScreenshotService.runQuickPrettify(capTile.modelData.path);
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            width: 19
+                                            height: 19
+                                            radius: 9.5
+                                            color: openBtnMouse.containsMouse ? Theme.primary : Theme.alpha(Theme.scrim, 0.78)
 
                                             Text {
                                                 anchors.centerIn: parent
@@ -1186,10 +1612,10 @@ BarPill {
                                         }
 
                                         Rectangle {
-                                            width: 18
-                                            height: 18
-                                            radius: 9
-                                            color: rmBtnMouse.containsMouse ? Theme.error : Theme.alpha(Theme.scrim, 0.75)
+                                            width: 19
+                                            height: 19
+                                            radius: 9.5
+                                            color: rmBtnMouse.containsMouse ? Theme.error : Theme.alpha(Theme.scrim, 0.78)
 
                                             Text {
                                                 anchors.centerIn: parent
@@ -1238,7 +1664,8 @@ BarPill {
                     Layout.preferredHeight: 30
                     onClicked: {
                         popup.open = false;
-                        let dir = Settings?.screenshotDir || ((Quickshell.env("HOME") || "") + "/Pictures/Screenshots");
+                        let rawDir = Settings?.screenshotDir || ((Quickshell.env("HOME") || "") + "/Pictures/Screenshots");
+                        let dir = ScreenshotService?.expandHome ? ScreenshotService.expandHome(rawDir) : rawDir.replace(/^~/, Quickshell.env("HOME") || "");
                         Quickshell.execDetached(["xdg-open", dir]);
                     }
                 }

@@ -13,7 +13,7 @@ BarPill {
     readonly property int itemCount: rawItems.length
     readonly property int collapseThreshold: 3
     readonly property int collapsedMax: 2
-    property bool trayCollapsed: false
+    readonly property bool trayCollapsed: Settings?.trayCollapsed ?? false
     readonly property bool isCollapsedActive: trayCollapsed && itemCount > collapseThreshold
     readonly property var displayedItems: isCollapsedActive ? rawItems.slice(0, collapsedMax) : rawItems
 
@@ -64,6 +64,15 @@ BarPill {
         id: btnRoot
         required property var modelData
 
+        readonly property string resolvedIconSource: {
+            let ic = (btnRoot.modelData?.icon || "").trim();
+            if (!ic) return "";
+            if (ic.startsWith("/") || ic.startsWith("file://") || ic.startsWith("image://")) return ic;
+            if (Quickshell?.hasThemeIcon && !Quickshell.hasThemeIcon(ic)) return "";
+            let p = Quickshell.iconPath(ic);
+            return p || "";
+        }
+
         width: 24
         height: 24
         radius: Theme.radiusSm
@@ -80,18 +89,27 @@ BarPill {
         Behavior on color { ColorAnimation { duration: Theme.animFast } }
         Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
-        IconImage {
+        Loader {
             anchors.centerIn: parent
-            width: 16
-            height: 16
-            source: {
-                let ic = btnRoot.modelData?.icon || "";
-                if (!ic) return "";
-                if (ic.startsWith("/") || ic.startsWith("file://") || ic.startsWith("image://")) return ic;
-                return Quickshell.iconPath(ic);
+            active: btnRoot.resolvedIconSource !== ""
+            sourceComponent: IconImage {
+                width: 16
+                height: 16
+                source: btnRoot.resolvedIconSource
+                scale: tMouse.containsMouse ? 1.08 : 1.0
+                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
             }
-            scale: tMouse.containsMouse ? 1.08 : 1.0
-            Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+        }
+
+        Text {
+            anchors.centerIn: parent
+            visible: btnRoot.resolvedIconSource === ""
+            text: (btnRoot.modelData?.title || btnRoot.modelData?.id || "?").slice(0, 1).toLowerCase()
+            font.family: Theme.fontMono
+            font.variableAxes: Theme.monoAxes
+            font.pixelSize: 10
+            font.weight: Theme.monoWeightBold
+            color: Theme.primary
         }
 
         QsMenuAnchor {
@@ -149,9 +167,9 @@ BarPill {
                 ? ("+" + (trayRoot.itemCount - trayRoot.collapsedMax))
                 : (Theme.isVertical ? Theme.iconChevronUp : Theme.iconChevronLeft)
             font.family: trayRoot.isCollapsedActive ? Theme.fontMono : Theme.fontIcon
-            font.variableAxes: Theme.iconAxes
+            font.variableAxes: trayRoot.isCollapsedActive ? Theme.monoAxes : Theme.iconAxes
             font.pixelSize: trayRoot.isCollapsedActive ? 10 : 12
-            font.weight: Font.Bold
+            font.weight: trayRoot.isCollapsedActive ? Theme.monoWeightBold : Theme.fontWeightBold
             color: trayRoot.isCollapsedActive ? Theme.primary : Theme.on_surface_variant
         }
 
@@ -160,7 +178,9 @@ BarPill {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: trayRoot.trayCollapsed = !trayRoot.trayCollapsed
+            onClicked: {
+                if (Settings) Settings.trayCollapsed = !trayRoot.trayCollapsed;
+            }
         }
     }
 

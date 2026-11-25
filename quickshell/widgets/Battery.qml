@@ -41,7 +41,7 @@ BarPill {
         Text {
             id: batIcon
             anchors.verticalCenter: parent.verticalCenter
-            text: Theme?.getBatteryIcon ? Theme.getBatteryIcon(container.pct, container.isCharging, !(UPower?.onBattery ?? true), container.isVertical) : (Theme?.iconBatFull ?? "\uE1A5")
+            text: Theme?.getBatteryIcon ? Theme.getBatteryIcon(container.pct, container.isCharging, batPopup.isSaver, container.isVertical) : (Theme?.iconBatFull ?? "\uE1A5")
             font.family: Theme?.fontIcon ?? "sans-serif"
             font.variableAxes: Theme?.iconAxes ?? ({})
             font.pixelSize: Theme?.fontSizeMd ?? 14
@@ -73,8 +73,9 @@ BarPill {
                 return container.pct + "%";
             }
             font.family: Theme?.fontFamily ?? "sans-serif"
+            font.variableAxes: Theme?.sansAxes ?? ({})
             font.pixelSize: Theme?.fontSizeXs ?? 10
-            font.weight: Theme?.fontWeightMedium ?? Font.Medium
+            font.weight: Theme?.fontWeightMedium ?? Theme?.fontWeightMedium ?? Font.Medium
             color: container.isLow ? Theme.error : Theme.on_surface
         }
     }

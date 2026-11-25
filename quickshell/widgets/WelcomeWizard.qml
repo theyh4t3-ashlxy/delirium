@@ -234,9 +234,9 @@ PanelWindow {
             }
         }
 
-        // ambient glow behind the wizard card when accent-glow or cyber-neon is active
+        // ambient glow behind the wizard card when tinted or outlined is active
         Rectangle {
-            visible: Theme.isAccentGlow || Theme.isCyberNeon
+            visible: Theme.isTinted || Theme.isOutlined
             anchors.fill: dialogCard
             anchors.margins: -6
             radius: dialogCard.radius + 6
@@ -312,8 +312,9 @@ PanelWindow {
                             Text {
                                 text: "welcome to lost"
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeMd
-                                font.weight: Font.Bold
+                                font.weight: Theme.fontWeightBold
                                 color: Theme.on_surface
                             }
 
@@ -330,8 +331,9 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     text: "thinkpad t16 • nixos"
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Font.Bold
+                                    font.weight: Theme.monoWeightBold
                                     color: Theme.primary
                                 }
                             }
@@ -340,6 +342,8 @@ PanelWindow {
                         Text {
                             text: Theme.getFlavor("system", "keyboard-driven layer-shell environment configured for zero mouse friction")
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.on_surface_variant
                             elide: Text.ElideRight
@@ -360,8 +364,9 @@ PanelWindow {
                             anchors.centerIn: parent
                             text: "step " + (root.currentStep + 1) + "/" + root.totalSteps
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
+                            font.weight: Theme.monoWeightBold
                             color: Theme.primary
                         }
                     }
@@ -450,8 +455,9 @@ PanelWindow {
                                     Text {
                                         text: modelData.label
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
-                                        font.weight: isActive ? Font.Bold : Font.DemiBold
+                                        font.weight: isActive ? Theme.fontWeightBold : Theme.fontWeightDemiBold
                                         color: isActive ? Theme.on_primary : (isPassed ? Theme.primary : Theme.on_surface_variant)
                                     }
                                 }
@@ -528,8 +534,9 @@ PanelWindow {
                                         Text {
                                             text: "ambient matugen palette"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeSm
-                                            font.weight: Font.Bold
+                                            font.weight: Theme.fontWeightBold
                                             color: Theme.on_surface
                                         }
 
@@ -538,6 +545,8 @@ PanelWindow {
                                         Text {
                                             text: "vibrancy " + Math.round((Theme.wallpaperVibrancy ?? 0.5) * 100) + "%"
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
+                                            font.weight: Theme.monoWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.primary
                                         }
@@ -548,6 +557,8 @@ PanelWindow {
                                         wrapMode: Text.Wrap
                                         text: "every surface, border, and concave scoop is extracted in real-time from your wallpaper. roll a new wallpaper below to watch the whole desktop morph."
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
+                                        font.weight: Theme.fontWeightRegular
                                         font.pixelSize: Theme.fontSizeXs
                                         color: Theme.on_surface_variant
                                     }
@@ -584,14 +595,17 @@ PanelWindow {
                                                         Layout.alignment: Qt.AlignHCenter
                                                         text: modelData.name
                                                         font.family: Theme.fontMono
+                                                        font.variableAxes: Theme.monoAxes
                                                         font.pixelSize: Theme.fontSizeXs
-                                                        font.weight: Font.Bold
+                                                        font.weight: Theme.monoWeightBold
                                                         color: modelData.onC
                                                     }
                                                     Text {
                                                         Layout.alignment: Qt.AlignHCenter
                                                         text: String(modelData.c).toUpperCase()
                                                         font.family: Theme.fontMono
+                                                        font.variableAxes: Theme.monoAxes
+                                                        font.weight: Theme.monoWeightRegular
                                                         font.pixelSize: Theme.fontSizeXs
                                                         color: Theme.alpha(modelData.onC, 0.78)
                                                     }
@@ -624,8 +638,9 @@ PanelWindow {
                                         Text {
                                             text: "appearance mode"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeSm
-                                            font.weight: Font.Bold
+                                            font.weight: Theme.fontWeightBold
                                             color: Theme.on_surface
                                         }
 
@@ -665,8 +680,9 @@ PanelWindow {
                                                         Text {
                                                             text: modelData.label
                                                             font.family: Theme.fontFamily
+                                                            font.variableAxes: Theme.sansAxes
                                                             font.pixelSize: Theme.fontSizeXs
-                                                            font.weight: parent.parent.isSel ? Font.Bold : Font.DemiBold
+                                                            font.weight: parent.parent.isSel ? Theme.fontWeightBold : Theme.fontWeightDemiBold
                                                             color: parent.parent.isSel ? Theme.on_primary : Theme.on_surface
                                                         }
                                                     }
@@ -716,8 +732,9 @@ PanelWindow {
                                             Text {
                                                 text: "roll wallpaper"
                                                 font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
                                                 font.pixelSize: Theme.fontSizeSm
-                                                font.weight: Font.Bold
+                                                font.weight: Theme.fontWeightBold
                                                 color: rollMouse.pressed ? Theme.on_primary : Theme.primary
                                             }
                                         }
@@ -726,6 +743,8 @@ PanelWindow {
                                             Layout.alignment: Qt.AlignHCenter
                                             text: "randomize wallpaper + palette"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.weight: Theme.fontWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: rollMouse.pressed ? Theme.on_primary : Theme.on_surface_variant
                                         }
@@ -763,8 +782,9 @@ PanelWindow {
                                     Text {
                                         text: "matugen color algorithm"
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeSm
-                                        font.weight: Font.Bold
+                                        font.weight: Theme.fontWeightBold
                                         color: Theme.on_surface
                                     }
 
@@ -797,8 +817,9 @@ PanelWindow {
                                                     anchors.centerIn: parent
                                                     text: modelData.name
                                                     font.family: Theme.fontMono
+                                                    font.variableAxes: Theme.monoAxes
                                                     font.pixelSize: Theme.fontSizeXs
-                                                    font.weight: isSel ? Font.Bold : Font.DemiBold
+                                                    font.weight: isSel ? Theme.monoWeightBold : Theme.monoWeightBold
                                                     color: isSel ? Theme.on_primary : Theme.on_surface
                                                 }
 
@@ -861,8 +882,9 @@ PanelWindow {
                                             Text {
                                                 text: "quickshell classic"
                                                 font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
                                                 font.pixelSize: Theme.fontSizeSm
-                                                font.weight: Font.Bold
+                                                font.weight: Theme.fontWeightBold
                                                 color: Theme.on_surface
                                                 Layout.fillWidth: true
                                             }
@@ -876,8 +898,9 @@ PanelWindow {
                                                     anchors.centerIn: parent
                                                     text: qsCard.isSelected ? "active" : "standby"
                                                     font.family: Theme.fontMono
+                                                    font.variableAxes: Theme.monoAxes
                                                     font.pixelSize: Theme.fontSizeXs
-                                                    font.weight: Font.Bold
+                                                    font.weight: Theme.monoWeightBold
                                                     color: qsCard.isSelected ? Theme.on_primary : Theme.on_surface_variant
                                                 }
                                             }
@@ -888,6 +911,8 @@ PanelWindow {
                                             wrapMode: Text.Wrap
                                             text: "lightweight layer-shell bar with concave screen scoops, hardware widgets, media controls, and fast flyout cards."
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.weight: Theme.fontWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.on_surface_variant
                                         }
@@ -904,8 +929,9 @@ PanelWindow {
                                                 anchors.centerIn: parent
                                                 text: qsCard.isSelected ? "currently engaged" : "switch to quickshell"
                                                 font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
                                                 font.pixelSize: Theme.fontSizeXs
-                                                font.weight: Font.Bold
+                                                font.weight: Theme.fontWeightBold
                                                 color: qsCard.isSelected ? Theme.on_primary : Theme.on_surface
                                             }
 
@@ -951,8 +977,9 @@ PanelWindow {
                                             Text {
                                                 text: "brain_shell cyberdeck"
                                                 font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
                                                 font.pixelSize: Theme.fontSizeSm
-                                                font.weight: Font.Bold
+                                                font.weight: Theme.fontWeightBold
                                                 color: Theme.on_surface
                                                 Layout.fillWidth: true
                                             }
@@ -966,8 +993,9 @@ PanelWindow {
                                                     anchors.centerIn: parent
                                                     text: bsCard.isSelected ? "active" : "standby"
                                                     font.family: Theme.fontMono
+                                                    font.variableAxes: Theme.monoAxes
                                                     font.pixelSize: Theme.fontSizeXs
-                                                    font.weight: Font.Bold
+                                                    font.weight: Theme.monoWeightBold
                                                     color: bsCard.isSelected ? Theme.on_primary : Theme.on_surface_variant
                                                 }
                                             }
@@ -978,6 +1006,8 @@ PanelWindow {
                                             wrapMode: Text.Wrap
                                             text: "cyberdeck workspace with built-in kanban board, quick notes, telemetry radar, and multi-monitor dashboard."
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.weight: Theme.fontWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.on_surface_variant
                                         }
@@ -996,8 +1026,9 @@ PanelWindow {
                                                     ? "currently engaged"
                                                     : (root.isInstallingBrainShell ? "cloning repo..." : (root.brainShellDetected ? "switch to brain_shell" : "clone brain_shell"))
                                                 font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
                                                 font.pixelSize: Theme.fontSizeXs
-                                                font.weight: Font.Bold
+                                                font.weight: Theme.fontWeightBold
                                                 color: bsCard.isSelected ? Theme.on_primary : Theme.on_surface
                                             }
 
@@ -1036,10 +1067,11 @@ PanelWindow {
                                     spacing: 8
 
                                     Text {
-                                        text: "bar shader style & icon set"
+                                        text: "bar surface material & icon set"
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeSm
-                                        font.weight: Font.Bold
+                                        font.weight: Theme.fontWeightBold
                                         color: Theme.on_surface
                                     }
 
@@ -1050,12 +1082,12 @@ PanelWindow {
                                         Repeater {
                                             model: [
                                                 { id: "glass", label: "glass" },
-                                                { id: "glass-frost", label: "frost" },
-                                                { id: "bento-floating", label: "bento" },
-                                                { id: "cyber-neon", label: "cyber-neon" },
-                                                { id: "accent-glow", label: "glow" },
-                                                { id: "pure-black", label: "oled black" },
-                                                { id: "regular", label: "solid" }
+                                                { id: "frosted", label: "frosted" },
+                                                { id: "islands", label: "islands" },
+                                                { id: "outlined", label: "outlined" },
+                                                { id: "tinted", label: "tinted" },
+                                                { id: "oled", label: "oled" },
+                                                { id: "solid", label: "solid" }
                                             ]
 
                                             delegate: Rectangle {
@@ -1074,8 +1106,9 @@ PanelWindow {
                                                     anchors.centerIn: parent
                                                     text: modelData.label
                                                     font.family: Theme.fontFamily
+                                                    font.variableAxes: Theme.sansAxes
                                                     font.pixelSize: Theme.fontSizeXs
-                                                    font.weight: isSel ? Font.Bold : Font.DemiBold
+                                                    font.weight: isSel ? Theme.fontWeightBold : Theme.fontWeightDemiBold
                                                     color: isSel ? Theme.on_primary : Theme.on_surface
                                                 }
 
@@ -1102,6 +1135,8 @@ PanelWindow {
                                         Text {
                                             text: "icons:"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.weight: Theme.fontWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.on_surface_variant
                                         }
@@ -1130,8 +1165,9 @@ PanelWindow {
                                                     anchors.centerIn: parent
                                                     text: modelData.label
                                                     font.family: Theme.fontFamily
+                                                    font.variableAxes: Theme.sansAxes
                                                     font.pixelSize: Theme.fontSizeXs
-                                                    font.weight: isSel ? Font.Bold : Font.DemiBold
+                                                    font.weight: isSel ? Theme.fontWeightBold : Theme.fontWeightDemiBold
                                                     color: isSel ? Theme.on_primary : Theme.on_surface
                                                 }
 
@@ -1192,8 +1228,9 @@ PanelWindow {
                                             Text {
                                                 text: "preferred config editor"
                                                 font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
                                                 font.pixelSize: Theme.fontSizeSm
-                                                font.weight: Font.Bold
+                                                font.weight: Theme.fontWeightBold
                                                 color: Theme.on_surface
                                             }
                                         }
@@ -1224,8 +1261,9 @@ PanelWindow {
                                                         anchors.centerIn: parent
                                                         text: modelData.label
                                                         font.family: Theme.fontMono
+                                                        font.variableAxes: Theme.monoAxes
                                                         font.pixelSize: Theme.fontSizeXs
-                                                        font.weight: isSel ? Font.Bold : Font.DemiBold
+                                                        font.weight: isSel ? Theme.monoWeightBold : Theme.monoWeightBold
                                                         color: isSel ? Theme.on_primary : Theme.on_surface
                                                     }
 
@@ -1245,6 +1283,8 @@ PanelWindow {
                                             wrapMode: Text.Wrap
                                             text: root.prefEditor === "nvim" ? "modal editing with treesitter & telescope" : "intuitive terminal editor with standard keybinds"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.weight: Theme.fontWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.on_surface_variant
                                         }
@@ -1278,8 +1318,9 @@ PanelWindow {
                                             Text {
                                                 text: "preferred file manager"
                                                 font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
                                                 font.pixelSize: Theme.fontSizeSm
-                                                font.weight: Font.Bold
+                                                font.weight: Theme.fontWeightBold
                                                 color: Theme.on_surface
                                             }
                                         }
@@ -1306,8 +1347,9 @@ PanelWindow {
                                                         anchors.centerIn: parent
                                                         text: modelData
                                                         font.family: Theme.fontMono
+                                                        font.variableAxes: Theme.monoAxes
                                                         font.pixelSize: Theme.fontSizeXs
-                                                        font.weight: isSel ? Font.Bold : Font.DemiBold
+                                                        font.weight: isSel ? Theme.monoWeightBold : Theme.monoWeightBold
                                                         color: isSel ? Theme.on_primary : Theme.on_surface
                                                     }
 
@@ -1327,6 +1369,8 @@ PanelWindow {
                                             wrapMode: Text.Wrap
                                             text: root.prefFm === "yazi" ? "blazing terminal file manager with image previews" : "native desktop graphical file explorer"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.weight: Theme.fontWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.on_surface_variant
                                         }
@@ -1361,8 +1405,9 @@ PanelWindow {
                                         Text {
                                             text: "hardware telemetry & thermal containment"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeSm
-                                            font.weight: Font.Bold
+                                            font.weight: Theme.fontWeightBold
                                             color: Theme.on_surface
                                         }
                                     }
@@ -1394,6 +1439,8 @@ PanelWindow {
                                                         Layout.alignment: Qt.AlignHCenter
                                                         text: modelData.title
                                                         font.family: Theme.fontMono
+                                                        font.variableAxes: Theme.monoAxes
+                                                        font.weight: Theme.monoWeightRegular
                                                         font.pixelSize: Theme.fontSizeXs
                                                         color: Theme.on_surface_variant
                                                     }
@@ -1401,8 +1448,9 @@ PanelWindow {
                                                         Layout.alignment: Qt.AlignHCenter
                                                         text: modelData.val
                                                         font.family: Theme.fontMono
+                                                        font.variableAxes: Theme.monoAxes
                                                         font.pixelSize: Theme.fontSizeXs
-                                                        font.weight: Font.Bold
+                                                        font.weight: Theme.monoWeightBold
                                                         color: Theme.primary
                                                     }
                                                 }
@@ -1445,8 +1493,9 @@ PanelWindow {
                                         Text {
                                             text: "core keybindings • click any row to test live"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeSm
-                                            font.weight: Font.Bold
+                                            font.weight: Theme.fontWeightBold
                                             color: Theme.on_surface
                                         }
                                     }
@@ -1497,8 +1546,9 @@ PanelWindow {
                                                             anchors.centerIn: parent
                                                             text: modelData.bind
                                                             font.family: Theme.fontMono
+                                                            font.variableAxes: Theme.monoAxes
                                                             font.pixelSize: Theme.fontSizeXs
-                                                            font.weight: Font.Bold
+                                                            font.weight: Theme.monoWeightBold
                                                             color: Theme.primary
                                                         }
                                                     }
@@ -1509,13 +1559,16 @@ PanelWindow {
                                                         Text {
                                                             text: modelData.desc
                                                             font.family: Theme.fontFamily
+                                                            font.variableAxes: Theme.sansAxes
                                                             font.pixelSize: Theme.fontSizeSm
-                                                            font.weight: Font.Bold
+                                                            font.weight: Theme.fontWeightBold
                                                             color: Theme.on_surface
                                                         }
                                                         Text {
                                                             text: modelData.note
                                                             font.family: Theme.fontFamily
+                                                            font.variableAxes: Theme.sansAxes
+                                                            font.weight: Theme.fontWeightRegular
                                                             font.pixelSize: Theme.fontSizeXs
                                                             color: Theme.on_surface_variant
                                                             elide: Text.ElideRight
@@ -1536,8 +1589,9 @@ PanelWindow {
                                                             anchors.centerIn: parent
                                                             text: "test"
                                                             font.family: Theme.fontMono
+                                                            font.variableAxes: Theme.monoAxes
                                                             font.pixelSize: Theme.fontSizeXs
-                                                            font.weight: Font.Bold
+                                                            font.weight: Theme.monoWeightBold
                                                             color: testMouse.containsMouse ? Theme.on_primary : Theme.primary
                                                         }
                                                     }
@@ -1580,6 +1634,8 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 text: "home-row window navigation: SUPER + I (up), SUPER + K (down), SUPER + J (left), SUPER + L (right)"
                                                 font.family: Theme.fontMono
+                                                font.variableAxes: Theme.monoAxes
+                                                font.weight: Theme.monoWeightRegular
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: Theme.on_surface_variant
                                                 elide: Text.ElideRight
@@ -1622,8 +1678,9 @@ PanelWindow {
                                         Text {
                                             text: "launchpad • 4 terminal commands to rule the desktop"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeSm
-                                            font.weight: Font.Bold
+                                            font.weight: Theme.fontWeightBold
                                             color: Theme.on_surface
                                         }
                                     }
@@ -1670,8 +1727,9 @@ PanelWindow {
                                                             anchors.centerIn: parent
                                                             text: modelData.cmd
                                                             font.family: Theme.fontMono
+                                                            font.variableAxes: Theme.monoAxes
                                                             font.pixelSize: Theme.fontSizeSm
-                                                            font.weight: Font.Bold
+                                                            font.weight: Theme.monoWeightBold
                                                             color: Theme.primary
                                                         }
                                                     }
@@ -1682,13 +1740,16 @@ PanelWindow {
                                                         Text {
                                                             text: modelData.title
                                                             font.family: Theme.fontFamily
+                                                            font.variableAxes: Theme.sansAxes
                                                             font.pixelSize: Theme.fontSizeSm
-                                                            font.weight: Font.Bold
+                                                            font.weight: Theme.fontWeightBold
                                                             color: Theme.on_surface
                                                         }
                                                         Text {
                                                             text: modelData.desc
                                                             font.family: Theme.fontFamily
+                                                            font.variableAxes: Theme.sansAxes
+                                                            font.weight: Theme.fontWeightRegular
                                                             font.pixelSize: Theme.fontSizeXs
                                                             color: Theme.on_surface_variant
                                                             elide: Text.ElideRight
@@ -1724,8 +1785,9 @@ PanelWindow {
                                             Text {
                                                 text: "lock configuration & engage desktop"
                                                 font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
                                                 font.pixelSize: Theme.fontSizeSm
-                                                font.weight: Font.Bold
+                                                font.weight: Theme.fontWeightBold
                                                 color: Theme.on_primary
                                             }
                                         }
@@ -1774,8 +1836,9 @@ PanelWindow {
                             Text {
                                 text: "previous"
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeXs
-                                font.weight: Font.DemiBold
+                                font.weight: Theme.fontWeightDemiBold
                                 color: Theme.on_surface
                             }
                         }
@@ -1792,6 +1855,8 @@ PanelWindow {
                     Text {
                         text: Theme.kaoCozy + " arrow keys (←/→) or enter to navigate"
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
+                        font.weight: Theme.monoWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface_variant
                     }
@@ -1813,8 +1878,9 @@ PanelWindow {
                             Text {
                                 text: root.currentStep === root.totalSteps - 1 ? "finish & launch" : "next step"
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeXs
-                                font.weight: Font.Bold
+                                font.weight: Theme.fontWeightBold
                                 color: Theme.on_primary
                             }
                             Text {

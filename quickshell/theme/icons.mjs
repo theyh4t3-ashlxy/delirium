@@ -21,7 +21,10 @@ export const KAOMOJI_MAP = Object.freeze({
     "chevronRight": ">", "chevronLeft": "<", "chevronDown": "v", "chevronUp": "^", "flame": "(ง •̀_•́)ง",
     "sparkles": "( ✧ω✧ )", "radio": "( ~˘▾˘)~", "sliders": "( ˘_˘ )", "terminal": "( ¬‿¬ )", "calendar": "( ˘▾˘ )",
     "history": "( ◔_◔ )", "copy": "(っ•̀ᴗ•́)っ", "externalLink": "( ☞ﾟヮﾟ)☞", "signal": "( •̀ᴗ•́ )", "filter": "( ¬_¬ )",
-    "user": "( •‿• )", "shield": "(ง •̀_•́)ง", "expand": "( ⊙_⊙ )", "collapse": "( >_< )", "keyboard": "φ(•̀ᴗ•́ )"
+    "user": "( •‿• )", "shield": "(ง •̀_•́)ง", "expand": "( ⊙_⊙ )", "collapse": "( >_< )", "keyboard": "φ(•̀ᴗ•́ )",
+    "undo": "( ↺_↺ )", "redo": "( ↻_↻ )", "brush": "φ(．．)", "highlight": "( ✧_✧ )", "arrow": "↗",
+    "rect": "[ ]", "circle": "( )", "blur": "( ░_░ )", "step": "(1)", "eyedropper": "( ◉_◉ )",
+    "zoom": "( ⊙_⊙ )", "frame": "[✧]", "text": "[Aa]"
 });
 
 export const TEXT_MAP = Object.freeze({
@@ -44,7 +47,10 @@ export const TEXT_MAP = Object.freeze({
     "chevronRight": ">", "chevronLeft": "<", "chevronDown": "v", "chevronUp": "^", "flame": "chaos",
     "sparkles": "magic", "radio": "radio", "sliders": "opts", "terminal": "term", "calendar": "cal",
     "history": "hist", "copy": "copy", "externalLink": "open", "signal": "sig", "filter": "filter",
-    "user": "user", "shield": "safe", "expand": "max", "collapse": "min", "keyboard": "keys"
+    "user": "user", "shield": "safe", "expand": "max", "collapse": "min", "keyboard": "keys",
+    "undo": "undo", "redo": "redo", "brush": "pen", "highlight": "mark", "arrow": "arr",
+    "rect": "box", "circle": "oval", "blur": "blur", "step": "123", "eyedropper": "pick",
+    "zoom": "zoom", "frame": "card", "text": "text"
 });
 
 export const KAO_FIRE = "(ง •̀_•́)ง";

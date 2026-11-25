@@ -147,9 +147,15 @@ Scope {
         return Theme.fontDisplay;
     }
 
+    function resolvedClockAxes(px: real): var {
+        if (clockFont === "mono") return Theme.monoAxesFor(px);
+        if (clockFont === "serif") return ({});
+        return Theme.textAxesFor(px, clockFont !== "sans");
+    }
+
     readonly property int resolvedClockWeight: {
-        if (clockWeight === "light") return Font.Light;
-        if (clockWeight === "black") return Font.Black;
+        if (clockWeight === "light") return Theme.fontWeightLight;
+        if (clockWeight === "black") return Math.min(900, Theme.fontWeightBold + 150);
         return Theme.fontWeightBold;
     }
 
@@ -1874,8 +1880,9 @@ Scope {
                                 Text {
                                     text: lockRoot.fmtText("drag stage (snaps to 50%) • double-click to center")
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Theme.fontWeightBold
+                                    font.weight: Theme.monoWeightBold
                                     color: stageDragMouse.pressed ? lockRoot.uiOnAccent : lockRoot.uiTextPrimary
                                 }
                             }

@@ -196,8 +196,9 @@ BarPill {
             anchors.verticalCenter: parent.verticalCenter
             text: String(root.pinEntries.length)
             font.family: Theme.fontMono
+            font.variableAxes: Theme.monoAxes
             font.pixelSize: 10
-            font.weight: Font.Bold
+            font.weight: Theme.monoWeightBold
             color: popup.open ? Theme.primary : Theme.on_surface_variant
         }
     }
@@ -299,8 +300,9 @@ BarPill {
                 Text {
                     text: "clipboard"
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.titleAxes
                     font.pixelSize: Theme.fontSizeLg
-                    font.weight: Font.Bold
+                    font.weight: Theme.fontWeightBold
                     color: Theme.on_surface
                 }
 
@@ -319,6 +321,8 @@ BarPill {
                             ? "copied to clipboard"
                             : (root.visibleEntries.length + " items" + (root.pinEntries.length > 0 ? (" • " + root.pinEntries.length + " pinned") : ""))
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
+                        font.weight: Theme.monoWeightRegular
                         font.pixelSize: 10
                         color: root.copiedFeedback ? Theme.primary : Theme.on_surface_variant
                     }
@@ -383,6 +387,8 @@ BarPill {
                         Layout.fillHeight: true
                         verticalAlignment: TextInput.AlignVCenter
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeSm
                         color: Theme.on_surface
                         selectionColor: Theme.primary_container
@@ -472,8 +478,9 @@ BarPill {
                             anchors.centerIn: parent
                             text: modelData.label
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: 11
-                            font.weight: isCur ? Font.Bold : Font.Medium
+                            font.weight: isCur ? Theme.fontWeightBold : Theme.fontWeightMedium
                             color: isCur ? Theme.on_primary : Theme.on_surface_variant
                         }
 
@@ -564,8 +571,9 @@ BarPill {
                                             ? ("pin • " + clipDelegate.modelData.kind)
                                             : clipDelegate.modelData.kind
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: 9
-                                        font.weight: Font.Bold
+                                        font.weight: Theme.monoWeightBold
                                         color: clipDelegate.modelData.pinned ? Theme.on_primary : Theme.on_surface_variant
                                     }
                                 }
@@ -574,6 +582,8 @@ BarPill {
                                     visible: clipDelegate.modelData.meta !== "" && clipDelegate.modelData.kind === "image"
                                     text: clipDelegate.modelData.meta
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.weight: Theme.monoWeightRegular
                                     font.pixelSize: 10
                                     color: Theme.on_surface_variant
                                     elide: Text.ElideRight
@@ -589,6 +599,8 @@ BarPill {
                                     visible: cMouse.containsMouse
                                     text: "copy"
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.weight: Theme.fontWeightRegular
                                     font.pixelSize: 10
                                     color: Theme.primary
                                 }
@@ -695,6 +707,8 @@ BarPill {
                                 visible: !clipDelegate.isImage
                                 text: clipDelegate.modelData.preview
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: clipDelegate.isSelected ? Theme.primary : Theme.on_surface
                                 wrapMode: Text.WrapAnywhere
@@ -718,6 +732,8 @@ BarPill {
                 Text {
                     text: Theme.iconClipboard + "\n" + (root.searchFilter.length > 0 ? "no matching clips" : "clipboard history is empty")
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: Theme.fontSizeMd
                     color: Theme.on_surface_variant
                     horizontalAlignment: Text.AlignHCenter

@@ -14,12 +14,12 @@ Item {
     property string cornerStyle: (typeof Settings !== "undefined" ? Settings?.cornerStyle : null) ?? "cubic"
 
     readonly property bool hasThemeStroke: (typeof Theme !== "undefined") && (
-        (Theme?.isCyberNeon ?? false) || (Theme?.isAccentGlow ?? false) || (Theme?.isGlass ?? false) || (Theme?.isPureBlack ?? false)
+        (Theme?.isOutlined ?? false) || (Theme?.isTinted ?? false) || (Theme?.isGlass ?? false) || (Theme?.isOled ?? false)
     )
     property bool showBorder: ((typeof Theme !== "undefined" && Theme?.scoopBorderEnabled) ?? false) || hasThemeStroke
     property real borderWidth: {
         if (typeof Theme !== "undefined" && (Theme?.scoopBorderWidth ?? 0) > 0) return Theme.scoopBorderWidth;
-        if (typeof Theme !== "undefined" && ((Theme?.isCyberNeon ?? false) || (Theme?.isAccentGlow ?? false))) return 2;
+        if (typeof Theme !== "undefined" && ((Theme?.isOutlined ?? false) || (Theme?.isTinted ?? false))) return 2;
         if (hasThemeStroke) return 1;
         return 0;
     }
@@ -28,9 +28,9 @@ Item {
             return Theme.scoopBorderColor;
         }
         if (typeof Theme !== "undefined") {
-            if ((Theme?.isCyberNeon ?? false) || (Theme?.isAccentGlow ?? false)) return Theme.alpha(Theme.primary, 0.85);
+            if ((Theme?.isOutlined ?? false) || (Theme?.isTinted ?? false)) return Theme.alpha(Theme.primary, 0.85);
             if (Theme?.isGlass ?? false) return Theme?.glassHighlight ?? Qt.rgba(1, 1, 1, 0.22);
-            if (Theme?.isPureBlack ?? false) return Theme.barBorderColor;
+            if (Theme?.isOled ?? false) return Theme.barBorderColor;
         }
         return "transparent";
     }

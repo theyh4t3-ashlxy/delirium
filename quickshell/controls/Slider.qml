@@ -65,6 +65,7 @@ Item {
                 visible: root.label !== ""
                 text: root.label
                 font.family: Theme.fontSans
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: Theme.fontSizeSm
                 font.weight: Theme.fontWeightMedium
                 color: Theme.on_surface
@@ -91,8 +92,9 @@ Item {
                         return v.toFixed(1) + root.unit;
                     }
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
                     font.pixelSize: Theme.fontSizeXs
-                    font.weight: Theme.fontWeightDemiBold
+                    font.weight: Theme.monoWeightBold
                     color: mouseArea.pressed ? Theme.on_primary_container : Theme.on_surface
                 }
             }

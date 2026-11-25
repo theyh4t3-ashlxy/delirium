@@ -1,8 +1,10 @@
-// QuickSettings.qml
+// QuickSettings.qml — global appearance (popups, screen frame, typography), behavior, keybinds & system
 import QtQuick
 import QtQuick.Layouts
 import ".."
 import "../controls"
+import "../theme/styleEngine.mjs" as StyleEngine
+import "../theme/confFormat.mjs" as ConfFmt
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
@@ -11,7 +13,7 @@ import Quickshell.Hyprland
 BarPill {
     id: root
 
-    readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
+    readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isIslands
     readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
 
     active: popup.open
@@ -25,13 +27,33 @@ BarPill {
 
     Behavior on implicitWidth { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
 
-    property string activeTab: "layout"
+    property string activeTab: "style"
     property string fontTarget: "sans"
     property string fontSearchQuery: ""
+    property bool variableFontsOnly: false
     property bool showResetConfirm: false
     property string activeShell: "quickshell"
     property bool fontsLoaded: false
     property var allFonts: []
+    property var fontMetaMap: ({})
+
+    readonly property var _mergedSansSpec: {
+        let a = Theme.sansVarAxes || ({});
+        let d = Theme.displayVarAxes || ({});
+        return Object.assign({}, d, a);
+    }
+    readonly property bool hasWdthAxis: _mergedSansSpec.wdth !== undefined
+    readonly property bool hasRondAxis: _mergedSansSpec.ROND !== undefined
+    readonly property bool hasSlantAxis: _mergedSansSpec.slnt !== undefined
+    readonly property bool hasOpszAxis: _mergedSansSpec.opsz !== undefined
+    readonly property bool hasMonoWghtAxis: (Theme.monoVarAxes || ({})).wght !== undefined
+    readonly property bool hasMonoWdthAxis: (Theme.monoVarAxes || ({})).wdth !== undefined
+
+    function axisLabelSummary(spec) {
+        if (!spec) return "static";
+        let keys = Object.keys(spec);
+        return keys.length > 0 ? keys.join(" · ") : "static";
+    }
 
     readonly property string userHome: Quickshell.env("HOME") || ""
     readonly property string cacheDir: Quickshell.env("XDG_CACHE_HOME") || (userHome + "/.cache")
@@ -41,7 +63,14 @@ BarPill {
         if (Settings?.save) Settings.save();
     }
 
-    // only query system fonts when the user actually opens the appearance tab
+    function fmtIdleSecs(sec) {
+        const s = Math.max(0, Math.round(sec));
+        if (s < 60) return s + "s";
+        const m = Math.floor(s / 60);
+        const rem = s % 60;
+        return rem === 0 ? (m + "m") : (m + "m " + rem + "s");
+    }
+
     function ensureFontsLoaded() {
         if (root.fontsLoaded) return;
         root.fontsLoaded = true;
@@ -52,6 +81,38 @@ BarPill {
             }
         } catch (e) {
             root.allFonts = [];
+        }
+        if (fontMetaProc.running) fontMetaProc.running = false;
+        fontMetaProc.running = true;
+    }
+
+    Process {
+        id: fontMetaProc
+        command: ["python3", Theme.fontsScriptPath, "list"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const recs = ConfFmt.parseRecords(text || "", "font");
+                if (!recs || recs.length === 0) return;
+                let map = {};
+                for (let i = 0; i < recs.length; i++) {
+                    let r = recs[i];
+                    if (!r || !r.family) continue;
+                    let axesStr = r.axes || "";
+                    let tags = [];
+                    if (axesStr) {
+                        let parts = axesStr.split(";");
+                        for (let j = 0; j < parts.length; j++) {
+                            let tag = parts[j].split(":")[0];
+                            if (tag) tags.push(tag);
+                        }
+                    }
+                    map[r.family.trim().toLowerCase()] = {
+                        isVar: r.isVar === "true" && tags.length > 0,
+                        tags: tags.join(" ")
+                    };
+                }
+                root.fontMetaMap = map;
+            }
         }
     }
 
@@ -64,7 +125,6 @@ BarPill {
         || Settings.iconSet === "sharp"
 
     readonly property string activeTabTitle: ({
-        layout: "bar & geometry",
         style: "appearance",
         behavior: "behavior",
         keybinds: "keybinds",
@@ -72,17 +132,15 @@ BarPill {
     })[root.activeTab] || "settings"
 
     readonly property string activeTabSubtitle: ({
-        layout: "bar dimensions, floating islands, and studio launcher",
-        style: "materials, concave scoops, and typography",
-        behavior: "clock formats, idle timing, and motion physics",
+        style: "popups, screen frame, typography, and icons",
+        behavior: "flyouts, audio & alerts, idle timers, and flavor",
         keybinds: "view and manage your shell shortcuts",
         advanced: "shell profiles, network aliases, and recovery"
     })[root.activeTab] || ""
 
     onActiveTabChanged: {
         if (root.activeTab === "style") root.ensureFontsLoaded();
-        if (root.activeTab === "layout" && flickLayout) flickLayout.contentY = 0;
-        else if (root.activeTab === "style" && flickStyle) flickStyle.contentY = 0;
+        if (root.activeTab === "style" && flickStyle) flickStyle.contentY = 0;
         else if (root.activeTab === "behavior" && flickBehavior) flickBehavior.contentY = 0;
         else if (root.activeTab === "advanced" && flickAdvanced) flickAdvanced.contentY = 0;
     }
@@ -119,9 +177,18 @@ BarPill {
     }
 
     readonly property var filteredFonts: {
-        if (!fontSearchQuery || fontSearchQuery.trim() === "") return allFonts;
-        const q = fontSearchQuery.trim().toLowerCase();
-        return allFonts.filter(f => f && f.toLowerCase().includes(q));
+        const q = (fontSearchQuery || "").trim().toLowerCase();
+        const varOnly = root.variableFontsOnly;
+        const meta = root.fontMetaMap;
+        return allFonts.filter(f => {
+            if (!f) return false;
+            if (q && !f.toLowerCase().includes(q)) return false;
+            if (varOnly) {
+                const m = meta[f.toLowerCase()];
+                if (!m || !m.isVar) return false;
+            }
+            return true;
+        });
     }
 
     function isTargetMonitorActive() {
@@ -146,539 +213,7 @@ BarPill {
         }
     }
 
-    component CategoryHeader: ColumnLayout {
-        id: catHdr
-        property string title: ""
-        property string icon: ""
-        property string subtitle: ""
-
-        Layout.fillWidth: true
-        Layout.topMargin: 8
-        Layout.bottomMargin: 2
-        spacing: 3
-
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
-
-            Rectangle {
-                visible: catHdr.icon !== ""
-                width: 24
-                height: 24
-                radius: Theme.radiusSm
-                color: Theme.primary_overlay
-                border.color: Theme.alpha(Theme.primary, 0.35)
-                border.width: 1
-
-                Text {
-                    anchors.centerIn: parent
-                    text: catHdr.icon
-                    font.family: Theme.fontIcon
-                    font.variableAxes: Theme.iconAxes
-                    font.pixelSize: Theme.fontSizeXs
-                    color: Theme.primary
-                }
-            }
-
-            Text {
-                text: catHdr.title
-                font.family: Theme.fontDisplay
-                font.pixelSize: Theme.fontSizeSm
-                font.weight: Theme.fontWeightBold
-                color: Theme.textPrimary
-                Layout.alignment: Qt.AlignVCenter
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Theme.widgetBorder
-                Layout.alignment: Qt.AlignVCenter
-            }
-        }
-
-        Text {
-            visible: catHdr.subtitle !== ""
-            text: catHdr.subtitle
-            Layout.leftMargin: catHdr.icon !== "" ? 32 : 0
-            Layout.fillWidth: true
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeXs
-            color: Theme.textSecondary
-            wrapMode: Text.Wrap
-        }
-    }
-
-    component SettingCard: Rectangle {
-        default property alias content: cardCol.data
-        Layout.fillWidth: true
-        width: parent ? parent.width : undefined
-        implicitHeight: cardCol.implicitHeight + (Theme.widgetPaddingV * 2) + 12
-        radius: Theme.radiusMd
-        color: Theme.cardBg
-        border.color: Theme.cardBorder
-        border.width: Theme.popupBorderWidth
-        clip: true
-
-        Rectangle {
-            visible: Theme.isGlass
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            color: Theme.glassHighlight
-        }
-
-        Column {
-            id: cardCol
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.leftMargin: Theme.widgetPaddingH + 2
-            anchors.rightMargin: Theme.widgetPaddingH + 2
-            anchors.topMargin: Theme.widgetPaddingV + 6
-            spacing: 6
-        }
-    }
-
-    component RowDivider: Rectangle {
-        width: parent ? parent.width - 12 : 0
-        anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
-        height: 1
-        color: Theme.widgetBorder
-    }
-
-    component ToggleRow: Rectangle {
-        id: trRoot
-        property string icon: ""
-        property string title: ""
-        property string subtitle: ""
-        property bool checked: false
-        signal toggled()
-
-        width: parent ? parent.width : 0
-        implicitHeight: subtitle !== "" ? 46 : 36
-        height: implicitHeight
-        radius: Theme.radiusSm
-        color: trMouse.containsMouse ? Theme.widgetHover : "transparent"
-
-        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-        Rectangle {
-            id: trIcon
-            visible: trRoot.icon !== ""
-            anchors.left: parent.left
-            anchors.leftMargin: 6
-            anchors.verticalCenter: parent.verticalCenter
-            width: 28
-            height: 28
-            radius: Theme.radiusSm
-            color: trRoot.checked ? Theme.primary_overlay : Theme.widgetBg
-            border.color: trRoot.checked ? Theme.alpha(Theme.primary, 0.4) : Theme.widgetBorder
-            border.width: 1
-
-            Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-            Text {
-                anchors.centerIn: parent
-                text: trRoot.icon
-                font.family: Theme.fontIcon
-                font.variableAxes: Theme.iconAxes
-                font.pixelSize: Theme.fontSizeXs
-                color: trRoot.checked ? Theme.primary : Theme.textSecondary
-            }
-        }
-
-        ToggleSwitch {
-            id: trSwitch
-            anchors.right: parent.right
-            anchors.rightMargin: 6
-            anchors.verticalCenter: parent.verticalCenter
-            enabled: false
-            checked: trRoot.checked
-
-            Binding {
-                target: trSwitch
-                property: "checked"
-                value: trRoot.checked
-            }
-        }
-
-        Column {
-            anchors.left: trIcon.visible ? trIcon.right : parent.left
-            anchors.leftMargin: trIcon.visible ? 10 : 6
-            anchors.right: trSwitch.left
-            anchors.rightMargin: 12
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 1
-
-            Text {
-                width: parent.width
-                text: trRoot.title
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeSm
-                font.weight: trRoot.checked ? Theme.fontWeightDemiBold : Theme.fontWeightMedium
-                color: Theme.textPrimary
-                elide: Text.ElideRight
-            }
-
-            Text {
-                visible: trRoot.subtitle !== ""
-                width: parent.width
-                text: trRoot.subtitle
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeXs
-                color: Theme.textSecondary
-                elide: Text.ElideRight
-            }
-        }
-
-        MouseArea {
-            id: trMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: trRoot.toggled()
-        }
-    }
-
-    component ChoiceRow: ColumnLayout {
-        id: crRoot
-        property string title: ""
-        property var model: []
-        property var currentValue
-        property int buttonHeight: 28
-        signal selected(var value)
-
-        width: parent ? parent.width : 0
-        implicitWidth: width
-        Layout.fillWidth: true
-        spacing: 5
-
-        Text {
-            visible: crRoot.title !== ""
-            text: crRoot.title
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeXs
-            font.weight: Theme.fontWeightDemiBold
-            color: Theme.textSecondary
-        }
-
-        GridLayout {
-            Layout.fillWidth: true
-            columns: crRoot.model.length >= 6 ? 3 : Math.max(1, crRoot.model.length)
-            columnSpacing: 5
-            rowSpacing: 5
-
-            Repeater {
-                model: crRoot.model
-
-                delegate: Rectangle {
-                    required property var modelData
-                    readonly property var itemVal: modelData && typeof modelData === "object"
-                        ? (modelData.value !== undefined ? modelData.value : modelData)
-                        : modelData
-                    readonly property string itemText: modelData && typeof modelData === "object" && modelData.label !== undefined
-                        ? String(modelData.label)
-                        : (typeof modelData === "number" ? (modelData === 0 ? "none" : modelData + "px") : String(modelData || ""))
-                    readonly property bool isSelected: (typeof crRoot.currentValue === "number" && typeof itemVal === "number" && !Number.isInteger(itemVal))
-                        ? Math.abs(crRoot.currentValue - itemVal) < 0.04
-                        : crRoot.currentValue === itemVal
-
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: crRoot.buttonHeight
-                    radius: isSelected ? Theme.radiusMd : Theme.radiusPill
-                    color: isSelected
-                        ? Theme.primary_overlay
-                        : (crMouse.pressed ? Theme.widgetActive : (crMouse.containsMouse ? Theme.widgetHover : Theme.widgetBg))
-                    border.color: isSelected
-                        ? Theme.alpha(Theme.primary, 0.65)
-                        : (crMouse.containsMouse ? Theme.alpha(Theme.primary, 0.35) : Theme.widgetBorder)
-                    border.width: 1
-
-                    Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-                    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        width: Math.min(implicitWidth, Math.max(0, parent.width - 10))
-                        text: itemText
-                        horizontalAlignment: Text.AlignHCenter
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        font.weight: isSelected ? Theme.fontWeightBold : Theme.fontWeightMedium
-                        color: isSelected ? Theme.primary : Theme.textSecondary
-                        elide: Text.ElideRight
-                    }
-
-                    MouseArea {
-                        id: crMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            crRoot.selected(itemVal);
-                            root.saveSettings();
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    component SliderRow: ColumnLayout {
-        id: slRoot
-        property string title: ""
-        property real from: 0
-        property real to: 100
-        property real value: 0
-        property real stepSize: 1
-        property string suffix: "px"
-        property var formatter: null
-        signal moved(real val)
-
-        width: parent ? parent.width : 0
-        implicitWidth: width
-        Layout.fillWidth: true
-        spacing: 5
-
-        readonly property string displayText: slRoot.formatter
-            ? slRoot.formatter(slRoot.value)
-            : ((Math.round(slRoot.value * 100) / 100) + slRoot.suffix)
-
-        readonly property real ratio: slRoot.to > slRoot.from
-            ? Math.max(0.0, Math.min(1.0, (slRoot.value - slRoot.from) / (slRoot.to - slRoot.from)))
-            : 0.0
-
-        function commitRatio(r) {
-            const t = Math.max(0.0, Math.min(1.0, r));
-            let raw = slRoot.from + t * (slRoot.to - slRoot.from);
-            if (slRoot.stepSize > 0) raw = Math.round(raw / slRoot.stepSize) * slRoot.stepSize;
-            raw = Math.max(slRoot.from, Math.min(slRoot.to, raw));
-            if (Math.abs(raw - slRoot.value) > 1e-6) {
-                slRoot.moved(raw);
-                root.saveSettings();
-            }
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 6
-
-            Text {
-                visible: slRoot.title !== ""
-                text: slRoot.title
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeXs
-                font.weight: Theme.fontWeightDemiBold
-                color: Theme.textSecondary
-                Layout.fillWidth: true
-            }
-
-            Rectangle {
-                height: 18
-                implicitWidth: valBadge.implicitWidth + 10
-                radius: Theme.radiusPill
-                color: dragArea.pressed ? Theme.primary_overlay : Theme.widgetBg
-                border.color: dragArea.pressed ? Theme.alpha(Theme.primary, 0.5) : Theme.widgetBorder
-                border.width: 1
-
-                Text {
-                    id: valBadge
-                    anchors.centerIn: parent
-                    text: slRoot.displayText
-                    font.family: Theme.fontMono
-                    font.pixelSize: Theme.fontSizeXs
-                    font.weight: Theme.fontWeightBold
-                    color: Theme.primary
-                }
-            }
-        }
-
-        Item {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 20
-
-            Rectangle {
-                id: track
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                height: dragArea.pressed ? 14 : (dragArea.containsMouse ? 11 : 8)
-                radius: Theme.radiusPill
-                color: Theme.widgetBg
-                border.color: dragArea.containsMouse ? Theme.alpha(Theme.primary, 0.35) : Theme.widgetBorder
-                border.width: 1
-
-                Behavior on height { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
-
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    width: Math.max(parent.height, parent.width * slRoot.ratio)
-                    radius: Theme.radiusPill
-                    color: dragArea.pressed
-                        ? Theme.statePress(Theme.primary, Theme.on_primary)
-                        : (dragArea.containsMouse ? Theme.stateHover(Theme.primary, Theme.on_primary) : Theme.primary)
-
-                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-                }
-            }
-
-            Rectangle {
-                width: dragArea.pressed ? 6 : 4
-                height: dragArea.pressed ? 20 : (dragArea.containsMouse ? 17 : 14)
-                radius: Theme.radiusPill
-                color: Theme.on_surface
-                anchors.verticalCenter: parent.verticalCenter
-                x: Math.max(0, Math.min(parent.width - width, (parent.width * slRoot.ratio) - (width / 2)))
-
-                Behavior on width { NumberAnimation { duration: Theme.animFast } }
-                Behavior on height { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animExpressiveEasing } }
-            }
-
-            MouseArea {
-                id: dragArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                preventStealing: true
-
-                onPressed: (mouse) => slRoot.commitRatio(mouse.x / width)
-                onPositionChanged: (mouse) => {
-                    if (pressed) slRoot.commitRatio(mouse.x / width);
-                }
-                onWheel: (wheel) => {
-                    let dir = wheel.angleDelta.y > 0 ? 1 : -1;
-                    let step = slRoot.stepSize > 0 ? slRoot.stepSize : ((slRoot.to - slRoot.from) * 0.05);
-                    let next = Math.max(slRoot.from, Math.min(slRoot.to, slRoot.value + dir * step));
-                    if (Math.abs(next - slRoot.value) > 1e-6) {
-                        slRoot.moved(next);
-                        root.saveSettings();
-                    }
-                }
-            }
-        }
-    }
-
-    component ChoiceGrid: ColumnLayout {
-        id: cgRoot
-        property string title: ""
-        property int columns: 2
-        property var model: []
-        property var currentValue
-        property int buttonHeight: 28
-        signal selected(var value)
-
-        width: parent ? parent.width : 0
-        implicitWidth: width
-        Layout.fillWidth: true
-        spacing: 5
-
-        Text {
-            visible: cgRoot.title !== ""
-            text: cgRoot.title
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeXs
-            font.weight: Theme.fontWeightDemiBold
-            color: Theme.textSecondary
-        }
-
-        Grid {
-            id: choiceGrid
-            width: parent.width
-            Layout.fillWidth: true
-            columns: Math.max(1, cgRoot.columns)
-            rowSpacing: 6
-            columnSpacing: 6
-
-            Repeater {
-                model: cgRoot.model
-
-                delegate: Rectangle {
-                    required property var modelData
-                    readonly property var itemVal: modelData && typeof modelData === "object"
-                        ? (modelData.value !== undefined ? modelData.value : (modelData.id !== undefined ? modelData.id : modelData))
-                        : modelData
-                    readonly property string itemText: modelData && typeof modelData === "object" && modelData.label !== undefined
-                        ? String(modelData.label)
-                        : String(modelData || "")
-                    readonly property bool isSelected: (typeof cgRoot.currentValue === "number" && typeof itemVal === "number" && !Number.isInteger(itemVal))
-                        ? Math.abs(cgRoot.currentValue - itemVal) < 0.04
-                        : cgRoot.currentValue === itemVal
-
-                    width: Math.max(1, (choiceGrid.width - choiceGrid.columnSpacing * (choiceGrid.columns - 1)) / choiceGrid.columns)
-                    height: cgRoot.buttonHeight
-                    radius: isSelected ? Theme.radiusMd : Theme.radiusSm
-                    color: isSelected
-                        ? Theme.primary_overlay
-                        : (cgMouse.containsMouse ? Theme.widgetHover : Theme.widgetBg)
-                    border.color: isSelected
-                        ? Theme.alpha(Theme.primary, 0.65)
-                        : (cgMouse.containsMouse ? Theme.alpha(Theme.primary, 0.35) : Theme.widgetBorder)
-                    border.width: 1
-
-                    Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
-                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-                    Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                    Text {
-                        anchors.fill: parent
-                        anchors.leftMargin: 8
-                        anchors.rightMargin: 8
-                        verticalAlignment: Text.AlignVCenter
-                        horizontalAlignment: Text.AlignHCenter
-                        text: itemText
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        font.weight: isSelected ? Theme.fontWeightBold : Theme.fontWeightMedium
-                        color: isSelected ? Theme.primary : Theme.textSecondary
-                        elide: Text.ElideRight
-                    }
-
-                    MouseArea {
-                        id: cgMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            cgRoot.selected(itemVal);
-                            root.saveSettings();
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    component TabScrollTrack: Rectangle {
-        id: stRoot
-        required property Flickable target
-        anchors.right: target ? target.right : undefined
-        anchors.top: target ? target.top : undefined
-        anchors.bottom: target ? target.bottom : undefined
-        anchors.margins: 2
-        width: 4
-        radius: 2
-        color: "transparent"
-        visible: target ? (target.visible && target.visibleArea.heightRatio < 1.0) : false
-
-        Rectangle {
-            width: parent.width
-            readonly property real trackH: stRoot.height
-            readonly property real thumbH: Math.max(20, Math.min(trackH, (stRoot.target ? stRoot.target.visibleArea.heightRatio : 1) * trackH))
-            height: thumbH
-            y: Math.max(0, Math.min(trackH - thumbH, (stRoot.target ? stRoot.target.visibleArea.yPosition : 0) * trackH))
-            radius: 2
-            color: Theme.primary
-            opacity: 0.75
-        }
-    }
-
-    // bar pill content (expands on hover like ScreenCapture, Bluetooth, and NetworkStatus)
+    // bar pill content
     Row {
         id: qsRow
         anchors.centerIn: parent
@@ -700,8 +235,9 @@ BarPill {
             visible: !Theme.isVertical && (qsMouse.containsMouse || popup.open)
             text: "settings"
             font.family: Theme.fontFamily
+            font.variableAxes: Theme.sansAxes
             font.pixelSize: Theme.fontSizeSm
-            font.weight: Font.Medium
+            font.weight: Theme.fontWeightMedium
             color: Theme.textPrimary
         }
     }
@@ -807,7 +343,7 @@ BarPill {
             // top header
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 10
+                spacing: 8
 
                 Rectangle {
                     width: 36
@@ -832,8 +368,9 @@ BarPill {
                     spacing: 1
 
                     Text {
-                        text: "settings & studio"
+                        text: "settings"
                         font.family: Theme.fontDisplay
+                        font.variableAxes: Theme.displayAxes
                         font.pixelSize: Theme.fontSizeMd
                         font.weight: Theme.fontWeightBold
                         color: Theme.textPrimary
@@ -842,6 +379,8 @@ BarPill {
                     Text {
                         text: root.activeTabTitle + "  •  " + root.activeTabSubtitle
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.textSecondary
                         elide: Text.ElideRight
@@ -849,34 +388,51 @@ BarPill {
                     }
                 }
 
+                // jump straight to Bar Layout Studio
                 Rectangle {
-                    height: 22
-                    implicitWidth: saveBadgeRow.implicitWidth + 14
+                    height: 26
+                    implicitWidth: studioLinkRow.implicitWidth + 14
                     radius: Theme.radiusPill
-                    color: Theme.primary_overlay
+                    color: studioLinkMouse.containsMouse ? Theme.primary : Theme.primary_overlay
                     border.color: Theme.primary
                     border.width: 1
 
-                    RowLayout {
-                        id: saveBadgeRow
+                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                    Row {
+                        id: studioLinkRow
                         anchors.centerIn: parent
                         spacing: 4
 
                         Text {
                             visible: !Theme.isTextIconSet
-                            text: Theme.iconCheck
+                            text: Theme.iconGrid
                             font.family: Theme.fontIcon
                             font.variableAxes: Theme.iconAxes
                             font.pixelSize: Theme.fontSizeXs
-                            color: Theme.primary
+                            color: studioLinkMouse.containsMouse ? Theme.on_primary : Theme.primary
+                            anchors.verticalCenter: parent.verticalCenter
                         }
 
                         Text {
-                            text: "live"
-                            font.family: Theme.fontMono
+                            text: "bar studio"
+                            font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Theme.fontWeightBold
-                            color: Theme.primary
+                            color: studioLinkMouse.containsMouse ? Theme.on_primary : Theme.primary
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+
+                    MouseArea {
+                        id: studioLinkMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            popup.open = false;
+                            if (Settings) Settings.showBarStudio = true;
                         }
                     }
                 }
@@ -899,7 +455,7 @@ BarPill {
                 }
             }
 
-            // horizontal tab bar
+            // horizontal tab bar (bar tab removed; bar settings now live in Bar Layout Studio)
             Flickable {
                 id: tabFlick
                 Layout.fillWidth: true
@@ -927,11 +483,10 @@ BarPill {
 
                     Repeater {
                         model: [
-                            { id: "layout", label: "bar", icon: Theme.iconGrid },
-                            { id: "style", label: "appearance", icon: Theme.iconSparkles },
-                            { id: "behavior", label: "behavior", icon: Theme.iconFlame },
-                            { id: "keybinds", label: "keybinds", icon: Theme.iconKeyboard },
-                            { id: "advanced", label: "system", icon: Theme.iconSliders }
+                            { id: "style",    label: "appearance", icon: Theme.iconSparkles },
+                            { id: "behavior", label: "behavior",   icon: Theme.iconFlame },
+                            { id: "keybinds", label: "keybinds",   icon: Theme.iconKeyboard },
+                            { id: "advanced", label: "system",     icon: Theme.iconSliders }
                         ]
 
                         delegate: Rectangle {
@@ -967,6 +522,7 @@ BarPill {
                                 Text {
                                     text: modelData.label
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     font.weight: isSelected ? Theme.fontWeightBold : Theme.fontWeightMedium
                                     color: isSelected ? Theme.primary : Theme.textSecondary
@@ -995,331 +551,7 @@ BarPill {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
-                // 1. bar & geometry tab (module lists nuked since BarStudio owns module placement now)
-                Flickable {
-                    id: flickLayout
-                    anchors.fill: parent
-                    visible: root.activeTab === "layout"
-                    clip: true
-                    contentWidth: width
-                    contentHeight: layoutCol.implicitHeight + 28
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    WheelHandler {
-                        orientation: Qt.Vertical
-                        target: parent
-                    }
-
-                    ColumnLayout {
-                        id: layoutCol
-                        width: parent.width
-                        spacing: Theme.popupSpacing
-
-                        // bar layout studio launcher card (closes quick settings so they don't stack on top of each other)
-                        SettingCard {
-                            RowLayout {
-                                width: parent.width
-                                spacing: 10
-
-                                Rectangle {
-                                    width: 38
-                                    height: 38
-                                    radius: Theme.radiusMd
-                                    color: Settings.showBarStudio ? Theme.primary : Theme.primary_overlay
-                                    border.color: Theme.alpha(Theme.primary, 0.4)
-                                    border.width: 1
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: Theme.iconSparkles
-                                        font.family: Theme.fontIcon
-                                        font.variableAxes: Theme.iconAxes
-                                        font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeXs : Theme.fontSizeMd
-                                        color: Settings.showBarStudio ? Theme.on_primary : Theme.primary
-                                    }
-                                }
-
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 2
-
-                                    Text {
-                                        text: "bar layout studio"
-                                        font.family: Theme.fontDisplay
-                                        font.pixelSize: Theme.fontSizeSm
-                                        font.weight: Theme.fontWeightBold
-                                        color: Theme.textPrimary
-                                    }
-
-                                    Text {
-                                        text: "drag & drop modules, switch zones, toggle visibility, or load presets"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSizeXs
-                                        color: Theme.textSecondary
-                                        elide: Text.ElideRight
-                                        Layout.fillWidth: true
-                                    }
-                                }
-
-                                Rectangle {
-                                    height: 30
-                                    implicitWidth: studioQuickTxt.implicitWidth + 20
-                                    radius: Theme.radiusPill
-                                    color: studioBtnMouse.containsMouse
-                                        ? Theme.stateHover(Theme.primary, Theme.on_primary)
-                                        : Theme.primary
-
-                                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                                    Text {
-                                        id: studioQuickTxt
-                                        anchors.centerIn: parent
-                                        text: "open studio"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Theme.fontWeightBold
-                                        color: Theme.on_primary
-                                    }
-
-                                    MouseArea {
-                                        id: studioBtnMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            popup.open = false;
-                                            Settings.showBarStudio = true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        CategoryHeader {
-                            title: "bar geometry & spacing"
-                            subtitle: "screen edge, thickness, padding density, and corner rounding"
-                            icon: Theme.iconGrid
-                        }
-
-                        SettingCard {
-                            ChoiceRow {
-                                title: "screen placement"
-                                model: [
-                                    { label: "top", value: "top" },
-                                    { label: "bottom", value: "bottom" },
-                                    { label: "left", value: "left" },
-                                    { label: "right", value: "right" }
-                                ]
-                                currentValue: Settings.barPosition === "up" ? "top" : (Settings.barPosition === "down" ? "bottom" : Settings.barPosition)
-                                onSelected: (val) => Settings.barPosition = val
-                            }
-
-                            ChoiceRow {
-                                title: "padding density scale (Theme.paddingScale)"
-                                model: [
-                                    { label: "compact (0.8x)", value: "compact" },
-                                    { label: "cozy (1.0x)", value: "cozy" },
-                                    { label: "comfortable (1.25x)", value: "comfortable" }
-                                ]
-                                currentValue: Settings.paddingScale || "cozy"
-                                onSelected: (val) => Settings.paddingScale = val
-                            }
-
-                            RowDivider {}
-
-                            SliderRow {
-                                title: "bar thickness"
-                                from: 24
-                                to: 56
-                                stepSize: 2
-                                suffix: "px"
-                                value: Settings.barHeight
-                                onMoved: (val) => Settings.barHeight = val
-                            }
-
-                            SliderRow {
-                                title: "widget spacing"
-                                from: 0
-                                to: 16
-                                stepSize: 1
-                                suffix: "px"
-                                value: Settings.widgetSpacing
-                                onMoved: (val) => Settings.widgetSpacing = val
-                            }
-
-                            SliderRow {
-                                title: "widget horizontal padding"
-                                from: 2
-                                to: 18
-                                stepSize: 1
-                                suffix: "px"
-                                value: Settings.widgetPaddingH
-                                onMoved: (val) => Settings.widgetPaddingH = val
-                            }
-
-                            RowDivider {}
-
-                            ChoiceRow {
-                                title: "widget corner radius"
-                                model: [
-                                    { label: "sharp", value: 0 },
-                                    { label: "2px", value: 2 },
-                                    { label: "4px", value: 4 },
-                                    { label: "8px", value: 8 },
-                                    { label: "pill", value: 9999 }
-                                ]
-                                currentValue: Settings.widgetRadius
-                                onSelected: (val) => Settings.widgetRadius = val
-                            }
-
-                            SliderRow {
-                                title: "popup corner radius"
-                                from: 0
-                                to: 28
-                                stepSize: 2
-                                suffix: "px"
-                                value: Settings.popupRadius
-                                onMoved: (val) => Settings.popupRadius = val
-                            }
-                        }
-
-                        CategoryHeader {
-                            title: "bar layout, grouping & chrome"
-                            subtitle: "configure floating islands, module clusters, dividers, and widget framing"
-                            icon: Theme.iconExpand
-                        }
-
-                        SettingCard {
-                            ChoiceRow {
-                                title: "module grouping"
-                                model: [
-                                    { label: "clusters", value: "clusters" },
-                                    { label: "3 zones", value: "zones" },
-                                    { label: "none", value: "none" }
-                                ]
-                                currentValue: Settings.barGrouping || "clusters"
-                                onSelected: (val) => Settings.barGrouping = val
-                            }
-
-                            ChoiceRow {
-                                title: "widget chrome style"
-                                model: [
-                                    { label: "grouped", value: "grouped" },
-                                    { label: "ghost", value: "ghost" },
-                                    { label: "underline", value: "underline" },
-                                    { label: "pills", value: "pills" }
-                                ]
-                                currentValue: Settings.barWidgetChrome || "grouped"
-                                onSelected: (val) => Settings.barWidgetChrome = val
-                            }
-
-                            ChoiceRow {
-                                title: "cluster dividers"
-                                model: [
-                                    { label: "hairline", value: "line" },
-                                    { label: "dot", value: "dot" },
-                                    { label: "none", value: "none" }
-                                ]
-                                currentValue: Settings.barDividers || "line"
-                                onSelected: (val) => Settings.barDividers = val
-                            }
-
-                            RowDivider {}
-
-                            ToggleRow {
-                                icon: Theme.iconExpand
-                                title: "floating bar"
-                                subtitle: "detach status bar from screen edge"
-                                checked: Settings.barFloating
-                                onToggled: {
-                                    Settings.barFloating = !Settings.barFloating;
-                                    root.saveSettings();
-                                }
-                            }
-
-                            RowDivider { visible: Settings.barFloating || Theme.isBento }
-
-                            ToggleRow {
-                                visible: Settings.barFloating || Theme.isBento
-                                icon: Theme.iconGrid
-                                title: "bento island split"
-                                subtitle: "split left, center, and right zones into floating capsules"
-                                checked: Settings.barIslandMode ?? true
-                                onToggled: {
-                                    Settings.barIslandMode = !(Settings.barIslandMode ?? true);
-                                    root.saveSettings();
-                                }
-                            }
-
-                            ToggleRow {
-                                visible: Settings.barFloating || Theme.isBento
-                                icon: Theme.iconSparkles
-                                title: "bento island hover lift"
-                                subtitle: "elevate capsules slightly when hovered"
-                                checked: Settings.bentoHoverLift ?? true
-                                onToggled: {
-                                    Settings.bentoHoverLift = !(Settings.bentoHoverLift ?? true);
-                                    root.saveSettings();
-                                }
-                            }
-
-                            SliderRow {
-                                visible: Settings.barFloating || Theme.isBento
-                                title: "floating bar corner radius"
-                                from: 0
-                                to: 24
-                                stepSize: 2
-                                suffix: "px"
-                                value: Settings.barRadius
-                                onMoved: (v) => Settings.barRadius = v
-                            }
-
-                            SliderRow {
-                                visible: Settings.barFloating || Theme.isBento
-                                title: "floating screen margin"
-                                from: 0
-                                to: 32
-                                stepSize: 2
-                                suffix: "px"
-                                value: Settings.barMargin
-                                onMoved: (v) => Settings.barMargin = v
-                            }
-                        }
-
-                        CategoryHeader {
-                            title: "window title"
-                            subtitle: "configure active window pill sizing and app icon"
-                            icon: Theme.iconSparkles
-                        }
-
-                        SettingCard {
-                            ChoiceRow {
-                                title: "window title width mode"
-                                model: [
-                                    { label: "auto fit", value: "auto" },
-                                    { label: "fill space", value: "fill" },
-                                    { label: "compact", value: "compact" }
-                                ]
-                                currentValue: Settings.windowTitleMode || "auto"
-                                onSelected: (val) => Settings.windowTitleMode = val
-                            }
-
-                            ToggleRow {
-                                icon: Theme.iconEye
-                                title: "app icon in window title"
-                                subtitle: "resolve desktop entry icon next to active window title"
-                                checked: Settings.windowTitleShowIcon ?? true
-                                onToggled: {
-                                    Settings.windowTitleShowIcon = !(Settings.windowTitleShowIcon ?? true);
-                                    root.saveSettings();
-                                }
-                            }
-                        }
-                    }
-                }
-                TabScrollTrack { target: flickLayout }
-
-                // 2. appearance & style tab
+                // 1. appearance tab (popups, screen frame, typography, font browser)
                 Flickable {
                     id: flickStyle
                     anchors.fill: parent
@@ -1340,29 +572,42 @@ BarPill {
                         spacing: Theme.popupSpacing
 
                         CategoryHeader {
-                            title: "surface & material"
-                            subtitle: "bar shader preset, adaptive opacity, and surface glass"
+                            title: "popups & surfaces"
+                            subtitle: "global popup geometry, opacity, borders, and adaptive alpha"
                             icon: Theme.iconSparkles
                         }
 
                         SettingCard {
-                            ChoiceGrid {
-                                columns: 3
-                                buttonHeight: 32
-                                title: "bar material preset"
+                            SliderRow {
+                                title: "popup corner radius"
+                                from: 0
+                                to: 28
+                                stepSize: 2
+                                suffix: "px"
+                                value: Settings.popupRadius
+                                onMoved: (val) => Settings.popupRadius = val
+                            }
+
+                            SliderRow {
+                                title: "popup background opacity"
+                                from: 0.5
+                                to: 1.0
+                                stepSize: 0.05
+                                value: Settings.popupOpacity
+                                formatter: (v) => Math.round(v * 100) + "%"
+                                onMoved: (val) => Settings.popupOpacity = val
+                            }
+
+                            ChoiceRow {
+                                title: "popup border width"
                                 model: [
-                                    { label: "regular", value: "regular" },
-                                    { label: "frosted glass", value: "glass" },
-                                    { label: "glass frost", value: "glass-frost" },
-                                    { label: "pure black", value: "pure-black" },
-                                    { label: "cyber neon", value: "cyber-neon" },
-                                    { label: "bento", value: "bento-floating" },
-                                    { label: "translucent", value: "translucent" },
-                                    { label: "accent glow", value: "accent-glow" },
-                                    { label: "monochrome", value: "monochrome" }
+                                    { label: "none", value: 0 },
+                                    { label: "1px", value: 1 },
+                                    { label: "2px", value: 2 },
+                                    { label: "3px", value: 3 }
                                 ]
-                                currentValue: Settings.barStyle
-                                onSelected: (val) => Settings.barStyle = val
+                                currentValue: Settings.popupBorderWidth
+                                onSelected: (val) => Settings.popupBorderWidth = val
                             }
 
                             RowDivider {}
@@ -1377,32 +622,12 @@ BarPill {
                                     root.saveSettings();
                                 }
                             }
-
-                            SliderRow {
-                                title: "bar background opacity"
-                                from: 0.3
-                                to: 1.0
-                                stepSize: 0.05
-                                value: Settings.barOpacity
-                                formatter: (v) => Math.round(v * 100) + "%"
-                                onMoved: (val) => Settings.barOpacity = val
-                            }
-
-                            SliderRow {
-                                title: "popup background opacity"
-                                from: 0.5
-                                to: 1.0
-                                stepSize: 0.05
-                                value: Settings.popupOpacity
-                                formatter: (v) => Math.round(v * 100) + "%"
-                                onMoved: (val) => Settings.popupOpacity = val
-                            }
                         }
 
                         CollapsibleSection {
                             Layout.fillWidth: true
-                            title: "screen corners, scoops & frame"
-                            subtitle: "concave fillets, curvature math & border strokes"
+                            title: "screen frame & corners"
+                            subtitle: "screen-edge concave fillets, curvature math & border frame"
                             icon: Theme.iconGrid
                             badge: Settings.screenCornerRadius + "px"
 
@@ -1453,20 +678,10 @@ BarPill {
                                     { label: "bar match", value: "bar" },
                                     { label: "matugen", value: "theme" },
                                     { label: "accent", value: "accent" },
-                                    { label: "pure black", value: "pure-black" }
+                                    { label: "oled", value: "oled" }
                                 ]
-                                currentValue: Settings.cornerColorMode
+                                currentValue: StyleEngine.normalizeCornerColorMode(Settings.cornerColorMode)
                                 onSelected: (val) => Settings.cornerColorMode = val
-                            }
-
-                            SliderRow {
-                                title: "bar scoop radius"
-                                from: 0
-                                to: 32
-                                stepSize: 2
-                                suffix: "px"
-                                value: Settings.scoopRadius
-                                onMoved: (val) => Settings.scoopRadius = val
                             }
 
                             SliderRow {
@@ -1477,16 +692,6 @@ BarPill {
                                 suffix: "px"
                                 value: Settings.screenCornerRadius
                                 onMoved: (val) => Settings.screenCornerRadius = val
-                            }
-
-                            SliderRow {
-                                title: "scoop border width"
-                                from: 1
-                                to: 6
-                                stepSize: 1
-                                suffix: "px"
-                                value: Settings.scoopBorderWidth
-                                onMoved: (val) => Settings.scoopBorderWidth = val
                             }
 
                             SliderRow {
@@ -1502,20 +707,9 @@ BarPill {
                             SettingCard {
                                 width: parent.width
                                 ToggleRow {
-                                    icon: Theme.iconSparkles
-                                    title: "scoop border outlines"
-                                    subtitle: "draw continuous stroke along concave curves"
-                                    checked: Settings.scoopBorderEnabled
-                                    onToggled: {
-                                        Settings.scoopBorderEnabled = !Settings.scoopBorderEnabled;
-                                        root.saveSettings();
-                                    }
-                                }
-                                RowDivider {}
-                                ToggleRow {
                                     icon: Theme.iconGrid
-                                    title: "docked frame & scoops"
-                                    subtitle: "anchor shell fillets directly to screen bounds"
+                                    title: "docked screen frame"
+                                    subtitle: "anchor perimeter border and screen corners to monitor bounds"
                                     checked: Settings.screenFrameDocked
                                     onToggled: {
                                         Settings.screenFrameDocked = !Settings.screenFrameDocked;
@@ -1578,7 +772,10 @@ BarPill {
                                 title: "solid material fill"
                                 subtitle: "fill material symbols solid so sharp and rounded shapes pop"
                                 checked: Settings.materialFilled
-                                onToggled: Settings.materialFilled = !Settings.materialFilled
+                                onToggled: {
+                                    Settings.materialFilled = !Settings.materialFilled;
+                                    root.saveSettings();
+                                }
                             }
 
                             RowDivider {}
@@ -1593,8 +790,117 @@ BarPill {
                                 onMoved: (val) => Settings.fontScale = val
                             }
 
+                            RowDivider {}
+
+                            RowLayout {
+                                width: parent.width
+                                spacing: 6
+
+                                Text {
+                                    text: "variable font axes"
+                                    font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.pixelSize: Theme.fontSizeXs
+                                    font.weight: Theme.fontWeightDemiBold
+                                    color: Theme.textSecondary
+                                    Layout.fillWidth: true
+                                }
+
+                                Rectangle {
+                                    height: 20
+                                    implicitWidth: resetAxesTxt.implicitWidth + 12
+                                    radius: Theme.radiusPill
+                                    color: resetAxesMouse.containsMouse ? Theme.primary_overlay : Theme.widgetBg
+                                    border.color: resetAxesMouse.containsMouse ? Theme.primary : Theme.widgetBorder
+                                    border.width: 1
+
+                                    Text {
+                                        id: resetAxesTxt
+                                        anchors.centerIn: parent
+                                        text: "reset axes"
+                                        font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightMedium
+                                        color: resetAxesMouse.containsMouse ? Theme.primary : Theme.textSecondary
+                                    }
+
+                                    MouseArea {
+                                        id: resetAxesMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: Settings.resetFontAxes()
+                                    }
+                                }
+                            }
+
+                            // live specimen card showing sans, display, and mono variable rendering
+                            Rectangle {
+                                width: parent.width
+                                implicitHeight: specimenCol.implicitHeight + 14
+                                radius: Theme.radiusSm
+                                color: Theme.widgetBg
+                                border.color: Theme.widgetBorder
+                                border.width: 1
+
+                                ColumnLayout {
+                                    id: specimenCol
+                                    anchors.fill: parent
+                                    anchors.margins: 7
+                                    spacing: 3
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: Settings.fontFamily + (Settings.fontDisplay !== "" ? (" + " + Settings.fontDisplay) : "") + "  [" + root.axisLabelSummary(root._mergedSansSpec) + "]"
+                                        font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
+                                        font.weight: Theme.monoWeightRegular
+                                        font.pixelSize: Theme.fontSizeXs
+                                        color: Theme.primary
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: "display heading · " + Theme.fontDisplay.toLowerCase()
+                                        font.family: Theme.fontDisplay
+                                        font.variableAxes: Theme.displayAxes
+                                        font.pixelSize: Theme.fontSizeLg
+                                        font.weight: Theme.fontWeightBold
+                                        color: Theme.textPrimary
+                                        elide: Text.ElideRight
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "body text · wght " + Settings.fontWeightValue
+                                            font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.pixelSize: Theme.fontSizeSm
+                                            font.weight: Theme.fontWeightRegular
+                                            color: Theme.textSecondary
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            text: "01:23 mono " + Settings.fontMonoWeight
+                                            font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
+                                            font.pixelSize: Theme.fontSizeXs
+                                            font.weight: Theme.monoWeightMedium
+                                            color: Theme.textSecondary
+                                        }
+                                    }
+                                }
+                            }
+
                             ChoiceRow {
-                                title: "font weight"
+                                title: "weight preset"
                                 model: [
                                     { label: "light", value: "light" },
                                     { label: "regular", value: "regular" },
@@ -1605,34 +911,127 @@ BarPill {
                                 currentValue: Settings.fontWeight
                                 onSelected: (val) => Settings.fontWeight = val
                             }
+
+                            SliderRow {
+                                title: "base weight (wght)"
+                                from: Theme._sansWghtMin
+                                to: Theme._sansWghtMax
+                                stepSize: 10
+                                value: Settings.fontWeightValue
+                                formatter: (v) => Math.round(v) + ""
+                                onMoved: (val) => Settings.fontWeightValue = Math.round(val)
+                            }
+
+                            SliderRow {
+                                visible: root.hasWdthAxis
+                                title: "width stretch (wdth)"
+                                from: root._mergedSansSpec.wdth ? root._mergedSansSpec.wdth.min : 75
+                                to: root._mergedSansSpec.wdth ? root._mergedSansSpec.wdth.max : 150
+                                stepSize: 2.5
+                                value: Settings.fontWidth
+                                formatter: (v) => Math.round(v) + "%"
+                                onMoved: (val) => Settings.fontWidth = val
+                            }
+
+                            SliderRow {
+                                visible: root.hasRondAxis
+                                title: "corner roundness (ROND)"
+                                from: root._mergedSansSpec.ROND ? root._mergedSansSpec.ROND.min : 0
+                                to: root._mergedSansSpec.ROND ? root._mergedSansSpec.ROND.max : 100
+                                stepSize: 5
+                                value: Settings.fontRoundness
+                                formatter: (v) => Math.round(v) + "%"
+                                onMoved: (val) => Settings.fontRoundness = val
+                            }
+
+                            SliderRow {
+                                visible: root.hasSlantAxis
+                                title: "slant angle (slnt)"
+                                from: root._mergedSansSpec.slnt ? root._mergedSansSpec.slnt.min : -10
+                                to: root._mergedSansSpec.slnt ? root._mergedSansSpec.slnt.max : 0
+                                stepSize: 0.5
+                                value: Settings.fontSlant
+                                formatter: (v) => (Math.round(v * 10) / 10) + "°"
+                                onMoved: (val) => Settings.fontSlant = val
+                            }
+
+                            ToggleRow {
+                                visible: root.hasOpszAxis
+                                icon: Theme.iconEye
+                                title: "auto optical size (opsz)"
+                                subtitle: "adjust optical contrast automatically for small ui vs headings"
+                                checked: Settings.fontOpticalAuto
+                                onToggled: {
+                                    Settings.fontOpticalAuto = !Settings.fontOpticalAuto;
+                                    root.saveSettings();
+                                }
+                            }
+
+                            SliderRow {
+                                visible: root.hasOpszAxis && !Settings.fontOpticalAuto
+                                title: "manual optical size (opsz)"
+                                from: root._mergedSansSpec.opsz ? root._mergedSansSpec.opsz.min : 5
+                                to: root._mergedSansSpec.opsz ? Math.min(72, root._mergedSansSpec.opsz.max) : 36
+                                stepSize: 0.5
+                                value: Settings.fontOpticalSize
+                                formatter: (v) => (Math.round(v * 10) / 10) + "pt"
+                                onMoved: (val) => Settings.fontOpticalSize = val
+                            }
+
+                            RowDivider { visible: root.hasMonoWghtAxis || root.hasMonoWdthAxis }
+
+                            SliderRow {
+                                visible: root.hasMonoWghtAxis
+                                title: "mono weight (wght)"
+                                from: Theme._monoWghtMin
+                                to: Theme._monoWghtMax
+                                stepSize: 25
+                                value: Settings.fontMonoWeight
+                                formatter: (v) => Math.round(v) + ""
+                                onMoved: (val) => Settings.fontMonoWeight = Math.round(val)
+                            }
+
+                            SliderRow {
+                                visible: root.hasMonoWdthAxis
+                                title: "mono width (wdth)"
+                                from: (Theme.monoVarAxes && Theme.monoVarAxes.wdth) ? Theme.monoVarAxes.wdth.min : 62.5
+                                to: (Theme.monoVarAxes && Theme.monoVarAxes.wdth) ? Theme.monoVarAxes.wdth.max : 100
+                                stepSize: 2.5
+                                value: Settings.fontMonoWidth
+                                formatter: (v) => Math.round(v) + "%"
+                                onMoved: (val) => Settings.fontMonoWidth = val
+                            }
                         }
 
                         CollapsibleSection {
                             Layout.fillWidth: true
                             title: "system font browser"
-                            subtitle: "swap interface or monospace font families"
+                            subtitle: "swap interface, display, or monospace families"
                             icon: Theme.iconSearch
-                            badge: root.fontTarget === "sans" ? Settings.fontFamily : Settings.fontMono
+                            badge: root.fontTarget === "sans" ? Settings.fontFamily : (root.fontTarget === "display" ? (Settings.fontDisplay || "same as sans") : Settings.fontMono)
 
                             RowLayout {
                                 width: parent.width
-                                spacing: 6
+                                spacing: 5
 
                                 Rectangle {
                                     Layout.fillWidth: true
-                                    height: 32
+                                    height: 30
                                     radius: root.fontTarget === "sans" ? Theme.radiusMd : Theme.radiusPill
                                     color: root.fontTarget === "sans" ? Theme.primary_overlay : Theme.widgetBg
                                     border.color: root.fontTarget === "sans" ? Theme.primary : Theme.widgetBorder
                                     border.width: 1
 
                                     Text {
+                                        width: parent.width - 10
                                         text: "sans: " + Settings.fontFamily
                                         font.family: Settings.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightBold
                                         color: root.fontTarget === "sans" ? Theme.primary : Theme.textSecondary
                                         anchors.centerIn: parent
+                                        horizontalAlignment: Text.AlignHCenter
                                         elide: Text.ElideRight
                                     }
 
@@ -1645,19 +1044,50 @@ BarPill {
 
                                 Rectangle {
                                     Layout.fillWidth: true
-                                    height: 32
+                                    height: 30
+                                    radius: root.fontTarget === "display" ? Theme.radiusMd : Theme.radiusPill
+                                    color: root.fontTarget === "display" ? Theme.primary_overlay : Theme.widgetBg
+                                    border.color: root.fontTarget === "display" ? Theme.primary : Theme.widgetBorder
+                                    border.width: 1
+
+                                    Text {
+                                        width: parent.width - 10
+                                        text: "display: " + (Settings.fontDisplay || "auto")
+                                        font.family: Theme.fontDisplay
+                                        font.variableAxes: Theme.displayAxes
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightBold
+                                        color: root.fontTarget === "display" ? Theme.primary : Theme.textSecondary
+                                        anchors.centerIn: parent
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.fontTarget = "display"
+                                    }
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 30
                                     radius: root.fontTarget === "mono" ? Theme.radiusMd : Theme.radiusPill
                                     color: root.fontTarget === "mono" ? Theme.primary_overlay : Theme.widgetBg
                                     border.color: root.fontTarget === "mono" ? Theme.primary : Theme.widgetBorder
                                     border.width: 1
 
                                     Text {
+                                        width: parent.width - 10
                                         text: "mono: " + Settings.fontMono
                                         font.family: Settings.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: Theme.monoWeightBold
                                         color: root.fontTarget === "mono" ? Theme.primary : Theme.textSecondary
                                         anchors.centerIn: parent
+                                        horizontalAlignment: Text.AlignHCenter
                                         elide: Text.ElideRight
                                     }
 
@@ -1669,60 +1099,127 @@ BarPill {
                                 }
                             }
 
-                            Rectangle {
+                            RowLayout {
                                 width: parent.width
-                                height: 36
-                                color: Theme.widgetBg
-                                radius: Theme.radiusMd
-                                border.color: fontSearchInput.activeFocus ? Theme.primary : Theme.widgetBorder
-                                border.width: 1
+                                spacing: 6
 
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: 8
-                                    spacing: 8
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 34
+                                    color: Theme.widgetBg
+                                    radius: Theme.radiusMd
+                                    border.color: fontSearchInput.activeFocus ? Theme.primary : Theme.widgetBorder
+                                    border.width: 1
 
-                                    Text {
-                                        text: Theme.iconSearch
-                                        font.family: Theme.fontIcon
-                                        font.variableAxes: Theme.iconAxes
-                                        font.pixelSize: Theme.fontSizeSm
-                                        color: fontSearchInput.activeFocus ? Theme.primary : Theme.textSecondary
-                                    }
-
-                                    Item {
-                                        Layout.fillWidth: true
-                                        Layout.fillHeight: true
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 8
+                                        spacing: 8
 
                                         Text {
-                                            anchors.fill: parent
-                                            verticalAlignment: Text.AlignVCenter
-                                            visible: fontSearchInput.text === "" && !fontSearchInput.activeFocus
-                                            text: "filter " + root.allFonts.length + " installed fonts..."
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSizeXs
-                                            color: Theme.textSecondary
+                                            text: Theme.iconSearch
+                                            font.family: Theme.fontIcon
+                                            font.variableAxes: Theme.iconAxes
+                                            font.pixelSize: Theme.fontSizeSm
+                                            color: fontSearchInput.activeFocus ? Theme.primary : Theme.textSecondary
                                         }
 
-                                        TextInput {
-                                            id: fontSearchInput
-                                            anchors.fill: parent
-                                            verticalAlignment: TextInput.AlignVCenter
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSizeXs
-                                            color: Theme.textPrimary
-                                            onTextChanged: root.fontSearchQuery = text
+                                        Item {
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+
+                                            Text {
+                                                anchors.fill: parent
+                                                verticalAlignment: Text.AlignVCenter
+                                                visible: fontSearchInput.text === "" && !fontSearchInput.activeFocus
+                                                text: "filter " + root.allFonts.length + " installed fonts..."
+                                                font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
+                                                font.weight: Theme.fontWeightRegular
+                                                font.pixelSize: Theme.fontSizeXs
+                                                color: Theme.textSecondary
+                                            }
+
+                                            TextInput {
+                                                id: fontSearchInput
+                                                anchors.fill: parent
+                                                verticalAlignment: TextInput.AlignVCenter
+                                                font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
+                                                font.weight: Theme.fontWeightRegular
+                                                font.pixelSize: Theme.fontSizeXs
+                                                color: Theme.textPrimary
+                                                onTextChanged: root.fontSearchQuery = text
+                                            }
+                                        }
+
+                                        IconButton {
+                                            visible: fontSearchInput.text !== ""
+                                            icon: Theme.iconClose
+                                            iconSize: Theme.fontSizeXs
+                                            tooltip: "clear search"
+                                            onClicked: {
+                                                fontSearchInput.text = "";
+                                                root.fontSearchQuery = "";
+                                            }
                                         }
                                     }
+                                }
 
-                                    IconButton {
-                                        visible: fontSearchInput.text !== ""
-                                        icon: Theme.iconClose
-                                        iconSize: Theme.fontSizeXs
-                                        tooltip: "clear search"
+                                Rectangle {
+                                    height: 34
+                                    implicitWidth: vfFilterTxt.implicitWidth + 16
+                                    radius: Theme.radiusMd
+                                    color: root.variableFontsOnly ? Theme.primary_overlay : Theme.widgetBg
+                                    border.color: root.variableFontsOnly ? Theme.primary : Theme.widgetBorder
+                                    border.width: 1
+
+                                    Text {
+                                        id: vfFilterTxt
+                                        anchors.centerIn: parent
+                                        text: "variable only"
+                                        font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: root.variableFontsOnly ? Theme.fontWeightBold : Theme.fontWeightMedium
+                                        color: root.variableFontsOnly ? Theme.primary : Theme.textSecondary
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.variableFontsOnly = !root.variableFontsOnly
+                                    }
+                                }
+
+                                Rectangle {
+                                    visible: root.fontTarget === "display" && Settings.fontDisplay !== ""
+                                    height: 34
+                                    implicitWidth: clrDispTxt.implicitWidth + 14
+                                    radius: Theme.radiusMd
+                                    color: clrDispMouse.containsMouse ? Theme.error_overlay : Theme.widgetBg
+                                    border.color: clrDispMouse.containsMouse ? Theme.error : Theme.widgetBorder
+                                    border.width: 1
+
+                                    Text {
+                                        id: clrDispTxt
+                                        anchors.centerIn: parent
+                                        text: "auto"
+                                        font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightBold
+                                        color: clrDispMouse.containsMouse ? Theme.error : Theme.textSecondary
+                                    }
+
+                                    MouseArea {
+                                        id: clrDispMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            fontSearchInput.text = "";
-                                            root.fontSearchQuery = "";
+                                            Settings.fontDisplay = "";
+                                            root.saveSettings();
                                         }
                                     }
                                 }
@@ -1730,7 +1227,7 @@ BarPill {
 
                             Rectangle {
                                 width: parent.width
-                                height: 170
+                                height: 180
                                 color: Theme.widgetBg
                                 radius: Theme.radiusMd
                                 border.color: Theme.widgetBorder
@@ -1757,7 +1254,10 @@ BarPill {
                                         width: fontListView.width
                                         height: 32
                                         radius: Theme.radiusSm
+                                        readonly property var fMeta: root.fontMetaMap[modelData.toLowerCase()] ?? null
+                                        readonly property bool isVarFont: Boolean(fMeta && fMeta.isVar)
                                         readonly property bool isCurrent: (root.fontTarget === "sans" && Settings.fontFamily === modelData)
+                                            || (root.fontTarget === "display" && Settings.fontDisplay === modelData)
                                             || (root.fontTarget === "mono" && Settings.fontMono === modelData)
                                         color: isCurrent ? Theme.primary_overlay : (fItemMouse.containsMouse ? Theme.widgetHover : "transparent")
 
@@ -1776,7 +1276,26 @@ BarPill {
                                                 elide: Text.ElideRight
                                             }
 
-                                            // keep iconCheck in Theme.fontIcon so random system fonts don't render it as a box
+                                            Rectangle {
+                                                visible: isVarFont
+                                                height: 16
+                                                implicitWidth: vfBadgeTxt.implicitWidth + 8
+                                                radius: Theme.radiusPill
+                                                color: Theme.alpha(Theme.primary, 0.14)
+                                                border.color: Theme.alpha(Theme.primary, 0.35)
+                                                border.width: 1
+
+                                                Text {
+                                                    id: vfBadgeTxt
+                                                    anchors.centerIn: parent
+                                                    text: "vf · " + (fMeta?.tags ?? "")
+                                                    font.family: Theme.fontMono
+                                                    font.pixelSize: 8
+                                                    font.weight: Theme.monoWeightBold
+                                                    color: Theme.primary
+                                                }
+                                            }
+
                                             Text {
                                                 visible: isCurrent && !Theme.isTextIconSet
                                                 text: Theme.iconCheck
@@ -1787,7 +1306,7 @@ BarPill {
                                             }
 
                                             Text {
-                                                text: isCurrent ? "active" : "123 abc"
+                                                text: isCurrent ? "active" : "123"
                                                 font.family: modelData
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: isCurrent ? Theme.primary : Theme.textSecondary
@@ -1801,6 +1320,7 @@ BarPill {
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
                                                 if (root.fontTarget === "sans") Settings.fontFamily = modelData;
+                                                else if (root.fontTarget === "display") Settings.fontDisplay = modelData;
                                                 else Settings.fontMono = modelData;
                                                 root.saveSettings();
                                             }
@@ -1815,7 +1335,7 @@ BarPill {
                 }
                 TabScrollTrack { target: flickStyle }
 
-                // 3. behavior, lock screen studio & clock tab
+                // 2. behavior tab (hover flyouts, launcher features, audio & alerts, idle timers, flavor)
                 Flickable {
                     id: flickBehavior
                     anchors.fill: parent
@@ -1836,129 +1356,16 @@ BarPill {
                         spacing: Theme.popupSpacing
 
                         CategoryHeader {
-                            title: "bar clock & workspaces"
-                            icon: Theme.iconClock
+                            title: "flyout hover & launcher"
+                            subtitle: "hover behavior for bar popups and app launcher utilities"
+                            icon: Theme.iconEye
                         }
 
                         SettingCard {
-                            ChoiceRow {
-                                title: "bar clock format"
-                                model: [
-                                    { label: "24h", value: "HH:mm" },
-                                    { label: "12h", value: "h:mm ap" },
-                                    { label: "24h + sec", value: "HH:mm:ss" },
-                                    { label: "12h + sec", value: "h:mm:ss ap" }
-                                ]
-                                currentValue: Settings.clockFormat
-                                onSelected: (value) => {
-                                    Settings.clockFormat = value;
-                                    let is12 = /ap/i.test(value);
-                                    let hasSec = /:ss/i.test(value);
-                                    Settings.clockMilitary = !is12;
-                                    Settings.clock24h = !is12;
-                                    Settings.clockShowSeconds = hasSec;
-                                }
-                            }
-
-                            ChoiceRow {
-                                title: "bar date format"
-                                model: [
-                                    { label: "hidden", value: "none" },
-                                    { label: "short", value: "ddd, MMM d" },
-                                    { label: "full", value: "MMM d, yyyy" },
-                                    { label: "iso", value: "yyyy-MM-dd" }
-                                ]
-                                currentValue: !Settings.showBarDate ? "none" : Settings.dateFormat
-                                onSelected: (value) => {
-                                    if (value === "none") {
-                                        Settings.showBarDate = false;
-                                    } else {
-                                        Settings.dateFormat = value;
-                                        Settings.showBarDate = true;
-                                    }
-                                }
-                            }
-
-                            ChoiceRow {
-                                title: "workspace capacity"
-                                model: [
-                                    { label: "5", value: 5 },
-                                    { label: "8", value: 8 },
-                                    { label: "10", value: 10 },
-                                    { label: "12", value: 12 },
-                                    { label: "16", value: 16 }
-                                ]
-                                currentValue: Settings.workspaceCount
-                                onSelected: (value) => Settings.workspaceCount = value
-                            }
-                        }
-
-                        CategoryHeader {
-                            title: "motion & interaction"
-                            subtitle: "animation speed, easing curves, workspace trail, and flyouts"
-                            icon: Theme.iconFlame
-                        }
-
-                        SettingCard {
-                            ChoiceGrid {
-                                columns: 3
-                                buttonHeight: 30
-                                title: "animation speed preset"
-                                model: [
-                                    { label: "hyprland", value: "hyprland" },
-                                    { label: "snappy", value: "snappy" },
-                                    { label: "hyper", value: "hyper" },
-                                    { label: "normal", value: "normal" },
-                                    { label: "chill", value: "chill" },
-                                    { label: "instant", value: "instant" }
-                                ]
-                                currentValue: Settings.animSpeed
-                                onSelected: (val) => Settings.animSpeed = val
-                            }
-
-                            ChoiceRow {
-                                title: "easing curve profile (Theme.animCurve)"
-                                model: [
-                                    { label: "cubic", value: "cubic" },
-                                    { label: "hyprland", value: "hyprland" },
-                                    { label: "snappy", value: "snappy" },
-                                    { label: "expressive", value: "expressive" },
-                                    { label: "linear", value: "linear" }
-                                ]
-                                currentValue: Settings.animCurve || "cubic"
-                                onSelected: (val) => Settings.animCurve = val
-                            }
-
-                            RowDivider {}
-
-                            ChoiceRow {
-                                title: "workspace indicator motion"
-                                model: [
-                                    { label: "smooth slide", value: "slide" },
-                                    { label: "fluid trail", value: "fluid-trail" },
-                                    { label: "discrete", value: "discrete" }
-                                ]
-                                currentValue: Settings.workspaceMode
-                                onSelected: (value) => Settings.workspaceMode = value
-                            }
-
-                            SliderRow {
-                                visible: Settings.workspaceMode === "fluid-trail"
-                                title: "workspace trail duration"
-                                from: 120
-                                to: 400
-                                stepSize: 10
-                                suffix: "ms"
-                                value: Settings.workspaceTrailDuration
-                                onMoved: (val) => Settings.workspaceTrailDuration = val
-                            }
-
-                            RowDivider {}
-
                             ToggleRow {
                                 icon: Theme.iconEye
                                 title: "hover to open flyouts"
-                                subtitle: "hover over bar pills to open popups"
+                                subtitle: "hover over bar pills to preview popups automatically"
                                 checked: Settings.hoverToOpen
                                 onToggled: {
                                     Settings.hoverToOpen = !Settings.hoverToOpen;
@@ -1969,7 +1376,7 @@ BarPill {
                             ToggleRow {
                                 icon: Theme.iconEyeOff
                                 title: "hover auto-close"
-                                subtitle: "dismiss popup when cursor leaves"
+                                subtitle: "dismiss unpinned flyouts when cursor leaves"
                                 checked: Settings.hoverAutoClose
                                 onToggled: {
                                     Settings.hoverAutoClose = !Settings.hoverAutoClose;
@@ -1987,10 +1394,35 @@ BarPill {
                                 value: Settings.hoverDelay
                                 onMoved: (val) => Settings.hoverDelay = val
                             }
+
+                            RowDivider {}
+
+                            ToggleRow {
+                                icon: Theme.iconSearch
+                                title: "launcher inline calculator"
+                                subtitle: "evaluate math expressions directly inside app search"
+                                checked: Settings.launcherCalcEnabled
+                                onToggled: {
+                                    Settings.launcherCalcEnabled = !Settings.launcherCalcEnabled;
+                                    root.saveSettings();
+                                }
+                            }
+
+                            ToggleRow {
+                                icon: Theme.iconTerminal
+                                title: "launcher shell commands"
+                                subtitle: "allow prefixing queries with > to run quick commands"
+                                checked: Settings.launcherCommandEnabled
+                                onToggled: {
+                                    Settings.launcherCommandEnabled = !Settings.launcherCommandEnabled;
+                                    root.saveSettings();
+                                }
+                            }
                         }
 
                         CategoryHeader {
-                            title: "audio, notifications & flavor"
+                            title: "audio & notifications"
+                            subtitle: "volume limits and toast popup layout"
                             icon: Theme.iconBell
                         }
 
@@ -2015,6 +1447,8 @@ BarPill {
                                 onMoved: (val) => Settings.volumeMax = val
                             }
 
+                            RowDivider {}
+
                             ChoiceRow {
                                 title: "toast auto-dismiss timeout"
                                 model: [
@@ -2028,7 +1462,27 @@ BarPill {
                                 onSelected: (value) => Settings.notificationTimeout = value
                             }
 
-                            RowDivider {}
+                            ChoiceRow {
+                                title: "notification anchor edge"
+                                model: [
+                                    { label: "right", value: "right" },
+                                    { label: "left", value: "left" },
+                                    { label: "top", value: "top" },
+                                    { label: "bottom", value: "bottom" }
+                                ]
+                                currentValue: Settings.notificationEdge || "right"
+                                onSelected: (value) => Settings.notificationEdge = value
+                            }
+
+                            ChoiceRow {
+                                title: "toast corner style"
+                                model: [
+                                    { label: "concave scoop", value: "concave" },
+                                    { label: "rounded card", value: "rounded" }
+                                ]
+                                currentValue: Settings.notificationCornerStyle || "concave"
+                                onSelected: (value) => Settings.notificationCornerStyle = value
+                            }
 
                             ToggleRow {
                                 icon: Theme.iconBellOff
@@ -2040,7 +1494,112 @@ BarPill {
                                     root.saveSettings();
                                 }
                             }
+                        }
+
+                        CategoryHeader {
+                            title: "idle & power timers"
+                            subtitle: "screen dimming, automatic lock, display sleep, and suspend"
+                            icon: Theme.iconCoffee
+                        }
+
+                        SettingCard {
+                            ToggleRow {
+                                icon: Theme.iconBrightness
+                                title: "dim screen after inactivity"
+                                checked: Settings.idleDimEnabled
+                                onToggled: {
+                                    Settings.idleDimEnabled = !Settings.idleDimEnabled;
+                                    root.saveSettings();
+                                }
+                            }
+
+                            SliderRow {
+                                visible: Settings.idleDimEnabled
+                                title: "dim delay"
+                                from: 30
+                                to: 600
+                                stepSize: 30
+                                value: Settings.idleDimSeconds
+                                formatter: (v) => root.fmtIdleSecs(v)
+                                onMoved: (val) => Settings.idleDimSeconds = val
+                            }
+
                             RowDivider {}
+
+                            ToggleRow {
+                                icon: Theme.iconLock
+                                title: "auto-lock session"
+                                checked: Settings.idleLockEnabled
+                                onToggled: {
+                                    Settings.idleLockEnabled = !Settings.idleLockEnabled;
+                                    root.saveSettings();
+                                }
+                            }
+
+                            SliderRow {
+                                visible: Settings.idleLockEnabled
+                                title: "lock delay"
+                                from: 60
+                                to: 1800
+                                stepSize: 30
+                                value: Settings.idleLockSeconds
+                                formatter: (v) => root.fmtIdleSecs(v)
+                                onMoved: (val) => Settings.idleLockSeconds = val
+                            }
+
+                            RowDivider {}
+
+                            ToggleRow {
+                                icon: Theme.iconMoon
+                                title: "turn display off (dpms)"
+                                checked: Settings.idleDpmsEnabled
+                                onToggled: {
+                                    Settings.idleDpmsEnabled = !Settings.idleDpmsEnabled;
+                                    root.saveSettings();
+                                }
+                            }
+
+                            SliderRow {
+                                visible: Settings.idleDpmsEnabled
+                                title: "dpms delay"
+                                from: 60
+                                to: 1800
+                                stepSize: 30
+                                value: Settings.idleDpmsSeconds
+                                formatter: (v) => root.fmtIdleSecs(v)
+                                onMoved: (val) => Settings.idleDpmsSeconds = val
+                            }
+
+                            RowDivider {}
+
+                            ToggleRow {
+                                icon: Theme.iconSuspend
+                                title: "suspend system"
+                                checked: Settings.idleSuspendEnabled
+                                onToggled: {
+                                    Settings.idleSuspendEnabled = !Settings.idleSuspendEnabled;
+                                    root.saveSettings();
+                                }
+                            }
+
+                            SliderRow {
+                                visible: Settings.idleSuspendEnabled
+                                title: "suspend delay"
+                                from: 120
+                                to: 3600
+                                stepSize: 60
+                                value: Settings.idleSuspendSeconds
+                                formatter: (v) => root.fmtIdleSecs(v)
+                                onMoved: (val) => Settings.idleSuspendSeconds = val
+                            }
+                        }
+
+                        CategoryHeader {
+                            title: "shell flavor"
+                            icon: Theme.iconSparkles
+                        }
+
+                        SettingCard {
                             ChoiceRow {
                                 title: "shell flavor text"
                                 model: [
@@ -2055,23 +1614,24 @@ BarPill {
                                     root.saveSettings();
                                 }
                             }
-                            RowDivider {}
-                            ToggleRow {
-                                icon: Theme.iconSparkles
-                                title: "motion sandbox playground"
-                                subtitle: "open interactive physics playground on screen edge"
-                                checked: Settings.showMotionSandbox
-                                onToggled: {
-                                    Settings.showMotionSandbox = !Settings.showMotionSandbox;
-                                    root.saveSettings();
-                                }
-                            }
                         }
                     }
                 }
                 TabScrollTrack { target: flickBehavior }
 
-                // 5. system & recovery tab
+                // 3. keybinds tab
+                Item {
+                    id: tabKeybinds
+                    anchors.fill: parent
+                    visible: root.activeTab === "keybinds"
+
+                    KeybindsPreview {
+                        anchors.fill: parent
+                        anchors.margins: 4
+                    }
+                }
+
+                // 4. system & recovery tab
                 Flickable {
                     id: flickAdvanced
                     anchors.fill: parent
@@ -2160,6 +1720,7 @@ BarPill {
                                                 Text {
                                                     text: modelData.name
                                                     font.family: Theme.fontFamily
+                                                    font.variableAxes: Theme.sansAxes
                                                     font.pixelSize: Theme.fontSizeSm
                                                     font.weight: Theme.fontWeightBold
                                                     color: Theme.textPrimary
@@ -2168,6 +1729,8 @@ BarPill {
                                                 Text {
                                                     text: modelData.desc + "  •  " + modelData.path
                                                     font.family: Theme.fontMono
+                                                    font.variableAxes: Theme.monoAxes
+                                                    font.weight: Theme.monoWeightRegular
                                                     font.pixelSize: Theme.fontSizeXs
                                                     color: Theme.textSecondary
                                                     elide: Text.ElideRight
@@ -2187,6 +1750,7 @@ BarPill {
                                                     anchors.centerIn: parent
                                                     text: root.activeShell === modelData.id ? "active" : "switch"
                                                     font.family: Theme.fontFamily
+                                                    font.variableAxes: Theme.sansAxes
                                                     font.pixelSize: Theme.fontSizeXs
                                                     font.weight: Theme.fontWeightBold
                                                     color: root.activeShell === modelData.id ? Theme.on_primary : Theme.textPrimary
@@ -2235,6 +1799,7 @@ BarPill {
                                     Text {
                                         text: switchProc.running ? "restarting shell..." : "restart active shell process"
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightBold
                                         color: Theme.textPrimary
@@ -2268,6 +1833,8 @@ BarPill {
                                     anchors.centerIn: parent
                                     text: "no custom network aliases saved yet (rename in wi-fi menu)"
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.weight: Theme.fontWeightRegular
                                     font.pixelSize: Theme.fontSizeXs
                                     color: Theme.textSecondary
                                 }
@@ -2305,6 +1872,7 @@ BarPill {
                                             Text {
                                                 text: (Settings.networkAliases && Settings.networkAliases[modelData]) || ""
                                                 font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
                                                 font.pixelSize: Theme.fontSizeSm
                                                 font.weight: Theme.fontWeightBold
                                                 color: Theme.textPrimary
@@ -2313,6 +1881,8 @@ BarPill {
                                             Text {
                                                 text: "(" + modelData + ")"
                                                 font.family: Theme.fontMono
+                                                font.variableAxes: Theme.monoAxes
+                                                font.weight: Theme.monoWeightRegular
                                                 font.pixelSize: Theme.fontSizeXs
                                                 color: Theme.textSecondary
                                                 Layout.fillWidth: true
@@ -2378,6 +1948,7 @@ BarPill {
                                         Text {
                                             text: "reset all custom settings"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeSm
                                             font.weight: Theme.fontWeightBold
                                             color: Theme.textPrimary
@@ -2386,6 +1957,8 @@ BarPill {
                                         Text {
                                             text: "wipe all tweaks and restore stock defaults"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.weight: Theme.fontWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.textSecondary
                                         }
@@ -2400,6 +1973,7 @@ BarPill {
                                         Text {
                                             text: "nuke"
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightBold
                                             color: Theme.on_error
@@ -2420,18 +1994,6 @@ BarPill {
                     }
                 }
                 TabScrollTrack { target: flickAdvanced }
-
-                // 6. keybinds tab
-                Item {
-                    id: tabKeybinds
-                    anchors.fill: parent
-                    visible: root.activeTab === "keybinds"
-
-                    KeybindsPreview {
-                        anchors.fill: parent
-                        anchors.margins: 4
-                    }
-                }
             }
 
             // footer
@@ -2450,6 +2012,8 @@ BarPill {
                 Text {
                     text: "changes apply immediately"
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.textSecondary
                     Layout.fillWidth: true
@@ -2458,6 +2022,8 @@ BarPill {
                 Text {
                     text: "esc  close"
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
+                    font.weight: Theme.monoWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.textSecondary
                     opacity: 0.75
@@ -2509,6 +2075,7 @@ BarPill {
                 Text {
                     text: "reset all custom settings?"
                     font.family: Theme.fontDisplay
+                    font.variableAxes: Theme.displayAxes
                     font.pixelSize: Theme.fontSizeLg
                     font.weight: Theme.fontWeightBold
                     color: Theme.textPrimary
@@ -2518,6 +2085,8 @@ BarPill {
                 Text {
                     text: "are you sure? this will wipe every tweak and revert everything back to stock defaults."
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: Theme.fontSizeSm
                     color: Theme.textSecondary
                     wrapMode: Text.Wrap
@@ -2540,6 +2109,7 @@ BarPill {
                         Text {
                             text: "nevermind"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeSm
                             font.weight: Theme.fontWeightBold
                             color: Theme.textPrimary
@@ -2566,6 +2136,7 @@ BarPill {
                         Text {
                             text: "reset everything"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeSm
                             font.weight: Theme.fontWeightBold
                             color: Theme.on_error

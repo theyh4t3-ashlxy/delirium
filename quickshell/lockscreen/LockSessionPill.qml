@@ -44,14 +44,17 @@ Rectangle {
         Text {
             text: root ? root.fmtText(root.currentUser) : ""
             font.family: Theme.fontMono
+            font.variableAxes: Theme.monoAxes
             font.pixelSize: Theme.fontSizeSm
-            font.weight: Theme.fontWeightDemiBold
+            font.weight: Theme.monoWeightBold
             color: root?.uiTextPrimary ?? Theme.on_surface
         }
 
         Text {
             text: "• " + (root?.lockedDurationText ?? "")
             font.family: Theme.fontMono
+            font.variableAxes: Theme.monoAxes
+            font.weight: Theme.monoWeightRegular
             font.pixelSize: Theme.fontSizeXs
             color: root?.uiTextSecondary ?? Theme.on_surface_variant
         }
@@ -70,8 +73,9 @@ Rectangle {
                 anchors.centerIn: parent
                 text: root ? root.fmtText(root.failedAttempts + (root.failedAttempts === 1 ? " failed try" : " failed tries")) : ""
                 font.family: Theme.fontMono
+                font.variableAxes: Theme.monoAxes
                 font.pixelSize: Theme.fontSizeXs
-                font.weight: Theme.fontWeightBold
+                font.weight: Theme.monoWeightBold
                 color: Theme.error
             }
         }

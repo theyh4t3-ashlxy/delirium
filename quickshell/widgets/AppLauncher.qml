@@ -735,6 +735,8 @@ PopupPanel {
                         Layout.fillHeight: true
                         verticalAlignment: TextInput.AlignVCenter
                         font.family: root.isCommand ? Theme.fontMono : Theme.fontFamily
+                        font.variableAxes: root.isCommand ? Theme.monoAxes : Theme.sansAxes
+                        font.weight: root.isCommand ? Theme.monoWeightRegular : Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeSm
                         color: Theme.textPrimary
                         selectionColor: Theme.primary_container
@@ -746,6 +748,8 @@ PopupPanel {
                         Text {
                             text: root.fmtText("search apps, math, @windows, :actions, or >zsh...")
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeSm
                             color: Theme.on_surface_disabled
                             anchors.verticalCenter: parent.verticalCenter
@@ -1012,6 +1016,8 @@ PopupPanel {
                         Text {
                             text: root.fmtText("sort:")
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textSecondary
                         }
@@ -1036,6 +1042,7 @@ PopupPanel {
                                     anchors.centerIn: parent
                                     text: root.fmtText(modelData.lbl)
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: sel ? Theme.fontWeightBold : Theme.fontWeightMedium
                                     color: sel ? Theme.primary : Theme.textSecondary
@@ -1056,6 +1063,8 @@ PopupPanel {
                         Text {
                             text: root.fmtText("case:")
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textSecondary
                         }
@@ -1080,8 +1089,9 @@ PopupPanel {
                                     anchors.centerIn: parent
                                     text: modelData.lbl
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.weight: sel ? Theme.fontWeightBold : Theme.fontWeightMedium
+                                    font.weight: sel ? Theme.monoWeightBold : Theme.monoWeightMedium
                                     color: sel ? Theme.primary : Theme.textSecondary
                                 }
 
@@ -1105,6 +1115,8 @@ PopupPanel {
                         Text {
                             text: root.fmtText("sub:")
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textSecondary
                         }
@@ -1129,6 +1141,7 @@ PopupPanel {
                                     anchors.centerIn: parent
                                     text: root.fmtText(modelData.lbl)
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: sel ? Theme.fontWeightBold : Theme.fontWeightMedium
                                     color: sel ? Theme.primary : Theme.textSecondary
@@ -1149,6 +1162,8 @@ PopupPanel {
                         Text {
                             text: root.fmtText("grid:")
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textSecondary
                         }
@@ -1169,8 +1184,9 @@ PopupPanel {
                                     anchors.centerIn: parent
                                     text: modelData + "c"
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.weight: sel ? Theme.fontWeightBold : Theme.fontWeightMedium
+                                    font.weight: sel ? Theme.monoWeightBold : Theme.monoWeightMedium
                                     color: sel ? Theme.primary : Theme.textSecondary
                                 }
 
@@ -1203,6 +1219,7 @@ PopupPanel {
                                 anchors.centerIn: parent
                                 text: root.fmtText("auto categories: " + (root.autoDesktopCats ? "on" : "off"))
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeXs
                                 font.weight: Theme.fontWeightDemiBold
                                 color: root.autoDesktopCats ? Theme.primary : Theme.textSecondary
@@ -1234,6 +1251,7 @@ PopupPanel {
                                 anchors.centerIn: parent
                                 text: root.fmtText("wide card: " + (root.launcherWide ? "on" : "off"))
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeXs
                                 font.weight: Theme.fontWeightDemiBold
                                 color: root.launcherWide ? Theme.primary : Theme.textSecondary
@@ -1263,6 +1281,8 @@ PopupPanel {
                                 anchors.centerIn: parent
                                 text: root.fmtText("reset stats")
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.textSecondary
                             }
@@ -1344,6 +1364,7 @@ PopupPanel {
                                     Text {
                                         text: modelData.label
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: isSelected ? Theme.fontWeightBold : Theme.fontWeightMedium
                                         color: isSelected ? Theme.primary : Theme.textSecondary
@@ -1381,8 +1402,9 @@ PopupPanel {
                         anchors.centerIn: parent
                         text: "+"
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
                         font.pixelSize: Theme.fontSizeSm
-                        font.weight: Theme.fontWeightBold
+                        font.weight: Theme.monoWeightBold
                         color: manageHover.containsMouse ? Theme.primary : Theme.textSecondary
                     }
 
@@ -1431,8 +1453,9 @@ PopupPanel {
                         Text {
                             text: "="
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeLg
-                            font.weight: Theme.fontWeightBold
+                            font.weight: Theme.monoWeightBold
                             color: Theme.on_primary
                             anchors.centerIn: parent
                         }
@@ -1445,14 +1468,17 @@ PopupPanel {
                         Text {
                             text: root.calcResult ?? ""
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeLg
-                            font.weight: Theme.fontWeightBold
+                            font.weight: Theme.monoWeightBold
                             color: Theme.textPrimary
                         }
 
                         Text {
                             text: root.fmtText("press enter or click to copy to clipboard")
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.primary
                         }
@@ -1469,8 +1495,9 @@ PopupPanel {
                             anchors.centerIn: parent
                             text: root.fmtText("copy ↵")
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeXs
-                            font.weight: Theme.fontWeightBold
+                            font.weight: Theme.monoWeightBold
                             color: Theme.on_primary
                         }
                     }
@@ -1536,8 +1563,9 @@ PopupPanel {
                         Text {
                             text: root.expandedPath
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeSm
-                            font.weight: Theme.fontWeightBold
+                            font.weight: Theme.monoWeightBold
                             color: Theme.textPrimary
                             elide: Text.ElideMiddle
                             Layout.fillWidth: true
@@ -1546,6 +1574,8 @@ PopupPanel {
                         Text {
                             text: root.fmtText("enter to open • shift+enter for terminal")
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.primary
                         }
@@ -1567,6 +1597,8 @@ PopupPanel {
                                 anchors.centerIn: parent
                                 text: root.fmtText("copy")
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.textPrimary
                             }
@@ -1593,6 +1625,8 @@ PopupPanel {
                                 anchors.centerIn: parent
                                 text: root.fmtText("term ⇧↵")
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.textPrimary
                             }
@@ -1617,8 +1651,9 @@ PopupPanel {
                                 anchors.centerIn: parent
                                 text: root.fmtText("open ↵")
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
                                 font.pixelSize: Theme.fontSizeXs
-                                font.weight: Font.Bold
+                                font.weight: Theme.monoWeightBold
                                 color: Theme.on_primary
                             }
                         }
@@ -1672,8 +1707,9 @@ PopupPanel {
                         Text {
                             text: root.isWebSearch ? root.cleanWebQuery : (root.isCommand ? root.cleanCommand : root.cleanQuery)
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeSm
-                            font.weight: Theme.fontWeightBold
+                            font.weight: Theme.monoWeightBold
                             color: Theme.textPrimary
                             elide: Text.ElideRight
                             Layout.fillWidth: true
@@ -1682,6 +1718,8 @@ PopupPanel {
                         Text {
                             text: root.fmtText(root.isWebSearch ? "search the web in default browser" : ("run detached in " + root.userShell.replace(/^.*\//, "")))
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: root.isWebSearch ? Theme.primary : Theme.tertiary
                         }
@@ -1698,8 +1736,9 @@ PopupPanel {
                             anchors.centerIn: parent
                             text: root.fmtText(root.isWebSearch ? "web ↵" : "exec ↵")
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeXs
-                            font.weight: Theme.fontWeightBold
+                            font.weight: Theme.monoWeightBold
                             color: root.isWebSearch ? Theme.on_primary : Theme.on_tertiary
                         }
                     }
@@ -1773,6 +1812,7 @@ PopupPanel {
                                 Text {
                                     text: root.fmtText(modelData.name)
                                     font.family: Theme.fontDisplay
+                                    font.variableAxes: Theme.displayAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     font.weight: Theme.fontWeightBold
                                     color: Theme.textPrimary
@@ -1780,6 +1820,8 @@ PopupPanel {
                                 Text {
                                     text: root.fmtText(modelData.desc)
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.weight: Theme.fontWeightRegular
                                     font.pixelSize: Theme.fontSizeXs
                                     color: Theme.textSecondary
                                 }
@@ -1788,6 +1830,8 @@ PopupPanel {
                             Text {
                                 text: ":" + modelData.id
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.primary
                             }
@@ -1853,6 +1897,7 @@ PopupPanel {
                                 Text {
                                     text: root.fmtText(modelData.title || parent.parent.winClass)
                                     font.family: Theme.fontDisplay
+                                    font.variableAxes: Theme.displayAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     font.weight: isSelected ? Theme.fontWeightBold : Theme.fontWeightDemiBold
                                     color: isSelected ? Theme.primary : Theme.textPrimary
@@ -1863,6 +1908,8 @@ PopupPanel {
                                 Text {
                                     text: root.fmtText(parent.parent.winClass)
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.weight: Theme.monoWeightRegular
                                     font.pixelSize: Theme.fontSizeXs
                                     color: Theme.textSecondary
                                 }
@@ -1880,8 +1927,9 @@ PopupPanel {
                                     anchors.centerIn: parent
                                     text: root.fmtText("ws " + parent.parent.parent.wsName)
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: Theme.fontSizeXs
-                                    font.weight: Theme.fontWeightBold
+                                    font.weight: Theme.monoWeightBold
                                     color: Theme.primary
                                 }
                             }
@@ -1993,6 +2041,7 @@ PopupPanel {
                                     Text {
                                         text: root.fmtText(modelData?.name ?? "")
                                         font.family: Theme.fontDisplay
+                                        font.variableAxes: Theme.displayAxes
                                         font.pixelSize: Theme.fontSizeSm
                                         font.weight: appDelegate.isSelected ? Theme.fontWeightBold : Theme.fontWeightDemiBold
                                         color: appDelegate.isSelected ? Theme.primary : Theme.textPrimary
@@ -2013,8 +2062,9 @@ PopupPanel {
                                             anchors.centerIn: parent
                                             text: "tty"
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: 9
-                                            font.weight: Theme.fontWeightBold
+                                            font.weight: Theme.monoWeightBold
                                             color: Theme.tertiary
                                         }
                                     }
@@ -2038,6 +2088,8 @@ PopupPanel {
                                                     anchors.centerIn: parent
                                                     text: modelData.name
                                                     font.family: Theme.fontMono
+                                                    font.variableAxes: Theme.monoAxes
+                                                    font.weight: Theme.monoWeightRegular
                                                     font.pixelSize: Theme.fontSizeXs
                                                     color: Theme.textSecondary
                                                 }
@@ -2106,8 +2158,9 @@ PopupPanel {
                                     anchors.centerIn: parent
                                     text: "•••"
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: 9
-                                    font.weight: Theme.fontWeightBold
+                                    font.weight: Theme.monoWeightBold
                                     color: actMenuMouse.containsMouse ? Theme.primary : Theme.textSecondary
                                 }
 
@@ -2139,6 +2192,7 @@ PopupPanel {
                                     Text {
                                         text: root.fmtText("open")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightBold
                                         color: Theme.on_primary
@@ -2147,8 +2201,9 @@ PopupPanel {
                                     Text {
                                         text: "↵"
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: Theme.monoWeightBold
                                         color: Theme.on_primary
                                     }
                                 }
@@ -2261,6 +2316,7 @@ PopupPanel {
                                 Text {
                                     text: root.fmtText(gridCell.modelData?.name ?? "")
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: gridCell.isSelected ? Theme.fontWeightBold : Theme.fontWeightMedium
                                     color: gridCell.isSelected ? Theme.primary : Theme.textPrimary
@@ -2342,6 +2398,7 @@ PopupPanel {
                         Text {
                             text: root.fmtText(root.activeCategory !== "all" ? "no apps in this category" : "no matching applications")
                             font.family: Theme.fontDisplay
+                            font.variableAxes: Theme.displayAxes
                             font.pixelSize: Theme.fontSizeSm
                             font.weight: Theme.fontWeightBold
                             color: Theme.textPrimary
@@ -2351,6 +2408,8 @@ PopupPanel {
                         Text {
                             text: root.fmtText("tip: prefix > for zsh, @ for windows, : for actions, ? for web")
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textSecondary
                             Layout.alignment: Qt.AlignHCenter
@@ -2384,8 +2443,9 @@ PopupPanel {
                                     : (root.filteredApps.length + " apps"))
                         )
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Theme.fontWeightBold
+                        font.weight: Theme.monoWeightBold
                         color: Theme.primary
                     }
                 }
@@ -2395,6 +2455,8 @@ PopupPanel {
                 Text {
                     text: root.fmtText("↵ open  •  ⇧↵ tty  •  alt+↵/r-click actions  •  ^p pin")
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
+                    font.weight: Theme.monoWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.textSecondary
                     opacity: 0.78
@@ -2447,6 +2509,7 @@ PopupPanel {
                     Text {
                         text: root.fmtText(root.activeManagingCatId !== "" ? ("assign apps: " + root.getActiveCatName()) : "category studio")
                         font.family: Theme.fontDisplay
+                        font.variableAxes: Theme.displayAxes
                         font.pixelSize: Theme.fontSizeMd
                         font.weight: Theme.fontWeightBold
                         color: Theme.textPrimary
@@ -2466,6 +2529,7 @@ PopupPanel {
                             anchors.centerIn: parent
                             text: root.fmtText("done")
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Theme.fontWeightBold
                             color: Theme.on_primary
@@ -2529,6 +2593,8 @@ PopupPanel {
                                         anchors.rightMargin: 10
                                         verticalAlignment: TextInput.AlignVCenter
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
+                                        font.weight: Theme.fontWeightRegular
                                         font.pixelSize: Theme.fontSizeXs
                                         color: Theme.textPrimary
                                         selectByMouse: true
@@ -2536,6 +2602,8 @@ PopupPanel {
                                         Text {
                                             text: root.fmtText("new category name (e.g. work,rice,music)...")
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.weight: Theme.fontWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.on_surface_disabled
                                             anchors.verticalCenter: parent.verticalCenter
@@ -2564,6 +2632,7 @@ PopupPanel {
                                         anchors.centerIn: parent
                                         text: root.fmtText("+ add")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightBold
                                         color: parent.canAdd ? Theme.on_primary : Theme.textSecondary
@@ -2678,6 +2747,7 @@ PopupPanel {
                                     Text {
                                         text: root.fmtText(modelData.name || "")
                                         font.family: Theme.fontDisplay
+                                        font.variableAxes: Theme.displayAxes
                                         font.pixelSize: Theme.fontSizeSm
                                         font.weight: Theme.fontWeightBold
                                         color: Theme.textPrimary
@@ -2686,6 +2756,8 @@ PopupPanel {
                                     Text {
                                         text: root.fmtText((modelData.appIds ? modelData.appIds.length : 0) + " apps assigned")
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
+                                        font.weight: Theme.monoWeightRegular
                                         font.pixelSize: Theme.fontSizeXs
                                         color: Theme.textSecondary
                                     }
@@ -2703,6 +2775,7 @@ PopupPanel {
                                         anchors.centerIn: parent
                                         text: root.fmtText("assign apps")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightBold
                                         color: manageAppsHover.containsMouse ? Theme.primary : Theme.textPrimary
@@ -2769,6 +2842,8 @@ PopupPanel {
                                 Layout.fillHeight: true
                                 verticalAlignment: TextInput.AlignVCenter
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.textPrimary
                                 selectByMouse: true
@@ -2776,6 +2851,8 @@ PopupPanel {
                                 Text {
                                     text: root.fmtText("filter apps to assign...")
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.weight: Theme.fontWeightRegular
                                     font.pixelSize: Theme.fontSizeXs
                                     color: Theme.on_surface_disabled
                                     anchors.verticalCenter: parent.verticalCenter
@@ -2852,6 +2929,7 @@ PopupPanel {
                                 Text {
                                     text: root.fmtText(modelData?.name ?? "")
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeSm
                                     font.weight: isChecked ? Theme.fontWeightBold : Theme.fontWeightMedium
                                     color: isChecked ? Theme.primary : Theme.textPrimary
@@ -2955,6 +3033,7 @@ PopupPanel {
                             Text {
                                 text: root.fmtText(root.categoryAssignApp?.name ?? "")
                                 font.family: Theme.fontDisplay
+                                font.variableAxes: Theme.displayAxes
                                 font.pixelSize: Theme.fontSizeSm
                                 font.weight: Theme.fontWeightBold
                                 color: Theme.textPrimary
@@ -2965,6 +3044,8 @@ PopupPanel {
                             Text {
                                 text: (root.categoryAssignApp?.id ?? "")
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.textSecondary
                                 elide: Text.ElideMiddle
@@ -3017,6 +3098,7 @@ PopupPanel {
                                     Text {
                                         text: root.fmtText(modelData.lbl)
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: Theme.textPrimary
@@ -3058,6 +3140,7 @@ PopupPanel {
                         Text {
                             text: root.fmtText("app actions")
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Theme.fontWeightBold
                             color: Theme.textSecondary
@@ -3091,6 +3174,7 @@ PopupPanel {
                                     Text {
                                         text: root.fmtText(modelData.name || modelData.id || "action")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightMedium
                                         color: Theme.textPrimary
@@ -3123,6 +3207,7 @@ PopupPanel {
                     Text {
                         text: root.fmtText("custom categories")
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Theme.fontWeightBold
                         color: Theme.textSecondary
@@ -3132,6 +3217,8 @@ PopupPanel {
                         visible: (Settings?.launcherCustomCategories ?? []).length === 0
                         text: root.fmtText("no custom categories created yet. click + on the category bar to create one.")
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.textSecondary
                         wrapMode: Text.WordWrap
@@ -3181,6 +3268,7 @@ PopupPanel {
                                 Text {
                                     text: root.fmtText(modelData.name || "")
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: isAssigned ? Theme.fontWeightBold : Theme.fontWeightMedium
                                     color: isAssigned ? Theme.primary : Theme.textPrimary

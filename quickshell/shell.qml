@@ -25,16 +25,10 @@ ShellRoot {
         NotificationToasts {}
     }
 
-    // the mad scientist bar studio for dragging pills around at 3am (lazy-loaded on toggle)
+    // bar studio: layout & presets, bar style, widget options, and motion lab (lazy-loaded on toggle)
     Variants {
         model: (typeof Settings !== "undefined" && Settings?.showBarStudio) ? Quickshell.screens : []
         BarStudio {}
-    }
-
-    // bezier curves and spring physics calibration playground (lazy-loaded on toggle)
-    Variants {
-        model: (typeof Settings !== "undefined" && Settings?.showMotionSandbox) ? Quickshell.screens : []
-        MotionSandbox {}
     }
 
     // on-screen volume & brightness pills so you know your keys aren't broken
@@ -78,20 +72,36 @@ ShellRoot {
         function dnd(): void { Settings.dnd = !Settings.dnd; }
     }
 
-    // bar studio IPC: drag status bar pills around at 3am
+    // bar studio IPC
     IpcHandler {
         target: "studio"
         function toggle(): void { Settings.showBarStudio = !Settings.showBarStudio; }
         function open(): void { Settings.showBarStudio = true; }
         function close(): void { Settings.showBarStudio = false; }
+        function tab(name: string): void {
+            if (["layout", "style", "widgets", "motion"].indexOf(name) !== -1) {
+                Settings.barStudioTab = name;
+            }
+            Settings.showBarStudio = true;
+        }
     }
 
-    // motion sandbox IPC: torture test bezier curves and spring physics
+    // motion lab IPC: routes directly to Bar Studio's motion tab
     IpcHandler {
         target: "sandbox"
-        function toggle(): void { Settings.showMotionSandbox = !Settings.showMotionSandbox; }
-        function open(): void { Settings.showMotionSandbox = true; }
-        function close(): void { Settings.showMotionSandbox = false; }
+        function toggle(): void {
+            if (Settings.showBarStudio && Settings.barStudioTab === "motion") {
+                Settings.showBarStudio = false;
+            } else {
+                Settings.barStudioTab = "motion";
+                Settings.showBarStudio = true;
+            }
+        }
+        function open(): void {
+            Settings.barStudioTab = "motion";
+            Settings.showBarStudio = true;
+        }
+        function close(): void { Settings.showBarStudio = false; }
     }
 
     // app launcher IPC: fuzzy search apps at lightspeed
@@ -116,13 +126,33 @@ ShellRoot {
         ScreenshotOverlay {}
     }
 
+    Variants {
+        model: Quickshell.screens
+        ScreenshotHud {}
+    }
+
+    Variants {
+        model: ScreenshotService.pinnedShots
+        ScreenshotPinLayer {}
+    }
+
     IpcHandler {
         target: "screenshot"
         function open(): void { ScreenshotService.open("region"); }
+        function region(): void { ScreenshotService.open("region"); }
         function close(): void { ScreenshotService.close(); }
         function toggle(): void { ScreenshotService.toggle("region"); }
-        function full(): void { ScreenshotService.captureFullscreen(Quickshell.screens[0], "both"); }
+        function full(): void { ScreenshotService.captureFullscreen(ScreenshotService.getFocusedScreen(), Settings?.screenshotDefaultAction || "both"); }
         function window(): void { ScreenshotService.open("window"); }
+        function annotate(): void { ScreenshotService.openAnnotate(); }
+        function picker(): void { ScreenshotService.openEyedropper(); }
+        function delay(sec: int): void { ScreenshotService.openDelayed("region", sec > 0 ? sec : (Settings?.screenshotDelay || 3)); }
+        function editFile(path: string): void { ScreenshotService.editFile(path); }
+        function editLast(): void { ScreenshotService.editLast(); }
+        function editClipboard(): void { ScreenshotService.editClipboard(); }
+        function pinFile(path: string): void { ScreenshotService.pinFile(path, 520, 320, ScreenshotService.getFocusedScreen()?.name ?? ""); }
+        function pinLast(): void { ScreenshotService.pinLast(); }
+        function clearPins(): void { ScreenshotService.clearPins(); }
     }
 
     // screen recording IPC: hardware-accelerated video capture with native multi-source audio
@@ -202,12 +232,15 @@ ShellRoot {
         function close(): void { Settings.requestVolumeClose(); }
     }
 
-    // network & wifi IPC: wifi, ethernet, and disconnecting from reality
+    // network & wifi IPC: wifi, ethernet, vpn, hotspot, and disconnecting from reality
     IpcHandler {
         target: "network"
         function toggle(): void { Settings.requestNetworkToggle(); }
         function open(): void { Settings.requestNetworkOpen(); }
         function close(): void { Settings.requestNetworkClose(); }
+        function vpn(): void { Settings.requestNetworkTab("vpn"); }
+        function hotspot(): void { Settings.requestNetworkTab("hotspot"); }
+        function tab(name: string): void { Settings.requestNetworkTab(name || "wifi"); }
     }
 
     IpcHandler {
@@ -215,6 +248,8 @@ ShellRoot {
         function toggle(): void { Settings.requestNetworkToggle(); }
         function open(): void { Settings.requestNetworkOpen(); }
         function close(): void { Settings.requestNetworkClose(); }
+        function vpn(): void { Settings.requestNetworkTab("vpn"); }
+        function hotspot(): void { Settings.requestNetworkTab("hotspot"); }
     }
 
     // bluetooth IPC: rf packets screaming into the void

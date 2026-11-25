@@ -119,6 +119,8 @@ ColumnLayout {
                                             ? TextInput.Normal
                                             : (root.pwMaskChar === "none" ? TextInput.NoEcho : TextInput.Password)
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
+                                        font.weight: Theme.monoWeightRegular
                                         font.pixelSize: Theme.fontSizeMd
                                         color: root.uiTextPrimary
                                         selectionColor: root.uiAccentOverlay
@@ -139,6 +141,8 @@ ColumnLayout {
                                                         : "enter password to unlock...")
                                             )
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.weight: Theme.fontWeightRegular
                                             font.pixelSize: Theme.fontSizeSm
                                             color: root.pwMaskChar === "none" && root.sharedPassword.length > 0
                                                 ? root.uiAccent
@@ -242,8 +246,9 @@ ColumnLayout {
                                             anchors.centerIn: parent
                                             text: root.fmtText("caps")
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: Theme.fontSizeXs
-                                            font.weight: Theme.fontWeightBold
+                                            font.weight: Theme.monoWeightBold
                                             color: Theme.warn
                                         }
                                     }
@@ -339,6 +344,7 @@ ColumnLayout {
                                     )
                                     opacity: text !== "" ? 1.0 : 0.0
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightMedium
                                     color: root.unlocking

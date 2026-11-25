@@ -600,8 +600,9 @@ Rectangle {
             Text {
                 text: (root.notif?.appName || "system").toLowerCase()
                 font.family: Theme?.fontMono ?? "monospace"
+                font.variableAxes: Theme?.monoAxes ?? ({})
                 font.pixelSize: Theme?.fontSizeXs ?? 11
-                font.weight: Theme?.fontWeightBold ?? Font.Bold
+                font.weight: Theme?.monoWeightBold ?? Theme?.monoWeightBold ?? Font.Bold ?? Theme?.monoWeightBold ?? Font.Bold
                 color: root.accentColor
                 Layout.fillWidth: true
                 elide: Text.ElideRight
@@ -621,8 +622,9 @@ Rectangle {
                     anchors.centerIn: parent
                     text: "urgent"
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
                     font.pixelSize: Theme.fontSizeXs
-                    font.weight: Theme.fontWeightBold
+                    font.weight: Theme.monoWeightBold
                     color: Theme.error
                 }
             }
@@ -651,6 +653,8 @@ Rectangle {
         Text {
             text: (root.notif?.body ?? "").replace(/<[^>]*>/g, "").toLowerCase()
             font.family: Theme?.fontFamily ?? "sans-serif"
+            font.variableAxes: Theme?.sansAxes ?? ({})
+            font.weight: Theme?.fontWeightRegular ?? Font.Normal
             font.pixelSize: Theme?.fontSizeXs ?? 11
             color: Theme?.on_surface_variant ?? "#a6adc8"
             Layout.fillWidth: true
@@ -706,8 +710,9 @@ Rectangle {
                         anchors.centerIn: parent
                         text: (modelData?.text || modelData?.id || "action").toLowerCase()
                         font.family: Theme?.fontFamily ?? "sans-serif"
+                        font.variableAxes: Theme?.sansAxes ?? ({})
                         font.pixelSize: Theme?.fontSizeXs ?? 11
-                        font.weight: Theme?.fontWeightBold ?? Font.Medium
+                        font.weight: Theme?.fontWeightBold ?? Theme?.fontWeightMedium ?? Font.Medium
                         color: actMouse.pressed
                             ? (root.isCritical ? Theme.on_error : Theme.on_primary)
                             : (actMouse.containsMouse ? root.accentColor : Theme.on_surface)

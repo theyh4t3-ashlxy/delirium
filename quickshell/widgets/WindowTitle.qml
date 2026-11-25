@@ -39,6 +39,8 @@ BarPill {
         visible: false
         text: windowTitleRoot.displayTitle
         font.family: Theme?.fontFamily ?? "sans-serif"
+        font.variableAxes: Theme?.sansAxes ?? ({})
+        font.weight: Theme?.fontWeightRegular ?? Font.Normal
         font.pixelSize: Theme?.fontSizeSm ?? 12
     }
 
@@ -104,6 +106,8 @@ BarPill {
             Layout.alignment: Qt.AlignVCenter
             text: windowTitleRoot.displayTitle
             font.family: Theme?.fontFamily ?? "sans-serif"
+            font.variableAxes: Theme?.sansAxes ?? ({})
+            font.weight: Theme?.fontWeightRegular ?? Font.Normal
             font.pixelSize: Theme?.fontSizeSm ?? 12
             color: Theme?.on_surface ?? "#ffffff"
             elide: Text.ElideRight

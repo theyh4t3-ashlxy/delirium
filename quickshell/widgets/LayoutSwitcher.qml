@@ -51,7 +51,7 @@ BarPill {
     hovered: lMouse.containsMouse
     pressed: lMouse.pressed
     activeBorder: Theme?.primary ?? "transparent"
-    normalBorder: ((Theme?.isBarPills ?? true) && (Theme?.isCyberNeon ?? false)) ? (Theme?.primary ?? Theme.barPillBorder) : (Theme?.barPillBorder ?? "transparent")
+    normalBorder: ((Theme?.isBarPills ?? true) && (Theme?.isOutlined ?? false)) ? (Theme?.primary ?? Theme.barPillBorder) : (Theme?.barPillBorder ?? "transparent")
 
     implicitWidth: {
         if (Theme?.isVertical ?? false) return (Theme?.barHeight ?? 32) - 8;
@@ -262,8 +262,9 @@ BarPill {
             anchors.verticalCenter: parent.verticalCenter
             text: root.getLayoutIcon(root.currentLayout)
             font.family: Theme?.fontMono ?? "monospace"
+            font.variableAxes: Theme?.monoAxes ?? ({})
             font.pixelSize: Theme?.fontSizeMd ?? 13
-            font.weight: Theme?.fontWeightBold ?? Font.Bold
+            font.weight: Theme?.monoWeightBold ?? Theme?.monoWeightBold ?? Font.Bold ?? Theme?.monoWeightBold ?? Font.Bold
             color: popup.open ? Theme.primary : Theme.on_surface
         }
 
@@ -272,8 +273,9 @@ BarPill {
             anchors.verticalCenter: parent.verticalCenter
             text: root.getLayoutLabel(root.currentLayout)
             font.family: Theme?.fontFamily ?? "sans-serif"
+            font.variableAxes: Theme?.sansAxes ?? ({})
             font.pixelSize: Theme?.fontSizeXs ?? 10
-            font.weight: Theme?.fontWeightMedium ?? Font.Medium
+            font.weight: Theme?.fontWeightMedium ?? Theme?.fontWeightMedium ?? Font.Medium
             color: popup.open ? Theme.primary : Theme.on_surface_variant
         }
 
@@ -283,8 +285,9 @@ BarPill {
             anchors.verticalCenter: parent.verticalCenter
             text: root.numWindows.toString()
             font.family: Theme?.fontMono ?? "monospace"
+            font.variableAxes: Theme?.monoAxes ?? ({})
             font.pixelSize: Theme?.fontSizeXs ?? 9
-            font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
+            font.weight: Theme?.monoWeightBold ?? Theme?.monoWeightBold ?? Font.DemiBold ?? Theme?.monoWeightBold ?? Font.DemiBold
             color: Theme?.primary ?? "#00ffff"
             opacity: 0.85
         }
@@ -300,8 +303,9 @@ BarPill {
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.getLayoutIcon(root.currentLayout)
             font.family: Theme?.fontMono ?? "monospace"
+            font.variableAxes: Theme?.monoAxes ?? ({})
             font.pixelSize: Theme?.fontSizeSm ?? 12
-            font.weight: Theme?.fontWeightBold ?? Font.Bold
+            font.weight: Theme?.monoWeightBold ?? Theme?.monoWeightBold ?? Font.Bold ?? Theme?.monoWeightBold ?? Font.Bold
             color: popup.open ? Theme.primary : Theme.on_surface
         }
 
@@ -310,8 +314,9 @@ BarPill {
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.numWindows.toString()
             font.family: Theme?.fontMono ?? "monospace"
+            font.variableAxes: Theme?.monoAxes ?? ({})
             font.pixelSize: Theme?.fontSizeXs ?? 9
-            font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
+            font.weight: Theme?.monoWeightBold ?? Theme?.monoWeightBold ?? Font.DemiBold ?? Theme?.monoWeightBold ?? Font.DemiBold
             color: Theme?.primary ?? "#00ffff"
         }
     }
@@ -399,8 +404,9 @@ BarPill {
                         anchors.centerIn: parent
                         text: root.getLayoutIcon(root.currentLayout)
                         font.family: Theme?.fontMono ?? "monospace"
+                        font.variableAxes: Theme?.monoAxes ?? ({})
                         font.pixelSize: Theme?.fontSizeLg ?? 15
-                        font.weight: Theme?.fontWeightBold ?? Font.Bold
+                        font.weight: Theme?.monoWeightBold ?? Theme?.monoWeightBold ?? Font.Bold ?? Theme?.monoWeightBold ?? Font.Bold
                         color: Theme.primary
                     }
                 }
@@ -412,14 +418,17 @@ BarPill {
                     Text {
                         text: "window tiling layouts"
                         font.family: Theme?.fontFamily ?? "sans-serif"
+                        font.variableAxes: Theme?.sansAxes ?? ({})
                         font.pixelSize: Theme?.fontSizeSm ?? 12
-                        font.weight: Theme?.fontWeightBold ?? Font.Bold
+                        font.weight: Theme?.fontWeightBold ?? Theme?.fontWeightBold ?? Font.Bold
                         color: Theme.on_surface
                     }
 
                     Text {
                         text: "switch tiling engine or eval custom lua layout"
                         font.family: Theme?.fontFamily ?? "sans-serif"
+                        font.variableAxes: Theme?.sansAxes ?? ({})
+                        font.weight: Theme?.fontWeightRegular ?? Font.Normal
                         font.pixelSize: Theme?.fontSizeXs ?? 10
                         color: Theme.on_surface_variant
                     }
@@ -503,16 +512,18 @@ BarPill {
                                     Text {
                                         text: layoutCard.modelData.icon
                                         font.family: Theme?.fontMono ?? "monospace"
+                                        font.variableAxes: Theme?.monoAxes ?? ({})
                                         font.pixelSize: Theme?.fontSizeLg ?? 15
-                                        font.weight: Theme?.fontWeightBold ?? Font.Bold
+                                        font.weight: Theme?.monoWeightBold ?? Theme?.monoWeightBold ?? Font.Bold ?? Theme?.monoWeightBold ?? Font.Bold
                                         color: layoutCard.isCurrent ? Theme.primary : Theme.on_surface
                                     }
 
                                     Text {
                                         text: layoutCard.modelData.title
                                         font.family: Theme?.fontFamily ?? "sans-serif"
+                                        font.variableAxes: Theme?.sansAxes ?? ({})
                                         font.pixelSize: Theme?.fontSizeSm ?? 12
-                                        font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
+                                        font.weight: Theme?.fontWeightDemiBold ?? Theme?.fontWeightDemiBold ?? Font.DemiBold
                                         color: layoutCard.isCurrent ? Theme.primary : Theme.on_surface
                                     }
 
@@ -529,8 +540,9 @@ BarPill {
                                             anchors.centerIn: parent
                                             text: layoutCard.modelData.badge
                                             font.family: Theme?.fontFamily ?? "sans-serif"
+                                            font.variableAxes: Theme?.sansAxes ?? ({})
                                             font.pixelSize: Theme?.fontSizeXs ?? 9
-                                            font.weight: Theme?.fontWeightMedium ?? Font.Medium
+                                            font.weight: Theme?.fontWeightMedium ?? Theme?.fontWeightMedium ?? Font.Medium
                                             color: layoutCard.isCurrent ? Theme.primary : Theme.on_surface_variant
                                         }
                                     }
@@ -552,6 +564,8 @@ BarPill {
                                     Layout.fillWidth: true
                                     text: layoutCard.modelData.desc
                                     font.family: Theme?.fontFamily ?? "sans-serif"
+                                    font.variableAxes: Theme?.sansAxes ?? ({})
+                                    font.weight: Theme?.fontWeightRegular ?? Font.Normal
                                     font.pixelSize: Theme?.fontSizeXs ?? 10
                                     color: Theme.on_surface_variant
                                     wrapMode: Text.Wrap
@@ -599,16 +613,18 @@ BarPill {
                                 Text {
                                     text: "{}"
                                     font.family: Theme?.fontMono ?? "monospace"
+                                    font.variableAxes: Theme?.monoAxes ?? ({})
                                     font.pixelSize: Theme?.fontSizeMd ?? 13
-                                    font.weight: Theme?.fontWeightBold ?? Font.Bold
+                                    font.weight: Theme?.monoWeightBold ?? Theme?.monoWeightBold ?? Font.Bold ?? Theme?.monoWeightBold ?? Font.Bold
                                     color: Theme.primary
                                 }
 
                                 Text {
                                     text: "custom lua layout"
                                     font.family: Theme?.fontFamily ?? "sans-serif"
+                                    font.variableAxes: Theme?.sansAxes ?? ({})
                                     font.pixelSize: Theme?.fontSizeSm ?? 12
-                                    font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
+                                    font.weight: Theme?.fontWeightDemiBold ?? Theme?.fontWeightDemiBold ?? Font.DemiBold
                                     color: Theme.on_surface
                                 }
 
@@ -625,8 +641,9 @@ BarPill {
                                         anchors.centerIn: parent
                                         text: "lua engine"
                                         font.family: Theme?.fontFamily ?? "sans-serif"
+                                        font.variableAxes: Theme?.sansAxes ?? ({})
                                         font.pixelSize: Theme?.fontSizeXs ?? 9
-                                        font.weight: Theme?.fontWeightMedium ?? Font.Medium
+                                        font.weight: Theme?.fontWeightMedium ?? Theme?.fontWeightMedium ?? Font.Medium
                                         color: customCard.isCustomActive ? Theme.primary : Theme.on_surface_variant
                                     }
                                 }
@@ -648,6 +665,8 @@ BarPill {
                                 Layout.fillWidth: true
                                 text: "passes a custom layout or plugin name into hyprctl eval."
                                 font.family: Theme?.fontFamily ?? "sans-serif"
+                                font.variableAxes: Theme?.sansAxes ?? ({})
+                                font.weight: Theme?.fontWeightRegular ?? Font.Normal
                                 font.pixelSize: Theme?.fontSizeXs ?? 10
                                 color: Theme.on_surface_variant
                                 wrapMode: Text.Wrap
@@ -672,6 +691,8 @@ BarPill {
                                         anchors.rightMargin: 8
                                         verticalAlignment: TextInput.AlignVCenter
                                         font.family: Theme?.fontMono ?? "monospace"
+                                        font.variableAxes: Theme?.monoAxes ?? ({})
+                                        font.weight: Theme?.monoWeightRegular ?? Font.Normal
                                         font.pixelSize: Theme?.fontSizeSm ?? 11
                                         color: Theme.on_surface
                                         clip: true
@@ -690,6 +711,8 @@ BarPill {
                                             anchors.verticalCenter: parent.verticalCenter
                                             text: "enter custom layout name..."
                                             font.family: Theme?.fontFamily ?? "sans-serif"
+                                            font.variableAxes: Theme?.sansAxes ?? ({})
+                                            font.weight: Theme?.fontWeightRegular ?? Font.Normal
                                             font.pixelSize: Theme?.fontSizeXs ?? 10
                                             color: Theme.on_surface_variant
                                             opacity: 0.6
@@ -715,8 +738,9 @@ BarPill {
                                         anchors.centerIn: parent
                                         text: "apply"
                                         font.family: Theme?.fontFamily ?? "sans-serif"
+                                        font.variableAxes: Theme?.sansAxes ?? ({})
                                         font.pixelSize: Theme?.fontSizeXs ?? 10
-                                        font.weight: Theme?.fontWeightBold ?? Font.Bold
+                                        font.weight: Theme?.fontWeightBold ?? Theme?.fontWeightBold ?? Font.Bold
                                         color: Theme.primary
                                     }
 

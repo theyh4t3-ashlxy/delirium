@@ -1,4 +1,4 @@
-// BarStudio.qml
+// BarStudio.qml — full-featured bar studio: layout & presets, bar style & geometry, widget options, motion lab
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -15,9 +15,15 @@ PopupPanel {
     required property var modelData
     screen: modelData
 
-    cardWidth: Math.min(1160, Math.max(780, (root.screen?.width ?? 1920) - 48))
-    cardHeight: Math.min(680, Math.max(520, (root.screen?.height ?? 1080) - Theme.barHeight - 32))
+    cardWidth: Math.min(1160, Math.max(820, (root.screen?.width ?? 1920) - 48))
+    cardHeight: Math.min(720, Math.max(540, (root.screen?.height ?? 1080) - Theme.barHeight - 32))
     open: false
+
+    property string activeTab: (Settings?.barStudioTab && ["layout", "style", "widgets", "motion"].indexOf(Settings.barStudioTab) !== -1)
+        ? Settings.barStudioTab
+        : "layout"
+    property bool showSavePresetInput: false
+    property string hoveredPresetDesc: ""
 
     property bool isDragging: false
     property string draggedModId: ""
@@ -30,6 +36,34 @@ PopupPanel {
     property real dragOffsetY: 0
     property string hoverZoneId: ""
     property int hoverIndex: -1
+
+    readonly property string activeTabSubtitle: ({
+        layout:  "arrange zone modules, dock edge, and material presets",
+        style:   "surface material, opacity, spacing, floating islands, and bar scoops",
+        widgets: "clock formatting, active window pill, workspace rail, and media equalizer",
+        motion:  "animation timing, easing curves, and interactive physics playground"
+    })[root.activeTab] || ""
+
+    readonly property string activePresetDesc: {
+        const list = (typeof PresetService !== "undefined" ? PresetService?.availablePresets : null) ?? [];
+        const activeId = PresetService?.activePresetName ?? "";
+        for (let i = 0; i < list.length; i++) {
+            if (list[i].id === activeId && list[i].desc) return list[i].desc;
+        }
+        return "";
+    }
+
+    onActiveTabChanged: {
+        if (Settings && Settings.barStudioTab !== root.activeTab) {
+            Settings.barStudioTab = root.activeTab;
+        }
+        if (root.activeTab !== "layout" && root.isDragging) {
+            root.cancelDrag();
+        }
+        if (root.activeTab === "style" && styleTab) styleTab.resetScroll();
+        else if (root.activeTab === "widgets" && widgetsTab) widgetsTab.resetScroll();
+        else if (root.activeTab === "motion" && motionTab) motionTab.resetScroll();
+    }
 
     readonly property var moduleCatalog: ({
         "launcher":       { name: "app launcher",      icon: Theme.iconDistro,      desc: "application search & grid" },
@@ -48,7 +82,7 @@ PopupPanel {
         "network":        { name: "network status",    icon: Theme.iconWifi,        desc: "wifi & ethernet monitor" },
         "volume":         { name: "volume & sink",     icon: Theme.iconVolHigh,     desc: "pipewire audio controls" },
         "battery":        { name: "battery & power",   icon: Theme.iconBatFull,     desc: "upower level & charging" },
-        "quickSettings":  { name: "quick settings",    icon: Theme.iconSettings,    desc: "system & appearance toggles" },
+        "quickSettings":  { name: "quick settings",    icon: Theme.iconSettings,    desc: "system & global settings" },
         "powerMenu":      { name: "power menu",        icon: Theme.iconPower,       desc: "lock, logout & power off" },
         "screenCapture":  { name: "screen capture",    icon: Theme.iconCamera,      desc: "screenshot & screen recording" }
     })
@@ -81,8 +115,18 @@ PopupPanel {
             if (Settings?.showBarStudio) {
                 const focused = Hyprland?.focusedMonitor?.name;
                 root.open = (!focused || !root.screen || root.screen?.name === focused);
+                if (typeof PresetService !== "undefined" && PresetService?.refreshPresets) {
+                    PresetService.refreshPresets();
+                }
             } else {
                 root.open = false;
+            }
+        }
+
+        function onBarStudioTabChanged() {
+            const t = Settings?.barStudioTab;
+            if (t && ["layout", "style", "widgets", "motion"].indexOf(t) !== -1 && root.activeTab !== t) {
+                root.activeTab = t;
             }
         }
     }
@@ -90,6 +134,7 @@ PopupPanel {
     onOpenChanged: {
         if (!open) {
             if (isDragging) cancelDrag();
+            root.showSavePresetInput = false;
             if (Settings?.showBarStudio) {
                 const focused = Hyprland?.focusedMonitor?.name;
                 if (!focused || !root.screen || root.screen?.name === focused) {
@@ -101,6 +146,14 @@ PopupPanel {
 
     function saveSettings() {
         if (Settings?.save) Settings.save();
+    }
+
+    function commitSavePreset() {
+        const typed = presetNameInput.text.trim();
+        if (!typed) return;
+        PresetService?.exportCurrentAsPreset(typed);
+        presetNameInput.text = "";
+        root.showSavePresetInput = false;
     }
 
     function getModuleInfo(modId) {
@@ -325,7 +378,11 @@ PopupPanel {
         focus: true
 
         Keys.onEscapePressed: (event) => {
-            if (root.isDragging) {
+            if (root.showSavePresetInput) {
+                root.showSavePresetInput = false;
+                presetNameInput.text = "";
+                event.accepted = true;
+            } else if (root.isDragging) {
                 root.cancelDrag();
                 event.accepted = true;
             } else if (root.open) {
@@ -341,8 +398,8 @@ PopupPanel {
             spacing: 10
 
             Rectangle {
-                Layout.preferredWidth: 34
-                Layout.preferredHeight: 34
+                Layout.preferredWidth: 36
+                Layout.preferredHeight: 36
                 radius: Theme.radiusMd
                 color: Theme.primary_overlay
                 border.color: Theme.alpha(Theme.primary, 0.35)
@@ -350,7 +407,7 @@ PopupPanel {
 
                 Text {
                     anchors.centerIn: parent
-                    text: Theme.iconSparkles
+                    text: Theme.iconGrid
                     font.family: Theme.fontIcon
                     font.variableAxes: Theme.iconAxes
                     font.pixelSize: Theme.isTextIconSet ? Theme.fontSizeSm : Theme.fontSizeLg
@@ -359,121 +416,105 @@ PopupPanel {
             }
 
             ColumnLayout {
+                Layout.fillWidth: true
                 spacing: 1
-                Text {
-                    text: "bar layout studio"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeMd
-                    font.weight: Font.Bold
-                    color: Theme.on_surface
-                }
-                Text {
-                    text: Theme.getFlavor("system", "drag cards or click arrows to hot-reorder panels on your status bar")
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeXs
-                    color: Theme.on_surface_variant
-                }
-            }
 
-            Row {
-                spacing: 6
-                Layout.alignment: Qt.AlignVCenter
+                RowLayout {
+                    spacing: 8
+                    Text {
+                        text: "bar layout studio"
+                        font.family: Theme.fontDisplay
+                        font.variableAxes: Theme.displayAxes
+                        font.pixelSize: Theme.fontSizeMd
+                        font.weight: Theme.fontWeightBold
+                        color: Theme.on_surface
+                    }
 
-                Text {
-                    text: "preset:"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeXs
-                    color: Theme.on_surface_variant
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
-                Repeater {
-                    model: (typeof PresetService !== "undefined" ? PresetService?.availablePresets : null) ?? []
-                    delegate: Rectangle {
-                        required property var modelData
-                        height: 24
-                        implicitWidth: pText.implicitWidth + 14
+                    Rectangle {
+                        height: 20
+                        implicitWidth: matTag.implicitWidth + 12
                         radius: Theme.radiusPill
-                        readonly property bool isCurrent: PresetService?.activePresetName === modelData.id
-                        color: isCurrent ? Theme.primary : (pMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-                        border.color: isCurrent ? Theme.primary : Theme.pillBorder
-                        border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
-
-                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+                        color: Theme.primary_overlay
+                        border.color: Theme.alpha(Theme.primary, 0.35)
+                        border.width: 1
 
                         Text {
-                            id: pText
+                            id: matTag
                             anchors.centerIn: parent
-                            text: modelData.name
-                            font.family: Theme.fontFamily
+                            text: Theme.barStyle + " · " + ((Settings?.barFloating || Theme.isIslands) ? "floating" : "docked")
+                            font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeXs
-                            font.weight: isCurrent ? Font.Bold : Font.Normal
-                            color: isCurrent ? Theme.on_primary : Theme.on_surface
-                        }
-
-                        MouseArea {
-                            id: pMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: PresetService?.applyPresetById(modelData.id)
+                            font.weight: Theme.monoWeightBold
+                            color: Theme.primary
                         }
                     }
                 }
 
-                Rectangle {
-                    height: 24
-                    implicitWidth: saveRow.implicitWidth + 14
-                    radius: Theme.radiusPill
-                    color: saveMouse.containsMouse ? Theme.primary_overlay : "transparent"
-                    border.color: saveMouse.containsMouse ? Theme.primary : Theme.widgetBorder
-                    border.width: 1
-
-                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                    Row {
-                        id: saveRow
-                        anchors.centerIn: parent
-                        spacing: 4
-
-                        Text {
-                            visible: !Theme.isTextIconSet
-                            text: Theme.iconSave
-                            font.family: Theme.fontIcon
-                            font.variableAxes: Theme.iconAxes
-                            font.pixelSize: Theme.fontSizeXs
-                            color: Theme.primary
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-
-                        Text {
-                            text: "save preset"
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.DemiBold
-                            color: Theme.primary
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                    }
-
-                    MouseArea {
-                        id: saveMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            let name = "custom_" + Math.floor(Date.now() / 1000);
-                            PresetService?.exportCurrentAsPreset(name);
-                        }
-                    }
+                Text {
+                    text: root.activeTabSubtitle
+                    font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
+                    font.pixelSize: Theme.fontSizeXs
+                    color: Theme.on_surface_variant
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
                 }
             }
 
-            Item { Layout.fillWidth: true }
-
+            // open global settings button
             Rectangle {
                 Layout.preferredHeight: 28
-                Layout.preferredWidth: resetRow.implicitWidth + 18
+                Layout.preferredWidth: openSetRow.implicitWidth + 16
+                radius: Theme.radiusPill
+                color: openSetMouse.containsMouse ? Theme.primary_overlay : Theme.pillBg
+                border.color: openSetMouse.containsMouse ? Theme.primary : Theme.widgetBorder
+                border.width: 1
+
+                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                Row {
+                    id: openSetRow
+                    anchors.centerIn: parent
+                    spacing: 5
+                    Text {
+                        visible: !Theme.isTextIconSet
+                        text: Theme.iconSettings
+                        font.family: Theme.fontIcon
+                        font.variableAxes: Theme.iconAxes
+                        font.pixelSize: Theme.fontSizeXs
+                        color: openSetMouse.containsMouse ? Theme.primary : Theme.on_surface
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: "settings"
+                        font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
+                        font.pixelSize: Theme.fontSizeXs
+                        color: openSetMouse.containsMouse ? Theme.primary : Theme.on_surface
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+
+                MouseArea {
+                    id: openSetMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (Settings) Settings.showBarStudio = false;
+                        root.open = false;
+                        if (Settings?.requestQuickSettingsOpen) Settings.requestQuickSettingsOpen();
+                    }
+                }
+            }
+
+            // reset bar defaults button
+            Rectangle {
+                Layout.preferredHeight: 28
+                Layout.preferredWidth: resetRow.implicitWidth + 16
                 radius: Theme.radiusPill
                 color: resetMouse.pressed ? Theme.widgetActive : (resetMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
                 border.color: Theme.widgetBorder
@@ -495,8 +536,10 @@ PopupPanel {
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Text {
-                        text: "reset layout"
+                        text: "reset bar"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface
                         anchors.verticalCenter: parent.verticalCenter
@@ -510,14 +553,18 @@ PopupPanel {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         if (Settings?.resetBarLayout) Settings.resetBarLayout();
+                        if (typeof PresetService !== "undefined" && PresetService) {
+                            PresetService.activePresetName = "solid";
+                        }
                         root.saveSettings();
                     }
                 }
             }
 
+            // reload shell button
             Rectangle {
-                height: 24
-                implicitWidth: reloadShellRow.implicitWidth + 14
+                Layout.preferredHeight: 28
+                Layout.preferredWidth: reloadShellRow.implicitWidth + 16
                 radius: Theme.radiusPill
                 color: reloadShellMouse.containsMouse ? Theme.primary_overlay : Theme.pillBg
                 border.color: reloadShellMouse.containsMouse ? Theme.primary : Theme.widgetBorder
@@ -528,8 +575,7 @@ PopupPanel {
                 Row {
                     id: reloadShellRow
                     anchors.centerIn: parent
-                    spacing: 4
-
+                    spacing: 5
                     Text {
                         visible: !Theme.isTextIconSet
                         text: Theme.iconRefresh
@@ -542,6 +588,8 @@ PopupPanel {
                     Text {
                         text: "reload shell"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: reloadShellMouse.containsMouse ? Theme.primary : Theme.on_surface
                         anchors.verticalCenter: parent.verticalCenter
@@ -561,6 +609,7 @@ PopupPanel {
                 }
             }
 
+            // close button
             Rectangle {
                 Layout.preferredWidth: 28
                 Layout.preferredHeight: 28
@@ -593,324 +642,283 @@ PopupPanel {
             }
         }
 
-        // live mini screen preview (now actually using ConcaveCorner instead of leaving the import hanging)
-        Rectangle {
-            id: barPreviewMock
+        // tab bar
+        Flickable {
+            id: tabFlick
             Layout.fillWidth: true
-            Layout.preferredHeight: 88
-            color: Theme.cardBg
-            radius: Theme.radiusMd
-            border.color: Theme.cardBorder
-            border.width: 1
+            height: 32
+            contentWidth: tabRow.implicitWidth
+            flickableDirection: Flickable.HorizontalFlick
+            boundsBehavior: Flickable.StopAtBounds
             clip: true
 
-            readonly property string barPos: Settings?.barPosition ?? "top"
-            readonly property bool isTop: barPos === "up" || barPos === "top"
-            readonly property bool isBottom: barPos === "down" || barPos === "bottom"
-            readonly property bool isLeft: barPos === "left"
-            readonly property bool isRight: barPos === "right"
-            readonly property bool isVertical: isLeft || isRight
-            readonly property bool isFloating: (Settings?.barFloating ?? false) || Theme.isBento
-
-            Rectangle {
-                visible: Theme.isGlass
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: 1
-                color: Theme.glassHighlight
+            WheelHandler {
+                orientation: Qt.Vertical
+                onWheel: (event) => {
+                    const delta = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x;
+                    const targetX = tabFlick.contentX - (delta * 0.8);
+                    const maxX = Math.max(0, tabFlick.contentWidth - tabFlick.width);
+                    tabFlick.contentX = Math.max(0, Math.min(maxX, targetX));
+                    event.accepted = true;
+                }
             }
 
-            Rectangle {
-                id: screenMock
-                anchors.fill: parent
-                anchors.margins: 7
-                color: Theme.background
-                radius: Theme.radiusSm
-                border.color: Theme.widgetBorder
-                border.width: 1
-                clip: true
+            RowLayout {
+                id: tabRow
+                spacing: 6
+                anchors.verticalCenter: parent.verticalCenter
 
-                Rectangle {
-                    id: mockBar
-                    anchors.left: !barPreviewMock.isRight ? parent.left : undefined
-                    anchors.right: !barPreviewMock.isLeft ? parent.right : undefined
-                    anchors.top: !barPreviewMock.isBottom ? parent.top : undefined
-                    anchors.bottom: !barPreviewMock.isTop ? parent.bottom : undefined
-                    anchors.margins: barPreviewMock.isFloating ? 4 : 0
-                    width: barPreviewMock.isVertical ? 24 : (parent.width - (barPreviewMock.isFloating ? 8 : 0))
-                    height: barPreviewMock.isVertical ? (parent.height - (barPreviewMock.isFloating ? 8 : 0)) : 22
-                    radius: barPreviewMock.isFloating ? Theme.radiusSm : 0
-                    color: Theme.cornerFill
-                    border.color: barPreviewMock.isFloating ? Theme.barBorderColor : "transparent"
-                    border.width: barPreviewMock.isFloating ? 1 : 0
-                    z: 2
+                Repeater {
+                    model: [
+                        { id: "layout",  label: "layout",     icon: Theme.iconGrid },
+                        { id: "style",   label: "bar style",  icon: Theme.iconPalette },
+                        { id: "widgets", label: "widgets",    icon: Theme.iconClock },
+                        { id: "motion",  label: "motion lab", icon: Theme.iconFlame }
+                    ]
 
-                    component MiniModulePill: Rectangle {
-                        required property string modelData
-                        readonly property var info: root.getModuleInfo(modelData)
-                        readonly property bool isVis: root.isModuleVisible(modelData)
-                        readonly property bool isGhostTarget: root.isDragging && root.draggedModId === modelData
-                        readonly property color bColor: info?.color ?? Theme.primary
+                    delegate: Rectangle {
+                        required property var modelData
+                        readonly property bool isSelected: root.activeTab === modelData.id
+                        height: 30
+                        width: tabItemRow.implicitWidth + 22
+                        radius: isSelected ? Theme.radiusMd : Theme.radiusPill
+                        color: isSelected
+                            ? Theme.primary_overlay
+                            : (tabMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                        border.color: isSelected ? Theme.primary : Theme.pillBorder
+                        border.width: (isSelected || Theme.pillBorder.a > 0) ? 1 : 0
 
-                        height: barPreviewMock.isVertical ? 14 : 13
-                        width: barPreviewMock.isVertical ? 14 : Math.max(14, mText.implicitWidth + 6)
-                        radius: Theme.radiusXs
-                        color: isGhostTarget ? Theme.on_surface : (isVis ? bColor : Theme.widgetBg)
-                        border.color: isGhostTarget ? Theme.primary : "transparent"
-                        border.width: 1
+                        Behavior on radius { NumberAnimation { duration: Theme.animFast; easing.type: Theme.animEasing } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+                        Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
-                        Text {
-                            id: mText
+                        RowLayout {
+                            id: tabItemRow
                             anchors.centerIn: parent
-                            text: parent.info.icon
-                            font.family: Theme.fontIcon
-                            font.variableAxes: Theme.iconAxes
-                            font.pixelSize: 8
-                            color: parent.isGhostTarget ? Theme.surface : (parent.isVis ? Theme.on_primary : Theme.on_surface_disabled)
+                            spacing: 6
+
+                            Text {
+                                visible: !Theme.isTextIconSet
+                                text: modelData.icon
+                                font.family: Theme.fontIcon
+                                font.variableAxes: Theme.iconAxes
+                                font.pixelSize: Theme.fontSizeSm
+                                color: isSelected ? Theme.primary : Theme.textSecondary
+                            }
+
+                            Text {
+                                text: modelData.label
+                                font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.pixelSize: Theme.fontSizeSm
+                                font.weight: isSelected ? Theme.fontWeightBold : Theme.fontWeightMedium
+                                color: isSelected ? Theme.primary : Theme.textSecondary
+                            }
+                        }
+
+                        MouseArea {
+                            id: tabMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.activeTab = modelData.id
                         }
                     }
+                }
+            }
+        }
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 3
-                        spacing: 3
-                        visible: !barPreviewMock.isVertical
+        Rectangle {
+            Layout.fillWidth: true
+            height: Theme.popupDividerHeight
+            color: Theme.widgetBorder
+        }
 
-                        Repeater {
-                            model: Settings?.barModulesLeft ?? []
-                            MiniModulePill {}
-                        }
+        // tab container
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
 
-                        Item { Layout.fillWidth: true }
+            // TAB 1: LAYOUT (presets, mini preview + dock edge, 3-zone drag & drop, unassigned tray)
+            ColumnLayout {
+                anchors.fill: parent
+                visible: root.activeTab === "layout"
+                spacing: Theme.popupSpacing
 
-                        Repeater {
-                            model: Settings?.barModulesCenter ?? []
-                            MiniModulePill {}
-                        }
+                // Presets bar (material presets + user-saved presets w/ typed naming + delete)
+                Rectangle {
+                    id: presetBarCard
+                    Layout.fillWidth: true
+                    implicitHeight: presetCol.implicitHeight + 16
+                    radius: Theme.radiusMd
+                    color: Theme.cardBg
+                    border.color: Theme.cardBorder
+                    border.width: 1
 
-                        Item { Layout.fillWidth: true }
-
-                        Repeater {
-                            model: Settings?.barModulesRight ?? []
-                            MiniModulePill {}
-                        }
+                    Rectangle {
+                        visible: Theme.isGlass
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: 1
+                        color: Theme.glassHighlight
                     }
 
                     ColumnLayout {
+                        id: presetCol
                         anchors.fill: parent
-                        anchors.margins: 3
-                        spacing: 3
-                        visible: barPreviewMock.isVertical
+                        anchors.margins: 8
+                        spacing: 6
 
-                        Repeater {
-                            model: Settings?.barModulesLeft ?? []
-                            MiniModulePill {}
-                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
 
-                        Item { Layout.fillHeight: true }
+                            Text {
+                                text: "presets"
+                                font.family: Theme.fontDisplay
+                                font.variableAxes: Theme.displayAxes
+                                font.pixelSize: Theme.fontSizeXs
+                                font.weight: Theme.fontWeightBold
+                                color: Theme.textPrimary
+                            }
 
-                        Repeater {
-                            model: Settings?.barModulesCenter ?? []
-                            MiniModulePill {}
-                        }
+                            Text {
+                                Layout.fillWidth: true
+                                text: root.hoveredPresetDesc !== ""
+                                    ? root.hoveredPresetDesc
+                                    : (root.activePresetDesc !== ""
+                                        ? root.activePresetDesc
+                                        : ("active: " + (PresetService?.activePresetName ?? "custom") + " · built from bar materials"))
+                                font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
+                                font.pixelSize: Theme.fontSizeXs
+                                color: Theme.textSecondary
+                                elide: Text.ElideRight
+                            }
 
-                        Item { Layout.fillHeight: true }
+                            // Inline preset name prompt OR "save as preset" button
+                            RowLayout {
+                                visible: root.showSavePresetInput
+                                spacing: 5
 
-                        Repeater {
-                            model: Settings?.barModulesRight ?? []
-                            MiniModulePill {}
-                        }
-                    }
-                }
+                                Rectangle {
+                                    width: 170
+                                    height: 24
+                                    radius: Theme.radiusSm
+                                    color: Theme.widgetBg
+                                    border.color: presetNameInput.activeFocus ? Theme.primary : Theme.widgetBorder
+                                    border.width: 1
 
-                // miniature concave scoops on the bar edges when docked
-                ConcaveCorner {
-                    visible: !barPreviewMock.isFloating && Theme.screenFrameDocked
-                    radius: 8
-                    fillColor: Theme.cornerFill
-                    x: barPreviewMock.isLeft ? mockBar.width : (barPreviewMock.isRight ? (screenMock.width - mockBar.width - width) : 0)
-                    y: barPreviewMock.isTop ? mockBar.height : (barPreviewMock.isBottom ? (screenMock.height - mockBar.height - height) : 0)
-                    flipX: barPreviewMock.isRight
-                    flipY: barPreviewMock.isBottom
-                    z: 2
-                }
+                                    Text {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 8
+                                        verticalAlignment: Text.AlignVCenter
+                                        visible: presetNameInput.text === "" && !presetNameInput.activeFocus
+                                        text: "type preset name..."
+                                        font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
+                                        font.weight: Theme.fontWeightRegular
+                                        font.pixelSize: Theme.fontSizeXs
+                                        color: Theme.textSecondary
+                                    }
 
-                ConcaveCorner {
-                    visible: !barPreviewMock.isFloating && Theme.screenFrameDocked
-                    radius: 8
-                    fillColor: Theme.cornerFill
-                    x: barPreviewMock.isLeft ? mockBar.width : (barPreviewMock.isRight ? (screenMock.width - mockBar.width - width) : (screenMock.width - width))
-                    y: barPreviewMock.isTop ? mockBar.height : (barPreviewMock.isBottom ? (screenMock.height - mockBar.height - height) : (screenMock.height - height))
-                    flipX: !barPreviewMock.isLeft
-                    flipY: !barPreviewMock.isTop
-                    z: 2
-                }
-
-                Rectangle {
-                    anchors.left: barPreviewMock.isLeft ? mockBar.right : parent.left
-                    anchors.right: barPreviewMock.isRight ? mockBar.left : parent.right
-                    anchors.top: barPreviewMock.isTop ? mockBar.bottom : parent.top
-                    anchors.bottom: barPreviewMock.isBottom ? mockBar.top : parent.bottom
-                    anchors.margins: 6
-                    color: Theme.widgetBg
-                    radius: Theme.radiusSm
-                    border.color: Theme.widgetBorder
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 8
-
-                        Text {
-                            text: "dock position:"
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeXs
-                            color: Theme.on_surface_variant
-                        }
-
-                        Repeater {
-                            model: [
-                                { pos: "top", label: "top ↑" },
-                                { pos: "bottom", label: "bottom ↓" },
-                                { pos: "left", label: "left ←" },
-                                { pos: "right", label: "right →" }
-                            ]
-
-                            delegate: Rectangle {
-                                required property var modelData
-                                height: 22
-                                implicitWidth: dockText.implicitWidth + 12
-                                radius: Theme.radiusPill
-                                readonly property bool isCurrent: (Settings?.barPosition === modelData.pos)
-                                    || (modelData.pos === "top" && Settings?.barPosition === "up")
-                                    || (modelData.pos === "bottom" && Settings?.barPosition === "down")
-                                color: isCurrent ? Theme.primary : (dockMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
-                                border.color: isCurrent ? Theme.primary : Theme.pillBorder
-                                border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
-
-                                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-
-                                Text {
-                                    id: dockText
-                                    anchors.centerIn: parent
-                                    text: modelData.label
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeXs
-                                    font.weight: isCurrent ? Font.Bold : Font.Normal
-                                    color: isCurrent ? Theme.on_primary : Theme.on_surface
+                                    TextInput {
+                                        id: presetNameInput
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 8
+                                        anchors.rightMargin: 8
+                                        verticalAlignment: TextInput.AlignVCenter
+                                        font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
+                                        font.weight: Theme.fontWeightRegular
+                                        font.pixelSize: Theme.fontSizeXs
+                                        color: Theme.textPrimary
+                                        clip: true
+                                        Keys.onReturnPressed: root.commitSavePreset()
+                                        Keys.onEscapePressed: {
+                                            presetNameInput.text = "";
+                                            root.showSavePresetInput = false;
+                                        }
+                                    }
                                 }
 
-                                MouseArea {
-                                    id: dockMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (Settings) {
-                                            Settings.barPosition = modelData.pos;
-                                            root.saveSettings();
+                                Rectangle {
+                                    height: 24
+                                    implicitWidth: confirmSaveTxt.implicitWidth + 14
+                                    radius: Theme.radiusPill
+                                    readonly property bool canSave: presetNameInput.text.trim().length > 0
+                                    color: canSave ? Theme.primary : Theme.widgetBg
+                                    opacity: canSave ? 1.0 : 0.55
+
+                                    Text {
+                                        id: confirmSaveTxt
+                                        anchors.centerIn: parent
+                                        text: "save"
+                                        font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
+                                        font.pixelSize: Theme.fontSizeXs
+                                        font.weight: Theme.fontWeightBold
+                                        color: parent.canSave ? Theme.on_primary : Theme.textSecondary
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: parent.canSave ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        onClicked: if (parent.canSave) root.commitSavePreset()
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 24
+                                    width: 24
+                                    radius: Theme.radiusPill
+                                    color: cancelSaveMouse.containsMouse ? Theme.error_overlay : Theme.widgetBg
+                                    border.color: cancelSaveMouse.containsMouse ? Theme.error : Theme.widgetBorder
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: Theme.iconClose
+                                        font.family: Theme.fontIcon
+                                        font.variableAxes: Theme.iconAxes
+                                        font.pixelSize: 10
+                                        color: cancelSaveMouse.containsMouse ? Theme.error : Theme.textSecondary
+                                    }
+
+                                    MouseArea {
+                                        id: cancelSaveMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            presetNameInput.text = "";
+                                            root.showSavePresetInput = false;
                                         }
                                     }
                                 }
                             }
-                        }
-                    }
-                }
-            }
-        }
 
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            spacing: Theme.popupSpacing
-
-            ZoneColumn {
-                id: leftColZone
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                zoneId: "left"
-                zoneTitle: root.barPreviewMock?.isVertical ? "top modules" : "left modules"
-                modulesList: Settings?.barModulesLeft ?? []
-            }
-
-            ZoneColumn {
-                id: centerColZone
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                zoneId: "center"
-                zoneTitle: "center modules"
-                modulesList: Settings?.barModulesCenter ?? []
-            }
-
-            ZoneColumn {
-                id: rightColZone
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                zoneId: "right"
-                zoneTitle: root.barPreviewMock?.isVertical ? "bottom modules" : "right modules"
-                modulesList: Settings?.barModulesRight ?? []
-            }
-        }
-
-        Rectangle {
-            id: unassignedTray
-            visible: root.unassignedModules.length > 0
-            Layout.fillWidth: true
-            Layout.preferredHeight: 38
-            color: Theme.cardBg
-            radius: Theme.radiusSm
-            border.color: Theme.cardBorder
-            border.width: 1
-
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 10
-                anchors.rightMargin: 10
-                spacing: 8
-
-                Text {
-                    text: "unassigned (" + root.unassignedModules.length + "):"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeXs
-                    font.weight: Font.DemiBold
-                    color: Theme.on_surface_variant
-                }
-
-                Flickable {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    contentWidth: unassignedRow.implicitWidth
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    Row {
-                        id: unassignedRow
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 6
-
-                        Repeater {
-                            model: root.unassignedModules
-
-                            delegate: Rectangle {
-                                required property string modelData
-                                readonly property var info: root.getModuleInfo(modelData)
-
+                            Rectangle {
+                                visible: !root.showSavePresetInput
                                 height: 24
-                                implicitWidth: pillRow.implicitWidth + 12
+                                implicitWidth: saveRow.implicitWidth + 14
                                 radius: Theme.radiusPill
-                                color: Theme.pillBg
-                                border.color: Theme.pillBorder
-                                border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+                                color: saveMouse.containsMouse ? Theme.primary_overlay : "transparent"
+                                border.color: saveMouse.containsMouse ? Theme.primary : Theme.widgetBorder
+                                border.width: 1
+
+                                Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                                 Row {
-                                    id: pillRow
+                                    id: saveRow
                                     anchors.centerIn: parent
-                                    spacing: 5
+                                    spacing: 4
 
                                     Text {
                                         visible: !Theme.isTextIconSet
-                                        text: parent.parent.info.icon
+                                        text: Theme.iconSave
                                         font.family: Theme.fontIcon
                                         font.variableAxes: Theme.iconAxes
                                         font.pixelSize: Theme.fontSizeXs
@@ -919,61 +927,114 @@ PopupPanel {
                                     }
 
                                     Text {
-                                        text: parent.parent.info.name
+                                        text: "save preset"
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
-                                        color: Theme.on_surface
+                                        font.weight: Theme.fontWeightDemiBold
+                                        color: Theme.primary
                                         anchors.verticalCenter: parent.verticalCenter
                                     }
+                                }
 
-                                    Text {
-                                        text: "+left"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Font.Bold
-                                        color: leftAddMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
-                                        anchors.verticalCenter: parent.verticalCenter
+                                MouseArea {
+                                    id: saveMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        root.showSavePresetInput = true;
+                                        presetNameInput.forceActiveFocus();
+                                    }
+                                }
+                            }
+                        }
 
-                                        MouseArea {
-                                            id: leftAddMouse
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: root.addModuleToZone(modelData, "left")
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Repeater {
+                                model: (typeof PresetService !== "undefined" ? PresetService?.availablePresets : null) ?? []
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    readonly property bool isCurrent: PresetService?.activePresetName === modelData.id
+                                    readonly property bool isUserPreset: !modelData.isBuiltin
+                                    height: 24
+                                    implicitWidth: pPillRow.implicitWidth + 14
+                                    radius: Theme.radiusPill
+                                    color: isCurrent ? Theme.primary : (pMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                                    border.color: isCurrent ? Theme.primary : (isUserPreset ? Theme.alpha(Theme.secondary, 0.55) : Theme.pillBorder)
+                                    border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+
+                                    Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                                    MouseArea {
+                                        id: pMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onEntered: root.hoveredPresetDesc = (modelData.name + ": " + (modelData.desc || ""))
+                                        onExited: root.hoveredPresetDesc = ""
+                                        onClicked: PresetService?.applyPresetById(modelData.id)
+                                    }
+
+                                    Row {
+                                        id: pPillRow
+                                        anchors.centerIn: parent
+                                        spacing: 5
+
+                                        Rectangle {
+                                            visible: isUserPreset
+                                            width: 5
+                                            height: 5
+                                            radius: 2.5
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            color: isCurrent ? Theme.on_primary : Theme.secondary
                                         }
-                                    }
 
-                                    Text {
-                                        text: "+center"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Font.Bold
-                                        color: centerAddMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
-                                        anchors.verticalCenter: parent.verticalCenter
-
-                                        MouseArea {
-                                            id: centerAddMouse
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: root.addModuleToZone(modelData, "center")
+                                        Text {
+                                            text: modelData.name
+                                            font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.pixelSize: Theme.fontSizeXs
+                                            font.weight: isCurrent ? Theme.fontWeightBold : Theme.fontWeightRegular
+                                            color: isCurrent ? Theme.on_primary : Theme.on_surface
+                                            anchors.verticalCenter: parent.verticalCenter
                                         }
-                                    }
 
-                                    Text {
-                                        text: "+right"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Font.Bold
-                                        color: rightAddMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
-                                        anchors.verticalCenter: parent.verticalCenter
+                                        Rectangle {
+                                            visible: isUserPreset
+                                            width: 14
+                                            height: 14
+                                            radius: 7
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            color: delMouse.containsMouse
+                                                ? (isCurrent ? Theme.alpha(Theme.on_primary, 0.25) : Theme.error_overlay)
+                                                : "transparent"
 
-                                        MouseArea {
-                                            id: rightAddMouse
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: root.addModuleToZone(modelData, "right")
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "×"
+                                                font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
+                                                font.pixelSize: 10
+                                                font.weight: Theme.fontWeightBold
+                                                color: delMouse.containsMouse
+                                                    ? (isCurrent ? Theme.on_primary : Theme.error)
+                                                    : (isCurrent ? Theme.on_primary : Theme.textSecondary)
+                                            }
+
+                                            MouseArea {
+                                                id: delMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: (mouse) => {
+                                                    mouse.accepted = true;
+                                                    PresetService?.deleteUserPreset(modelData.id);
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -981,6 +1042,429 @@ PopupPanel {
                         }
                     }
                 }
+
+                // live mini screen preview
+                Rectangle {
+                    id: barPreviewMock
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 82
+                    color: Theme.cardBg
+                    radius: Theme.radiusMd
+                    border.color: Theme.cardBorder
+                    border.width: 1
+                    clip: true
+
+                    readonly property string barPos: Settings?.barPosition ?? "top"
+                    readonly property bool isTop: barPos === "up" || barPos === "top"
+                    readonly property bool isBottom: barPos === "down" || barPos === "bottom"
+                    readonly property bool isLeft: barPos === "left"
+                    readonly property bool isRight: barPos === "right"
+                    readonly property bool isVertical: isLeft || isRight
+                    readonly property bool isFloating: (Settings?.barFloating ?? false) || Theme.isIslands
+
+                    Rectangle {
+                        visible: Theme.isGlass
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: 1
+                        color: Theme.glassHighlight
+                    }
+
+                    Rectangle {
+                        id: screenMock
+                        anchors.fill: parent
+                        anchors.margins: 7
+                        color: Theme.background
+                        radius: Theme.radiusSm
+                        border.color: Theme.widgetBorder
+                        border.width: 1
+                        clip: true
+
+                        Rectangle {
+                            id: mockBar
+                            anchors.left: !barPreviewMock.isRight ? parent.left : undefined
+                            anchors.right: !barPreviewMock.isLeft ? parent.right : undefined
+                            anchors.top: !barPreviewMock.isBottom ? parent.top : undefined
+                            anchors.bottom: !barPreviewMock.isTop ? parent.bottom : undefined
+                            anchors.margins: barPreviewMock.isFloating ? 4 : 0
+                            width: barPreviewMock.isVertical ? 24 : (parent.width - (barPreviewMock.isFloating ? 8 : 0))
+                            height: barPreviewMock.isVertical ? (parent.height - (barPreviewMock.isFloating ? 8 : 0)) : 22
+                            radius: barPreviewMock.isFloating ? Theme.radiusSm : 0
+                            color: Theme.cornerFill
+                            border.color: barPreviewMock.isFloating ? Theme.barBorderColor : "transparent"
+                            border.width: barPreviewMock.isFloating ? 1 : 0
+                            z: 2
+
+                            component MiniModulePill: Rectangle {
+                                required property string modelData
+                                readonly property var info: root.getModuleInfo(modelData)
+                                readonly property bool isVis: root.isModuleVisible(modelData)
+                                readonly property bool isGhostTarget: root.isDragging && root.draggedModId === modelData
+                                readonly property color bColor: info?.color ?? Theme.primary
+
+                                height: barPreviewMock.isVertical ? 14 : 13
+                                width: barPreviewMock.isVertical ? 14 : Math.max(14, mText.implicitWidth + 6)
+                                radius: Theme.radiusXs
+                                color: isGhostTarget ? Theme.on_surface : (isVis ? bColor : Theme.widgetBg)
+                                border.color: isGhostTarget ? Theme.primary : "transparent"
+                                border.width: 1
+
+                                Text {
+                                    id: mText
+                                    anchors.centerIn: parent
+                                    text: parent.info.icon
+                                    font.family: Theme.fontIcon
+                                    font.variableAxes: Theme.iconAxes
+                                    font.pixelSize: 8
+                                    color: parent.isGhostTarget ? Theme.surface : (parent.isVis ? Theme.on_primary : Theme.on_surface_disabled)
+                                }
+                            }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: 3
+                                spacing: 3
+                                visible: !barPreviewMock.isVertical
+
+                                Repeater {
+                                    model: Settings?.barModulesLeft ?? []
+                                    MiniModulePill {}
+                                }
+
+                                Item { Layout.fillWidth: true }
+
+                                Repeater {
+                                    model: Settings?.barModulesCenter ?? []
+                                    MiniModulePill {}
+                                }
+
+                                Item { Layout.fillWidth: true }
+
+                                Repeater {
+                                    model: Settings?.barModulesRight ?? []
+                                    MiniModulePill {}
+                                }
+                            }
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 3
+                                spacing: 3
+                                visible: barPreviewMock.isVertical
+
+                                Repeater {
+                                    model: Settings?.barModulesLeft ?? []
+                                    MiniModulePill {}
+                                }
+
+                                Item { Layout.fillHeight: true }
+
+                                Repeater {
+                                    model: Settings?.barModulesCenter ?? []
+                                    MiniModulePill {}
+                                }
+
+                                Item { Layout.fillHeight: true }
+
+                                Repeater {
+                                    model: Settings?.barModulesRight ?? []
+                                    MiniModulePill {}
+                                }
+                            }
+                        }
+
+                        ConcaveCorner {
+                            visible: !barPreviewMock.isFloating && Theme.screenFrameDocked
+                            radius: 8
+                            fillColor: Theme.cornerFill
+                            x: barPreviewMock.isLeft ? mockBar.width : (barPreviewMock.isRight ? (screenMock.width - mockBar.width - width) : 0)
+                            y: barPreviewMock.isTop ? mockBar.height : (barPreviewMock.isBottom ? (screenMock.height - mockBar.height - height) : 0)
+                            flipX: barPreviewMock.isRight
+                            flipY: barPreviewMock.isBottom
+                            z: 2
+                        }
+
+                        ConcaveCorner {
+                            visible: !barPreviewMock.isFloating && Theme.screenFrameDocked
+                            radius: 8
+                            fillColor: Theme.cornerFill
+                            x: barPreviewMock.isLeft ? mockBar.width : (barPreviewMock.isRight ? (screenMock.width - mockBar.width - width) : (screenMock.width - width))
+                            y: barPreviewMock.isTop ? mockBar.height : (barPreviewMock.isBottom ? (screenMock.height - mockBar.height - height) : (screenMock.height - height))
+                            flipX: !barPreviewMock.isLeft
+                            flipY: !barPreviewMock.isTop
+                            z: 2
+                        }
+
+                        Rectangle {
+                            anchors.left: barPreviewMock.isLeft ? mockBar.right : parent.left
+                            anchors.right: barPreviewMock.isRight ? mockBar.left : parent.right
+                            anchors.top: barPreviewMock.isTop ? mockBar.bottom : parent.top
+                            anchors.bottom: barPreviewMock.isBottom ? mockBar.top : parent.bottom
+                            anchors.margins: 6
+                            color: Theme.widgetBg
+                            radius: Theme.radiusSm
+                            border.color: Theme.widgetBorder
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 8
+
+                                Text {
+                                    text: "dock position:"
+                                    font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.weight: Theme.fontWeightRegular
+                                    font.pixelSize: Theme.fontSizeXs
+                                    color: Theme.on_surface_variant
+                                }
+
+                                Repeater {
+                                    model: [
+                                        { pos: "top",    label: "top ↑" },
+                                        { pos: "bottom", label: "bottom ↓" },
+                                        { pos: "left",   label: "left ←" },
+                                        { pos: "right",  label: "right →" }
+                                    ]
+
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        height: 22
+                                        implicitWidth: dockText.implicitWidth + 12
+                                        radius: Theme.radiusPill
+                                        readonly property bool isCurrent: (Settings?.barPosition === modelData.pos)
+                                            || (modelData.pos === "top" && Settings?.barPosition === "up")
+                                            || (modelData.pos === "bottom" && Settings?.barPosition === "down")
+                                        color: isCurrent ? Theme.primary : (dockMouse.containsMouse ? Theme.pillHover : Theme.pillBg)
+                                        border.color: isCurrent ? Theme.primary : Theme.pillBorder
+                                        border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+
+                                        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
+
+                                        Text {
+                                            id: dockText
+                                            anchors.centerIn: parent
+                                            text: modelData.label
+                                            font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.pixelSize: Theme.fontSizeXs
+                                            font.weight: isCurrent ? Theme.fontWeightBold : Theme.fontWeightRegular
+                                            color: isCurrent ? Theme.on_primary : Theme.on_surface
+                                        }
+
+                                        MouseArea {
+                                            id: dockMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (Settings) {
+                                                    Settings.barPosition = modelData.pos;
+                                                    root.saveSettings();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3-zone drag-drop board
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    spacing: Theme.popupSpacing
+
+                    ZoneColumn {
+                        id: leftColZone
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        zoneId: "left"
+                        zoneTitle: barPreviewMock.isVertical ? "top modules" : "left modules"
+                        modulesList: Settings?.barModulesLeft ?? []
+                    }
+
+                    ZoneColumn {
+                        id: centerColZone
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        zoneId: "center"
+                        zoneTitle: "center modules"
+                        modulesList: Settings?.barModulesCenter ?? []
+                    }
+
+                    ZoneColumn {
+                        id: rightColZone
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        zoneId: "right"
+                        zoneTitle: barPreviewMock.isVertical ? "bottom modules" : "right modules"
+                        modulesList: Settings?.barModulesRight ?? []
+                    }
+                }
+
+                // unassigned tray
+                Rectangle {
+                    id: unassignedTray
+                    visible: root.unassignedModules.length > 0
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 38
+                    color: Theme.cardBg
+                    radius: Theme.radiusSm
+                    border.color: Theme.cardBorder
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        spacing: 8
+
+                        Text {
+                            text: "unassigned (" + root.unassignedModules.length + "):"
+                            font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.pixelSize: Theme.fontSizeXs
+                            font.weight: Theme.fontWeightDemiBold
+                            color: Theme.on_surface_variant
+                        }
+
+                        Flickable {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            contentWidth: unassignedRow.implicitWidth
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            Row {
+                                id: unassignedRow
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 6
+
+                                Repeater {
+                                    model: root.unassignedModules
+
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        readonly property var info: root.getModuleInfo(modelData)
+
+                                        height: 24
+                                        implicitWidth: pillRow.implicitWidth + 12
+                                        radius: Theme.radiusPill
+                                        color: Theme.pillBg
+                                        border.color: Theme.pillBorder
+                                        border.width: (border.color === "transparent" || border.color.a === 0) ? 0 : 1
+
+                                        Row {
+                                            id: pillRow
+                                            anchors.centerIn: parent
+                                            spacing: 5
+
+                                            Text {
+                                                visible: !Theme.isTextIconSet
+                                                text: parent.parent.info.icon
+                                                font.family: Theme.fontIcon
+                                                font.variableAxes: Theme.iconAxes
+                                                font.pixelSize: Theme.fontSizeXs
+                                                color: Theme.primary
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+
+                                            Text {
+                                                text: parent.parent.info.name
+                                                font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
+                                                font.weight: Theme.fontWeightRegular
+                                                font.pixelSize: Theme.fontSizeXs
+                                                color: Theme.on_surface
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+
+                                            Text {
+                                                text: "+left"
+                                                font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
+                                                font.pixelSize: Theme.fontSizeXs
+                                                font.weight: Theme.fontWeightBold
+                                                color: leftAddMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
+                                                anchors.verticalCenter: parent.verticalCenter
+
+                                                MouseArea {
+                                                    id: leftAddMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: root.addModuleToZone(modelData, "left")
+                                                }
+                                            }
+
+                                            Text {
+                                                text: "+center"
+                                                font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
+                                                font.pixelSize: Theme.fontSizeXs
+                                                font.weight: Theme.fontWeightBold
+                                                color: centerAddMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
+                                                anchors.verticalCenter: parent.verticalCenter
+
+                                                MouseArea {
+                                                    id: centerAddMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: root.addModuleToZone(modelData, "center")
+                                                }
+                                            }
+
+                                            Text {
+                                                text: "+right"
+                                                font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
+                                                font.pixelSize: Theme.fontSizeXs
+                                                font.weight: Theme.fontWeightBold
+                                                color: rightAddMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
+                                                anchors.verticalCenter: parent.verticalCenter
+
+                                                MouseArea {
+                                                    id: rightAddMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: root.addModuleToZone(modelData, "right")
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // TAB 2: BAR STYLE & GEOMETRY
+            BarStudioStyleTab {
+                id: styleTab
+                anchors.fill: parent
+                visible: root.activeTab === "style"
+            }
+
+            // TAB 3: BAR WIDGETS (clock, workspaces, window title, media)
+            BarStudioWidgetsTab {
+                id: widgetsTab
+                anchors.fill: parent
+                visible: root.activeTab === "widgets"
+            }
+
+            // TAB 4: MOTION LAB (merged MotionSandbox + timing/easing curves)
+            BarStudioMotionTab {
+                id: motionTab
+                anchors.fill: parent
+                visible: root.activeTab === "motion"
+                activeTabOpen: root.open && root.activeTab === "motion"
             }
         }
     }
@@ -1038,14 +1522,17 @@ PopupPanel {
                 Text {
                     text: zoneRoot.zoneTitle
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
                     font.pixelSize: Theme.fontSizeSm
-                    font.weight: Font.Bold
+                    font.weight: Theme.fontWeightBold
                     color: zoneRoot.isOverThisZone ? Theme.primary : Theme.on_surface
                 }
                 Item { Layout.fillWidth: true }
                 Text {
                     text: zoneRoot.getActiveCount() + "/" + zoneRoot.modulesList.length + " active"
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
+                    font.weight: Theme.monoWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.on_surface_variant
                 }
@@ -1170,14 +1657,17 @@ PopupPanel {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: zoneRoot.isOverThisZone ? "drop module here" : "empty zone"
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeSm
-                                font.weight: Font.Bold
+                                font.weight: Theme.fontWeightBold
                                 color: zoneRoot.isOverThisZone ? Theme.primary : Theme.on_surface_variant
                             }
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: "drag cards across or use unassigned tray"
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.on_surface_disabled
                             }
@@ -1224,6 +1714,8 @@ PopupPanel {
             Text {
                 text: "⠿"
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
+                font.weight: Theme.fontWeightRegular
                 font.pixelSize: Theme.fontSizeMd
                 color: Theme.on_surface_variant
             }
@@ -1249,8 +1741,9 @@ PopupPanel {
             Text {
                 text: dragGhost.info?.name ?? root.draggedModId
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: Theme.fontSizeSm
-                font.weight: Font.DemiBold
+                font.weight: Theme.fontWeightDemiBold
                 color: Theme.on_surface
                 Layout.fillWidth: true
                 elide: Text.ElideRight

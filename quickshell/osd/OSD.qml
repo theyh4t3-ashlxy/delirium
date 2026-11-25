@@ -214,6 +214,14 @@ PanelWindow {
         }
     }
 
+    Connections {
+        target: typeof Settings !== "undefined" ? Settings : null
+        function onRequestOsdShow(t, icon, val, lbl, sub) {
+            if (!osdRoot._ready) return;
+            osdRoot.show(t, icon, val, lbl, sub);
+        }
+    }
+
     Rectangle {
         id: osdCard
         anchors.centerIn: parent
@@ -254,7 +262,7 @@ PanelWindow {
 
         // ambient underglow matching StatusBar & WelcomeWizard
         Rectangle {
-            visible: Theme.isAccentGlow || Theme.isCyberNeon || osdRoot.isOverAmp || osdRoot.isMuted
+            visible: Theme.isTinted || Theme.isOutlined || osdRoot.isOverAmp || osdRoot.isMuted
             anchors.fill: parent
             anchors.margins: -4
             radius: parent.radius
@@ -323,9 +331,9 @@ PanelWindow {
                     anchors.centerIn: parent
                     text: osdRoot.osdIcon
                     font.family: osdRoot.isKaomoji ? Theme.fontFamily : Theme.fontIcon
-                    font.variableAxes: Theme.iconAxes
+                    font.variableAxes: osdRoot.isKaomoji ? (Theme?.sansAxes ?? ({})) : (Theme?.iconAxes ?? ({}))
                     font.pixelSize: osdRoot.isKaomoji ? Theme.fontSizeXs : Theme.fontSizeLg
-                    font.weight: osdRoot.isKaomoji ? Font.Bold : Font.Normal
+                    font.weight: osdRoot.isKaomoji ? (Theme?.fontWeightBold ?? Font.Bold) : (Theme?.fontWeightRegular ?? Font.Normal)
                     color: osdRoot.activeColor
                     Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                 }
@@ -357,6 +365,7 @@ PanelWindow {
                     Text {
                         text: osdRoot.osdType
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeSm
                         font.weight: Theme.fontWeightBold
                         color: osdRoot.isOverAmp ? Theme.warn : Theme.on_surface
@@ -367,6 +376,8 @@ PanelWindow {
                         Layout.fillWidth: true
                         text: "• " + osdRoot.osdSubtitle
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: Theme.on_surface_variant
                         elide: Text.ElideRight
@@ -380,8 +391,9 @@ PanelWindow {
                     Text {
                         text: osdRoot.osdLabel
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Theme.fontWeightBold
+                        font.weight: Theme.monoWeightBold
                         color: osdRoot.activeColor
                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                     }

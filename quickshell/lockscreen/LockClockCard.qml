@@ -34,6 +34,7 @@ ColumnLayout {
                                 visible: root.showDate && root.dateAboveClock && root.clockStyle !== "editorial"
                                 text: clockBlock.formattedDateText
                                 font.family: Theme.fontDisplay
+                                font.variableAxes: Theme.displayAxes
                                 font.pixelSize: Theme.fontSizeMd
                                 font.weight: Theme.fontWeightDemiBold
                                 color: root.uiAccent
@@ -61,6 +62,9 @@ ColumnLayout {
                                     font.pixelSize: (root.effectiveShowSeconds && root.secondsStyle === "inline")
                                         ? Math.round(clockBlock.baseClockPx * 0.76)
                                         : clockBlock.baseClockPx
+                                    font.variableAxes: root.resolvedClockAxes((root.effectiveShowSeconds && root.secondsStyle === "inline")
+                                        ? Math.round(clockBlock.baseClockPx * 0.76)
+                                        : clockBlock.baseClockPx)
                                     font.weight: root.clockStyle === "minimal" ? (root.clockWeight === "black" ? Font.Bold : Font.Light) : root.resolvedClockWeight
                                     color: root.uiTextPrimary
                                     Layout.alignment: Qt.AlignVCenter
@@ -87,8 +91,9 @@ ColumnLayout {
                                             anchors.centerIn: parent
                                             text: clockBlock.secondsDigits
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: parent.badgeFontPx
-                                            font.weight: Theme.fontWeightBold
+                                            font.weight: Theme.monoWeightBold
                                             color: root.uiAccent
                                         }
                                     }
@@ -97,8 +102,9 @@ ColumnLayout {
                                         visible: !root.effectiveClock24h
                                         text: clockBlock.amPmText
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: Math.max(11, Math.round(clockBlock.baseClockPx * 0.18))
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: Theme.monoWeightBold
                                         color: root.uiTextSecondary
                                         Layout.alignment: Qt.AlignHCenter
                                     }
@@ -113,6 +119,7 @@ ColumnLayout {
                                         text: ":" + clockBlock.secondsDigits
                                         font.family: root.resolvedClockFontFamily
                                         font.pixelSize: Math.max(20, Math.round(clockBlock.baseClockPx * 0.44))
+                                        font.variableAxes: root.resolvedClockAxes(Math.max(20, Math.round(clockBlock.baseClockPx * 0.44)))
                                         font.weight: root.resolvedClockWeight
                                         color: root.uiAccent
                                     }
@@ -121,8 +128,9 @@ ColumnLayout {
                                         visible: !root.effectiveClock24h
                                         text: clockBlock.amPmText
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: Math.max(12, Math.round(clockBlock.baseClockPx * 0.22))
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: Theme.monoWeightBold
                                         color: root.uiTextSecondary
                                     }
                                 }
@@ -141,6 +149,7 @@ ColumnLayout {
                                         text: clockBlock.mainHoursText
                                         font.family: root.resolvedClockFontFamily
                                         font.pixelSize: Math.round(92 * Theme.fontScale * root.clockScale)
+                                        font.variableAxes: root.resolvedClockAxes(Math.round(92 * Theme.fontScale * root.clockScale))
                                         font.weight: root.resolvedClockWeight
                                         color: root.uiTextPrimary
                                         Layout.alignment: Qt.AlignHCenter
@@ -150,6 +159,7 @@ ColumnLayout {
                                         text: clockBlock.mainMinutesText
                                         font.family: root.resolvedClockFontFamily
                                         font.pixelSize: Math.round(92 * Theme.fontScale * root.clockScale)
+                                        font.variableAxes: root.resolvedClockAxes(Math.round(92 * Theme.fontScale * root.clockScale))
                                         font.weight: root.resolvedClockWeight
                                         color: root.uiAccent
                                         Layout.alignment: Qt.AlignHCenter
@@ -160,6 +170,7 @@ ColumnLayout {
                                         text: clockBlock.secondsDigits
                                         font.family: root.resolvedClockFontFamily
                                         font.pixelSize: Math.round(92 * Theme.fontScale * root.clockScale)
+                                        font.variableAxes: root.resolvedClockAxes(Math.round(92 * Theme.fontScale * root.clockScale))
                                         font.weight: root.resolvedClockWeight
                                         color: root.uiTertiary
                                         Layout.alignment: Qt.AlignHCenter
@@ -186,8 +197,9 @@ ColumnLayout {
                                             anchors.centerIn: parent
                                             text: clockBlock.amPmText
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: parent.amPx
-                                            font.weight: Theme.fontWeightBold
+                                            font.weight: Theme.monoWeightBold
                                             color: root.uiTextSecondary
                                         }
                                     }
@@ -207,8 +219,9 @@ ColumnLayout {
                                             anchors.centerIn: parent
                                             text: ":" + clockBlock.secondsDigits
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: parent.secPx
-                                            font.weight: Theme.fontWeightBold
+                                            font.weight: Theme.monoWeightBold
                                             color: root.uiAccent
                                         }
                                     }
@@ -249,6 +262,7 @@ ColumnLayout {
                                         text: clockBlock.mainHoursText
                                         font.family: root.resolvedClockFontFamily
                                         font.pixelSize: parent.parent.digitPx
+                                        font.variableAxes: root.resolvedClockAxes(parent.parent.digitPx)
                                         font.weight: root.resolvedClockWeight
                                         color: root.uiTextPrimary
                                     }
@@ -260,8 +274,9 @@ ColumnLayout {
                                         anchors.margins: 8
                                         text: clockBlock.amPmText
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: Theme.monoWeightBold
                                         color: root.uiAccent
                                     }
                                 }
@@ -307,6 +322,7 @@ ColumnLayout {
                                         text: clockBlock.mainMinutesText
                                         font.family: root.resolvedClockFontFamily
                                         font.pixelSize: parent.parent.digitPx
+                                        font.variableAxes: root.resolvedClockAxes(parent.parent.digitPx)
                                         font.weight: root.resolvedClockWeight
                                         color: root.uiAccent
                                     }
@@ -318,8 +334,9 @@ ColumnLayout {
                                         anchors.margins: 8
                                         text: ":" + clockBlock.secondsDigits
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: Theme.fontSizeXs
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: Theme.monoWeightBold
                                         color: root.uiTextSecondary
                                     }
                                 }
@@ -335,6 +352,7 @@ ColumnLayout {
                                     text: root.numberToWords(clockBlock.displayHourNum)
                                     font.family: root.resolvedClockFontFamily
                                     font.pixelSize: Math.round(56 * Theme.fontScale * root.clockScale)
+                                    font.variableAxes: root.resolvedClockAxes(Math.round(56 * Theme.fontScale * root.clockScale))
                                     font.weight: root.resolvedClockWeight
                                     color: root.uiTextPrimary
                                     Layout.alignment: Qt.AlignHCenter
@@ -348,6 +366,7 @@ ColumnLayout {
                                             : root.numberToWords(clockBlock.displayMinNum))
                                     font.family: root.resolvedClockFontFamily
                                     font.pixelSize: Math.round(48 * Theme.fontScale * root.clockScale)
+                                    font.variableAxes: root.resolvedClockAxes(Math.round(48 * Theme.fontScale * root.clockScale))
                                     font.italic: true
                                     font.weight: Font.DemiBold
                                     color: root.uiAccent
@@ -374,8 +393,9 @@ ColumnLayout {
                                     Text {
                                         text: clockBlock.mainHoursText + ":" + clockBlock.mainMinutesText + (root.effectiveShowSeconds ? (":" + clockBlock.secondsDigits) : "")
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: Math.round(54 * Theme.fontScale * root.clockScale)
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: Theme.monoWeightBold
                                         color: root.uiAccent
                                     }
 
@@ -383,8 +403,9 @@ ColumnLayout {
                                         visible: !root.effectiveClock24h
                                         text: clockBlock.amPmText
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: Theme.fontSizeSm
-                                        font.weight: Theme.fontWeightBold
+                                        font.weight: Theme.monoWeightBold
                                         color: root.uiTextSecondary
                                         Layout.alignment: Qt.AlignBottom
                                         Layout.bottomMargin: 8
@@ -402,6 +423,7 @@ ColumnLayout {
                                     text: root.fmtText(Qt.formatDateTime(root.currentTime, "dddd"))
                                     font.family: root.resolvedClockFontFamily
                                     font.pixelSize: Math.round(58 * Theme.fontScale * root.clockScale)
+                                    font.variableAxes: root.resolvedClockAxes(Math.round(58 * Theme.fontScale * root.clockScale))
                                     font.weight: root.resolvedClockWeight
                                     color: root.uiTextPrimary
                                     Layout.alignment: Qt.AlignHCenter
@@ -424,8 +446,9 @@ ColumnLayout {
                                                 + (root.effectiveShowSeconds ? (":" + clockBlock.secondsDigits) : "")
                                                 + (!root.effectiveClock24h ? (" " + clockBlock.amPmText) : "")
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
                                             font.pixelSize: Theme.fontSizeMd
-                                            font.weight: Theme.fontWeightBold
+                                            font.weight: Theme.monoWeightBold
                                             color: root.uiOnAccent
                                         }
                                     }
@@ -444,6 +467,7 @@ ColumnLayout {
                                             anchors.centerIn: parent
                                             text: root.fmtText(Qt.formatDateTime(root.currentTime, "MMMM d, yyyy"))
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeSm
                                             font.weight: Theme.fontWeightDemiBold
                                             color: root.uiTextPrimary
@@ -481,8 +505,9 @@ ColumnLayout {
                                 Text {
                                     text: clockBlock.secondsDigits + "s" + (!root.effectiveClock24h ? (" • " + clockBlock.amPmText) : "")
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: Math.max(12, Math.round(Theme.fontSizeSm * root.clockScale))
-                                    font.weight: Theme.fontWeightBold
+                                    font.weight: Theme.monoWeightBold
                                     color: root.uiAccent
                                 }
                             }
@@ -491,6 +516,7 @@ ColumnLayout {
                                 visible: root.showDate && !root.dateAboveClock && root.clockStyle !== "editorial"
                                 text: clockBlock.formattedDateText
                                 font.family: Theme.fontDisplay
+                                font.variableAxes: Theme.displayAxes
                                 font.pixelSize: Theme.fontSizeMd
                                 font.weight: Theme.fontWeightDemiBold
                                 color: root.uiAccent
@@ -518,6 +544,8 @@ ColumnLayout {
                                     width: Math.min(stage.width - 40, implicitWidth)
                                     text: root.activeQuoteText
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.weight: Theme.fontWeightRegular
                                     font.pixelSize: Theme.fontSizeXs
                                     font.italic: root.quoteMode === "quotes" || root.quoteMode === "custom"
                                     color: quoteMouse.containsMouse ? root.uiTextPrimary : root.uiTextSecondary

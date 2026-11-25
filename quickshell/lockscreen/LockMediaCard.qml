@@ -162,6 +162,7 @@ ClippingRectangle {
                                             Text {
                                                 text: root.fmtText(lockSurface.activePlayer?.trackTitle || "Unknown Track")
                                                 font.family: Theme.fontDisplay
+                                                font.variableAxes: Theme.displayAxes
                                                 font.pixelSize: Theme.fontSizeSm
                                                 font.weight: Theme.fontWeightBold
                                                 color: root.uiTextPrimary
@@ -185,8 +186,9 @@ ClippingRectangle {
                                                         ? lockSurface.volumeHudLabel
                                                         : root.fmtText((lockSurface.activePlayer?.identity || "player") + " " + (lockSurface.currentPlayerIdx + 1) + "/" + lockSurface.playerList.length)
                                                     font.family: Theme.fontMono
+                                                    font.variableAxes: Theme.monoAxes
                                                     font.pixelSize: Theme.fontSizeXs
-                                                    font.weight: Theme.fontWeightBold
+                                                    font.weight: Theme.monoWeightBold
                                                     color: lockSurface.artAccent
                                                 }
 
@@ -205,6 +207,7 @@ ClippingRectangle {
                                         Text {
                                             text: root.fmtText(lockSurface.activePlayer?.trackArtist || "Unknown Artist")
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightDemiBold
                                             color: lockSurface.artAccent
@@ -283,6 +286,8 @@ ClippingRectangle {
                                     Text {
                                         text: root.formatTime(lockSurface.trackPosition)
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
+                                        font.weight: Theme.monoWeightRegular
                                         font.pixelSize: Theme.fontSizeXs
                                         color: root.uiTextSecondary
                                     }
@@ -343,6 +348,8 @@ ClippingRectangle {
                                     Text {
                                         text: root.formatTime(lockSurface.activePlayer?.length ?? 0)
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
+                                        font.weight: Theme.monoWeightRegular
                                         font.pixelSize: Theme.fontSizeXs
                                         color: root.uiTextSecondary
                                     }

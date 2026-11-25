@@ -66,12 +66,12 @@ Scope {
 
     readonly property string rawBarPos: Settings?.barPosition ?? "up"
     readonly property string barPos: (rawBarPos === "up" || rawBarPos === "top") ? "top" : ((rawBarPos === "down" || rawBarPos === "bottom") ? "bottom" : rawBarPos)
-    readonly property bool isBarFloating: (Settings?.barFloating ?? false) || (Theme?.isBento ?? false) || (Settings?.barStyle === "bento-floating")
-    readonly property bool isIslandMode: (Theme?.isBento ?? false) || (Settings?.barStyle === "bento-floating") || (isBarFloating && (Settings?.barIslandMode ?? true))
+    readonly property bool isBarFloating: (Settings?.barFloating ?? false) || (Theme?.isIslands ?? false)
+    readonly property bool isIslandMode: (Theme?.isIslands ?? false) || (isBarFloating && (Settings?.barIslandMode ?? true))
     readonly property bool framingEnabled: Settings?.screenFrameDocked ?? true
     readonly property bool isDocked: framingEnabled && !isBarFloating
-    // synced with StatusBar & ConcaveCorner so we don't end up with two different radii
-    readonly property int cornerRadius: Math.round(Settings?.scoopRadius ?? Settings?.screenCornerRadius ?? Theme?.scoopRadius ?? 16)
+    // prefer independent screenCornerRadius so appearance corner slider works separately from bar scoops
+    readonly property int cornerRadius: Math.round(Settings?.screenCornerRadius ?? Settings?.scoopRadius ?? Theme?.scoopRadius ?? 16)
     readonly property int borderWidth: Math.round(Settings?.screenBorderWidth ?? 0)
     property color cornerColor: Theme?.cornerFill ?? Theme?.barBg ?? "#14140c"
     Behavior on cornerColor { ColorAnimation { duration: (typeof Theme !== "undefined" ? Theme?.animFast : null) ?? 150 } }

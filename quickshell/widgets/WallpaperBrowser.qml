@@ -13,7 +13,7 @@ import Quickshell.Hyprland
 BarPill {
     id: root
 
-    readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isBento
+    readonly property bool isFloatingBar: (Settings?.barFloating ?? false) || Theme.isIslands
     readonly property int effectiveBarMargin: isFloatingBar ? ((Settings?.barMargin > 0) ? Settings.barMargin : 8) : 0
 
     active: popup.open
@@ -595,8 +595,9 @@ BarPill {
 
     component GroupLabel: Text {
         font.family: Theme.fontFamily
+        font.variableAxes: Theme.sansAxes
         font.pixelSize: Theme.fontSizeXs
-        font.weight: Font.DemiBold
+        font.weight: Theme.fontWeightDemiBold
         color: Theme.on_surface_variant
     }
 
@@ -650,8 +651,9 @@ BarPill {
                 Text {
                     text: sCard.title
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
                     font.pixelSize: Theme.fontSizeSm
-                    font.weight: Font.Bold
+                    font.weight: Theme.fontWeightBold
                     color: Theme.on_surface
                 }
 
@@ -671,8 +673,9 @@ BarPill {
                         anchors.centerIn: parent
                         text: sCard.badge
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
+                        font.weight: Theme.monoWeightBold
                         color: Theme.primary
                     }
                 }
@@ -705,8 +708,9 @@ BarPill {
                         Text {
                             text: sCard.actionLabel
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
+                            font.weight: Theme.fontWeightBold
                             color: sActionMouse.containsMouse ? Theme.on_primary : Theme.on_surface
                         }
                     }
@@ -773,6 +777,8 @@ BarPill {
                 Layout.fillHeight: true
                 verticalAlignment: TextInput.AlignVCenter
                 font.family: fieldRoot.monoFont ? Theme.fontMono : Theme.fontFamily
+                font.variableAxes: fieldRoot.monoFont ? Theme.monoAxes : Theme.sansAxes
+                font.weight: fieldRoot.monoFont ? Theme.monoWeightRegular : Theme.fontWeightRegular
                 font.pixelSize: Theme.fontSizeSm
                 color: Theme.on_surface
                 selectByMouse: true
@@ -782,6 +788,8 @@ BarPill {
                 Text {
                     text: fieldRoot.placeholder
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
+                    font.weight: Theme.fontWeightRegular
                     font.pixelSize: Theme.fontSizeSm
                     color: Theme.on_surface_disabled
                     visible: inputItem.text.length === 0 && !inputItem.activeFocus
@@ -810,6 +818,8 @@ BarPill {
                     anchors.centerIn: parent
                     text: fieldRoot.badgeText
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
+                    font.weight: Theme.monoWeightRegular
                     font.pixelSize: Theme.fontSizeXs
                     color: Theme.on_surface_variant
                 }
@@ -882,8 +892,9 @@ BarPill {
                 visible: chipRoot.label !== ""
                 text: chipRoot.label
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: chipRoot.fontSize
-                font.weight: chipRoot.selected ? Font.Bold : Font.Normal
+                font.weight: chipRoot.selected ? Theme.fontWeightBold : Theme.fontWeightRegular
                 color: chipRoot.selected ? chipRoot.activeFg : chipRoot.inactiveFg
             }
         }
@@ -941,6 +952,8 @@ BarPill {
                 Layout.alignment: Qt.AlignHCenter
                 text: emptyRoot.message
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
+                font.weight: Theme.fontWeightRegular
                 font.pixelSize: Theme.fontSizeSm
                 color: Theme.on_surface_variant
                 horizontalAlignment: Text.AlignHCenter
@@ -1043,8 +1056,9 @@ BarPill {
                     anchors.centerIn: parent
                     text: cardRoot.badgeText.toLowerCase()
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
                     font.pixelSize: Theme.fontSizeXs
-                    font.weight: Font.Medium
+                    font.weight: Theme.fontWeightMedium
                     color: Theme.on_surface
                 }
             }
@@ -1070,8 +1084,9 @@ BarPill {
                         anchors.centerIn: parent
                         text: cardRoot.tagText.toLowerCase()
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
+                        font.weight: Theme.monoWeightBold
                         color: cardRoot.tagAccent ? Theme.on_primary : Theme.on_surface_variant
                     }
                 }
@@ -1121,8 +1136,9 @@ BarPill {
                     Layout.fillWidth: true
                     text: (cardRoot.titleText !== "" ? cardRoot.titleText : "click to set").toLowerCase()
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
                     font.pixelSize: Theme.fontSizeXs
-                    font.weight: Font.Medium
+                    font.weight: Theme.fontWeightMedium
                     color: Theme.on_surface
                     elide: Text.ElideRight
                 }
@@ -1270,8 +1286,9 @@ BarPill {
             visible: !Theme.isVertical && Theme.isTextIconSet
             text: "wall"
             font.family: Theme.fontFamily
+            font.variableAxes: Theme.sansAxes
             font.pixelSize: Theme.fontSizeXs
-            font.weight: Font.Medium
+            font.weight: Theme.fontWeightMedium
             color: Theme.on_surface
         }
     }
@@ -1391,8 +1408,9 @@ BarPill {
                         Text {
                             text: "wallpapers & aesthetics"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeMd
-                            font.weight: Font.Bold
+                            font.weight: Theme.fontWeightBold
                             color: Theme.on_surface
                         }
 
@@ -1410,6 +1428,8 @@ BarPill {
                                 return "matugen palette, awww transitions & mpvpaper";
                             }
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: root.batchStatusText !== "" ? Theme.primary : Theme.on_surface_variant
                         }
@@ -1540,8 +1560,9 @@ BarPill {
                                 Text {
                                     text: modelData.label
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeSm
-                                    font.weight: isSelected ? Font.Bold : Font.Medium
+                                    font.weight: isSelected ? Theme.fontWeightBold : Theme.fontWeightMedium
                                     color: isSelected ? Theme.primary : Theme.on_surface_variant
                                 }
                             }
@@ -1672,8 +1693,9 @@ BarPill {
                                 Layout.fillWidth: true
                                 text: root.getBasename(WallpaperService?.currentWallpaperPath ?? "")
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeXs
-                                font.weight: Font.Bold
+                                font.weight: Theme.fontWeightBold
                                 color: Theme.on_surface
                                 elide: Text.ElideMiddle
                             }
@@ -1690,6 +1712,8 @@ BarPill {
                                     return parts.join(" • ");
                                 }
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
                                 font.pixelSize: Math.max(9, Theme.fontSizeXs - 1)
                                 color: Theme.on_surface_variant
                                 elide: Text.ElideRight
@@ -1948,8 +1972,9 @@ BarPill {
                         Text {
                             text: "api key"
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
+                            font.weight: Theme.monoWeightBold
                             color: Theme.primary
                             Layout.leftMargin: 4
                         }
@@ -2189,8 +2214,9 @@ BarPill {
                             anchors.centerIn: parent
                             text: root.onlinePage + "/" + root.onlineTotalPages
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeXs
-                            font.weight: Font.Bold
+                            font.weight: Theme.monoWeightBold
                             color: Theme.primary
                         }
                     }
@@ -2600,6 +2626,8 @@ BarPill {
                                             Layout.fillWidth: true
                                             text: modelData.name
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.weight: Theme.fontWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: Theme.on_surface
                                             elide: Text.ElideRight
@@ -2608,6 +2636,8 @@ BarPill {
                                         Text {
                                             text: String(modelData.col).toLowerCase()
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
+                                            font.weight: Theme.monoWeightRegular
                                             font.pixelSize: Theme.fontSizeXs - 1
                                             color: Theme.on_surface_variant
                                         }
@@ -3252,8 +3282,9 @@ BarPill {
                             Text {
                                 text: "wallhaven #" + (root.selectedDetailItem?.id ?? "")
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
                                 font.pixelSize: Theme.fontSizeMd
-                                font.weight: Font.Bold
+                                font.weight: Theme.monoWeightBold
                                 color: Theme.on_surface
                             }
 
@@ -3270,6 +3301,8 @@ BarPill {
                                     return parts.join(" • ");
                                 }
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: root.detailMeta?.error ? Theme.error : Theme.on_surface_variant
                                 elide: Text.ElideRight
@@ -3330,6 +3363,8 @@ BarPill {
                                     anchors.centerIn: parent
                                     text: (root.detailMeta?.views ?? 0) + " views"
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.weight: Theme.monoWeightRegular
                                     font.pixelSize: Theme.fontSizeXs
                                     color: Theme.on_surface
                                 }
@@ -3348,6 +3383,8 @@ BarPill {
                                     anchors.centerIn: parent
                                     text: (root.detailMeta?.favorites ?? 0) + " likes"
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.weight: Theme.monoWeightRegular
                                     font.pixelSize: Theme.fontSizeXs
                                     color: Theme.on_surface
                                 }
@@ -3364,6 +3401,8 @@ BarPill {
                         Text {
                             text: "palette:"
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.on_surface_variant
                         }
@@ -3438,6 +3477,8 @@ BarPill {
                                 visible: !root.detailMeta?.loading && (!root.detailMeta?.tags || root.detailMeta.tags.length === 0)
                                 text: "no public tags returned for this wallpaper"
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.on_surface_variant
                             }

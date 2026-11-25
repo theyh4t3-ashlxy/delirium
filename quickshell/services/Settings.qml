@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import ".."
 import "../theme/confFormat.mjs" as ConfFmt
+import "../theme/styleEngine.mjs" as StyleEngine
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
@@ -14,7 +15,7 @@ QtObject {
     property int barMargin: 0
     property bool barFloating: false
     property int barHeight: 34
-    property string barStyle: "regular"
+    property string barStyle: "solid"
     property int scoopRadius: 16
     property real scoopTension: 0.55228475
     property int screenCornerRadius: 16
@@ -133,11 +134,14 @@ QtObject {
     signal requestCaptureToggle()
     signal requestCaptureOpen()
     signal requestCaptureClose()
+    signal requestOsdShow(string osdType, string icon, int value, string label, string subtitle)
+    signal requestNetworkTab(string tabName)
 
     property var barModulesLeft: ["launcher", "wallpaper", "workspaces", "layout", "windowTitle"]
     property var barModulesCenter: ["clock", "notifications"]
     property var barModulesRight: ["media", "screenCapture", "systemTray", "volume", "battery", "quickSettings", "powerMenu"]
     property bool showBarStudio: false
+    property string barStudioTab: "layout"
     property bool showScreenCapture: true
 
     property string currentWallpaper: ""
@@ -164,6 +168,14 @@ QtObject {
     readonly property bool unhingedFlavor: flavorMode !== "off"
     property string vibeStyle: "icon"
     property bool dnd: false
+    property bool trayCollapsed: false
+    property string weatherLocation: ""
+    property string weatherUnit: "F"
+    property bool weatherEnabled: true
+    property int pomodoroFocusMin: 25
+    property int pomodoroBreakMin: 5
+    property string hotspotSsid: "quickshell-ap"
+    property string hotspotPassword: "nixoshotspot"
 
     property bool showWorkspaces: true
     property bool showWindowTitle: true
@@ -182,7 +194,6 @@ QtObject {
     property bool showQuickSettings: true
     property bool showWallpaper: true
     property bool showQuickNotes: true
-    property bool showMotionSandbox: false
     property bool lockscreenWallpaperSync: true
     property string lockscreenWallpaper: ""
     property bool lockscreenShowMedia: true
@@ -194,12 +205,22 @@ QtObject {
     property string iconSet: "material"
     property string fontFamily: "Noto Sans"
     property string fontSans: fontFamily
+    property string fontDisplay: ""
     property string fontMono: "JetBrainsMono Nerd Font"
     property string fontWindows: "Segoe Fluent Icons"
     property string fontMaterial: "Material Symbols Rounded"
     property bool materialFilled: false
     property real fontScale: 1.0
     property string fontWeight: "regular"
+    property int fontWeightValue: 400
+    property real fontWidth: 100.0
+    property real fontRoundness: 0.0
+    property real fontSlant: 0.0
+    property bool fontOpticalAuto: true
+    property real fontOpticalSize: 14.0
+    property int fontMonoWeight: 400
+    property real fontMonoWidth: 100.0
+    property bool _syncingFontWeight: false
     property var networkAliases: ({})
 
     property string screenshotDir: "~/Pictures/Screenshots"
@@ -214,6 +235,19 @@ QtObject {
     property bool screenshotShowBadge: true
     property bool screenshotShowHandles: true
     property bool screenshotFlash: true
+    property string screenshotFormat: "png"
+    property int screenshotQuality: 92
+    property bool screenshotIncludeCursor: false
+    property int screenshotDelay: 0
+    property bool screenshotShowLoupe: true
+    property bool screenshotPostHud: true
+    property bool screenshotDefaultAnnotate: false
+    property bool screenshotPrettifyEnabled: false
+    property int screenshotPrettifyPadding: 48
+    property int screenshotPrettifyRadius: 14
+    property bool screenshotPrettifyShadow: true
+    property string screenshotPrettifyStyle: "matugen"
+    property string screenshotFilenamePattern: "timestamp"
 
     property int barRadius: 0
     property real barOpacity: 1.0
@@ -336,7 +370,6 @@ QtObject {
     onShowWallpaperChanged: queueSave()
     onShowQuickNotesChanged: queueSave()
     onShowScreenCaptureChanged: queueSave()
-    onShowMotionSandboxChanged: queueSave()
     onShowBarStudioChanged: queueSave()
     onLockscreenWallpaperSyncChanged: queueSave()
     onLockscreenWallpaperChanged: queueSave()
@@ -361,16 +394,80 @@ QtObject {
     onShowBarDateChanged: queueSave()
     onWorkspaceCountChanged: queueSave()
     onIconSetChanged: queueSave()
+    function weightNameToValue(name) {
+        switch (String(name || "regular").toLowerCase().trim()) {
+        case "light": return 300;
+        case "medium": return 500;
+        case "demibold":
+        case "semibold": return 600;
+        case "bold": return 700;
+        default: return 400;
+        }
+    }
+
+    function weightValueToName(val) {
+        const w = Number(val) || 400;
+        if (w <= 340) return "light";
+        if (w <= 440) return "regular";
+        if (w <= 540) return "medium";
+        if (w <= 640) return "demibold";
+        return "bold";
+    }
+
     onFontFamilyChanged: queueSave()
+    onFontDisplayChanged: queueSave()
     onFontMonoChanged: queueSave()
     onFontWindowsChanged: queueSave()
     onFontMaterialChanged: queueSave()
     onMaterialFilledChanged: queueSave()
     onFontScaleChanged: queueSave()
-    onFontWeightChanged: queueSave()
+    onFontWeightChanged: {
+        if (!root._loading && !root._syncingFontWeight) {
+            root._syncingFontWeight = true;
+            const mapped = weightNameToValue(fontWeight);
+            if (fontWeightValue !== mapped) fontWeightValue = mapped;
+            root._syncingFontWeight = false;
+        }
+        queueSave();
+    }
+    onFontWeightValueChanged: {
+        if (!root._loading && !root._syncingFontWeight) {
+            root._syncingFontWeight = true;
+            const nm = weightValueToName(fontWeightValue);
+            if (fontWeight !== nm) fontWeight = nm;
+            root._syncingFontWeight = false;
+        }
+        queueSave();
+    }
+    onFontWidthChanged: queueSave()
+    onFontRoundnessChanged: queueSave()
+    onFontSlantChanged: queueSave()
+    onFontOpticalAutoChanged: queueSave()
+    onFontOpticalSizeChanged: queueSave()
+    onFontMonoWeightChanged: queueSave()
+    onFontMonoWidthChanged: queueSave()
     onMpvPanscanChanged: queueSave()
     onMpvAudioChanged: queueSave()
-    onDndChanged: queueSave()
+    onDndChanged: {
+        queueSave();
+        if (!root._loading && root._initialized) {
+            requestOsdShow(
+                "dnd",
+                dnd ? Theme.iconBellOff : Theme.iconBell,
+                dnd ? 100 : 0,
+                dnd ? "muted" : "active",
+                dnd ? "do not disturb enabled" : "notifications enabled"
+            );
+        }
+    }
+    onTrayCollapsedChanged: queueSave()
+    onWeatherLocationChanged: queueSave()
+    onWeatherUnitChanged: queueSave()
+    onWeatherEnabledChanged: queueSave()
+    onPomodoroFocusMinChanged: queueSave()
+    onPomodoroBreakMinChanged: queueSave()
+    onHotspotSsidChanged: queueSave()
+    onHotspotPasswordChanged: queueSave()
     onVibeStyleChanged: queueSave()
     onNetworkAliasesChanged: queueSave()
     onBarRadiusChanged: queueSave()
@@ -438,6 +535,19 @@ QtObject {
     onScreenshotShowBadgeChanged: queueSave()
     onScreenshotShowHandlesChanged: queueSave()
     onScreenshotFlashChanged: queueSave()
+    onScreenshotFormatChanged: queueSave()
+    onScreenshotQualityChanged: queueSave()
+    onScreenshotIncludeCursorChanged: queueSave()
+    onScreenshotDelayChanged: queueSave()
+    onScreenshotShowLoupeChanged: queueSave()
+    onScreenshotPostHudChanged: queueSave()
+    onScreenshotDefaultAnnotateChanged: queueSave()
+    onScreenshotPrettifyEnabledChanged: queueSave()
+    onScreenshotPrettifyPaddingChanged: queueSave()
+    onScreenshotPrettifyRadiusChanged: queueSave()
+    onScreenshotPrettifyShadowChanged: queueSave()
+    onScreenshotPrettifyStyleChanged: queueSave()
+    onScreenshotFilenamePatternChanged: queueSave()
     onPaddingScaleChanged: queueSave()
     onWidgetPaddingVChanged: queueSave()
     onAnimCurveChanged: queueSave()
@@ -485,7 +595,7 @@ QtObject {
         { key: "barMargin", type: "int", def: 0 },
         { key: "barFloating", type: "bool", def: false },
         { key: "barHeight", type: "int", def: 34 },
-        { key: "barStyle", type: "string", def: "regular" },
+        { key: "barStyle", type: "string", def: "solid" },
         { key: "scoopRadius", type: "int", def: 16 },
         { key: "scoopTension", type: "float", def: 0.55228475 },
         { key: "screenCornerRadius", type: "int", def: 16 },
@@ -513,6 +623,14 @@ QtObject {
         { key: "mpvPanscan", type: "float", def: 1.0 },
         { key: "mpvAudio", type: "bool", def: false },
         { key: "dnd", type: "bool", def: false },
+        { key: "trayCollapsed", type: "bool", def: false },
+        { key: "weatherLocation", type: "string", def: "" },
+        { key: "weatherUnit", type: "string", def: "F" },
+        { key: "weatherEnabled", type: "bool", def: true },
+        { key: "pomodoroFocusMin", type: "int", def: 25 },
+        { key: "pomodoroBreakMin", type: "int", def: 5 },
+        { key: "hotspotSsid", type: "string", def: "quickshell-ap" },
+        { key: "hotspotPassword", type: "string", def: "nixoshotspot" },
         { key: "vibeStyle", type: "string", def: "icon" },
         { key: "animSpeed", type: "string", def: "snappy" },
         { key: "flavorMode", type: "string", def: "actions" },
@@ -535,7 +653,6 @@ QtObject {
         { key: "showWallpaper", type: "bool", def: true },
         { key: "showQuickNotes", type: "bool", def: true },
         { key: "showScreenCapture", type: "bool", def: true },
-        { key: "showMotionSandbox", type: "bool", def: false },
         { key: "showBarStudio", type: "bool", def: false },
         { key: "lockscreenWallpaperSync", type: "bool", def: true },
         { key: "lockscreenWallpaper", type: "string", def: "" },
@@ -549,12 +666,21 @@ QtObject {
         { key: "showBarDate", type: "bool", def: false },
         { key: "workspaceCount", type: "int", def: 10 },
         { key: "fontFamily", type: "string", def: "Noto Sans" },
+        { key: "fontDisplay", type: "string", def: "" },
         { key: "fontMono", type: "string", def: "JetBrainsMono Nerd Font" },
         { key: "fontWindows", type: "string", def: "Segoe Fluent Icons" },
         { key: "fontMaterial", type: "string", def: "Material Symbols Rounded" },
         { key: "materialFilled", type: "bool", def: false },
         { key: "fontScale", type: "float", def: 1.0 },
         { key: "fontWeight", type: "string", def: "regular" },
+        { key: "fontWeightValue", type: "int", def: 400 },
+        { key: "fontWidth", type: "float", def: 100.0 },
+        { key: "fontRoundness", type: "float", def: 0.0 },
+        { key: "fontSlant", type: "float", def: 0.0 },
+        { key: "fontOpticalAuto", type: "bool", def: true },
+        { key: "fontOpticalSize", type: "float", def: 14.0 },
+        { key: "fontMonoWeight", type: "int", def: 400 },
+        { key: "fontMonoWidth", type: "float", def: 100.0 },
         { key: "networkAliases", type: "map", def: ({}) },
         { key: "screenshotDir", type: "string", def: "~/Pictures/Screenshots" },
         { key: "screenshotDefaultAction", type: "string", def: "both" },
@@ -568,6 +694,19 @@ QtObject {
         { key: "screenshotShowBadge", type: "bool", def: true },
         { key: "screenshotShowHandles", type: "bool", def: true },
         { key: "screenshotFlash", type: "bool", def: true },
+        { key: "screenshotFormat", type: "string", def: "png" },
+        { key: "screenshotQuality", type: "int", def: 92 },
+        { key: "screenshotIncludeCursor", type: "bool", def: false },
+        { key: "screenshotDelay", type: "int", def: 0 },
+        { key: "screenshotShowLoupe", type: "bool", def: true },
+        { key: "screenshotPostHud", type: "bool", def: true },
+        { key: "screenshotDefaultAnnotate", type: "bool", def: false },
+        { key: "screenshotPrettifyEnabled", type: "bool", def: false },
+        { key: "screenshotPrettifyPadding", type: "int", def: 48 },
+        { key: "screenshotPrettifyRadius", type: "int", def: 14 },
+        { key: "screenshotPrettifyShadow", type: "bool", def: true },
+        { key: "screenshotPrettifyStyle", type: "string", def: "matugen" },
+        { key: "screenshotFilenamePattern", type: "string", def: "timestamp" },
         { key: "barRadius", type: "int", def: 0 },
         { key: "barOpacity", type: "float", def: 1.0 },
         { key: "widgetRadius", type: "int", def: 8 },
@@ -653,6 +792,12 @@ QtObject {
             let v = data[item.key];
             if (v === undefined) continue;
 
+            if (item.key === "barStyle") {
+                v = StyleEngine.normalizeBarStyle(v);
+            }
+            if (item.key === "cornerColorMode") {
+                v = StyleEngine.normalizeCornerColorMode(v);
+            }
             if (item.key === "awwwTransitionType") {
                 let valid = ["wipe", "wave", "grow", "fade", "center", "outer", "simple", "left", "right", "top", "bottom", "random", "none"];
                 if (valid.indexOf(v) === -1) v = "wipe";
@@ -798,6 +943,11 @@ QtObject {
             let is12 = !root.clockMilitary;
             let sec = root.clockShowSeconds;
             root.clockFormat = is12 ? (sec ? "h:mm:ss ap" : "h:mm ap") : (sec ? "HH:mm:ss" : "HH:mm");
+        }
+        if (data.fontWeightValue === undefined && data.fontWeight !== undefined) {
+            root.fontWeightValue = weightNameToValue(root.fontWeight);
+        } else if (data.fontWeightValue !== undefined && data.fontWeight === undefined) {
+            root.fontWeight = weightValueToName(root.fontWeightValue);
         }
         if (data.hasCompletedWelcome !== undefined) {
             root.hasCompletedWelcome = (data.hasCompletedWelcome === true || data.hasCompletedWelcome === "true");
@@ -976,13 +1126,45 @@ QtObject {
         else barModulesRight = toList;
     }
 
+    function resetFontAxes() {
+        root._syncingFontWeight = true;
+        fontWeight = "regular";
+        fontWeightValue = 400;
+        root._syncingFontWeight = false;
+        fontWidth = 100.0;
+        fontRoundness = 0.0;
+        fontSlant = 0.0;
+        fontOpticalAuto = true;
+        fontOpticalSize = 14.0;
+        fontMonoWeight = 400;
+        fontMonoWidth = 100.0;
+        save();
+    }
+
     function resetBarLayout() {
         barModulesLeft = ["launcher", "wallpaper", "workspaces", "layout", "windowTitle"];
         barModulesCenter = ["clock", "notifications"];
         barModulesRight = ["media", "screenCapture", "systemTray", "volume", "battery", "quickSettings", "powerMenu"];
+        barPosition = "top";
+        barFloating = false;
+        barMargin = 0;
+        barHeight = 34;
+        barRadius = 0;
+        barOpacity = 1.0;
+        barStyle = "solid";
         barGrouping = "clusters";
         barWidgetChrome = "grouped";
         barDividers = "line";
+        barIslandMode = true;
+        bentoGap = 8;
+        bentoHoverLift = true;
+        widgetRadius = 8;
+        widgetSpacing = 4;
+        widgetPaddingH = 8;
+        widgetPaddingV = 4;
+        paddingScale = "cozy";
+        scoopRadius = 16;
+        scoopBorderEnabled = false;
     }
 
     function dispatchCloseWindow() {

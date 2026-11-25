@@ -1,31 +1,22 @@
+// BarStudioMotionTab.qml — animation speed, easing curves, live curve tester, and embedded physics playground
 import QtQuick
 import QtQuick.Layouts
 import ".."
-import "../corners"
-import Quickshell
-import Quickshell.Wayland
+import "../controls"
+import "../services"
 
-PanelWindow {
+Item {
     id: root
 
-    required property var modelData
-    screen: modelData
-
-    // ── state ──────────────────────────────────────────────────────────
+    property bool activeTabOpen: false
     property bool springMode: false
     property string activeSandboxMode: "toy"
     property string gravityMode: "normal"
     property int bounceScore: 0
     property int bestScore: 0
+    property bool curveTestAtEnd: false
+    property bool curveAutoLoop: false
     onBounceScoreChanged: if (bounceScore > bestScore) bestScore = bounceScore
-
-    // ── docking ────────────────────────────────────────────────────────
-    // Follows the bar by default. manualDockPosition is kept as a debug override;
-    // when it differs from the bar's edge we no longer add the bar offset.
-    property string manualDockPosition: ""
-    // Where along the bar the popup sits: "center" | "start" | "end"
-    property string barAlign: "center"
-    property int crossMargin: 12
 
     function normalizeDock(p) {
         switch (p) {
@@ -45,70 +36,16 @@ PanelWindow {
     }
 
     readonly property string barDock: normalizeDock(Settings?.barPosition ?? "top")
-    readonly property string resolvedDock: manualDockPosition !== "" ? normalizeDock(manualDockPosition) : barDock
-    readonly property bool followsBar: resolvedDock === barDock
-
-    readonly property bool isTop: resolvedDock === "top"
-    readonly property bool isBottom: resolvedDock === "bottom"
-    readonly property bool isLeft: resolvedDock === "left"
-    readonly property bool isRight: resolvedDock === "right"
+    readonly property bool isTop: barDock === "top"
+    readonly property bool isBottom: barDock === "bottom"
+    readonly property bool isLeft: barDock === "left"
+    readonly property bool isRight: barDock === "right"
     readonly property bool isVertical: isLeft || isRight
-
-    // unit vector pointing from the popup toward the bar
     readonly property int barDx: isLeft ? -1 : (isRight ? 1 : 0)
     readonly property int barDy: isTop ? -1 : (isBottom ? 1 : 0)
 
-    readonly property int scoopRadius: Math.round(Settings?.scoopRadius ?? Settings?.screenCornerRadius ?? 16)
-    readonly property int barOffset: (Theme?.barHeight ?? 40) + ((Settings?.barFloating ?? false) ? (Settings?.barMargin ?? 8) : 0)
-    readonly property int edgeOffset: followsBar ? barOffset : 0
-
-    readonly property bool alignStart: barAlign === "start"
-    readonly property bool alignEnd: barAlign === "end"
-
-    anchors {
-        top: root.isTop || (root.isVertical && root.alignStart)
-        bottom: root.isBottom || (root.isVertical && root.alignEnd)
-        left: root.isLeft || (!root.isVertical && root.alignStart)
-        right: root.isRight || (!root.isVertical && root.alignEnd)
-    }
-
-    margins {
-        top: root.isTop ? root.edgeOffset : ((root.isVertical && root.alignStart) ? root.crossMargin : 0)
-        bottom: root.isBottom ? root.edgeOffset : ((root.isVertical && root.alignEnd) ? root.crossMargin : 0)
-        left: root.isLeft ? root.edgeOffset : ((!root.isVertical && root.alignStart) ? root.crossMargin : 0)
-        right: root.isRight ? root.edgeOffset : ((!root.isVertical && root.alignEnd) ? root.crossMargin : 0)
-    }
-
-    color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "quickshell:motionsandbox"
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-
-    // ── open / close animation (slides out of the bar) ─────────────────
-    readonly property bool isOpen: Settings.showMotionSandbox
-    property real reveal: isOpen ? 1 : 0
-    Behavior on reveal {
-        NumberAnimation {
-            duration: Theme.animNormal
-            easing.type: Easing.OutCubic
-        }
-    }
-
-    visible: isOpen || reveal > 0.001
-    implicitWidth: root.isVertical ? 380 : 620
-    implicitHeight: root.isVertical ? 520 : 320
-
-    onIsOpenChanged: if (isOpen) toyBall.wake()
-    onGravityModeChanged: toyBall.wake()
-    onResolvedDockChanged: layoutSettle.restart()
-
-    // Sizes only settle after the compositor answers the resize, so anything that
-    // depends on canvas size is (re)placed after a short debounce instead of instantly.
-    Timer {
-        id: layoutSettle
-        interval: 150
-        onTriggered: root.resetPlayground()
+    function resetScroll() {
+        if (leftFlick) leftFlick.contentY = 0;
     }
 
     function resetPlayground() {
@@ -118,7 +55,32 @@ PanelWindow {
         dragCard3.snapHome();
     }
 
-    // ── reusable pieces ────────────────────────────────────────────────
+    onActiveTabOpenChanged: {
+        if (activeTabOpen) {
+            if (!toyBall.placed && canvasArea.width > 40 && canvasArea.height > 40) {
+                layoutSettle.restart();
+            } else {
+                toyBall.wake();
+            }
+        }
+    }
+    onGravityModeChanged: if (activeTabOpen) toyBall.wake()
+    onBarDockChanged: if (activeTabOpen) layoutSettle.restart()
+
+    Timer {
+        id: layoutSettle
+        interval: 90
+        onTriggered: root.resetPlayground()
+    }
+
+    Timer {
+        id: curveLoopTimer
+        interval: Math.max(260, Theme.animSlow + 260)
+        running: root.activeTabOpen && root.curveAutoLoop
+        repeat: true
+        onTriggered: root.curveTestAtEnd = !root.curveTestAtEnd
+    }
+
     component Chip: Rectangle {
         id: chip
         property string label: ""
@@ -127,29 +89,21 @@ PanelWindow {
         property color activeTextColor: Theme.on_primary
         signal clicked
 
-        implicitWidth: chipText.implicitWidth + 16
+        implicitWidth: chipText.implicitWidth + 14
         implicitHeight: 24
         radius: Theme.radiusPill
-        color: active ? activeColor : Theme.surface_container_high
-        border.color: Theme.widgetBorder
+        color: active ? activeColor : Theme.widgetBg
+        border.color: active ? activeColor : Theme.widgetBorder
         border.width: 1
 
-        Behavior on color {
-            ColorAnimation {
-                duration: Theme.animNormal
-            }
-        }
+        Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
         Rectangle {
             anchors.fill: parent
             radius: chip.radius
             color: Theme.on_surface
             opacity: chipMouse.pressed ? 0.14 : (chipMouse.containsMouse ? 0.07 : 0)
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Theme.animNormal
-                }
-            }
+            Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
         }
 
         Text {
@@ -157,8 +111,9 @@ PanelWindow {
             anchors.centerIn: parent
             text: chip.label
             font.family: Theme.fontFamily
+            font.variableAxes: Theme.sansAxes
             font.pixelSize: Theme.fontSizeXs
-            font.weight: Font.Bold
+            font.weight: Theme.fontWeightBold
             color: chip.active ? chip.activeTextColor : Theme.on_surface
         }
 
@@ -203,8 +158,6 @@ PanelWindow {
         width: 52
         height: 52
         radius: 26
-        // flash is blended in instead of animating `color` directly, so the
-        // binding survives and the bumper keeps following theme changes
         color: Qt.tint(Theme.surface_container_high, Qt.alpha(Theme.primary, flash))
         border.color: Theme.widgetBorder
         border.width: 2
@@ -240,8 +193,9 @@ PanelWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "+" + bmp.points
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: 8
-                font.weight: Font.Bold
+                font.weight: Theme.fontWeightBold
                 color: Theme.on_surface_variant
             }
         }
@@ -250,16 +204,16 @@ PanelWindow {
     component PhysicsCard: Rectangle {
         id: pcRoot
         property int slot: 0
-        readonly property int homeX: root.isVertical ? 10 : 10 + slot * 135
-        readonly property int homeY: root.isVertical ? 10 + slot * 96 : 10
+        readonly property int homeX: 12 + slot * 138
+        readonly property int homeY: 16
         property alias icon: pcIcon.text
         property alias title: pcTitle.text
         property color accentColor: Theme.primary
 
         x: homeX
         y: homeY
-        width: 120
-        height: 88
+        width: 124
+        height: 90
         radius: Theme.radiusMd
         color: Theme.surface_container_highest
         border.color: cardDrag.active ? accentColor : Theme.widgetBorder
@@ -267,24 +221,22 @@ PanelWindow {
         z: cardDrag.active ? 20 : 1
 
         function snapHome() {
-            if (cardDrag.active)
-                return;
-            animX.to = Math.max(0, Math.min(canvasArea.width - width, homeX));
-            animY.to = Math.max(0, Math.min(canvasArea.height - height, homeY));
-            animX.easing.type = root.springMode ? Easing.OutBack : Easing.OutCubic;
-            animY.easing.type = root.springMode ? Easing.OutBack : Easing.OutCubic;
+            if (cardDrag.active) return;
+            animX.to = Math.max(0, Math.min(Math.max(0, canvasArea.width - width), homeX));
+            animY.to = Math.max(0, Math.min(Math.max(0, canvasArea.height - height), homeY));
+            animX.easing.type = root.springMode ? Easing.OutBack : Theme.animEasing;
+            animY.easing.type = root.springMode ? Easing.OutBack : Theme.animEasing;
             animX.duration = Theme.animSlow;
             animY.duration = Theme.animSlow;
             momentumAnim.restart();
         }
 
         function animateTo(targetX, targetY) {
-            if (cardDrag.active)
-                return;
-            animX.to = Math.max(0, Math.min(canvasArea.width - width, targetX));
-            animY.to = Math.max(0, Math.min(canvasArea.height - height, targetY));
-            animX.easing.type = Easing.OutCubic;
-            animY.easing.type = Easing.OutCubic;
+            if (cardDrag.active) return;
+            animX.to = Math.max(0, Math.min(Math.max(0, canvasArea.width - width), targetX));
+            animY.to = Math.max(0, Math.min(Math.max(0, canvasArea.height - height), targetY));
+            animX.easing.type = Theme.animEasing;
+            animY.easing.type = Theme.animEasing;
             animX.duration = Theme.animNormal;
             animY.duration = Theme.animNormal;
             momentumAnim.restart();
@@ -311,14 +263,17 @@ PanelWindow {
             Text {
                 id: pcTitle
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: Theme.fontSizeXs
-                font.weight: Font.Bold
+                font.weight: Theme.fontWeightBold
                 color: Theme.on_surface
                 Layout.alignment: Qt.AlignHCenter
             }
             Text {
                 text: "(" + Math.round(pcRoot.x) + ", " + Math.round(pcRoot.y) + ")"
                 font.family: Theme.fontMono
+                font.variableAxes: Theme.monoAxes
+                font.weight: Theme.monoWeightRegular
                 font.pixelSize: 9
                 color: Theme.on_surface_variant
                 Layout.alignment: Qt.AlignHCenter
@@ -329,9 +284,9 @@ PanelWindow {
             id: cardDrag
             target: pcRoot
             xAxis.minimum: 0
-            xAxis.maximum: canvasArea.width - pcRoot.width
+            xAxis.maximum: Math.max(0, canvasArea.width - pcRoot.width)
             yAxis.minimum: 0
-            yAxis.maximum: canvasArea.height - pcRoot.height
+            yAxis.maximum: Math.max(0, canvasArea.height - pcRoot.height)
             cursorShape: active ? Qt.ClosedHandCursor : Qt.OpenHandCursor
 
             onActiveChanged: {
@@ -346,65 +301,220 @@ PanelWindow {
         }
     }
 
-    // ── frame: concave scoops + body ───────────────────────────────────
-    Item {
-        id: frame
+    RowLayout {
         anchors.fill: parent
-        focus: true
-        opacity: root.reveal
-        Keys.onEscapePressed: Settings.showMotionSandbox = false
+        spacing: Theme.popupSpacing + 2
 
-        transform: Translate {
-            x: root.barDx * frame.width * 0.3 * (1 - root.reveal)
-            y: root.barDy * frame.height * 0.3 * (1 - root.reveal)
-        }
+        // Left: Animation Timing & Live Curve Test
+        Item {
+            Layout.fillHeight: true
+            Layout.preferredWidth: Math.max(320, Math.round(parent.width * 0.44))
 
-        // Two scoops flank the edge that touches the bar.
-        Repeater {
-            model: 2
-            delegate: ConcaveCorner {
-                required property int index
-                readonly property bool isStart: index === 0
+            Flickable {
+                id: leftFlick
+                anchors.fill: parent
+                clip: true
+                contentWidth: width
+                contentHeight: leftCol.implicitHeight + 16
+                boundsBehavior: Flickable.StopAtBounds
 
-                x: root.isVertical ? (root.isLeft ? 0 : frame.width - root.scoopRadius) : (isStart ? 0 : frame.width - root.scoopRadius)
-                y: root.isVertical ? (isStart ? 0 : frame.height - root.scoopRadius) : (root.isTop ? 0 : frame.height - root.scoopRadius)
-                radiusX: root.scoopRadius
-                radiusY: root.scoopRadius
-                fillColor: Theme.popupBg
-                showBorder: true
-                borderWidth: 1
-                borderColor: Theme.popupBorderColor
-                flipX: root.isVertical ? root.isRight : isStart
-                flipY: root.isVertical ? isStart : root.isBottom
-                visible: root.scoopRadius > 0
+                WheelHandler {
+                    orientation: Qt.Vertical
+                    target: parent
+                }
+
+                ColumnLayout {
+                    id: leftCol
+                    width: parent.width - 10
+                    spacing: Theme.popupSpacing
+
+                    CategoryHeader {
+                        title: "animation timing & easing"
+                        subtitle: "global motion multipliers, curve family, and base durations"
+                        icon: Theme.iconFlame
+                    }
+
+                    SettingCard {
+                        ChoiceGrid {
+                            columns: 3
+                            buttonHeight: 28
+                            title: "animation speed preset"
+                            model: [
+                                { label: "hyprland", value: "hyprland" },
+                                { label: "snappy", value: "snappy" },
+                                { label: "hyper", value: "hyper" },
+                                { label: "normal", value: "normal" },
+                                { label: "chill", value: "chill" },
+                                { label: "instant", value: "instant" }
+                            ]
+                            currentValue: Settings.animSpeed
+                            onSelected: (val) => Settings.animSpeed = val
+                        }
+
+                        ChoiceRow {
+                            title: "easing curve profile"
+                            model: [
+                                { label: "cubic", value: "cubic" },
+                                { label: "hyprland", value: "hyprland" },
+                                { label: "snappy", value: "snappy" },
+                                { label: "expressive", value: "expressive" },
+                                { label: "linear", value: "linear" }
+                            ]
+                            currentValue: Settings.animCurve || "cubic"
+                            onSelected: (val) => Settings.animCurve = val
+                        }
+
+                        ChoiceRow {
+                            title: "easing direction"
+                            model: [
+                                { label: "out", value: "out" },
+                                { label: "in", value: "in" },
+                                { label: "in-out", value: "inout" }
+                            ]
+                            currentValue: Settings.animEasingType || "out"
+                            onSelected: (val) => Settings.animEasingType = val
+                        }
+
+                        RowDivider {}
+
+                        SliderRow {
+                            title: "fast base duration"
+                            from: 60
+                            to: 240
+                            stepSize: 10
+                            value: Settings.animDurationFast
+                            formatter: (v) => Math.round(v) + "ms → " + Theme.animFast + "ms"
+                            onMoved: (val) => Settings.animDurationFast = val
+                        }
+
+                        SliderRow {
+                            title: "normal base duration"
+                            from: 100
+                            to: 400
+                            stepSize: 10
+                            value: Settings.animDurationNormal
+                            formatter: (v) => Math.round(v) + "ms → " + Theme.animNormal + "ms"
+                            onMoved: (val) => Settings.animDurationNormal = val
+                        }
+
+                        SliderRow {
+                            title: "slow base duration"
+                            from: 180
+                            to: 600
+                            stepSize: 10
+                            value: Settings.animDurationSlow
+                            formatter: (v) => Math.round(v) + "ms → " + Theme.animSlow + "ms"
+                            onMoved: (val) => Settings.animDurationSlow = val
+                        }
+                    }
+
+                    CategoryHeader {
+                        title: "live curve preview"
+                        subtitle: "trigger motion using active Theme.animNormal + easing settings"
+                        icon: Theme.iconSparkles
+                    }
+
+                    SettingCard {
+                        RowLayout {
+                            width: parent.width
+                            spacing: 6
+
+                            Text {
+                                text: "scale " + Theme.animSpeedMult.toFixed(2) + "x · " + Theme.animNormal + "ms"
+                                font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
+                                font.pixelSize: Theme.fontSizeXs
+                                color: Theme.textSecondary
+                                Layout.fillWidth: true
+                            }
+
+                            Chip {
+                                label: root.curveAutoLoop ? "auto: on" : "auto: off"
+                                active: root.curveAutoLoop
+                                onClicked: root.curveAutoLoop = !root.curveAutoLoop
+                            }
+
+                            Chip {
+                                label: "trigger"
+                                active: true
+                                onClicked: root.curveTestAtEnd = !root.curveTestAtEnd
+                            }
+                        }
+
+                        Rectangle {
+                            id: previewTrack
+                            width: parent.width
+                            height: 36
+                            radius: Theme.radiusMd
+                            color: Theme.widgetBg
+                            border.color: Theme.widgetBorder
+                            border.width: 1
+
+                            Rectangle {
+                                id: previewKnob
+                                width: 64
+                                height: 24
+                                anchors.verticalCenter: parent.verticalCenter
+                                x: root.curveTestAtEnd ? Math.max(6, previewTrack.width - width - 6) : 6
+                                radius: Theme.radiusPill
+                                color: Theme.primary
+
+                                Behavior on x {
+                                    NumberAnimation {
+                                        duration: Theme.animNormal
+                                        easing.type: Theme.animEasing
+                                    }
+                                }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: Theme.animCurve
+                                    font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.pixelSize: Theme.fontSizeXs
+                                    font.weight: Theme.monoWeightBold
+                                    color: Theme.on_primary
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.curveTestAtEnd = !root.curveTestAtEnd
+                            }
+                        }
+                    }
+                }
             }
+
+            TabScrollTrack { target: leftFlick }
         }
 
+        // Right: Interactive Physics Playground
         Rectangle {
-            id: body
-            anchors.fill: parent
-            // -1 on the attached side pushes the border under the bar so there's no seam line
-            anchors.leftMargin: root.isVertical ? (root.isLeft ? -1 : 0) : root.scoopRadius
-            anchors.rightMargin: root.isVertical ? (root.isRight ? -1 : 0) : root.scoopRadius
-            anchors.topMargin: root.isVertical ? root.scoopRadius : (root.isTop ? -1 : 0)
-            anchors.bottomMargin: root.isVertical ? root.scoopRadius : (root.isBottom ? -1 : 0)
-
+            Layout.fillWidth: true
+            Layout.fillHeight: true
             radius: Theme.radiusMd
-            color: Theme.popupBg
-            border.color: Theme.popupBorderColor
-            border.width: 1
+            color: Theme.cardBg
+            border.color: Theme.cardBorder
+            border.width: Theme.popupBorderWidth
+            clip: true
 
-            topLeftRadius: (root.isTop || root.isLeft) ? 0 : Theme.radiusMd
-            topRightRadius: (root.isTop || root.isRight) ? 0 : Theme.radiusMd
-            bottomLeftRadius: (root.isBottom || root.isLeft) ? 0 : Theme.radiusMd
-            bottomRightRadius: (root.isBottom || root.isRight) ? 0 : Theme.radiusMd
+            Rectangle {
+                visible: Theme.isGlass
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 1
+                color: Theme.glassHighlight
+            }
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 14
+                anchors.margins: 12
                 spacing: 8
 
-                // header
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -412,11 +522,21 @@ PanelWindow {
                     Text {
                         text: "physics & momentum playground"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeSm
-                        font.weight: Font.Bold
+                        font.weight: Theme.fontWeightBold
                         color: Theme.primary
                         elide: Text.ElideRight
                         Layout.fillWidth: true
+                    }
+
+                    Text {
+                        text: "dock: " + root.barDock
+                        font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
+                        font.weight: Theme.monoWeightRegular
+                        font.pixelSize: Theme.fontSizeXs
+                        color: Theme.textSecondary
                     }
 
                     IconButton {
@@ -428,16 +548,8 @@ PanelWindow {
                             root.resetPlayground();
                         }
                     }
-
-                    IconButton {
-                        icon: Theme.iconClose
-                        iconSize: Theme.fontSizeXs
-                        tooltip: "close (esc)"
-                        onClicked: Settings.showMotionSandbox = false
-                    }
                 }
 
-                // toolbar (wraps instead of overflowing on vertical docks)
                 Flow {
                     Layout.fillWidth: true
                     spacing: 8
@@ -475,29 +587,26 @@ PanelWindow {
                     }
                 }
 
-                // play area
                 Rectangle {
                     id: canvasArea
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.minimumHeight: 120
+                    Layout.minimumHeight: 160
                     radius: Theme.radiusSm
                     color: Qt.alpha(Theme.surface_container_high, 0.35)
                     border.color: Theme.widgetBorder
                     border.width: 1
                     clip: true
 
-                    onWidthChanged: layoutSettle.restart()
-                    onHeightChanged: layoutSettle.restart()
+                    onWidthChanged: if (width > 40) layoutSettle.restart()
+                    onHeightChanged: if (height > 40) layoutSettle.restart()
 
-                    // ─ pinball toy ─
+                    // pinball layer
                     Item {
                         id: toyLayer
                         anchors.fill: parent
                         visible: root.activeSandboxMode === "toy"
 
-                        // (u, d) = position along the bar, depth away from the bar (0..1),
-                        // so the layout mirrors correctly for every dock edge
                         function mapX(u, d) {
                             const w = canvasArea.width;
                             return root.isVertical ? (root.isLeft ? d * w : (1 - d) * w) : u * w;
@@ -527,8 +636,8 @@ PanelWindow {
                             anchors.top: parent.top
                             anchors.left: parent.left
                             anchors.right: parent.right
-                            anchors.margins: 6
-                            spacing: 6
+                            anchors.margins: 8
+                            spacing: 8
 
                             Rectangle {
                                 implicitHeight: 20
@@ -541,8 +650,9 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     text: "score " + root.bounceScore + " · best " + root.bestScore
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: 9
-                                    font.weight: Font.Bold
+                                    font.weight: Theme.monoWeightBold
                                     color: Theme.primary
                                 }
                             }
@@ -552,6 +662,8 @@ PanelWindow {
                                 text: "click = shockwave · drag ball to fling"
                                 elide: Text.ElideRight
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: 9
                                 color: Theme.on_surface_variant
                             }
@@ -586,18 +698,17 @@ PanelWindow {
                             property real chaosAngle: 0
                             property real restTime: 0
                             property bool placed: false
-                            property bool asleep: true   // physics loop stops when the ball settles
+                            property bool asleep: true
                             property bool dragging: ballDrag.active
 
                             function wake() {
-                                if (!placed)
-                                    return;
+                                if (!placed) return;
                                 asleep = false;
                                 restTime = 0;
                             }
 
-                            // spawn on the far side from the bar; gravity pulls it back through the bumpers
                             function resetBall() {
+                                if (canvasArea.width <= 40 || canvasArea.height <= 40) return;
                                 const cx = toyLayer.mapX(0.5, 0.8);
                                 const cy = toyLayer.mapY(0.5, 0.8);
                                 x = Math.round(cx - width / 2);
@@ -623,9 +734,9 @@ PanelWindow {
                                 id: ballDrag
                                 target: toyBall
                                 xAxis.minimum: 0
-                                xAxis.maximum: canvasArea.width - toyBall.width
+                                xAxis.maximum: Math.max(0, canvasArea.width - toyBall.width)
                                 yAxis.minimum: 0
-                                yAxis.maximum: canvasArea.height - toyBall.height
+                                yAxis.maximum: Math.max(0, canvasArea.height - toyBall.height)
                                 cursorShape: active ? Qt.ClosedHandCursor : Qt.OpenHandCursor
 
                                 onActiveChanged: {
@@ -637,7 +748,6 @@ PanelWindow {
                                         toyBall.vx = Math.max(-cap, Math.min(cap, centroid.velocity.x));
                                         toyBall.vy = Math.max(-cap, Math.min(cap, centroid.velocity.y));
                                         if (Math.hypot(toyBall.vx, toyBall.vy) < 60) {
-                                            // a plain drop gets tossed away from the bar
                                             toyBall.vx = -root.barDx * 380;
                                             toyBall.vy = -root.barDy * 380;
                                         }
@@ -648,14 +758,12 @@ PanelWindow {
                         }
 
                         FrameAnimation {
-                            running: root.isOpen && root.activeSandboxMode === "toy" && !toyBall.dragging && !toyBall.asleep
+                            running: root.activeTabOpen && root.activeSandboxMode === "toy" && !toyBall.dragging && !toyBall.asleep
 
                             onTriggered: {
                                 const dt = Math.min(0.05, frameTime);
-                                if (dt <= 0)
-                                    return;
+                                if (dt <= 0) return;
 
-                                // "normal" gravity pulls toward the bar, "reverse" away from it
                                 const gMag = 920;
                                 let gx = 0, gy = 0;
                                 if (root.gravityMode === "normal") {
@@ -680,33 +788,28 @@ PanelWindow {
                                 toyBall.x += toyBall.vx * dt;
                                 toyBall.y += toyBall.vy * dt;
 
-                                // walls
-                                const maxX = canvasArea.width - toyBall.width;
-                                const maxY = canvasArea.height - toyBall.height;
+                                const maxX = Math.max(0, canvasArea.width - toyBall.width);
+                                const maxY = Math.max(0, canvasArea.height - toyBall.height);
                                 const bounceLoss = 0.78;
 
                                 if (toyBall.x < 0 || toyBall.x > maxX) {
                                     toyBall.x = Math.max(0, Math.min(maxX, toyBall.x));
-                                    if (Math.abs(toyBall.vx) > 50)
-                                        root.bounceScore += 1;
+                                    if (Math.abs(toyBall.vx) > 50) root.bounceScore += 1;
                                     toyBall.vx = -toyBall.vx * bounceLoss;
                                 }
                                 if (toyBall.y < 0 || toyBall.y > maxY) {
                                     toyBall.y = Math.max(0, Math.min(maxY, toyBall.y));
-                                    if (Math.abs(toyBall.vy) > 50)
-                                        root.bounceScore += 1;
+                                    if (Math.abs(toyBall.vy) > 50) root.bounceScore += 1;
                                     toyBall.vy = -toyBall.vy * bounceLoss;
                                 }
 
-                                // bumpers
                                 const bx = toyBall.x + toyBall.width / 2;
                                 const by = toyBall.y + toyBall.height / 2;
                                 const ballRadius = toyBall.width / 2;
 
                                 for (let i = 0; i < bumperRepeater.count; ++i) {
                                     const b = bumperRepeater.itemAt(i);
-                                    if (!b)
-                                        continue;
+                                    if (!b) continue;
                                     const cx = b.x + b.width / 2;
                                     const cy = b.y + b.height / 2;
                                     const dist = Math.hypot(bx - cx, by - cy);
@@ -732,7 +835,6 @@ PanelWindow {
                                     }
                                 }
 
-                                // fall asleep once settled so an idle popup doesn't redraw every frame
                                 if (Math.hypot(toyBall.vx, toyBall.vy) < 20 && root.gravityMode !== "chaos") {
                                     toyBall.restTime += dt;
                                     if (toyBall.restTime > 0.4) {
@@ -747,7 +849,7 @@ PanelWindow {
                         }
                     }
 
-                    // ─ cards ─
+                    // draggable physics cards layer
                     Item {
                         id: cardsLayer
                         anchors.fill: parent
@@ -756,9 +858,11 @@ PanelWindow {
                         Text {
                             anchors.left: parent.left
                             anchors.bottom: parent.bottom
-                            anchors.margins: 6
+                            anchors.margins: 8
                             text: root.springMode ? "release to snap back" : "drag and release to flick"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: 9
                             color: Theme.on_surface_variant
                         }
@@ -775,7 +879,7 @@ PanelWindow {
                             id: dragCard2
                             slot: 1
                             icon: Theme.iconExpand
-                            title: "freedom card"
+                            title: "ease curve card"
                             accentColor: Theme.warn
                         }
 
@@ -786,41 +890,6 @@ PanelWindow {
                             title: "media pill"
                             accentColor: Theme.secondary
                         }
-                    }
-                }
-
-                // footer
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    Text {
-                        text: "timing"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeXs
-                        font.weight: Font.Bold
-                        color: Theme.primary
-                    }
-
-                    ChipGroup {
-                        options: [
-                            { id: "hyprland", label: "hypr" },
-                            { id: "snappy", label: "snappy" },
-                            { id: "chill", label: "chill" },
-                            { id: "instant", label: "zero" }
-                        ]
-                        current: Settings.animSpeed
-                        onPicked: key => Settings.animSpeed = key
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignRight
-                        elide: Text.ElideLeft
-                        text: root.resolvedDock + " · scoop " + root.scoopRadius + "px" + (root.followsBar ? "" : " · detached")
-                        font.family: Theme.fontMono
-                        font.pixelSize: 10
-                        color: Theme.on_surface_variant
                     }
                 }
             }

@@ -428,6 +428,8 @@ BarPill {
                     : Theme.getFlavor("media_quiet", Theme.getVibe(Theme.kaoEmpty + " quiet", "quiet", "quiet"));
             }
             font.family: Theme.fontFamily
+            font.variableAxes: Theme.sansAxes
+            font.weight: Theme.fontWeightRegular
             font.pixelSize: Theme.fontSizeSm
             color: root.hasTrack ? Theme.textPrimary : Theme.textSecondary
             elide: Text.ElideRight
@@ -560,6 +562,7 @@ BarPill {
                         ? "media " + Theme.kaoDJ
                         : "media"
                     font.family: Theme.fontDisplay
+                    font.variableAxes: Theme.displayAxes
                     font.pixelSize: Theme.fontSizeLg
                     font.weight: Theme.fontWeightBold
                     color: Theme.textPrimary
@@ -601,6 +604,7 @@ BarPill {
                                     anchors.centerIn: parent
                                     text: modelData.label
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: 10
                                     font.weight: isCur ? Theme.fontWeightBold : Theme.fontWeightMedium
                                     color: isCur ? Theme.on_primary : Theme.textSecondary
@@ -646,8 +650,9 @@ BarPill {
                         Text {
                             text: (root.player?.identity || "player").toLowerCase()
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeXs
-                            font.weight: Theme.fontWeightBold
+                            font.weight: Theme.monoWeightBold
                             color: root.artAccent
                         }
 
@@ -655,6 +660,8 @@ BarPill {
                             visible: root.activeList.length > 1
                             text: (root.currentPlayerIdx + 1) + "/" + root.activeList.length
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textSecondary
                         }
@@ -833,6 +840,7 @@ BarPill {
                             Text {
                                 text: (root.player?.trackTitle || "unknown track").toLowerCase()
                                 font.family: Theme.fontDisplay
+                                font.variableAxes: Theme.displayAxes
                                 font.pixelSize: Theme.fontSizeMd
                                 font.weight: Theme.fontWeightBold
                                 color: Theme.textPrimary
@@ -845,6 +853,7 @@ BarPill {
                             Text {
                                 text: (root.player?.trackArtist || "unknown artist").toLowerCase()
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeSm
                                 font.weight: Theme.fontWeightDemiBold
                                 color: root.artAccent
@@ -856,6 +865,8 @@ BarPill {
                             Text {
                                 text: (root.player?.trackAlbum || "").toLowerCase()
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.textSecondary
                                 Layout.fillWidth: true
@@ -868,6 +879,8 @@ BarPill {
                                 visible: root.isPlaying && (((Settings?.flavorMode ?? "actions") !== "off") || Theme.iconSet === "kaomoji")
                                 text: Theme.getFlavor("media_playing", Theme.getVibe(Theme.kaoVibe + " vibing", "", ""))
                                 font.family: Theme.fontVibe
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: Theme.fontSizeXs
                                 color: Theme.alpha(Theme.textSecondary, 0.85)
                                 Layout.fillWidth: true
@@ -907,6 +920,8 @@ BarPill {
                         Text {
                             text: root.formatTime(root.trackPosition)
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textSecondary
                         }
@@ -916,6 +931,8 @@ BarPill {
                         Text {
                             text: root.formatTime(root.player?.length ?? 0)
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.textSecondary
                         }
@@ -1064,6 +1081,8 @@ BarPill {
                     Text {
                         text: "speed"
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
+                        font.weight: Theme.monoWeightRegular
                         font.pixelSize: 10
                         color: Theme.textSecondary
                     }
@@ -1093,8 +1112,9 @@ BarPill {
                                 anchors.centerIn: parent
                                 text: modelData === 1.0 ? "1x" : (modelData + "x")
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
                                 font.pixelSize: 10
-                                font.weight: isCur ? Font.Bold : Font.Medium
+                                font.weight: isCur ? Theme.monoWeightBold : Theme.monoWeightMedium
                                 color: isCur ? root.artAccent : Theme.textSecondary
                             }
 
@@ -1146,8 +1166,9 @@ BarPill {
                                 return "no lyrics";
                             }
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: 9
-                            font.weight: Font.Bold
+                            font.weight: Theme.monoWeightBold
                             color: (root.lyricsSource === "custom" || root.lyricsStatusMsg !== "") ? root.artAccent : Theme.textSecondary
                         }
                     }
@@ -1180,8 +1201,9 @@ BarPill {
                                 anchors.centerIn: parent
                                 text: modelData.label
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
                                 font.pixelSize: 9
-                                font.weight: modelData.active ? Font.Bold : Font.Medium
+                                font.weight: modelData.active ? Theme.monoWeightBold : Theme.monoWeightMedium
                                 color: modelData.active ? root.artAccent : Theme.textPrimary
                             }
 
@@ -1259,6 +1281,8 @@ BarPill {
                                         anchors.centerIn: parent
                                         text: modelData.label
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
+                                        font.weight: Theme.monoWeightRegular
                                         font.pixelSize: 9
                                         color: Theme.textPrimary
                                     }
@@ -1279,6 +1303,8 @@ BarPill {
                         Text {
                             text: root.pickerCwd || "~"
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
+                            font.weight: Theme.monoWeightRegular
                             font.pixelSize: 9
                             color: Theme.textSecondary
                             elide: Text.ElideMiddle
@@ -1326,6 +1352,8 @@ BarPill {
                                             Text {
                                                 text: modelData.name
                                                 font.family: Theme.fontMono
+                                                font.variableAxes: Theme.monoAxes
+                                                font.weight: Theme.monoWeightRegular
                                                 font.pixelSize: 10
                                                 color: Theme.textPrimary
                                                 elide: Text.ElideMiddle
@@ -1381,6 +1409,8 @@ BarPill {
                                 wrapMode: TextEdit.Wrap
                                 selectByMouse: true
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
                                 font.pixelSize: 11
                                 color: Theme.textPrimary
                                 selectionColor: Theme.primary_container
@@ -1395,6 +1425,8 @@ BarPill {
                             Text {
                                 text: "saves to ~/.local/share/quickshell/lyrics/"
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
+                                font.weight: Theme.monoWeightRegular
                                 font.pixelSize: 8
                                 color: Theme.textSecondary
                                 elide: Text.ElideRight
@@ -1414,6 +1446,8 @@ BarPill {
                                     anchors.centerIn: parent
                                     text: "cancel"
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.weight: Theme.fontWeightRegular
                                     font.pixelSize: 10
                                     color: Theme.textPrimary
                                 }
@@ -1438,8 +1472,9 @@ BarPill {
                                     anchors.centerIn: parent
                                     text: "save custom .lrc"
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: 10
-                                    font.weight: Font.Bold
+                                    font.weight: Theme.fontWeightBold
                                     color: Theme.on_primary
                                 }
 
@@ -1482,6 +1517,8 @@ BarPill {
                                     ? "no active track"
                                     : (root.lyricsLoading ? "looking up lyrics..." : "no lyrics found for this track")
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: Theme.fontSizeSm
                                 color: Theme.textSecondary
                                 wrapMode: Text.Wrap
@@ -1505,6 +1542,8 @@ BarPill {
                                         anchors.centerIn: parent
                                         text: "browse .lrc"
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
+                                        font.weight: Theme.monoWeightRegular
                                         font.pixelSize: 10
                                         color: Theme.textPrimary
                                     }
@@ -1530,8 +1569,9 @@ BarPill {
                                         anchors.centerIn: parent
                                         text: "write / paste"
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: 10
-                                        font.weight: Font.Bold
+                                        font.weight: Theme.monoWeightBold
                                         color: Theme.on_primary
                                     }
 
@@ -1618,8 +1658,9 @@ BarPill {
                                         text: modelData.text
                                         wrapMode: Text.Wrap
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: isCurrent ? Theme.fontSizeMd : Theme.fontSizeSm
-                                        font.weight: isCurrent ? Font.Bold : Font.Normal
+                                        font.weight: isCurrent ? Theme.fontWeightBold : Theme.fontWeightRegular
                                         color: isCurrent
                                             ? root.artAccent
                                             : (isPast ? Theme.on_surface_variant : Theme.textPrimary)
@@ -1675,6 +1716,8 @@ BarPill {
                     Text {
                         text: Theme.getFlavor("media_quiet", Theme.getVibe("quiet right now", "no players active", "nothing playing"))
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeSm
                         color: Theme.textSecondary
                         Layout.alignment: Qt.AlignHCenter
@@ -1717,6 +1760,7 @@ BarPill {
                                 Text {
                                     text: (root.selectedApp?.name || "choose app").toLowerCase()
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightDemiBold
                                     color: Theme.textPrimary
@@ -1762,6 +1806,7 @@ BarPill {
                                 Text {
                                     text: "launch"
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: Theme.fontWeightBold
                                     color: Theme.on_primary
@@ -1843,6 +1888,7 @@ BarPill {
                                             Text {
                                                 text: modelData.name.toLowerCase()
                                                 font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
                                                 font.pixelSize: Theme.fontSizeXs
                                                 font.weight: parent.parent.isSelected ? Theme.fontWeightDemiBold : Theme.fontWeightRegular
                                                 color: parent.parent.isSelected ? Theme.textPrimary : Theme.textSecondary

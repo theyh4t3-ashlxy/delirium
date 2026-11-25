@@ -154,8 +154,8 @@ PanelWindow {
     readonly property var centerClusters: buildClusters(Settings.barModulesCenter ?? ["clock"])
     readonly property var rightClusters:  buildClusters(Settings.barModulesRight ?? [])
 
-    readonly property bool isFloating: (Settings?.barFloating ?? false) || Theme.isBento || (Settings?.barStyle === "bento-floating")
-    readonly property bool isIslandMode: Theme.isBento || (Settings?.barStyle === "bento-floating") || (root.isFloating && (Settings?.barIslandMode ?? true))
+    readonly property bool isFloating: (Settings?.barFloating ?? false) || Theme.isIslands
+    readonly property bool isIslandMode: Theme.isIslands || (root.isFloating && (Settings?.barIslandMode ?? true))
     readonly property int barMargin: Settings?.barMargin ?? 0
     readonly property int effectiveBarMargin: root.isFloating ? (root.barMargin > 0 ? root.barMargin : 8) : 0
     readonly property int barRadius: Settings?.barRadius ?? 0
@@ -530,8 +530,9 @@ PanelWindow {
                         visible: !zoneRoot.vertical
                         text: "REC " + (ScreenRecService?.elapsedTimeString ?? "00:00")
                         font.family: Theme.fontMono
+                        font.variableAxes: Theme.monoAxes
                         font.pixelSize: Theme.fontSizeXs
-                        font.weight: Theme.fontWeightBold
+                        font.weight: Theme.monoWeightBold
                         color: recMouseC.pressed ? Theme.on_error : Theme.error
                     }
                 }
@@ -583,7 +584,7 @@ PanelWindow {
                     Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                     Rectangle {
-                        visible: clusterTray.showTray && Theme.isAccentGlow
+                        visible: clusterTray.showTray && Theme.isTinted
                         anchors.fill: parent
                         anchors.margins: -3
                         radius: clusterTray.radius > 0 ? clusterTray.radius + 3 : 3
@@ -705,7 +706,7 @@ PanelWindow {
         anchors.fill: parent
 
         Rectangle {
-            visible: Theme.isAccentGlow && !root.isIslandMode
+            visible: Theme.isTinted && !root.isIslandMode
             anchors.fill: barBg
             anchors.margins: -4
             radius: root.effectiveBarRadius + 4
@@ -728,11 +729,11 @@ PanelWindow {
 
             property color fillColor: Theme.cornerFill
             Behavior on fillColor { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
-            property real glowOpacity: Theme.isCyberNeon ? 1.0 : 0.85
+            property real glowOpacity: Theme.isOutlined ? 1.0 : 0.85
 
             SequentialAnimation on glowOpacity {
                 loops: Animation.Infinite
-                running: Theme.isCyberNeon && !root.isIslandMode && !root.isFloating
+                running: Theme.isOutlined && !root.isIslandMode && !root.isFloating
                 NumberAnimation { from: 0.55; to: 1.0; duration: 1200; easing.type: Easing.InOutQuad }
                 NumberAnimation { from: 1.0; to: 0.55; duration: 1200; easing.type: Easing.InOutQuad }
             }
@@ -872,11 +873,11 @@ PanelWindow {
                 ctx.fill();
 
                 var hasCustomBorder = Theme.scoopBorderEnabled && Theme.scoopBorderWidth > 0 && Theme.scoopBorderColor !== "transparent" && Theme.scoopBorderColor.a > 0.01;
-                var hasNeon = Theme.isCyberNeon || Theme.isAccentGlow;
+                var hasAccentBorder = Theme.isOutlined || Theme.isTinted;
                 var hasGlass = Theme.isGlass;
-                var hasPureBlack = Theme.isPureBlack;
+                var hasOled = Theme.isOled;
 
-                if (hasCustomBorder || hasNeon || hasGlass || hasPureBlack) {
+                if (hasCustomBorder || hasAccentBorder || hasGlass || hasOled) {
                     ctx.beginPath();
                     if (root.isTop) {
                         if (sL) {
@@ -928,7 +929,7 @@ PanelWindow {
 
                     ctx.lineCap = "butt";
                     ctx.lineJoin = "round";
-                    if (hasNeon && (Settings?.scoopBorderColor ?? "auto") === "auto") {
+                    if (hasAccentBorder && (Settings?.scoopBorderColor ?? "auto") === "auto") {
                         ctx.lineWidth = Theme.scoopBorderWidth > 0 ? Theme.scoopBorderWidth : 2;
                         ctx.strokeStyle = Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, unifiedBarCanvas.glowOpacity);
                     } else if (hasCustomBorder) {
@@ -937,7 +938,7 @@ PanelWindow {
                     } else if (hasGlass) {
                         ctx.lineWidth = 1;
                         ctx.strokeStyle = Theme.glassHighlight;
-                    } else if (hasPureBlack) {
+                    } else if (hasOled) {
                         ctx.lineWidth = 1;
                         ctx.strokeStyle = Theme.barBorderColor;
                     }

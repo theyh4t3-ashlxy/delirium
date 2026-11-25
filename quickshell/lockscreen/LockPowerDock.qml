@@ -63,6 +63,7 @@ RowLayout {
                 visible: pRoot.isArmed
                 text: root ? root.fmtText("confirm " + pRoot.label + "?") : ("confirm " + pRoot.label + "?")
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: Theme.fontSizeXs
                 font.weight: Theme.fontWeightBold
                 color: Theme.on_error

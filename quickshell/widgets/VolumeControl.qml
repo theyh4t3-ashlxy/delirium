@@ -92,6 +92,8 @@ BarPill {
                 return pct + "%";
             }
             font.family: Theme.fontFamily
+            font.variableAxes: Theme.sansAxes
+            font.weight: Theme.fontWeightRegular
             font.pixelSize: Theme.fontSizeXs
             color: popup.open
                 ? Theme.primary
@@ -190,6 +192,7 @@ BarPill {
                     Text {
                         text: "audio & mixer"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeMd
                         font.weight: Theme.fontWeightBold
                         color: Theme.on_surface
@@ -204,6 +207,8 @@ BarPill {
                             return Theme.getFlavor("media_quiet", "pipewire graph idle");
                         }
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: volRoot.isOverdriven ? Theme.warn : Theme.on_surface_variant
                         elide: Text.ElideRight
@@ -246,6 +251,7 @@ BarPill {
                         Text {
                             text: "output"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Theme.fontWeightBold
                             color: Theme.primary
@@ -254,6 +260,8 @@ BarPill {
                         Text {
                             text: ((volRoot.sink?.description || volRoot.sink?.nickname || volRoot.sink?.name || "default output")).toLowerCase()
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.on_surface_variant
                             elide: Text.ElideRight
@@ -263,8 +271,9 @@ BarPill {
                         Text {
                             text: Math.round(volRoot.vol * 100) + "%"
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeSm
-                            font.weight: Theme.fontWeightBold
+                            font.weight: Theme.monoWeightBold
                             color: volRoot.muted
                                 ? Theme.on_surface_disabled
                                 : (volRoot.isOverdriven ? Theme.warn : Theme.primary)
@@ -377,6 +386,7 @@ BarPill {
                                 Text {
                                     text: modelData.label
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeXs
                                     font.weight: isActive ? Theme.fontWeightBold : Theme.fontWeightMedium
                                     color: isActive ? Theme.on_primary : Theme.on_surface
@@ -433,6 +443,7 @@ BarPill {
                                     elide: Text.ElideRight
                                     horizontalAlignment: Text.AlignHCenter
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: 10
                                     font.weight: isCur ? Theme.fontWeightBold : Theme.fontWeightMedium
                                     color: isCur ? Theme.primary : Theme.on_surface_variant
@@ -482,6 +493,7 @@ BarPill {
                         Text {
                             text: "microphone"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Theme.fontWeightBold
                             color: Theme.primary
@@ -490,6 +502,8 @@ BarPill {
                         Text {
                             text: ((volRoot.source?.description || volRoot.source?.nickname || volRoot.source?.name || "default mic")).toLowerCase()
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: Theme.on_surface_variant
                             elide: Text.ElideRight
@@ -499,8 +513,9 @@ BarPill {
                         Text {
                             text: Math.round((volRoot.source?.audio?.volume ?? 0) * 100) + "%"
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: Theme.fontSizeSm
-                            font.weight: Theme.fontWeightBold
+                            font.weight: Theme.monoWeightBold
                             color: (volRoot.source?.audio?.muted ?? false) ? Theme.on_surface_disabled : Theme.primary
                         }
                     }
@@ -595,6 +610,7 @@ BarPill {
                                     anchors.centerIn: parent
                                     text: modelData.label
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: 10
                                     font.weight: isActive ? Theme.fontWeightBold : Theme.fontWeightMedium
                                     color: isActive ? (modelData.boost ? Theme.on_warn_container : Theme.on_primary) : Theme.on_surface_variant
@@ -631,6 +647,7 @@ BarPill {
                 Text {
                     text: "active applications (" + volRoot.appStreams.length + ")"
                     font.family: Theme.fontFamily
+                    font.variableAxes: Theme.sansAxes
                     font.pixelSize: Theme.fontSizeXs
                     font.weight: Theme.fontWeightBold
                     color: Theme.primary
@@ -719,6 +736,7 @@ BarPill {
                                     Text {
                                         text: streamCard.appName
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightMedium
                                         color: streamCard.streamMuted ? Theme.on_surface_disabled : Theme.on_surface
@@ -765,6 +783,8 @@ BarPill {
                                     Text {
                                         text: Math.round(streamCard.streamVol * 100) + "%"
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
+                                        font.weight: Theme.monoWeightRegular
                                         font.pixelSize: Theme.fontSizeXs
                                         color: streamCard.streamMuted ? Theme.on_surface_disabled : Theme.on_surface_variant
                                         Layout.preferredWidth: 34
@@ -837,6 +857,7 @@ BarPill {
                             anchors.centerIn: parent
                             text: "outputs (" + volRoot.outputDevices.length + ")"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: !volRoot.showInputs ? Theme.fontWeightBold : Theme.fontWeightMedium
                             color: !volRoot.showInputs ? Theme.primary : Theme.on_surface_variant
@@ -862,6 +883,7 @@ BarPill {
                             anchors.centerIn: parent
                             text: "inputs (" + volRoot.inputDevices.length + ")"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: volRoot.showInputs ? Theme.fontWeightBold : Theme.fontWeightMedium
                             color: volRoot.showInputs ? Theme.primary : Theme.on_surface_variant
@@ -929,6 +951,7 @@ BarPill {
                                     Text {
                                         text: ((devDelegate.modelData.description || devDelegate.modelData.nickname || devDelegate.modelData.name || "audio device")).toLowerCase()
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: devDelegate.isCurrent ? Theme.fontWeightBold : Theme.fontWeightRegular
                                         color: devDelegate.isCurrent ? Theme.primary : Theme.on_surface

@@ -166,8 +166,9 @@ Item {
                 visible: root.label !== ""
                 text: root.label + ":"
                 font.family: Theme.fontSans
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: Theme.fontSizeXs
-                font.weight: Font.Medium
+                font.weight: Theme.fontWeightMedium
                 color: Theme.on_surface_variant
             }
 
@@ -177,8 +178,9 @@ Item {
                     ? root.getItemLabel(headerButton.curItem, root.currentIndex)
                     : root.placeholder
                 font.family: Theme.fontSans
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: Theme.fontSizeSm
-                font.weight: Font.DemiBold
+                font.weight: Theme.fontWeightDemiBold
                 color: headerButton.curItem !== null ? Theme.on_surface : Theme.on_surface_variant
                 elide: Text.ElideRight
             }
@@ -325,8 +327,9 @@ Item {
                                     Layout.fillWidth: true
                                     text: itemDelegate.itemLabel
                                     font.family: Theme.fontSans
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeSm
-                                    font.weight: itemDelegate.isSelected ? Font.DemiBold : Font.Normal
+                                    font.weight: itemDelegate.isSelected ? Theme.fontWeightDemiBold : Theme.fontWeightRegular
                                     color: itemDelegate.isSelected ? root.accentColor : Theme.on_surface
                                     elide: Text.ElideRight
                                 }
@@ -335,6 +338,8 @@ Item {
                                     visible: itemDelegate.itemBadge !== ""
                                     text: itemDelegate.itemBadge
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.weight: Theme.monoWeightRegular
                                     font.pixelSize: 9
                                     color: Theme.on_surface_variant
                                 }

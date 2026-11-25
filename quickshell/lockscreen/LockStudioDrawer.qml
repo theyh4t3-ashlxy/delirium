@@ -63,6 +63,7 @@ Rectangle {
                         Text {
                             text: root.fmtText(cRoot.label)
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: cRoot.selected ? Theme.fontWeightBold : Theme.fontWeightMedium
                             color: cRoot.selected ? root.uiAccent : root.uiTextSecondary
@@ -126,6 +127,7 @@ Rectangle {
                         Text {
                             text: root.fmtText(sRoot.label)
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
                             font.pixelSize: Theme.fontSizeXs
                             font.weight: Theme.fontWeightDemiBold
                             color: root.uiTextSecondary
@@ -145,8 +147,9 @@ Rectangle {
                                 anchors.centerIn: parent
                                 text: sRoot.displayText
                                 font.family: Theme.fontMono
+                                font.variableAxes: Theme.monoAxes
                                 font.pixelSize: Theme.fontSizeXs
-                                font.weight: Theme.fontWeightBold
+                                font.weight: Theme.monoWeightBold
                                 color: root.uiAccent
                             }
                         }
@@ -248,6 +251,8 @@ Rectangle {
                         Text {
                             text: root.fmtText(tRow.label)
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeXs
                             color: root.uiTextPrimary
                             Layout.fillWidth: true
@@ -346,6 +351,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("lock screen studio")
                                         font.family: Theme.fontDisplay
+                                        font.variableAxes: Theme.displayAxes
                                         font.pixelSize: Theme.fontSizeMd
                                         font.weight: Theme.fontWeightBold
                                         color: root.uiTextPrimary
@@ -418,6 +424,7 @@ Rectangle {
                                         Text {
                                             text: root.fmtText("surprise me! (roll layout & vibe)")
                                             font.family: Theme.fontDisplay
+                                            font.variableAxes: Theme.displayAxes
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightBold
                                             color: root.uiOnAccent
@@ -475,6 +482,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("quick presets")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -503,6 +511,7 @@ Rectangle {
                                         Text {
                                             text: root.fmtText("screen position")
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightDemiBold
                                             color: root.uiTextSecondary
@@ -512,6 +521,8 @@ Rectangle {
                                             visible: root.layoutPosition === "custom"
                                             text: Math.round(root.customNormX * 100) + "% , " + Math.round(root.customNormY * 100) + "%"
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
+                                            font.weight: Theme.monoWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: root.uiAccent
                                         }
@@ -538,6 +549,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("block stack order")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -569,6 +581,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("corner shape style")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -616,6 +629,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("lock & unlock transition")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -679,6 +693,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("clock architecture")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -723,6 +738,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("clock typeface & weight")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -829,6 +845,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("date format")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -861,6 +878,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("text casing (follow user preference)")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -932,6 +950,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("theme mode (" + (root.isLight ? "light" : "dark") + ")")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -964,6 +983,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("backdrop overlay texture")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -988,6 +1008,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("lock wallpaper & matugen palette")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -1205,6 +1226,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("password mask character")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -1239,6 +1261,7 @@ Rectangle {
                                         Text {
                                             text: root.fmtText("quote / greeting source")
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeXs
                                             font.weight: Theme.fontWeightDemiBold
                                             color: root.uiTextSecondary
@@ -1293,6 +1316,8 @@ Rectangle {
                                             verticalAlignment: TextInput.AlignVCenter
                                             text: root.customQuoteText
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
+                                            font.weight: Theme.fontWeightRegular
                                             font.pixelSize: Theme.fontSizeXs
                                             color: root.uiTextPrimary
                                             clip: true
@@ -1331,6 +1356,7 @@ Rectangle {
                                             Text {
                                                 text: root.fmtText("shuffle lock wallpaper")
                                                 font.family: Theme.fontFamily
+                                                font.variableAxes: Theme.sansAxes
                                                 font.pixelSize: Theme.fontSizeXs
                                                 font.weight: Theme.fontWeightDemiBold
                                                 color: root.uiTextPrimary
@@ -1482,6 +1508,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("automatic idle timeouts")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary
@@ -1606,6 +1633,7 @@ Rectangle {
                                     Text {
                                         text: root.fmtText("pam authentication service")
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
                                         font.pixelSize: Theme.fontSizeXs
                                         font.weight: Theme.fontWeightDemiBold
                                         color: root.uiTextSecondary

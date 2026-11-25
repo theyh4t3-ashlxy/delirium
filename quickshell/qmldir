@@ -34,6 +34,15 @@ Dropdown                 controls/Dropdown.qml
 Slider                   controls/Slider.qml
 CollapsibleSection       controls/CollapsibleSection.qml
 HoverFlyoutHandler       controls/HoverFlyoutHandler.qml
+ScratchBlock             controls/ScratchBlock.qml
+CategoryHeader           controls/CategoryHeader.qml
+SettingCard              controls/SettingCard.qml
+RowDivider               controls/RowDivider.qml
+ToggleRow                controls/ToggleRow.qml
+ChoiceRow                controls/ChoiceRow.qml
+ChoiceGrid               controls/ChoiceGrid.qml
+SliderRow                controls/SliderRow.qml
+TabScrollTrack           controls/TabScrollTrack.qml
 
 # widgets
 Workspaces               widgets/Workspaces.qml
@@ -62,8 +71,12 @@ LockClockCard            lockscreen/LockClockCard.qml
 LockMediaCard            lockscreen/LockMediaCard.qml
 LockAuthCard             lockscreen/LockAuthCard.qml
 ScreenshotOverlay        widgets/ScreenshotOverlay.qml
+ScreenshotHud            widgets/ScreenshotHud.qml
+ScreenshotPinLayer       widgets/ScreenshotPinLayer.qml
 BarStudio                widgets/BarStudio.qml
-MotionSandbox            widgets/MotionSandbox.qml
+BarStudioStyleTab        widgets/BarStudioStyleTab.qml
+BarStudioWidgetsTab      widgets/BarStudioWidgetsTab.qml
+BarStudioMotionTab       widgets/BarStudioMotionTab.qml
 KeybindsPreview          widgets/KeybindsPreview.qml
 WelcomeWizard            widgets/WelcomeWizard.qml
 ScreenCapture            widgets/ScreenCapture.qml

@@ -9,6 +9,32 @@ QtObject {
     property var _rawNotifs: ({})
     property var _dismissedIds: ({})
     property bool _replayingReload: true
+    property int dndRemainingSec: 0
+
+    property Timer dndCountdownTimer: Timer {
+        interval: 1000
+        repeat: true
+        running: root.dndRemainingSec > 0 && Boolean(Settings?.dnd ?? false)
+        onTriggered: {
+            if (root.dndRemainingSec > 1) {
+                root.dndRemainingSec -= 1;
+            } else {
+                root.dndRemainingSec = 0;
+                if (Settings) Settings.dnd = false;
+            }
+        }
+    }
+
+    function setDndForMinutes(minutes: int): void {
+        if (!Settings) return;
+        if (minutes <= 0) {
+            dndRemainingSec = 0;
+            Settings.dnd = false;
+        } else {
+            dndRemainingSec = minutes * 60;
+            Settings.dnd = true;
+        }
+    }
 
     property PersistentProperties persist: PersistentProperties {
         id: notifPersist

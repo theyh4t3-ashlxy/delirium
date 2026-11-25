@@ -536,8 +536,9 @@ BarPill {
             Text {
                 text: mChip.label
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: Theme.fontSizeXs
-                font.weight: mChip.selected ? Font.Bold : Font.Medium
+                font.weight: mChip.selected ? Theme.fontWeightBold : Theme.fontWeightMedium
                 color: mChip.danger ? (Theme.error ?? "#ff5449") : (mChip.selected ? Theme.primary : Theme.on_surface_variant)
             }
         }
@@ -574,8 +575,9 @@ BarPill {
                 ? (notesModel.count + "n · " + root.pendingTasksCount + "t")
                 : String(notesModel.count)
             font.family: Theme.fontMono
+            font.variableAxes: Theme.monoAxes
             font.pixelSize: Theme.fontSizeXs
-            font.weight: Font.Medium
+            font.weight: Theme.monoWeightMedium
             color: root.pendingTasksCount > 0 ? Theme.primary : Theme.on_surface_variant
         }
     }
@@ -734,8 +736,9 @@ BarPill {
                     Text {
                         text: "scratchpad & tasks"
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
                         font.pixelSize: Theme.fontSizeMd
-                        font.weight: Font.Bold
+                        font.weight: Theme.fontWeightBold
                         color: Theme.on_surface
                     }
 
@@ -750,6 +753,8 @@ BarPill {
                                 + "  •  " + root.pendingTasksCount + " pending " + (root.pendingTasksCount === 1 ? "task" : "tasks");
                         }
                         font.family: Theme.fontFamily
+                        font.variableAxes: Theme.sansAxes
+                        font.weight: Theme.fontWeightRegular
                         font.pixelSize: Theme.fontSizeXs
                         color: root.copiedFeedback ? Theme.primary : Theme.on_surface_variant
                         elide: Text.ElideRight
@@ -869,8 +874,9 @@ BarPill {
                                 Text {
                                     text: modelData.label
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeSm
-                                    font.weight: isSelected ? Font.DemiBold : Font.Medium
+                                    font.weight: isSelected ? Theme.fontWeightDemiBold : Theme.fontWeightMedium
                                     color: isSelected ? Theme.on_surface : Theme.on_surface_variant
                                 }
                             }
@@ -958,8 +964,9 @@ BarPill {
                                         Text {
                                             text: noteTabPill.title !== "" ? noteTabPill.title : ("note " + (noteTabPill.index + 1))
                                             font.family: Theme.fontFamily
+                                            font.variableAxes: Theme.sansAxes
                                             font.pixelSize: Theme.fontSizeXs
-                                            font.weight: noteTabPill.isCurrent ? Font.Bold : Font.Medium
+                                            font.weight: noteTabPill.isCurrent ? Theme.fontWeightBold : Theme.fontWeightMedium
                                             color: noteTabPill.isCurrent ? Theme.primary : Theme.on_surface
                                             Layout.maximumWidth: 130
                                             elide: Text.ElideRight
@@ -1062,8 +1069,9 @@ BarPill {
                                     Layout.preferredHeight: 28
                                     verticalAlignment: TextInput.AlignVCenter
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: Theme.fontSizeSm
-                                    font.weight: Font.Bold
+                                    font.weight: Theme.fontWeightBold
                                     color: Theme.on_surface
                                     selectByMouse: true
                                     activeFocusOnTab: true
@@ -1074,6 +1082,8 @@ BarPill {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: "note title..."
                                         font.family: Theme.fontFamily
+                                        font.variableAxes: Theme.sansAxes
+                                        font.weight: Theme.fontWeightRegular
                                         font.pixelSize: Theme.fontSizeSm
                                         color: Theme.on_surface_disabled
                                         visible: titleInput.text.length === 0 && !titleInput.activeFocus
@@ -1120,6 +1130,8 @@ BarPill {
                                             anchors.centerIn: parent
                                             text: modelData.label
                                             font.family: Theme.fontMono
+                                            font.variableAxes: Theme.monoAxes
+                                            font.weight: Theme.monoWeightRegular
                                             font.pixelSize: 9
                                             color: snipMouse.containsMouse ? Theme.primary : Theme.on_surface_variant
                                         }
@@ -1179,6 +1191,8 @@ BarPill {
                                     width: noteFlick.width
                                     height: Math.max(noteFlick.height, implicitHeight)
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.weight: Theme.monoWeightRegular
                                     font.pixelSize: Theme.fontSizeSm
                                     color: Theme.on_surface
                                     selectionColor: Theme.primary_container
@@ -1196,6 +1210,8 @@ BarPill {
                                             ? Theme.getFlavor("notes_empty", "type notes, snippets, or markdown memos here...")
                                             : "type notes, snippets, or markdown memos here..."
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
+                                        font.weight: Theme.monoWeightRegular
                                         font.pixelSize: Theme.fontSizeSm
                                         color: Theme.on_surface_disabled
                                         wrapMode: Text.Wrap
@@ -1263,6 +1279,8 @@ BarPill {
                                 Text {
                                     text: root.noteWordCount + " words  •  " + root.noteCharCount + " chars  •  " + root.noteLineCount + " lines"
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
+                                    font.weight: Theme.monoWeightRegular
                                     font.pixelSize: 9
                                     color: Theme.on_surface_variant
                                     Layout.fillWidth: true
@@ -1272,8 +1290,9 @@ BarPill {
                                     visible: noteArea.text.length > 0
                                     text: "clear"
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
                                     font.pixelSize: 10
-                                    font.weight: Font.Medium
+                                    font.weight: Theme.fontWeightMedium
                                     color: clearNoteMouse.containsMouse ? (Theme.error ?? "#ff5449") : Theme.on_surface_variant
 
                                     MouseArea {
@@ -1293,8 +1312,9 @@ BarPill {
                                 Text {
                                     text: saveTimer.running ? "saving..." : (root.savedFeedback ? "saved ✓" : "synced")
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: 9
-                                    font.weight: Font.Bold
+                                    font.weight: Theme.monoWeightBold
                                     color: Theme.primary
                                 }
                             }
@@ -1362,8 +1382,9 @@ BarPill {
                                 Text {
                                     text: root.newPriority
                                     font.family: Theme.fontMono
+                                    font.variableAxes: Theme.monoAxes
                                     font.pixelSize: 10
-                                    font.weight: Font.Bold
+                                    font.weight: Theme.monoWeightBold
                                     color: {
                                         if (root.newPriority === "urgent") return Theme.error ?? "#ff5449";
                                         if (root.newPriority === "low") return Theme.on_surface_variant;
@@ -1390,6 +1411,8 @@ BarPill {
                             Layout.preferredHeight: 28
                             verticalAlignment: TextInput.AlignVCenter
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeSm
                             color: Theme.on_surface
                             selectByMouse: true
@@ -1399,6 +1422,8 @@ BarPill {
                             Text {
                                 text: "add a new task... (press enter)"
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
+                                font.weight: Theme.fontWeightRegular
                                 font.pixelSize: Theme.fontSizeSm
                                 color: Theme.on_surface_disabled
                                 visible: taskInput.text.length === 0 && !taskInput.activeFocus
@@ -1429,8 +1454,9 @@ BarPill {
                                 anchors.centerIn: parent
                                 text: "+ add"
                                 font.family: Theme.fontFamily
+                                font.variableAxes: Theme.sansAxes
                                 font.pixelSize: Theme.fontSizeXs
-                                font.weight: Font.Bold
+                                font.weight: Theme.fontWeightBold
                                 color: taskInput.text.trim() !== "" ? Theme.on_primary : Theme.on_surface_variant
                             }
 
@@ -1477,8 +1503,9 @@ BarPill {
                         Text {
                             text: Math.round((root.completedTasksCount / Math.max(1, root.totalTasksCount)) * 100) + "%"
                             font.family: Theme.fontMono
+                            font.variableAxes: Theme.monoAxes
                             font.pixelSize: 10
-                            font.weight: Font.Bold
+                            font.weight: Theme.monoWeightBold
                             color: Theme.primary
                         }
 
@@ -1518,6 +1545,8 @@ BarPill {
                         Text {
                             text: root.pendingTasksCount === 0 ? Theme.kaoSparkle : Theme.kaoCoffee
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.titleAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: 28
                             color: Theme.primary
                             Layout.alignment: Qt.AlignHCenter
@@ -1528,6 +1557,8 @@ BarPill {
                                 ? (Theme.getFlavor ? Theme.getFlavor("notes_empty", "zero pending tasks · absolute zen status") : "zero pending tasks · absolute zen status")
                                 : "no tasks match this filter"
                             font.family: Theme.fontFamily
+                            font.variableAxes: Theme.sansAxes
+                            font.weight: Theme.fontWeightRegular
                             font.pixelSize: Theme.fontSizeSm
                             color: Theme.on_surface_variant
                             Layout.alignment: Qt.AlignHCenter
@@ -1637,8 +1668,9 @@ BarPill {
                                         anchors.centerIn: parent
                                         text: taskCard.priority
                                         font.family: Theme.fontMono
+                                        font.variableAxes: Theme.monoAxes
                                         font.pixelSize: 9
-                                        font.weight: Font.Bold
+                                        font.weight: Theme.monoWeightBold
                                         color: {
                                             if (taskCard.priority === "urgent") return Theme.error ?? "#ff5449";
                                             if (taskCard.priority === "low") return Theme.on_surface_variant;
@@ -1660,6 +1692,8 @@ BarPill {
                                     Layout.alignment: Qt.AlignVCenter
                                     text: taskCard.text
                                     font.family: Theme.fontFamily
+                                    font.variableAxes: Theme.sansAxes
+                                    font.weight: Theme.fontWeightRegular
                                     font.pixelSize: Theme.fontSizeSm
                                     font.strikeout: taskCard.done
                                     color: taskCard.done ? Theme.on_surface_disabled : Theme.on_surface

@@ -73,8 +73,9 @@ Rectangle {
                 Text {
                     text: root ? root.fmtText(root.kbLayoutShort) : ""
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
                     font.pixelSize: Theme.fontSizeXs
-                    font.weight: Theme.fontWeightBold
+                    font.weight: Theme.monoWeightBold
                     color: root?.uiTextPrimary ?? Theme.on_surface
                 }
             }
@@ -115,8 +116,9 @@ Rectangle {
                 Text {
                     text: root ? root.fmtText(parent.parent.sinkMuted ? "mute" : (Math.round(parent.parent.sinkVol * 100) + "%")) : (parent.parent.sinkMuted ? "mute" : (Math.round(parent.parent.sinkVol * 100) + "%"))
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
                     font.pixelSize: Theme.fontSizeXs
-                    font.weight: Theme.fontWeightMedium
+                    font.weight: Theme.monoWeightMedium
                     color: root?.uiTextPrimary ?? Theme.on_surface
                 }
             }
@@ -161,6 +163,7 @@ Rectangle {
                     : ((typeof NetworkService !== "undefined" ? NetworkService?.activeSsid : "") || (((typeof NetworkService !== "undefined" && NetworkService?.isConnected) ?? false) ? "online" : "offline"))
                 text: root ? root.fmtText(rawNetLabel) : rawNetLabel
                 font.family: Theme.fontFamily
+                font.variableAxes: Theme.sansAxes
                 font.pixelSize: Theme.fontSizeXs
                 font.weight: Theme.fontWeightMedium
                 color: root?.uiTextPrimary ?? Theme.on_surface
@@ -197,8 +200,9 @@ Rectangle {
                 Text {
                     text: parent.parent.batPct + "%" + (batHover.containsMouse && parent.parent.etaStr !== "" ? (" (" + parent.parent.etaStr + ")") : "")
                     font.family: Theme.fontMono
+                    font.variableAxes: Theme.monoAxes
                     font.pixelSize: Theme.fontSizeXs
-                    font.weight: Theme.fontWeightMedium
+                    font.weight: Theme.monoWeightMedium
                     color: root?.uiTextPrimary ?? Theme.on_surface
                 }
             }

@@ -113,6 +113,8 @@ Item {
         Text {
             text: "⠿"
             font.family: Theme?.fontFamily
+            font.variableAxes: Theme?.sansAxes ?? ({})
+            font.weight: Theme?.fontWeightRegular ?? Font.Normal
             font.pixelSize: 13
             color: Theme?.on_surface_variant ?? "#888888"
         }
@@ -144,8 +146,9 @@ Item {
             Text {
                 text: root.blockName
                 font.family: Theme?.fontFamily
+                font.variableAxes: Theme?.sansAxes ?? ({})
                 font.pixelSize: 11
-                font.weight: Font.DemiBold
+                font.weight: Theme?.fontWeightDemiBold ?? Font.DemiBold
                 color: root.isVisibleInBar ? (Theme?.on_surface ?? "#ffffff") : (Theme?.on_surface_variant ?? "#888888")
                 elide: Text.ElideRight
                 Layout.fillWidth: true
@@ -154,6 +157,8 @@ Item {
             Text {
                 text: root.blockCategory
                 font.family: Theme?.fontFamily
+                font.variableAxes: Theme?.sansAxes ?? ({})
+                font.weight: Theme?.fontWeightRegular ?? Font.Normal
                 font.pixelSize: 9
                 color: Theme?.on_surface_variant ?? "#888888"
             }
