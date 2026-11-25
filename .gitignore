@@ -8,17 +8,24 @@ gtk-4.0/colors.css
 gtk-3.0/matugen.css
 gtk-4.0/matugen.css
 quickshell/palette.css
-quickshell/settings.conf
-
 yazi/theme.toml
 nvim/lua/config/colors.lua
 
-# runtime state & caches
+# user customizations & live runtime state
+quickshell/settings.conf
+quickshell/lockscreen/state
 quickshell/launcher-frecency.json
+quickshell/launcher_state.json
+quickshell/launcher_state.conf
+quickshell/wallhaven.conf
+quickshell/wallhaven_favs.conf
+zsh/user_prefs.conf
+zsh/local.zsh
+
+# caches & temp files
 *.log
 *.tmp
 *.bak
-quickshell/launcher_state.json
 .zcompdump*
 *.zwc
 .DS_Store
