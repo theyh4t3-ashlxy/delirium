@@ -48,6 +48,23 @@ if you stick around anyway: steal the code, steal the bezier curves, steal `cli.
 
 ---
 
+## what's in this repo
+
+| directory | what it does |
+|---|---|
+| `quickshell/` | the entire desktop shell. bar, lockscreen, widgets, popups, notifications, presets, bar studio. |
+| `hypr/` | hyprland config in embedded lua tables instead of hyprlang. window rules, keybinds, animations, monitor layout. |
+| `zsh/` | zsh environment compiled to bytecode. prompt, syntax critic, fzf tools, matugen color sync. `sysup` runs the full nixos update pipeline in one command. |
+| `matugen/` | material you color pipeline. templates compile to kitty, quickshell, gtk, fastfetch, nvim, hyprland simultaneously on every wallpaper switch. |
+| `kitty/` | gpu terminal. palette registers `color0`–`color15` are owned by matugen and reload live via `pkill -USR1 kitty` without restarting open windows. |
+| `fastfetch/` | system info layout. template-driven, ansi-indexed, disk pinned to `/home` because `/` is a tmpfs ramdisk. |
+| `btop/` | resource monitor. `color_theme = TTY` so it inherits the terminal's ansi palette automatically. |
+| `nvim/` | neovim with lazy.nvim. colors pulled from matugen ansi registers, no hardcoded hex. |
+| `nixos/` | flake-driven nixos config. `sysup` does `nix flake update + rebuild + commit flake.lock + push` as a single command. |
+| `pkgs/fan-control/` | root systemd service that overrides the thinkpad ec fan cap and forces 5,400 rpm when temps spike. |
+
+---
+
 ## step 1: nixos packages
 
 before running `./install.zsh`, put this block into `/etc/nixos/configuration.nix` (or your flake). if you skip this, `./install.zsh --doctor` will call out every missing binary in red text, `quickshell` (`qs`) won't start, `matugen` will have nothing to sample, and your terminal will render hollow unicode tofu boxes (`[]`) instead of icons:

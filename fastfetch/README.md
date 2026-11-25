@@ -1,39 +1,36 @@
 # fastfetch
 
-the neofetch killer because we need system flex stats in 0.002 milliseconds or our fragile developer egos collapse.
+system information. renders in under 3ms.
 
-neofetch was abandoned and slow. fastfetch is written in c and queries your hardware directly through kernel interfaces so fast you can't even see the syscall happen.
+the config lives in `matugen/templates/fastfetch-colors.jsonc` as a matugen template, which compiles into `config.jsonc` on every wallpaper switch. editing `config.jsonc` directly does nothing because matugen immediately overwrites it. edit the template.
+
+colors are 100% ansi-indexed (`color0`–`color15`) pulled from kitty's palette registers. changing the wallpaper reloads kitty via `pkill -USR1 kitty`, which picks up the new palette without restarting any open terminal windows. no hardcoded hex values anywhere in the config.
+
+disk detection is pinned to `/home` because `/` is a 4gb tmpfs ramdisk that always reads `0 B used`. asking fastfetch to report disk usage on a ramdisk is accurate and useless.
 
 ### output
 
-```zsh
-╭─[ you at nixos in hell ]
-╰─ ❯ fastfetch                                                                                                                                                                                             13:37
-          ▗▄▄▄       ▗▄▄▄▄    ▄▄▄▖             ashley@lost
-          ▜███▙       ▜███▙  ▟███▛             -----------
-           ▜███▙       ▜███▙▟███▛               os 󰅂       NixOS 24.25 (Patrick says 25 is funnier than 24) x86_64
-            ▜███▙       ▜██████▛               󰌢 host 󰅂     preferably a thinkpad t42 (404 not found)
-     ▟█████████████████▙ ▜████▛     ▟▙         󰌽 kernel 󰅂   Linux 6.6.6-idk
-    ▟███████████████████▙ ▜███▙    ▟██▙        󰅐 uptime 󰅂   42 days, 13 hours, 37 mins
-           ▄▄▄▄▖           ▜███▙  ▟███▛        󰏖 pkgs 󰅂     1337 (nix-user [777], nix-system [418], flatpak-system [73], flatpak-user [69])
-          ▟███▛             ▜██▛ ▟███▛         󰞷 shell 󰅂    zsh 5.9
-         ▟███▛               ▜▛ ▟███▛          󱂬 wm 󰅂       Hyprland 8.00.85 (Wayland)
-▟███████████▛                  ▟██████████▙    󰞍 term 󰅂     kitty 0.49.2
-▜██████████▛                  ▟███████████▛    󰍛 cpu 󰅂      12th Gen Intel® Core™ i7-1260P (16) @ 4.20 GHz [66.6°C]
-      ▟███▛ ▟▙               ▟███▛             󰘚 mem 󰅂      6.94 GiB / 15.29 GiB (45%)
-     ▟███▛ ▟██▙             ▟███▛              󰋊 disk 󰅂     13.37 GiB / 420.69 GiB (3%) - btrfs
-    ▟███▛  ▜███▙           ▝▀▀▀▀               󰂄 bat 󰅂      69% [AC Connected, Charging]
-    ▜██▛    ▜███▙ ▜██████████████████▛
-     ▜▛     ▟████▙ ▜████████████████▛          ● ● ● ● ● ● ● ●
+```
+          ▗▄▄▄       ▗▄▄▄▄    ▄▄▄▖             ashley@lost  •  /home/ashley/
+          ▜███▙       ▜███▙  ▟███▛             ────────────────────────────────────────────
+           ▜███▙       ▜███▙▟███▛              ╭─  os     · NixOS 26.11 (Zokor) x86_64
+            ▜███▙       ▜██████▛               │  󰌢 host   · ThinkPad T16 Gen 1
+     ▟█████████████████▙ ▜████▛     ▟▙         │  󰌽 kernel · Linux 7.3.4
+    ▟███████████████████▙ ▜███▙    ▟██▙        │  󰏖 pkgs   · 1322 nix • 25 flatpak
+           ▄▄▄▄▖           ▜███▙  ▟███▛        ╰─ 󰅐 uptime · 10 h 15 m
+          ▟███▛             ▜██▛ ▟███▛         ╭─ 󱂬 wm     · Hyprland 0.57.2
+         ▟███▛               ▜▛ ▟███▛          │  󰞍 term   · kitty
+▟███████████▛                  ▟██████████▙    ╰─ 󰞷 shell  · zsh 5.9.0
+▜██████████▛                  ▟███████████▛    ╭─ 󰍛 cpu    · 12th Gen Intel(R) Core(TM) i7-1260P @ 4.70 GHz [65°C]
+      ▟███▛ ▟▙               ▟███▛             │  󰢮 gpu    · GeForce MX550
+     ▟███▛ ▟██▙             ▟███▛              │  󰢮 gpu    · Alder Lake-P Integrated Graphics Controller
+    ▟███▛  ▜███▙           ▝▀▀▀▀               │  󰘚 mem    · 10.6 GiB / 15.3 GiB  ━━━━━━━─── 69%
+    ▜██▛    ▜███▙ ▜██████████████████▛         │  󰋊 disk   · 57.5 GiB / 459.1 GiB  ━───────── 13%
+     ▜▛     ▟████▙ ▜████████████████▛          ╰─ 󰂄 bat    · 79%  ━━━━━━━━── [AC Connected, Charging]
            ▟██████▙         ▜███▙
-          ▟███▛▜███▙         ▜███▙
+          ▟███▛▜███▙         ▜███▙                           ● ● ● ● ● ● ● ●
          ▟███▛  ▜███▙         ▜███▙
          ▝▀▀▀    ▀▀▀▀▘         ▀▀▀▘
-
-╭─[ you at nixos in hell ]
-╰─ ❯                                                                                                                                                                                                       13:37                                                                                                                                                                                           18:45
 ```
 
-matugen dumps fresh accent colors into this every time you change wallpapers, which means that you will get colors that make windows noobs go "wow how do i get that"  
-and u say:  
-"u dont."  
+the color circles at the bottom are your current ansi palette rendered live. they update with the wallpaper.

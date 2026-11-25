@@ -18,7 +18,7 @@ everything between your wallpaper and your retinas:
 ## architecture map
 - `shell.qml`: root orchestrator. spawns bars, overlays, and registers ipc endpoints (`notifs`, `lock`, `studio`, `caffeine`). do not touch unless you enjoy staring into tty1 text purgatory.
 - `Theme.qml`: dynamic material design token bible. generated on the fly by matugen from wallpaper colors. defines palette tokens, radii, motion constants, and official material symbol codepoints.
-- `settings.conf`: persisted user state. stores bar edge, widget layout, theme mode, and font settings.
+- `settings.conf`: gitignored. quickshell writes live state to `~/.local/state/quickshell/settings.conf` and falls back to the repo copy on a fresh clone via `fallbackConfPath` in `Settings.qml`. stores bar edge, widget layout, theme mode, and font settings. do not commit changes to this file; they will not be tracked.
 - `bar/StatusBar.qml`: the status bar engine. dynamic edge anchoring, pill layout expansion, liquid corner docking.
 - `corners/`:
   - `ScreenCorners.qml`: monitor boundary anchors with continuous border lines and input passthrough masks.
