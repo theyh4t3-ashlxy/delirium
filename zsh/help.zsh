@@ -21,6 +21,7 @@ dots_help() {
         "fif <query> / fe         | fuzzy grep inside files / fuzzy open in \$EDITOR"
         "calc <expr>              | float & math evaluator (e.g. calc '5/2')"
         "why [code]               | decode last exit code cleanly"
+        "sysup / nixup [msg]      | update flake, rebuild nixos, commit lockfile & push"
         "critic                   | print a one-line developer check"
         "yz / yazi / mc / nvim    | yazi cwd sync, micro, neovim"
         "compile-zsh / unzwc      | compile .zwc bytecode cache / reset cache"

@@ -9,6 +9,52 @@ alias nrun="nix run nixpkgs#"
 alias nix-gens="nixos-rebuild list-generations"
 alias neovim="nvim"
 
+# all-in-one nixos flake update -> rebuild -> commit flake.lock -> push
+sysup() {
+    local dir="${DOTFILES_DIR:-/home/ashley/.local/share/dotfiles}"
+    local custom_msg="$*"
+
+    if [[ ! -d "$dir" ]]; then
+        print -P "%F{1}󰅚 dotfiles directory not found:%f $dir"
+        return 1
+    fi
+
+    print -P "%F{4}󰚰 updating flake inputs...%f"
+    nix flake update --flake "$dir" || return 1
+
+    print -P "%F{5}󱄅 rebuilding nixos (#lost)...%f"
+    sudo nixos-rebuild switch --flake "$dir#lost" || return 1
+
+    if git -C "$dir" diff --quiet -- flake.lock && git -C "$dir" diff --cached --quiet -- flake.lock; then
+        print -P "%F{2}󰄲 system rebuilt cleanly (flake.lock unchanged, skipping push)%f"
+        return 0
+    fi
+
+    local -a quotes=(
+        "flakey flake"
+        "flake"
+        "nixos wrath"
+        "fed the nix store"
+        "pray the build passes"
+        "nixpkgs roulette"
+        "bump lockfile and hope"
+        "declarative suffering"
+        "another sacrifice to hydra"
+        "impermanent sanity"
+        "eval took 4gb for this"
+        "rolling the unstable dice"
+        "lockfile roulette"
+        "sudo make me a generation"
+    )
+    local msg="${custom_msg:-${quotes[$(( RANDOM % ${#quotes[@]} + 1 ))]}}"
+
+    print -P "%F{6}󰊢 committing & pushing flake.lock:%f %F{3}\"$msg\"%f"
+    git -C "$dir" commit -m "$msg" -- flake.lock || return 1
+    git -C "$dir" push || return 1
+    print -P "%F{2}󰄲 system updated & pushed%f"
+}
+alias nixup="sysup"
+
 # sudo with trailing space for alias expansion
 alias sudo="sudo "
 

@@ -11,7 +11,7 @@ zero heavy frameworks, zero bloated prompt wrappers. just compiled zsh bytecode,
 - `dnd.zsh`: do-not-disturb toggle synced directly with quickshell's `settings.conf`.
 - `tools.zsh`: `zoxide`, `eza`, `bat`, `rg`, `fd`, `btop`, `yazi`, and `fzf` integration.
 - `functions.zsh`: interactive `glog` / `gbr` / `gdiff` git tools, `extract`, `ports`, `serve`, `calc`, `take`, `fif`, `fe`, and `nixs`.
-- `aliases.zsh`: nixos rebuild/gc shortcuts, safe file ops, `why`, `please`, and directory hashes.
+- `aliases.zsh`: nixos rebuild/update (`sysup`), gc shortcuts, safe file ops, `why`, `please`, and directory hashes.
 - `settings.zsh` & `user_prefs.conf`: live terminal customization hub (`syntax critic`, `session check-in`, prompt layout, transient prompt, vi/emacs mode, config quick-jump).
 - `matugen.zsh`: wallpaper-synced palette exports, ANSI `fzf` colors, `zsh-syntax-highlighting`, and `NEWT_COLORS`.
 - `help.zsh`: quick cheat sheet (`dots_help` / `cheatsheet` / bare `help`).
