@@ -1,8 +1,8 @@
 # nvim
 
-lua-configured neovim running on `lazy.nvim`. leave with `:qa!` or pull AC power from the wall.
+lua-configured neovim running on `lazy.nvim`. leave with `:qa!` or pull ac power from the wall.
 
-treesitter AST highlighting, LSP diagnostics, completion, and dynamically compiled `matugen` material tokens inject current wallpaper colors directly into syntax groups so the editor looks calm while you rewrite broken QML anchors at 03:30.
+treesitter ast highlighting, lsp diagnostics, completion, and dynamically compiled `matugen` material tokens inject current wallpaper colors directly into syntax groups so the editor looks calm while you rewrite broken qml anchors at 03:30.
 
 ## navigation baseline
 
@@ -10,7 +10,7 @@ if muscle memory locks up, `:Help` or `:Cheatsheet` opens a floating reference m
 
 ## the `ijkl` remap & `roast.lua`
 
-maintaining `hjkl` exclusively because a 1976 ADM-3A terminal painted four arrows onto incompatible keys is anatomical inertia. modal movement here sits on an inverted T around home row:
+maintaining `hjkl` exclusively because a 1976 adm-3a terminal painted four arrows onto incompatible keys is anatomical inertia. modal movement here sits on an inverted-t around home row:
 
 - `i` = up
 - `k` = down

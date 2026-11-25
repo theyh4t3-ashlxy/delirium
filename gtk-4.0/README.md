@@ -2,7 +2,7 @@
 
 runtime overrides targeting libadwaita's institutional hostility toward configuration.
 
-libadwaita exists because gnome maintainers openly resent users modifying software running on hardware they paid for. every default surface arrives molded in the exact sterile beige-grey of clinic drywall and modular waiting-room trays, enforcing compliance by stripping away standard theming APIs. since upstream left no sanctioned channel, this directory injects stylesheet overrides directly into runtime paths.
+libadwaita exists because gnome maintainers openly resent users modifying software running on hardware they paid for. every default surface arrives molded in the exact sterile beige-grey of clinic drywall and modular waiting-room trays, enforcing compliance by stripping away standard theming apis. since upstream left no sanctioned channel, this directory injects stylesheet overrides directly into runtime paths.
 
 ## overrides
 

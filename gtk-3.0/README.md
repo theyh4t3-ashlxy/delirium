@@ -2,7 +2,7 @@
 
 residual gnome toolkit files maintained solely to stop legacy dialogs from firing white-screen light flashes into an unlit room.
 
-unconfigured gtk3 file pickers open directly into a raw `#ffffff` slab with zero ambient scaling—closer to an unannounced clinical penlight check on dilated eyes after seventy-two hours indoors than a normal OS window. css never belonged inside desktop toolkits, yet every file dialog still demands it.
+unconfigured gtk3 file pickers open directly into a raw `#ffffff` slab with zero ambient scaling—closer to an unannounced clinical penlight check on dilated eyes after seventy-two hours indoors than a normal os window. css never belonged inside desktop toolkits, yet every file dialog still demands it.
 
 ## containment files
 

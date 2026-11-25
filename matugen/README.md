@@ -8,8 +8,8 @@ one `wp random` sweeps existing colors out of hyprland borders, kitty, quickshel
 
 - `config.toml`: registry mapping every input template to its compilation output path and post-write hook.
 - `templates/`: source skeletons containing `{{ variable }}` tokens expanded during palette synthesis.
-  - `kitty-colors.conf` -> `kitty/colors.conf`: owns ANSI slots `color0`–`color15`, cursor, selection, and background. terminal apps inherit nothing outside these 16 registers.
-  - `fastfetch-colors.jsonc` -> `fastfetch/config.jsonc`: layout and ANSI labels. the compiled file is gitignored because editing generated artifacts instead of templates wastes effort.
+  - `kitty-colors.conf` -> `kitty/colors.conf`: owns ansi slots `color0`–`color15`, cursor, selection, and background. terminal apps inherit nothing outside these 16 registers.
+  - `fastfetch-colors.jsonc` -> `fastfetch/config.jsonc`: layout and ansi labels. the compiled file is gitignored because editing generated artifacts instead of templates wastes effort.
   - `zsh-colors.zsh` -> `zsh/matugen.zsh`: exports palette strings for `fzf`, `zsh-syntax-highlighting`, and `NEWT_COLORS`.
   - `palette.css` -> `quickshell/palette.css`: material 3 tokens watched live on disk by `Theme.qml`.
   - gtk3, gtk4, hyprland, nvim, and kde outputs follow identical rewrite rules.

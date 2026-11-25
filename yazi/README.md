@@ -2,7 +2,7 @@
 
 asynchronous rust terminal file browser, chosen because scrolling through graphical file managers makes auditing neglected folders feel like pushing cold grease across a cafeteria tray.
 
-directory trees populate in the background without hitching keyboard navigation, source previews highlight inline, archives expose layouts prior to extraction, and images render natively over kitty's graphics protocol so forgotten downloads stay visible without dragging GTK or Electron onto screen.
+directory trees populate in the background without hitching keyboard navigation, source previews highlight inline, archives expose layouts prior to extraction, and images render natively over kitty's graphics protocol so forgotten downloads stay visible without dragging gtk or electron onto screen.
 
 ## structure
 

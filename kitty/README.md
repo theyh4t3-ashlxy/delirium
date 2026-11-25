@@ -2,7 +2,7 @@
 
 opengl-accelerated terminal emulator used to maintain a hostile nixos flake and stare at tracebacks until dawn.
 
-spawning a hidden chromium engine purely to paint monospace text into a box is architectural rot. kitty pushes glyph atlases directly to the GPU so bad commands render and execute with zero visible latency.
+spawning a hidden chromium engine purely to paint monospace text into a box is architectural rot. kitty pushes glyph atlases directly to the gpu so bad commands render and execute with zero visible latency.
 
 ## files
 

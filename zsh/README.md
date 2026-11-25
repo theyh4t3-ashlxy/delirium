@@ -9,7 +9,7 @@ oh-my-zsh wastes hundreds of milliseconds parsing dead plugin wrappers so newcom
 - `prompt.zsh`: reactive prompt reporting git v2 state, command timing, transient line collapse, and layout switching via `settings`.
 - `roast.zsh`: syntax critic hooking `command_not_found_handler` with dry, unrepeating disapproval, pure-zsh spell correction, and nixpkgs package hints whenever fatigue turns two keystrokes into gibberish.
 - `nuke.zsh`: `fzf` process termination selector using live previews, multi-select marking, and batched `sudo` signal escalation to execute unresponsive daemons without offering polite `SIGTERM` negotiation.
-- `dnd.zsh`: writes silence state directly into quickshell's runtime files without waiting on IPC round-trips.
+- `dnd.zsh`: writes silence state directly into quickshell's runtime files without waiting on ipc round-trips.
 - `tools.zsh`: integrates `zoxide`, `eza`, `bat`, `rg`, `fd`, `btop`, `yazi`, and `fzf`. redefines `c` to replace `cd` with immediate directory listing so dead folders cannot hide behind silent transitions.
 - `functions.zsh`: interactive git inspection (`glog`, `gbr`, `gdiff`), archive extraction (`extract`), socket auditing (`ports`, `serve`), `calc`, `take`, `fif`, `fe`, and `nixs`.
 - `aliases.zsh`: full-flake rebuild pipeline (`sysup` / `nixup`), generation purge (`cleanup`), interactive file guardrails (`rm -I`, `cp -iv`, `mv -iv`), `why`, `please`, and named hashes (`~qs`, `~hypr`, `~nix`).

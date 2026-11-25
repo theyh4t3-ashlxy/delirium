@@ -1,9 +1,9 @@
 > [!WARNING]
 > if anyone in your contacts would actually look for you after three days of silence, close this tab.  
-> this repository is what remains on a `ThinkPad T16 Gen 1` (`i7-1260P`, `MX550` idling on `nouveau`, `1920x1200@60Hz`) once sleep turns optional and automated agents spend the night rewriting broken QML anchors until dawn.  
-> install [caelestia](https://github.com/caelestia-dots/caelestia) or [end4-pC](https://github.com/pctrade/end4-pC) if you intend to use your laptop in public without debugging `tty1`.
+> this repository is what remains on a `thinkpad t16 gen 1` (`i7-1260P`, `mx550` idling on `nouveau`, `1920x1200@60hz`) once sleep turns optional and local agents spend the night editing broken qml anchors until dawn.  
+> install [caelestia](https://github.com/caelestia-dots/caelestia) or [end4-pC](https://github.com/pctrade/end4-pC) if you want a desktop where widgets work out of the box without reading runtime logs.
 
-recorded right before wayland dropped an orphaned layer-shell surface and dumped the graphical session onto `tty1`:
+captured right before hyprland dropped an orphaned layer-shell surface and terminated back to `tty1`:
 
 > [!NOTE]
 > if github refuses to stream the mp4 or your browser codec drops out mid-decode, nothing of value was lost. keep scrolling.
@@ -26,27 +26,27 @@ recorded right before wayland dropped an orphaned layer-shell surface and dumped
 
 ## other configurations vs this
 
-there is no practical justification for running someone else's personal nervous ticks on your own SSD. balanced adults install software maintained for more than one head.
+there is no practical justification for cloning someone else's compulsions onto your own ssd. balanced adults install software maintained for more than one head.
 
 | setup | stack | posture | primary audience | reason to use it instead | expected stability |
 |---|---|---|---|---|---|
-| **[caelestia](https://github.com/caelestia-dots/caelestia)** | quickshell, typescript, lua (`hypr-vars.lua`), `caelestia-cli`. | sanitized material symmetry. | people with appointments, social plans, and functioning sleep cycles. | maintainers answer bug reports before things decay into tracebacks. | high |
-| **[end4-pC](https://github.com/pctrade/end4-pC)** | qml fork stacked onto `illogical-impulse`, lua vars. | expressive widgets, community gallery, lyrics. | people who want visual complexity without babysitting C++/QML bindings at 4 am. | coherent upstream structure and preset curation. | moderate |
-| **[HyDE](https://github.com/HyDE-Project/HyDE)** | waybar, rofi, `wallbash`, shell, lua, python. | conventional tiling minimalism. | users who want theme patching without touching `dbus` internals. | mature across distros (`hydenix` on nixos) with minimal triage. | high |
-| **[ml4w](https://github.com/mylinuxforwork/dotfiles)** | quickshell, shell, css, lua, dedicated live iso. | appliance predictability. | anyone who cannot lose their display server five minutes before a call. | GUI installers and tested release channels. | very high |
-| **delirium** *(this repo)* | quickshell, python, hyprland lua, nixos on `7.6G` `tmpfs`. | mutual resentment between human, lenovo embedded controller, and unattended agents. | population: 1. calibrated strictly around stiff knuckles and bad habits. | none. strip individual scripts for parts and leave the rest alone. | none |
+| **[caelestia](https://github.com/caelestia-dots/caelestia)** | quickshell, typescript, lua (`hypr-vars.lua`), `caelestia-cli`. | sanitized material symmetry. | people with appointments, social plans, and regular sleep cycles. | maintainers patch breaking updates before modules rot. | high |
+| **[end4-pC](https://github.com/pctrade/end4-pC)** | qml fork stacked onto `illogical-impulse`, lua vars. | expressive widgets, community gallery, lyrics. | people who want visual density without debugging c++/qml bindings at 4 am. | coherent upstream layout and preset curation. | moderate |
+| **[HyDE](https://github.com/HyDE-Project/HyDE)** | waybar, rofi, `wallbash`, shell, lua, python. | conventional tiling minimalism. | users who want theme patching without inspecting `dbus` internals. | mature across distros (`hydenix` on nixos) with minimal triage. | high |
+| **[ml4w](https://github.com/mylinuxforwork/dotfiles)** | quickshell, shell, css, lua, dedicated live iso. | appliance predictability. | anyone who cannot lose their bar or audio panel five minutes before a call. | gui installers and tested release channels. | very high |
+| **delirium** *(this repo)* | quickshell, python, hyprland lua, nixos on `7.6g` `tmpfs`. | friction between user, lenovo embedded controller, and unattended agents. | population: 1. tuned strictly around stiff knuckles and bad habits. | none. strip individual scripts for parts and leave the rest alone. | none |
 
 ### why i didn't just use `caelestia` or `end-4`
 
-if you want volume sliders that bind cleanly, bluetooth codecs that connect without touching `pw-dump`, and clean screenshots you can send to coworkers without cropping out a traceback, install `caelestia` or `end-4`. they assume you are healthy enough to want defaults that work.
+if you want volume sliders that bind cleanly, bluetooth codecs that negotiate without reading `pw-dump`, and clean screenshots ready for coworkers without redacting a traceback, install `caelestia` or `end-4`. they assume you are healthy enough to expect coherent defaults.
 
-this setup exists strictly so that when impulse wins at 4:10 am and `/dev/nvme0n1` gets discarded back to bare silicon, whatever is strictly functional survives offsite. take `cli.py`, the bezier screen corners, `screenshot.py`, `battery.py`, or the fan watchdog and walk away.
+this repo exists strictly as cold offsite backup so when impulse wins at 4:10 am and `/dev/nvme0n1` gets wiped back down to bare flash, whatever still works survives somewhere off the drive. take `cli.py`, the bezier screen corners, `screenshot.py`, `battery.py`, or the fan watchdog and walk away.
 
 ---
 
 ## step 1: nixos base packages
 
-add these definitions into `/etc/nixos/configuration.nix` (or your flake module) prior to invoking `./install.zsh`. skipping them makes `./install.zsh --doctor` fail cleanly in red text, drops `quickshell` straight back to `tty1`, and degrades UI icons into hollow tofu boxes (`[]`):
+add these definitions into `/etc/nixos/configuration.nix` (or your flake module) before running `./install.zsh`. skipping them causes `./install.zsh --doctor` to complain in red, leaves `quickshell` unable to spawn if `qs` is absent, turns ui symbols into hollow tofu rectangles (`[]`), and breaks widgets wired to `wl-copy`, `hyprpicker`, or `playerctl`:
 
 ```nix
   # 1. wayland session: uwsm keeps systemd and hyprland from abandoning orphan daemons
@@ -64,7 +64,7 @@ add these definitions into `/etc/nixos/configuration.nix` (or your flake module)
     quickshell           # qml/c++ layer-shell host ('qs')
     matugen              # wallpaper palette compiler
     awww                 # wallpaper daemon
-    mpvpaper             # video wallpaper host for burning spare TDP
+    mpvpaper             # video wallpaper host for burning spare power
     hyprpicker           # screen pixel sampler
     wl-clipboard         # wl-copy / wl-paste
     brightnessctl        # backlight sysfs control
@@ -117,17 +117,17 @@ sudo nixos-rebuild switch
 
 > [!NOTE]
 > **on proprietary and icon fonts:**  
-> `install.zsh` downloads google material symbols, font awesome 6 free, and `SegoeIcons.ttf` into `~/.local/share/fonts` and updates `fc-cache -f`. packaging proprietary windows/icon TTFs inside nix derivations creates needless friction when `fontconfig` resolves `~/.local/share/fonts` directly. running `--doctor` prior to a first `./install.zsh` run will flag them absent.
+> `install.zsh` downloads google material symbols, font awesome 6 free, and `SegoeIcons.ttf` into `~/.local/share/fonts` and refreshes `fc-cache -f`. packaging proprietary icon fonts cleanly inside nix derivations creates needless churn when `fontconfig` resolves `~/.local/share/fonts` natively. running `--doctor` before a first `./install.zsh` run will flag them missing.
 
 ---
 
 ## step 2: installation
 
-never execute `./install.zsh` with `sudo`. the script checks `(( EUID == 0 ))` immediately and exits rather than corrupting file ownership across `~/.config`.
+never execute `./install.zsh` with `sudo`. the script traps `(( EUID == 0 ))` immediately and exits rather than poisoning file ownership across `~/.config`.
 
 ### standard clone
 
-keep the checkout inside `~/.local/share/dotfiles` rather than cluttering `~`:
+keep the checkout under `~/.local/share/dotfiles` rather than cluttering `~`:
 
 ```zsh
 mkdir -p ~/.local/share
@@ -137,11 +137,11 @@ chmod +x install.zsh
 ./install.zsh
 ```
 
-run `./install.zsh --help` for `--doctor`, `--dry-run`, `--fetch-wp`, `--update`, and `--rebuild`. with `fzf` on `$PATH` it presents a multi-select prompt; otherwise it drops to comma-separated numeric indices.
+run `./install.zsh --help` for `--doctor`, `--dry-run`, `--fetch-wp`, `--update`, and `--rebuild`. with `fzf` on `$PATH` it renders a multi-select prompt; otherwise it drops to comma-separated numbers.
 
 ### single-line bootstrap
 
-do not pipe `curl .../install.zsh | zsh` alone from `$HOME`. `install.zsh` resolves `DOTS_DIR="${0:A:h}"` from its own location and runs no `git clone`, so an unanchored pipe inside `~` will try symlinking `Downloads` and `Documents` straight into `~/.config`:
+do not pipe `curl .../install.zsh | zsh` alone from `$HOME`. `install.zsh` resolves `DOTS_DIR="${0:A:h}"` from its own path and performs no `git clone`, so an unanchored pipe inside `~` will attempt linking `Downloads` and `Documents` straight into `~/.config`:
 
 ```zsh
 git clone https://github.com/theyh4t3-ashlxy/delirium.git ~/.local/share/dotfiles && ~/.local/share/dotfiles/install.zsh
@@ -154,12 +154,12 @@ interactive prompts read straight from `/dev/tty`.
 ## defects & patches
 
 ### bugs
-an empty issue list does not indicate stability; either nothing broke locally or `quickshell` terminated before flushing logs to `/run/user/1000/quickshell`.
+an empty issue tracker does not prove stability; either nothing broke locally or `quickshell` rotated its runtime log before anyone checked `/run/user/1000/quickshell`.
 
 ### patches
-there is no roadmap or triage schedule. google shut down jules for active execution and rolled its workflow into antigravity, so no cloud bot is sitting around parsing issues anyway. send a PR if something offends you enough to fix it yourself; understand that late-night local agent passes on `main` may erase or break your diff before morning.
+there is no roadmap or triage schedule. google shut down jules for active execution and folded its workflow into antigravity, so no cloud agent is sitting around watching issues anyway. open a pull request if a defect bothers you enough to patch it yourself; understand that late-night local agent passes against `main` may overwrite your diff before morning.
 
 ---
 
 ## record
-for the hardware decay notes, the `atomic-lockfile` nvme wipe, `lanzaboote`, and why `/` clears itself inside a volatile `7.6G` `tmpfs` mount on poweroff, read [BACKSTORY.md](BACKSTORY.md).
+for the hardware decay notes, the `atomic-lockfile` nvme wipe, `lanzaboote`, and why `/` drains itself inside a volatile `7.6g` `tmpfs` mount on poweroff, read [BACKSTORY.md](BACKSTORY.md).
