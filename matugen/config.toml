@@ -50,6 +50,5 @@ post_hook = "$HOME/.config/matugen/post-hook-scripts/gnome-theme-reload.zsh 2>/d
 
 [templates.ptyxis]
 input_path = "~/.config/matugen/templates/ptyxis-colors.palette"
-output_path = "~/.var/app/app.devsuite.Ptyxis/data/ptyxis/palettes/matugen.palette"
-# auto-select the matugen palette in ptyxis profile settings
-post_hook = "sed -i \"s/^palette=.*/palette='matugen'/\" $HOME/.var/app/app.devsuite.Ptyxis/config/glib-2.0/settings/keyfile 2>/dev/null || true"
+output_path = "~/.local/share/org.gnome.Ptyxis/palettes/matugen.palette"
+post_hook = "$HOME/.config/matugen/post-hook-scripts/ptyxis-theme-reload.zsh 2>/dev/null || true"

@@ -302,6 +302,7 @@ EOF
 
     # wayland rice tooling
     kitty
+    ptyxis
     git
     quickshell
     matugen
