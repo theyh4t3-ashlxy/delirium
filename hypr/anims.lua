@@ -1,43 +1,49 @@
 --[[
-real spring physics for spatial stuff, fitted beziers for fades/exits.
-tuned for 1920x1200@60hz (340x220mm 16:10, 8px outer margin, eDP laptop).
-note: hyprland 0.57+ renamed `dampening` -> `damping`. swap it back if you're on 0.55/0.56.
+delirium motion profile: phase-matched springs + least-squares cubic beziers.
+solved via python damped-oscillator & frame-delta model for 1920x1200@60hz (340x220mm).
+note: hyprland 0.57+ uses `damping` (older 0.55/0.56 used `dampening`).
 ]]
 
--- alive window open: soft inertia launch, subtle +2% breath (+3.8px max edge), melts to rest
-hl.curve("openSpring", {
+-- lucid window bloom: wn=18.99 rad/s, zeta=0.869, +0.41% breath (~0.6px), 99.5% @ 260ms (~15.6f)
+hl.curve("bloomSpring", {
     type = "spring",
     mass = 1.0,
-    stiffness = 503.6,
-    damping = 35.0,
+    stiffness = 360.8,
+    damping = 33.0,
 })
 
--- glass-pane glide for moves & workspaces: near-critically damped (0% bounce, soft cushion)
-hl.curve("glideSpring", {
+-- zero-bounce dwindle & workspace glide: wn=24.23 rad/s, zeta=0.984, 0.00% overshoot, 99.5% @ 294ms (~17.7f)
+hl.curve("driftSpring", {
     type = "spring",
     mass = 1.0,
-    stiffness = 438.6,
-    damping = 41.1,
+    stiffness = 587.3,
+    damping = 47.7,
 })
 
--- lighter spring for menus/notifs so small ui feels nimble
-hl.curve("layerSpring", {
+-- airy overlay & popup spring: wn=28.08 rad/s, zeta=0.892, +0.20% polish, 99.5% @ 190ms (~11.4f)
+hl.curve("veilSpring", {
     type = "spring",
     mass = 1.0,
-    stiffness = 685.4,
-    damping = 46.1,
+    stiffness = 788.4,
+    damping = 50.1,
 })
 
--- least-squares fitted to openSpring so opacity & borders breathe with the same momentum
-hl.curve("organicFade", {
+-- fitted to bloomSpring opening envelope (RMSE=0.0070, p2y=0.99 avoids alpha clamping)
+hl.curve("lucidIn", {
     type = "bezier",
-    points = { { 0.16, 0.00 }, { 0.37, 0.98 } },
+    points = { { 0.18, 0.00 }, { 0.36, 0.99 } },
 })
 
--- gentle release that accelerates smoothly away instead of slamming into a wall
-hl.curve("softExit", {
+-- fitted to k=3.2 exponential release (RMSE=0.0069): responds on frame 1 (~26%), dissolves softly
+hl.curve("silkOut", {
     type = "bezier",
-    points = { { 0.38, 0.08 }, { 0.74, 0.60 } },
+    points = { { 0.23, 0.83 }, { 0.70, 0.99 } },
+})
+
+-- fitted to driftSpring for focus border, dim, and shadow shifts (RMSE=0.0063)
+hl.curve("focusGlide", {
+    type = "bezier",
+    points = { { 0.24, 0.19 }, { 0.19, 0.99 } },
 })
 
 hl.curve("linear", {
@@ -45,145 +51,166 @@ hl.curve("linear", {
     points = { { 0.0, 0.0 }, { 1.0, 1.0 } },
 })
 
--- springs ignore `speed`, keeping sensible fallbacks anyway because hyprland's example config does
+-- springs ignore `speed`, keeping matched values for fallback parity
 hl.animation({
     leaf = "global",
     enabled = true,
-    speed = 2.5,
-    spring = "glideSpring",
+    speed = 2.6,
+    spring = "driftSpring",
 })
 
 hl.animation({
     leaf = "windows",
     enabled = true,
-    speed = 2.5,
-    spring = "glideSpring",
-    style = "popin 80%",
+    speed = 2.6,
+    spring = "driftSpring",
+    style = "popin 84%",
 })
 
 hl.animation({
     leaf = "windowsIn",
     enabled = true,
-    speed = 2.8,
-    spring = "openSpring",
-    style = "popin 80%",
+    speed = 2.6,
+    spring = "bloomSpring",
+    style = "popin 84%",
 })
 
 hl.animation({
     leaf = "windowsOut",
     enabled = true,
-    speed = 1.66, -- 10f @ 60hz
-    bezier = "softExit",
-    style = "popin 80%",
+    speed = 1.9, -- 11.4f @ 60hz, locked 1:1 with fadeOut
+    bezier = "silkOut",
+    style = "popin 88%",
 })
 
 hl.animation({
     leaf = "windowsMove",
     enabled = true,
-    speed = 2.8,
-    spring = "glideSpring",
+    speed = 2.6,
+    spring = "driftSpring",
     style = "slide",
 })
 
--- fades synced to the spring envelopes (and explicitly set so closing layers don't inherit a ghost tail)
+-- fade timings phase-locked to geometry motion
 hl.animation({
     leaf = "fade",
     enabled = true,
-    speed = 2.0,
-    bezier = "organicFade",
+    speed = 2.1,
+    bezier = "lucidIn",
 })
 
 hl.animation({
     leaf = "fadeIn",
     enabled = true,
-    speed = 2.0, -- hits 100% solid at frame 12 right as openSpring crests its +2% breath
-    bezier = "organicFade",
+    speed = 2.1, -- solid alpha right as bloomSpring crosses 95%
+    bezier = "lucidIn",
 })
 
 hl.animation({
     leaf = "fadeOut",
     enabled = true,
-    speed = 1.66,
-    bezier = "softExit",
+    speed = 1.9,
+    bezier = "silkOut",
+})
+
+hl.animation({
+    leaf = "fadeSwitch",
+    enabled = true,
+    speed = 2.0,
+    bezier = "focusGlide",
+})
+
+hl.animation({
+    leaf = "fadeShadow",
+    enabled = true,
+    speed = 2.0,
+    bezier = "focusGlide",
+})
+
+hl.animation({
+    leaf = "fadeDim",
+    enabled = true,
+    speed = 2.2,
+    bezier = "focusGlide",
 })
 
 hl.animation({
     leaf = "fadeLayersIn",
     enabled = true,
-    speed = 1.5,
-    bezier = "organicFade",
+    speed = 1.6,
+    bezier = "lucidIn",
 })
 
 hl.animation({
     leaf = "fadeLayersOut",
     enabled = true,
-    speed = 1.33,
-    bezier = "softExit",
+    speed = 1.5,
+    bezier = "silkOut",
 })
 
 hl.animation({
     leaf = "fadePopupsIn",
     enabled = true,
-    speed = 1.16,
-    bezier = "organicFade",
+    speed = 1.3,
+    bezier = "lucidIn",
 })
 
 hl.animation({
     leaf = "fadePopupsOut",
     enabled = true,
-    speed = 1.0,
-    bezier = "softExit",
+    speed = 1.2,
+    bezier = "silkOut",
 })
 
--- 15% of 340mm (51mm) and 22% of 220mm (48.4mm) so both axes feel like the same physical slide
+-- physical slide parity on 340x220mm panel: 16% -> 54.4mm horiz, 25% -> 55.0mm vert
 hl.animation({
     leaf = "workspaces",
     enabled = true,
     speed = 2.8,
-    spring = "glideSpring",
-    style = "slidefade 15%",
+    spring = "driftSpring",
+    style = "slidefade 16%",
 })
 
 hl.animation({
     leaf = "specialWorkspace",
     enabled = true,
     speed = 2.8,
-    spring = "glideSpring",
-    style = "slidefadevert 22%",
+    spring = "driftSpring",
+    style = "slidefadevert 25%",
 })
 
 hl.animation({
     leaf = "layers",
     enabled = true,
-    speed = 2.0,
-    spring = "layerSpring",
+    speed = 1.9,
+    spring = "veilSpring",
     style = "fade",
 })
 
 hl.animation({
     leaf = "layersIn",
     enabled = true,
-    speed = 2.0,
-    spring = "layerSpring",
-    style = "popin 90%",
+    speed = 1.9,
+    spring = "veilSpring",
+    style = "popin 92%",
 })
 
 hl.animation({
     leaf = "layersOut",
     enabled = true,
-    speed = 1.33,
-    bezier = "softExit",
-    style = "popin 90%",
+    speed = 1.5,
+    bezier = "silkOut",
+    style = "popin 92%",
 })
 
 hl.animation({
     leaf = "border",
     enabled = true,
     speed = 2.0,
-    bezier = "organicFade",
+    bezier = "focusGlide",
 })
 
--- please keep this on "once" (or false) on a laptop, "loop" burns 60fps idle redraws 24/7
+-- keep "once" on battery so idle frames stay zero
 hl.animation({
     leaf = "borderangle",
     enabled = true,
@@ -195,6 +222,6 @@ hl.animation({
 hl.animation({
     leaf = "zoomFactor",
     enabled = true,
-    speed = 2.5,
-    spring = "glideSpring",
+    speed = 2.6,
+    spring = "driftSpring",
 })
