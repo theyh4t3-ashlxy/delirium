@@ -44,7 +44,7 @@ export const TEXT_MAP = Object.freeze({
     "wifiMed": "med", "wifiLow": "low", "wifiOff": "offline", "bluetooth": "bt",
     "bluetoothConnected": "bt-on", "bluetoothOff": "bt-off", "power": "power", "shutdown": "power",
     "lock": "lock", "logout": "logout", "reboot": "reboot", "suspend": "sleep", "hibernate": "hib",
-    "chevronRight": ">", "chevronLeft": "<", "chevronDown": "v", "chevronUp": "^", "flame": "chaos",
+    "chevronRight": ">", "chevronLeft": "<", "chevronDown": "v", "chevronUp": "^", "flame": "fire",
     "sparkles": "magic", "radio": "radio", "sliders": "opts", "terminal": "term", "calendar": "cal",
     "history": "hist", "copy": "copy", "externalLink": "open", "signal": "sig", "filter": "filter",
     "user": "user", "shield": "safe", "expand": "max", "collapse": "min", "keyboard": "keys",

@@ -10,7 +10,7 @@ fi
 c() {
     if [[ $# -eq 0 ]]; then
         builtin cd "$HOME" && ls
-    elif (( $+commands[z] )); then
+    elif (( $+functions[z] )); then
         z "$@" && ls
     else
         builtin cd "$@" && ls

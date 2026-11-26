@@ -22,6 +22,8 @@ Scope {
     property bool authFailed: false
     property bool isChecking: false
     property bool pamRespondedThisTurn: false
+    property bool pamHasModuleMessage: false
+    property bool pamErroredThisTurn: false
     property string pamFeedback: ""
     property bool pamFeedbackIsError: false
     property int failedAttempts: 0
@@ -90,7 +92,7 @@ Scope {
     property int autoSubmitTargetLen: 0
 
     // user-controlled vibe & quotes
-    property string quoteMode: "smart"         // "smart" | "hyprland" | "quotes" | "actions" | "custom" | "off"
+    property string quoteMode: "smart"         // "smart" | "hyprland" | "delirium" | "quotes" | "actions" | "custom" | "off"
     onQuoteModeChanged: refreshQuotes()
     property string customQuoteText: "welcome back"
     property string backdropMode: "auto"       // "auto" | "dark" | "light"
@@ -592,7 +594,7 @@ Scope {
                 case "clockScale": lockRoot.clockScale = parseClamped(v, 0.65, 1.65, 1.0); break;
                 case "quoteMode":
                     if (v === "unhinged") lockRoot.quoteMode = "actions";
-                    else if (["smart", "hyprland", "quotes", "actions", "custom", "off"].includes(v)) lockRoot.quoteMode = v;
+                    else if (["smart", "hyprland", "delirium", "quotes", "actions", "custom", "off"].includes(v)) lockRoot.quoteMode = v;
                     break;
                 case "customQuoteText": lockRoot.customQuoteText = v; break;
                 case "backdropMode":
@@ -793,7 +795,7 @@ Scope {
             "clock,password,media",
             "media,clock,password"
         ];
-        const qModes = ["smart", "hyprland", "quotes", "actions"];
+        const qModes = ["smart", "hyprland", "delirium", "quotes", "actions"];
 
         lockRoot.clockStyle = cStyles[Math.floor(Math.random() * cStyles.length)];
         lockRoot.clockFont = cFonts[Math.floor(Math.random() * cFonts.length)];
@@ -997,12 +999,11 @@ Scope {
     }
 
     function refreshQuotes() {
-        if (!splashProc.running) splashProc.running = true;
         let mode = lockRoot.quoteMode;
-        if (mode === "off" || mode === "custom" || mode === "hyprland") return;
+        if (mode === "off" || mode === "custom") return;
 
         let cat = (mode === "smart" || mode === "quotes") ? pickSmartCategory() : "system";
-        let srcMode = (mode === "quotes") ? "quotes" : "actions";
+        let srcMode = (mode === "smart") ? "actions" : mode;
         if (Theme.rollFlavor) {
             lockRoot.rolledQuote = Theme.rollFlavor(cat, srcMode, lockRoot.rolledQuote, "");
         } else {
@@ -1019,10 +1020,7 @@ Scope {
     readonly property string activeQuoteText: {
         if (lockRoot.quoteMode === "off") return "";
         if (lockRoot.quoteMode === "custom") return fmtText(lockRoot.customQuoteText);
-        if (lockRoot.quoteMode === "hyprland") {
-            return fmtText(lockRoot.hyprSplash || Theme.hyprSplash);
-        }
-        return fmtText(lockRoot.rolledQuote || lockRoot.hyprSplash);
+        return fmtText(lockRoot.rolledQuote || (Theme.getFlavor ? Theme.getFlavor(pickSmartCategory(), lockRoot.hyprSplash, lockRoot.quoteMode === "smart" ? "actions" : lockRoot.quoteMode) : lockRoot.hyprSplash));
     }
 
     function numberToWords(n: int): string {
@@ -1178,6 +1176,7 @@ Scope {
             if (lockRoot.isChecking) {
                 if (pam.active) pam.abort();
                 lockRoot.isChecking = false;
+                lockRoot.pamRespondedThisTurn = false;
                 lockRoot.pendingPassword = "";
                 lockRoot.authFailed = true;
                 lockRoot.pamFeedback = "authentication timed out";
@@ -1191,6 +1190,15 @@ Scope {
     IpcHandler {
         target: "lock"
         function lock(): void {
+            if (lockRoot.noNewPrivsActive) {
+                console.warn("[LockScreen] refusing to lock under NoNewPrivs=1 (unix_chkpwd setuid blocked)");
+                Quickshell.execDetached([
+                    "notify-send", "-u", "critical", "-a", "lockscreen",
+                    "Refusing to lock screen",
+                    "Quickshell started under NoNewPrivs=1 (unix_chkpwd blocked). Restart with 'cli reload' from a normal terminal."
+                ]);
+                return;
+            }
             unlockFinalizeTimer.stop();
             lockRoot.unlocking = false;
             lockRoot.locked = true;
@@ -1203,6 +1211,41 @@ Scope {
         }
     }
 
+    FileView {
+        id: selfStatusProbe
+        path: "/proc/self/status"
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
+
+    FileView {
+        id: nixPamLoginProbe
+        path: "/etc/static/pam.d/login"
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
+
+    FileView {
+        id: nixPamSelectedProbe
+        path: "/etc/static/pam.d/" + (lockRoot.pamService || "login")
+        blockLoading: true
+        watchChanges: false
+        printErrors: false
+    }
+
+    readonly property bool noNewPrivsActive: /\bNoNewPrivs:\s*1\b/.test(selfStatusProbe.text() || "")
+    readonly property bool useStaticPamDir: (nixPamLoginProbe.text() || "") !== ""
+    readonly property string resolvedPamConfigDir: useStaticPamDir ? "/etc/static/pam.d" : "/etc/pam.d"
+    readonly property string resolvedPamService: {
+        let svc = (lockRoot.pamService || "login").trim();
+        if (useStaticPamDir && (nixPamSelectedProbe.text() || "") === "") {
+            return "login";
+        }
+        return svc;
+    }
+
     /*
     rock-solid PAM handler:
     never calls pam.abort() inside handleResponse() when both onResponseRequiredChanged
@@ -1210,7 +1253,8 @@ Scope {
     */
     PamContext {
         id: pam
-        config: lockRoot.pamService || "login"
+        config: lockRoot.resolvedPamService
+        configDirectory: lockRoot.resolvedPamConfigDir
         user: Quickshell.env("USER") ?? ""
 
         function handleResponse(): void {
@@ -1226,6 +1270,7 @@ Scope {
             if (pam.message && pam.message.trim() !== "") {
                 let msg = pam.message.trim();
                 if (!msg.toLowerCase().startsWith("password")) {
+                    lockRoot.pamHasModuleMessage = true;
                     lockRoot.pamFeedback = msg;
                     lockRoot.pamFeedbackIsError = pam.messageIsError;
                 }
@@ -1248,31 +1293,45 @@ Scope {
             lockRoot.pendingPassword = "";
 
             if (result === PamResult.Success) {
+                lockRoot.pamErroredThisTurn = false;
                 lockRoot.authFailed = false;
                 lockRoot.pamFeedback = "unlocked";
                 lockRoot.pamFeedbackIsError = false;
                 lockRoot.beginUnlockTransition();
             } else {
                 lockRoot.authFailed = true;
-                lockRoot.failedAttempts += 1;
-                sessionPersist.failedCount = lockRoot.failedAttempts;
-                lockRoot.pollKeyboardState();
+                if (!lockRoot.pamErroredThisTurn) {
+                    lockRoot.failedAttempts += 1;
+                    sessionPersist.failedCount = lockRoot.failedAttempts;
+                    lockRoot.pollKeyboardState();
 
-                if (result === PamResult.MaxTries || lockRoot.faillockTripped) {
-                    lockRoot.pamFeedback = "account locked by pam_faillock (run 'faillock --reset' in tty)";
-                } else if (!lockRoot.pamFeedback) {
-                    lockRoot.pamFeedback = "incorrect password, try again";
+                    if (result === PamResult.MaxTries || lockRoot.faillockTripped) {
+                        lockRoot.pamFeedback = "account locked by pam_faillock (run 'faillock --reset' in tty)";
+                    } else if (!lockRoot.pamHasModuleMessage) {
+                        lockRoot.pamFeedback = "incorrect password, try again";
+                    }
+                    lockRoot.triggerShake();
+                    shakeTimer.restart();
                 }
+                lockRoot.pamErroredThisTurn = false;
                 lockRoot.pamFeedbackIsError = true;
-                lockRoot.triggerShake();
-                shakeTimer.restart();
             }
         }
 
         onError: (err) => {
-            console.warn("[LockScreen PAM Error]:", err);
-            lockRoot.pamFeedback = "pam error: " + err;
+            console.warn("[LockScreen PAM Error]:", err, PamError.toString(err));
+            pamSafetyTimeout.stop();
+            lockRoot.isChecking = false;
+            lockRoot.pamRespondedThisTurn = false;
+            lockRoot.pamErroredThisTurn = true;
+            lockRoot.pendingPassword = "";
+            lockRoot.authFailed = true;
+            lockRoot.failedAttempts += 1;
+            sessionPersist.failedCount = lockRoot.failedAttempts;
+            lockRoot.pamFeedback = "pam error (" + PamError.toString(err) + "), try again";
             lockRoot.pamFeedbackIsError = true;
+            lockRoot.triggerShake();
+            shakeTimer.restart();
         }
     }
 
@@ -1285,6 +1344,8 @@ Scope {
 
         isChecking = true;
         pamRespondedThisTurn = false;
+        pamHasModuleMessage = false;
+        pamErroredThisTurn = false;
         authFailed = false;
         pamFeedback = (!pw || pw.length === 0) ? "checking pam / passkey..." : "authenticating...";
         pamFeedbackIsError = false;
@@ -1298,9 +1359,10 @@ Scope {
             pamSafetyTimeout.stop();
             isChecking = false;
             pamRespondedThisTurn = false;
+            pamErroredThisTurn = true;
             pendingPassword = "";
             authFailed = true;
-            pamFeedback = "failed to start pam session";
+            pamFeedback = "failed to start pam session (" + resolvedPamService + ")";
             pamFeedbackIsError = true;
             triggerShake();
             shakeTimer.restart();
@@ -1312,6 +1374,8 @@ Scope {
         pamSafetyTimeout.stop();
         isChecking = false;
         pamRespondedThisTurn = false;
+        pamHasModuleMessage = false;
+        pamErroredThisTurn = false;
         pendingPassword = "";
         pamFeedback = "cancelled";
     }

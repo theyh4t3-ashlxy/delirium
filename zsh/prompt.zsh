@@ -1,11 +1,13 @@
 # prompt.zsh
 #
-# PROMPT_STYLE:    unhinged | two-line | single-line | minimal | bracket
-#                  gremlin | kaomoji-speech | cyberpunk | capsule
-# KAOMOJI_SET:     reactive | cats | cute | rage | doom | ascii | none
+# PROMPT_STYLE:    open-line | two-line | single-line | minimal | bracket | bash
+#                  pure | robby | lambda | face-prompt | kaomoji-speech | schematic
+#                  capsule | custom
+# KAOMOJI_SET:     reactive | cats | cute | angry | deadpan | ascii | none
 # PROMPT_ACCENT:   primary | secondary | tertiary | cyan | green | magenta | yellow | white
 # PROMPT_SYMBOL:   '❯'
 # SHOW_GIT_PROMPT / SHOW_CMD_TIMER / SHOW_PROMPT_BANTER / SHOW_TIMESTAMP: true | false
+# PROMPT_BLANK_LINE / SHOW_PWD_ONLY / SHOW_SHLVL: true | false | CMD_TIMER_MIN: int
 
 autoload -Uz add-zsh-hook
 
@@ -22,7 +24,7 @@ typeset -gi _GP_DIRTY=0 _GP_CONFLICT=0
 typeset -g  _GP_START="" _GP_MOOD_KEY=""
 typeset -g  _GP_FACE="" _GP_BANTER=""
 typeset -g  _GP_LAST_FACE="" _GP_LAST_BANTER=""
-typeset -g  _GP_LEFT="" _GP_RIGHT="" _GP_GIT=""
+typeset -g  _GP_LEFT="" _GP_RIGHT="" _GP_GIT="" _GP_BRANCH=""
 typeset -g  _GP_TRANSIENT_LEFT=""
 
 PROMPT='${_GP_LEFT}'
@@ -40,26 +42,28 @@ _gp_colors() {
     typeset -g _GP_PRI='%F{4}'
     typeset -g _GP_SEC='%F{6}'
     typeset -g _GP_TER='%F{5}'
-    typeset -g _GP_ERR='%F{1}'
+    typeset -g _GP_ERR='%F{9}'
     typeset -g _GP_WRN='%F{3}'
     typeset -g _GP_OK='%F{2}'
     typeset -g _GP_BG='4'
     typeset -g _GP_ACC="$_GP_PRI"
+    typeset -g _GP_MISS="$_GP_TER"
 
     case "${PROMPT_ACCENT:-primary}" in
-        secondary) _GP_ACC="$_GP_SEC" ;;
-        tertiary)  _GP_ACC="$_GP_TER" ;;
-        cyan)      _GP_ACC='%F{14}' ;;
-        green)     _GP_ACC='%F{2}' ;;
-        magenta)   _GP_ACC='%F{5}' ;;
-        yellow)    _GP_ACC='%F{3}' ;;
-        white)     _GP_ACC='%F{15}' ;;
+        secondary) _GP_ACC="$_GP_SEC"; _GP_MISS="$_GP_TER" ;;
+        tertiary)  _GP_ACC="$_GP_TER"; _GP_MISS="$_GP_SEC" ;;
+        cyan)      _GP_ACC='%F{14}';    _GP_MISS="$_GP_TER" ;;
+        green)     _GP_ACC='%F{2}';     _GP_MISS="$_GP_TER" ;;
+        magenta)   _GP_ACC='%F{5}';     _GP_MISS="$_GP_SEC" ;;
+        yellow)    _GP_ACC='%F{3}';     _GP_MISS="$_GP_TER" ;;
+        white)     _GP_ACC='%F{15}';    _GP_MISS="$_GP_TER" ;;
     esac
 }
 
 _gp_git() {
     emulate -L zsh
     _GP_GIT=""
+    _GP_BRANCH=""
     _GP_DIRTY=0
     _GP_CONFLICT=0
 
@@ -97,6 +101,7 @@ _gp_git() {
 
     _gp_literal "$branch"
     branch="$REPLY"
+    _GP_BRANCH="$branch"
 
     (( staged ))    && details+=("${_GP_TER}+${staged}%f")
     (( unstaged ))  && details+=("${_GP_SEC}~${unstaged}%f")
@@ -255,16 +260,48 @@ _gp_mood() {
             faces=()
             ;;
         cats)
-            faces=('ᓚᘏᗢ' '(=^･ω･^=)' '(=^･ｪ･^=)' '/ᐠ｡ꞈ｡ᐟ\' '(=｀ω´=)')
+            case "$state" in
+                error|conflict) faces=('(=；ェ；=)' '(=ＴェＴ=)' '(=｀ェ´=)' 'ฅ(•ㅅ•;)ฅ') ;;
+                notfound)       faces=('(=・ω・=?)' '/ᐠ｡ꞈ｡ᐟ\?' '(=^･ｪ･^=)?') ;;
+                cancelled)      faces=('(=￣ω￣=)' '(=´∇｀=;)') ;;
+                slow)           faces=('(=‐ω‐=) zzZ' '(=˘ω˘=)') ;;
+                dirty)          faces=('(=｀ω´=)' '(=^･ω･^;)') ;;
+                root)           faces=('(=｀ェ´=)' 'ฅ(•̀_•́ฅ)') ;;
+                *)              faces=('ᓚᘏᗢ' '(=^･ω･^=)' '(=^･ｪ･^=)' '/ᐠ｡ꞈ｡ᐟ\' 'ฅ(^･ω･^)ฅ') ;;
+            esac
             ;;
         cute)
-            faces=('(◕‿◕✿)' '(✿◠‿◠)' '(｡♥‿♥｡)' '(✿◡‿◡)' '(≧◡≦)' '(｡•̀ᴗ-)✧')
+            case "$state" in
+                error|conflict) faces=('(╥﹏╥)' '(｡•́︿•̀｡)' '(っ- ‸ - ς)' '(｡>﹏<｡)') ;;
+                notfound)       faces=('(・_・?)' '(｡•́︿•̀｡)' '(✿´・_・`)?') ;;
+                cancelled)      faces=('(✿˘･_･˘)' '(っ˘̩╭╮˘̩)っ' '(；￣Д￣)') ;;
+                slow)           faces=('(✿◡‿◡)' '(∪｡∪)｡｡｡zzZ') ;;
+                dirty)          faces=('(；・∀・)' '(✿・_・;)') ;;
+                root)           faces=('(｡•̀_•́｡)' '(✿ಠ_ಠ)') ;;
+                *)              faces=('(◕‿◕✿)' '(✿◠‿◠)' '(｡♥‿♥｡)' '(≧◡≦)' '(｡•̀ᴗ-)✧') ;;
+            esac
             ;;
-        rage)
-            faces=('(╯°□°)╯︵ ┻━┻' '(ノಠ益ಠ)ノ' '(╬ಠ益ಠ)' '(ﾒ｀ﾛ´)')
+        angry|rage)
+            case "$state" in
+                error|conflict) faces=('(╯°□°)╯︵ ┻━┻' '(ノಠ益ಠ)ノ' '(╬ಠ益ಠ)' '(ﾒ｀ﾛ´)') ;;
+                notfound)       faces=('(╬ Ò﹏Ó)?' '(ノಠ益ಠ)ノ?') ;;
+                cancelled)      faces=('┬─┬ノ( º _ ºノ)' '(눈_눈)') ;;
+                slow)           faces=('(ﾒ｀ﾛ´)' '(╬ಠ益ಠ)') ;;
+                dirty)          faces=('(ಠ益ಠ)' '(ﾒ｀ﾛ´)') ;;
+                root)           faces=('(╬ಠ益ಠ)' '(ノಠ益ಠ)ノ') ;;
+                *)              faces=('(ง •̀_•́)ง' '┻━┻ ︵ヽ(`Д´)ﾉ︵ ┻━┻' '(•̀_•́)') ;;
+            esac
             ;;
-        doom)
-            faces=('(눈_눈)' '(x_x)' '(¬_¬ )' '(⚆_⚆)' '(；一_一)')
+        deadpan|doom)
+            case "$state" in
+                error|conflict) faces=('(x_x)' '(ಥ_ಥ)' '(－_ლ)') ;;
+                notfound)       faces=('(⊙_⊙?)' '(¬_¬;)' '(・_・?)') ;;
+                cancelled)      faces=('( ._.)' '(¬_¬ )') ;;
+                slow)           faces=('(눈_눈)' '(－_－) zzZ') ;;
+                dirty)          faces=('(¬_¬ )' '(；一_一)') ;;
+                root)           faces=('(ಠ_ಠ)' '(⚆_⚆)') ;;
+                *)              faces=('(눈_눈)' '(¬_¬ )' '(；一_一)' '(⚆_⚆)') ;;
+            esac
             ;;
         ascii)
             case "$state" in
@@ -304,18 +341,94 @@ _gp_mood() {
     return 0
 }
 
+_gp_render_custom() {
+    emulate -L zsh
+    local s="$1" out="" pre tok rep
+    local c_id="$2" c_dir="$3" c_pwd="$4" c_full="$5" c_branch="$6"
+    local c_ctx="$7" c_face="$8" c_sym="$9" c_dollar="${10}"
+    local c_venv="${11}" c_extras="${12}" c_exit="${13}" c_timer="${14}"
+    local c_banter="${15}" c_time="${16}" c_acc="${17}" c_miss="${18}"
+
+    while [[ "$s" == *'{'*'}'* ]]; do
+        pre="${s%%\{*}"
+        out+="$pre"
+        s="${s#*\{}"
+        if [[ "$s" == *'}'* ]]; then
+            tok="${s%%\}*}"
+            s="${s#*\}}"
+            if [[ "$tok" == *'{'* ]]; then
+                out+="{${tok%%\{*}"
+                s="{${tok#*\{}}${s}"
+                continue
+            fi
+            case "$tok" in
+                nl)      rep=$'\n' ;;
+                pri)     rep="$_GP_PRI" ;;
+                sec)     rep="$_GP_SEC" ;;
+                ter)     rep="$_GP_TER" ;;
+                out)     rep="$_GP_OUT" ;;
+                ok)      rep="$_GP_OK" ;;
+                wrn)     rep="$_GP_WRN" ;;
+                err)     rep="$_GP_ERR" ;;
+                acc)     rep="$c_acc" ;;
+                miss)    rep="$c_miss" ;;
+                rst)     rep="%f" ;;
+                user)    rep="${_GP_PRI}%n%f" ;;
+                host)    rep="${_GP_SEC}%m%f" ;;
+                id)      rep="$c_id" ;;
+                dir)     rep="$c_dir" ;;
+                pwd)     rep="$c_pwd" ;;
+                full)    rep="$c_full" ;;
+                git)     rep="$_GP_GIT" ;;
+                branch)  rep="$c_branch" ;;
+                venv)    rep="$c_venv" ;;
+                extras)  rep="$c_extras" ;;
+                context) rep="$c_ctx" ;;
+                face)    rep="$c_face" ;;
+                sym)     rep="$c_sym" ;;
+                dollar)  rep="$c_dollar" ;;
+                exit)    rep="$c_exit" ;;
+                timer)   rep="$c_timer" ;;
+                banter)  rep="$c_banter" ;;
+                time)    rep="$c_time" ;;
+                time24)  rep="${_GP_OUT}%T%f" ;;
+                time12)  rep="${_GP_OUT}%t%f" ;;
+                date)    rep="${_GP_OUT}%D{%m/%d}%f" ;;
+                *)       rep="{${tok}}" ;;
+            esac
+            out+="$rep"
+        else
+            out+="{${s}"
+            s=""
+        fi
+    done
+
+    REPLY="${out}${s}"
+}
+
 _gp_build() {
     emulate -L zsh
     local out="$_GP_OUT" pri="$_GP_PRI" sec="$_GP_SEC"
-    local ter="$_GP_TER" err="$_GP_ERR" wrn="$_GP_WRN" acc="$_GP_ACC"
-    local REPLY symbol face="" identity dir extras="" venv=""
-    local elapsed="" vname style="${PROMPT_STYLE:-two-line}"
+    local ter="$_GP_TER" err="$_GP_ERR" wrn="$_GP_WRN" ok="$_GP_OK" acc="$_GP_ACC"
+    local miss="${_GP_MISS:-$_GP_TER}"
+    local REPLY symbol face="" identity dir dir_spec extras="" venv=""
+    local elapsed="" vname style="${PROMPT_STYLE:-two-line}" nl=""
+    local branch_tok="" robby_git="" custom_dollar="" exit_tok="" timer_tok="" banter_tok="" time_tok=""
+    local -i timer_min=1
     local -a rparts
 
-    (( _GP_EXIT != 0 || EUID == 0 )) && acc="$err"
+    [[ "${PROMPT_BLANK_LINE:-true}" == true ]] && nl=$'\n'
+    if [[ "${CMD_TIMER_MIN:-1}" == <-> ]]; then
+        timer_min="${CMD_TIMER_MIN:-1}"
+    fi
+
+    (( _GP_EXIT == 130 )) && acc="$wrn"
+    (( _GP_EXIT != 0 && _GP_EXIT != 130 )) && acc="$miss"
+    (( EUID == 0 )) && acc="$err"
 
     _gp_literal "${PROMPT_SYMBOL:-❯}"
     symbol="${acc}${REPLY}%f"
+    custom_dollar="${acc}%(#.#.\$)%f"
     _GP_TRANSIENT_LEFT="${out}%D{%H:%M}%f ${symbol} "
 
     if [[ -n "$_GP_FACE" ]]; then
@@ -324,16 +437,21 @@ _gp_build() {
     fi
 
     identity="${pri}%n${out}@${sec}%m%f"
-    dir="${ter}%~%f"
+    if [[ "${SHOW_PWD_ONLY:-false}" == true ]]; then
+        dir_spec='%1~'
+    else
+        dir_spec='%~'
+    fi
+    dir="${ter}${dir_spec}%f"
 
     [[ -w . ]] || extras+=" ${err}%f"
-    extras+=" %(1j.${wrn}⚙ %j%f.)"
+    (( ${#jobstates} )) && extras+=" ${wrn}⚙ ${#jobstates}%f"
 
     if [[ -n "${SSH_CONNECTION-}${SSH_CLIENT-}" ]]; then
         extras+=" ${sec}[ssh]%f"
     fi
 
-    if (( SHLVL > 1 )) &&
+    if [[ "${SHOW_SHLVL:-true}" == true ]] && (( SHLVL > 1 )) &&
        [[ -z "${TMUX-}" && "${TERM_PROGRAM-}" != vscode ]]; then
         extras+=" ${out}[lvl:${SHLVL}]%f"
     fi
@@ -354,6 +472,44 @@ _gp_build() {
 
     local context="${_GP_GIT}${venv}${extras}"
 
+    if [[ -n "$_GP_BRANCH" ]]; then
+        branch_tok="${ter}${_GP_BRANCH}%f"
+        robby_git=" ${pri}git:(%f${ter}${_GP_BRANCH}${pri})%f"
+        (( _GP_DIRTY )) && robby_git+=" ${wrn}✗%f"
+    fi
+
+    if (( _GP_EXIT == 130 )); then
+        exit_tok="${wrn}✘ ${_GP_EXIT}%f"
+        rparts+=("$exit_tok")
+    elif (( _GP_EXIT != 0 )); then
+        exit_tok="${miss}✘ ${_GP_EXIT}%f"
+        rparts+=("$exit_tok")
+    fi
+
+    if [[ "${SHOW_PROMPT_BANTER:-true}" == true && -n "$_GP_BANTER" ]] &&
+       (( ${COLUMNS:-80} >= 110 )); then
+        _gp_literal "$_GP_BANTER"
+        banter_tok="${out}${REPLY}%f"
+        rparts+=("$banter_tok")
+    fi
+
+    if [[ "${SHOW_CMD_TIMER:-true}" == true ]] && (( _GP_ELAPSED >= timer_min )); then
+        local -i hours=$(( _GP_ELAPSED / 3600 ))
+        local -i mins=$(( _GP_ELAPSED / 60 % 60 ))
+        local -i secs=$(( _GP_ELAPSED % 60 ))
+
+        (( hours )) && elapsed+="${hours}h"
+        (( hours || mins )) && elapsed+="${mins}m"
+        elapsed+="${secs}s"
+        timer_tok="${sec}${elapsed}%f"
+        rparts+=("$timer_tok")
+    fi
+
+    if [[ "${SHOW_TIMESTAMP:-true}" == true ]]; then
+        time_tok="${out}%T%f"
+        rparts+=("$time_tok")
+    fi
+
     case "$style" in
         single-line)
             _GP_LEFT="${face:+${face} }${identity} ${out}in ${dir}${context} ${symbol} "
@@ -364,52 +520,68 @@ _gp_build() {
         bracket)
             _GP_LEFT="${out}[${identity} ${dir}${out}]%f${face:+ ${face}}${context} ${symbol} "
             ;;
-        gremlin)
-            _GP_LEFT=$'\n'"${identity} ${out}in ${dir}${context}"
+        bash)
+            local bash_meta="${context}${face:+ ${face}}"
+            _GP_LEFT="${out}[${identity}${out}:${dir}${out}]%f${bash_meta:+${bash_meta} }${custom_dollar} "
+            ;;
+        pure)
+            _GP_LEFT="${nl}${dir}${context}${face:+ ${face}}"
+            _GP_LEFT+=$'\n'"${symbol} "
+            ;;
+        robby)
+            _GP_LEFT="${acc}➜%f ${sec}%1~%f${robby_git}${venv}${extras}${face:+ ${face}} "
+            ;;
+        lambda)
+            _GP_LEFT="${acc}λ%f ${dir}${context}${face:+ ${face}} "
+            ;;
+        face-prompt|gremlin)
+            _GP_LEFT="${nl}${identity} ${out}in ${dir}${context}"
             _GP_LEFT+=$'\n'"${face:-${symbol}} "
             ;;
         kaomoji-speech)
-            _GP_LEFT=$'\n'"${face:+${face} }${out}「${dir}${out}」%f ${identity}${context}"
+            _GP_LEFT="${nl}${face:+${face} }${out}「${dir}${out}」%f ${identity}${context}"
             _GP_LEFT+=$'\n'"${out}╰─%f ${symbol} "
             ;;
-        cyberpunk)
-            _GP_LEFT=$'\n'"${out}┌──[ ${identity} ${out}:: ${dir} ${out}]%f${face:+ ${face}}${context}"
+        schematic|cyberpunk)
+            _GP_LEFT="${nl}${out}┌──[ ${identity} ${out}:: ${dir} ${out}]%f${face:+ ${face}}${context}"
             _GP_LEFT+=$'\n'"${out}└──╼%f ${symbol} "
             ;;
         capsule)
-            _GP_LEFT=$'\n'"${pri}%K{4}%F{0}%B%n@%m%b%f%k${pri} ${sec}%K{6}%F{0}%~%f%k${sec}%f${face:+ ${face}}${context}"
+            _GP_LEFT="${nl}${pri}%K{4}%F{0}%B%n@%m%b%f%k${pri} ${sec}%K{6}%F{0}${dir_spec}%f%k${sec}%f${face:+ ${face}}${context}"
             _GP_LEFT+=$'\n'"${symbol} "
             ;;
+        custom)
+            local c_left="${PROMPT_CUSTOM_LEFT-}"
+            [[ -z "$c_left" ]] && c_left='{nl}{id} {out}in {dir}{context} {face}{nl}{sym} '
+            local c_right="${PROMPT_CUSTOM_RIGHT-}"
+            _gp_render_custom "$c_left" "$identity" "$dir" "${ter}%1~%f" "${ter}%~%f" \
+                "$branch_tok" "$context" "$face" "$symbol" "$custom_dollar" "$venv" "$extras" \
+                "$exit_tok" "$timer_tok" "$banter_tok" "$time_tok" "$acc" "$miss"
+            _GP_LEFT="$REPLY"
+
+            if [[ "$c_right" == (none|off|empty) ]]; then
+                _GP_RIGHT=""
+                return 0
+            elif [[ -n "$c_right" ]]; then
+                _gp_render_custom "$c_right" "$identity" "$dir" "${ter}%1~%f" "${ter}%~%f" \
+                    "$branch_tok" "$context" "$face" "$symbol" "$custom_dollar" "$venv" "$extras" \
+                    "$exit_tok" "$timer_tok" "$banter_tok" "$time_tok" "$acc" "$miss"
+                REPLY="${REPLY//  / }"
+                REPLY="${REPLY## }"
+                REPLY="${REPLY%% }"
+                _GP_RIGHT="$REPLY"
+                return 0
+            fi
+            ;;
         two-line)
-            _GP_LEFT=$'\n'"${out}╭─[ ${identity} ${out}in ${dir} ${out}]%f${face:+ ${face}}${context}"
+            _GP_LEFT="${nl}${out}╭─[ ${identity} ${out}in ${dir}${out}]%f${face:+ ${face}}${context}"
             _GP_LEFT+=$'\n'"${out}╰─%f ${symbol} "
             ;;
-        unhinged|*)
-            _GP_LEFT=$'\n'"${out}╭── ${face:+${face} }${identity} ${out}in ${dir}${context}"
+        open-line|unhinged|*)
+            _GP_LEFT="${nl}${out}╭── ${face:+${face} }${identity} ${out}in ${dir}${context}"
             _GP_LEFT+=$'\n'"${out}╰───%f ${symbol} "
             ;;
     esac
-
-    (( _GP_EXIT != 0 )) && rparts+=("${err}✘ ${_GP_EXIT}%f")
-
-    if [[ "${SHOW_PROMPT_BANTER:-true}" == true && -n "$_GP_BANTER" ]] &&
-       (( ${COLUMNS:-80} >= 110 )); then
-        _gp_literal "$_GP_BANTER"
-        rparts+=("${out}${REPLY}%f")
-    fi
-
-    if [[ "${SHOW_CMD_TIMER:-true}" == true ]] && (( _GP_ELAPSED >= 1 )); then
-        local -i hours=$(( _GP_ELAPSED / 3600 ))
-        local -i mins=$(( _GP_ELAPSED / 60 % 60 ))
-        local -i secs=$(( _GP_ELAPSED % 60 ))
-
-        (( hours )) && elapsed+="${hours}h"
-        (( hours || mins )) && elapsed+="${mins}m"
-        elapsed+="${secs}s"
-        rparts+=("${sec}${elapsed}%f")
-    fi
-
-    [[ "${SHOW_TIMESTAMP:-true}" == true ]] && rparts+=("${out}%T%f")
 
     _GP_RIGHT="${(j: :)rparts}"
     return 0
@@ -418,7 +590,14 @@ _gp_build() {
 _gp_zle_line_finish() {
     if [[ "${TRANSIENT_PROMPT:-false}" == "true" ]]; then
         case "${PROMPT_STYLE:-two-line}" in
-            single-line|minimal|bracket) ;;
+            single-line|minimal|bracket|bash|robby|lambda) ;;
+            custom)
+                if [[ "${PROMPT_CUSTOM_LEFT-}" == *$'\n'* || "${PROMPT_CUSTOM_LEFT-}" == *'{nl}'* ]]; then
+                    PROMPT='${_GP_TRANSIENT_LEFT}'
+                    RPROMPT=''
+                    zle .reset-prompt 2>/dev/null || zle reset-prompt 2>/dev/null
+                fi
+                ;;
             *)
                 PROMPT='${_GP_TRANSIENT_LEFT}'
                 RPROMPT=''

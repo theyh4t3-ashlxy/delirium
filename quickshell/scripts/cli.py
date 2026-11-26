@@ -141,7 +141,25 @@ def kill_running_shell(graceful_timeout: float = 1.5):
                 pass
 
 
+def has_no_new_privs() -> bool:
+    """Return True if NoNewPrivs is enabled on this process (blocks setuid unix_chkpwd)."""
+    try:
+        status = Path("/proc/self/status").read_text(encoding="utf-8", errors="ignore")
+        return re.search(r"(?m)^NoNewPrivs:\s*1\b", status) is not None
+    except OSError:
+        return False
+
+
 def launch_shell(shell_name: str):
+    if has_no_new_privs() and "--force" not in sys.argv:
+        print(
+            f"{C_RED}󰅚 refusing to launch {shell_name} under NoNewPrivs=1:{C_RESET} "
+            "setuid unix_chkpwd fails inside sandboxed shells and bricks lockscreen unlock. "
+            "run 'cli reload' from a normal terminal.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     print(f"{C_CYAN}󰄛 launching {C_BOLD}{shell_name}{C_RESET}...")
     has_uwsm = shutil.which("uwsm") is not None
 
@@ -212,6 +230,15 @@ def switch_shell(target: str):
 
     if target not in ("quickshell", "brain_shell"):
         print(f"{C_RED}error:{C_RESET} unknown shell target '{target}'. use 'quickshell' or 'brain_shell'.", file=sys.stderr)
+        sys.exit(1)
+
+    if has_no_new_privs() and "--force" not in sys.argv:
+        print(
+            f"{C_RED}󰅚 refusing to reload into {target} under NoNewPrivs=1:{C_RESET} "
+            "keeping existing host shell alive so lockscreen unix_chkpwd keeps setuid permissions. "
+            "run 'cli reload' from a normal terminal.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     print(f"{C_MAGENTA}󰑐 switching shell:{C_RESET} {C_DIM}{current}{C_RESET} -> {C_BOLD}{C_CYAN}{target}{C_RESET}")

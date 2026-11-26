@@ -37,7 +37,7 @@ zstyle ':completion:*' rehash true
 zstyle ':completion:*' verbose yes
 zstyle ':completion:*:*:*:*:descriptions' format '%F{cyan}󰅂 %d%f'
 zstyle ':completion:*:messages' format '%F{yellow}󰅂 %d%f'
-zstyle ':completion:*:warnings' format '%F{red}󰅂 no matches found: %d%f'
+zstyle ':completion:*:warnings' format '%F{5}󰅂 no matches found: %d%f'
 zstyle ':completion:*:corrections' format '%F{green}󰅂 %d (errors: %e)%f'
 zstyle ':completion:*' group-name ''
 
@@ -109,30 +109,74 @@ alias compile-zsh="zrecompile"
 
 # keys that actually work when i press them (respect KEY_BIND_MODE from user_prefs.conf)
 KEYTIMEOUT=5
-if [[ "${KEY_BIND_MODE:-vi}" == "vi" ]]; then
-    bindkey -v
-else
-    bindkey -e
-fi
 
-# bind standard navigation + ctrl-arrow + edit-command-line across both emacs & viins
+_vi_cursor_update() {
+    [[ -t 1 ]] || return 0
+    if [[ "${KEY_BIND_MODE:-vi}" != "vi" || "${VI_CURSOR_SHAPE:-true}" != "true" ]]; then
+        printf '\e[0 q'
+        return 0
+    fi
+    case "${1:-${KEYMAP:-main}}" in
+        vicmd)      printf '\e[2 q' ;;
+        viins|main) printf '\e[6 q' ;;
+    esac
+}
+
+_vi_cursor_keymap_select() { _vi_cursor_update "${KEYMAP:-main}" }
+_vi_cursor_line_init()     { _vi_cursor_update viins }
+_vi_cursor_preexec() {
+    [[ -t 1 && "${KEY_BIND_MODE:-vi}" == "vi" && "${VI_CURSOR_SHAPE:-true}" == "true" ]] && printf '\e[0 q'
+}
+
+_toggle_sudo_line() {
+    [[ -z "$BUFFER" ]] && zle up-history
+    if [[ "$BUFFER" == sudo\ * ]]; then
+        BUFFER="${BUFFER#sudo }"
+        (( CURSOR = CURSOR > 5 ? CURSOR - 5 : 0 ))
+    else
+        BUFFER="sudo $BUFFER"
+        (( CURSOR += 5 ))
+    fi
+}
+
+autoload -Uz add-zsh-hook
+add-zsh-hook -d preexec _vi_cursor_preexec 2>/dev/null
+add-zsh-hook preexec _vi_cursor_preexec
+
 autoload -Uz bracketed-paste-magic && zle -N bracketed-paste bracketed-paste-magic
 autoload -Uz url-quote-magic && zle -N self-insert url-quote-magic
 autoload -Uz select-word-style && select-word-style bash
 autoload -Uz edit-command-line && zle -N edit-command-line
+zle -N zle-keymap-select _vi_cursor_keymap_select
+zle -N zle-line-init _vi_cursor_line_init
+zle -N _toggle_sudo_line
 
-for _km in emacs viins; do
-    bindkey -M "$_km" '^[[H'    beginning-of-line
-    bindkey -M "$_km" '^[OH'    beginning-of-line
-    bindkey -M "$_km" '^[[F'    end-of-line
-    bindkey -M "$_km" '^[OF'    end-of-line
-    bindkey -M "$_km" '^[[3~'   delete-char
-    bindkey -M "$_km" '^?'      backward-delete-char
-    bindkey -M "$_km" '^[[1;5D' backward-word
-    bindkey -M "$_km" '^[[1;5C' forward-word
-    bindkey -M "$_km" '^X^E'    edit-command-line
-done
-unset _km
+_apply_key_binds() {
+    if [[ "${KEY_BIND_MODE:-vi}" == "vi" ]]; then
+        bindkey -v
+    else
+        bindkey -e
+    fi
+
+    local _km
+    for _km in emacs viins; do
+        bindkey -M "$_km" '^[[H'    beginning-of-line
+        bindkey -M "$_km" '^[OH'    beginning-of-line
+        bindkey -M "$_km" '^[[F'    end-of-line
+        bindkey -M "$_km" '^[OF'    end-of-line
+        bindkey -M "$_km" '^[[3~'   delete-char
+        bindkey -M "$_km" '^?'      backward-delete-char
+        bindkey -M "$_km" '^[[1;5D' backward-word
+        bindkey -M "$_km" '^[[1;5C' forward-word
+        bindkey -M "$_km" '^X^E'    edit-command-line
+        bindkey -M "$_km" '^[s'     _toggle_sudo_line
+    done
+    bindkey -M emacs '\e\e' _toggle_sudo_line
+    bindkey -M vicmd '^[s'  _toggle_sudo_line
+    _vi_cursor_update
+}
+
+_apply_key_binds
 
 # avoid leaving autosuggest ghost fragments during bracketed paste
 typeset -ga ZSH_AUTOSUGGEST_CLEAR_WIDGETS

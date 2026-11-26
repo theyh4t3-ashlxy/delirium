@@ -164,7 +164,7 @@ QtObject {
     property bool mpvAudio: false
 
     property string animSpeed: "snappy"
-    property string flavorMode: "actions"   // "actions" | "quotes" | "hyprland" | "off"
+    property string flavorMode: "actions"   // "actions" | "quotes" | "hyprland" | "delirium" | "off"
     readonly property bool unhingedFlavor: flavorMode !== "off"
     property string vibeStyle: "icon"
     property bool dnd: false
@@ -926,7 +926,7 @@ QtObject {
             root.flavorMode = (data.unhingedFlavor === true || data.unhingedFlavor === "true") ? "actions" : "off";
         } else if (root.flavorMode === "unhinged") {
             root.flavorMode = "actions";
-        } else if (!["actions", "quotes", "hyprland", "off"].includes(root.flavorMode)) {
+        } else if (!["actions", "quotes", "hyprland", "delirium", "off"].includes(root.flavorMode)) {
             root.flavorMode = "actions";
         }
         if (root.iconSet === "nerd" || root.iconSet === "awesome") {

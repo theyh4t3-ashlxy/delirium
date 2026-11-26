@@ -821,7 +821,7 @@ Singleton {
     readonly property string kaoCool:               "( ⌐■_■ )"
     readonly property string kaoLove:               "( ´▽`ʃ♡ƪ)"
     readonly property string kaoAnger:              "( ╬ Ò﹏Ó)"
-    readonly property string kaoChaos:              "(╯°□°)╯︵ ┻━┻"
+    readonly property string kaoAngry:              "(╯°□°)╯︵ ┻━┻"
     readonly property string kaoWink:               "( ¬‿¬ )"
     readonly property string kaoFlex:               "ᕦ(ò_óˇ)ᕤ"
     readonly property string kaoBolt:               "( ✧∇✧ )و"
@@ -858,9 +858,6 @@ Singleton {
 
     function rollFlavor(category: string, mode: var, currentText: var, fallback: var): string {
         let m = (typeof mode === "string" && mode !== "") ? mode : (cfg?.flavorMode ?? (cfg?.unhingedFlavor === false ? "off" : "actions"));
-        if (Quotes.normalizeFlavorMode(m) === "hyprland") {
-            return (hyprSplash || fallback || "read the wiki.").toLowerCase();
-        }
         return Quotes.rollFlavor(m, category, currentText ?? "", fallback ?? "");
     }
 

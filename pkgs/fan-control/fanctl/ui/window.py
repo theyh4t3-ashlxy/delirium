@@ -56,7 +56,7 @@ class FanControlWindow(Adw.ApplicationWindow):
 
         # headerbar
         header = Adw.HeaderBar()
-        title_widget = Adw.WindowTitle(title="fan control", subtitle="thinkpad thermal chaos controller")
+        title_widget = Adw.WindowTitle(title="fan control", subtitle="thinkpad thermal & fan controller")
         header.set_title_widget(title_widget)
 
         btn_copy = Gtk.Button(icon_name="edit-copy-symbolic")

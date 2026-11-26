@@ -51,6 +51,16 @@ ColumnLayout {
                                 Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
                                 Behavior on border.color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
+                                MouseArea {
+                                    anchors.fill: parent
+                                    z: -1
+                                    cursorShape: Qt.IBeamCursor
+                                    onClicked: {
+                                        if (lockSurface?.claimSurfaceFocus) lockSurface.claimSurfaceFocus();
+                                        pwInput.forceActiveFocus();
+                                    }
+                                }
+
                                 transform: Translate { id: pwShake }
 
                                 SequentialAnimation {
@@ -126,6 +136,7 @@ ColumnLayout {
                                         selectionColor: root.uiAccentOverlay
                                         selectedTextColor: root.uiTextPrimary
                                         readOnly: root.isChecking
+                                        inputMethodHints: Qt.ImhHiddenText | Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase | Qt.ImhSensitiveData
                                         passwordCharacter: (root.pwMaskChar !== "" && root.pwMaskChar !== "none") ? root.pwMaskChar : "•"
                                         passwordMaskDelay: 0
                                         clip: true
@@ -207,6 +218,7 @@ ColumnLayout {
                                         }
 
                                         onAccepted: {
+                                            if (root.isChecking) return;
                                             const p = pwInput.text !== "" ? pwInput.text : root.sharedPassword;
                                             root.sharedPassword = "";
                                             pwInput.text = "";
@@ -225,7 +237,8 @@ ColumnLayout {
                                                 }
                                             }
                                             function onIsCheckingChanged() {
-                                                if (!root.isChecking && root.locked && root.activeSurface === lockSurface) {
+                                                if (!root.isChecking && root.locked && (root.activeSurface === null || root.activeSurface === lockSurface)) {
+                                                    root.activeSurface = lockSurface;
                                                     pwInput.forceActiveFocus();
                                                 }
                                             }
@@ -281,11 +294,16 @@ ColumnLayout {
                                     }
 
                                     Rectangle {
+                                        id: submitBtn
                                         readonly property bool canSubmit: root.sharedPassword.length > 0 && !root.isChecking
-                                        width: canSubmit ? 38 : 0
-                                        height: 34
+                                        Layout.preferredWidth: canSubmit ? 38 : 0
+                                        Layout.minimumWidth: 0
+                                        Layout.maximumWidth: 38
+                                        Layout.preferredHeight: 34
+                                        Layout.alignment: Qt.AlignVCenter
+                                        clip: true
                                         opacity: canSubmit ? 1.0 : 0.0
-                                        visible: width > 0
+                                        visible: width > 0 || canSubmit
                                         radius: root.uiRadiusPill
                                         color: submitMouse.pressed
                                             ? Theme.statePress(root.uiAccent, root.uiOnAccent)
@@ -293,12 +311,13 @@ ColumnLayout {
                                                 ? Theme.stateHover(root.uiAccent, root.uiOnAccent)
                                                 : root.uiAccent)
 
-                                        Behavior on width { NumberAnimation { duration: Theme.expressiveFast; easing.type: Theme.animExpressiveEasing } }
+                                        Behavior on Layout.preferredWidth { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutCubic } }
                                         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
                                         Behavior on color { ColorAnimation { duration: Theme.animFast; easing.type: Theme.animColorEasing } }
 
                                         Text {
                                             anchors.centerIn: parent
+                                            visible: submitBtn.width > 12
                                             text: Theme.iconChevronRight
                                             font.family: Theme.fontIcon
                                             font.variableAxes: Theme.iconAxes
@@ -313,6 +332,7 @@ ColumnLayout {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
+                                                if (root.isChecking) return;
                                                 const p = pwInput.text !== "" ? pwInput.text : root.sharedPassword;
                                                 root.sharedPassword = "";
                                                 pwInput.text = "";
@@ -332,15 +352,17 @@ ColumnLayout {
                                     text: root.fmtText(
                                         root.unlocking
                                             ? "welcome back..."
-                                            : (root.pamFeedback !== ""
-                                                ? root.pamFeedback
-                                                : (root.isChecking
-                                                    ? "authenticating..."
-                                                    : (root.authFailed
-                                                        ? (root.faillockTripped
-                                                            ? "account locked by pam_faillock (run 'faillock --reset' in tty)"
-                                                            : "incorrect password, try again")
-                                                        : (root.capsLockActive ? "caps lock is on" : ""))))
+                                            : (root.noNewPrivsActive
+                                                ? "NoNewPrivs=1 active: unix_chkpwd blocked — run 'cli reload' in a normal terminal"
+                                                : (root.pamFeedback !== ""
+                                                    ? root.pamFeedback
+                                                    : (root.isChecking
+                                                        ? "authenticating..."
+                                                        : (root.authFailed
+                                                            ? (root.faillockTripped
+                                                                ? "account locked by pam_faillock (run 'faillock --reset' in tty)"
+                                                                : "incorrect password, try again")
+                                                            : (root.capsLockActive ? "caps lock is on" : "")))))
                                     )
                                     opacity: text !== "" ? 1.0 : 0.0
                                     font.family: Theme.fontFamily
@@ -349,7 +371,7 @@ ColumnLayout {
                                     font.weight: Theme.fontWeightMedium
                                     color: root.unlocking
                                         ? root.uiAccent
-                                        : ((root.authFailed || root.pamFeedbackIsError)
+                                        : ((root.authFailed || root.pamFeedbackIsError || root.noNewPrivsActive)
                                             ? Theme.error
                                             : (root.capsLockActive ? Theme.warn : root.uiTextSecondary))
 

@@ -14,7 +14,7 @@ export NEWT_COLORS="root=white,default:window=white,default:shadow=black,default
 
 typeset -gA ZSH_HIGHLIGHT_STYLES
 ZSH_HIGHLIGHT_STYLES[default]='none'
-ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=1,bold'
+ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=9,bold'
 ZSH_HIGHLIGHT_STYLES[reserved-word]='fg=5,bold'
 ZSH_HIGHLIGHT_STYLES[alias]='fg=6'
 ZSH_HIGHLIGHT_STYLES[builtin]='fg=4'

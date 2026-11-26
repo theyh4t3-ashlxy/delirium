@@ -62,7 +62,7 @@ _critic_suggest_cmd() {
 
     local -a pool=(
         ${(k)commands} ${(k)aliases} ${(k)functions} ${(k)builtins}
-        git nix rebuild zoxide bat eza rg fd fzf btop yazi nvim micro kitty cli wp qs
+        git nix rebuild sysup gens try in nshell nrun nixs zoxide bat eza rg fd fzf btop yazi nvim micro kitty cli wp qs
         settings dnd nuke glog gbr gdiff ports extract calc clear exit ls cd cat grep
     )
     typeset -U pool
@@ -177,9 +177,9 @@ command_not_found_handler() {
 
     if [[ "${ENABLE_SYNTAX_CRITIC:-true}" == "true" ]]; then
         _critic_pick ${#notes[@]} _CRITIC_RECENT 12
-        print -P "\n%F{1}󰅚%f %F{8}${notes[$REPLY]}%f"
+        print -P "\n%F{5}󰅚%f %F{8}${notes[$REPLY]}%f"
     else
-        print -Pn "\n%F{1}󰅚%f %F{8}command not found:%f "
+        print -Pn "\n%F{5}󰅚%f %F{8}command not found:%f "
         print -r -- "$cmd"
     fi
 
@@ -190,7 +190,7 @@ command_not_found_handler() {
 
     if (( ${#cmd} >= 2 )) && [[ "$cmd" != */* ]]; then
         print -Pn "  %F{6}󰄛 nix:%f "
-        print -r -- "nix-shell -p $cmd   •   nix run nixpkgs#$cmd"
+        print -r -- "nshell $cmd   •   nrun $cmd   •   nixs $cmd"
     fi
     print ""
 
@@ -219,25 +219,25 @@ _critic_precmd() {
             local head_cmd="${${(z)_LAST_CRITIC_CMD}[1]:-}"
             case "$last_status" in
                 139)
-                    print -P "\n%F{1}󰅚%f %F{8}segfault (exit 139). memory stepped out of bounds and vanished.%f"
+                    print -P "\n%F{9}󰅚%f %F{8}segfault (exit 139). memory stepped out of bounds and vanished.%f"
                     ;;
                 137)
-                    print -P "\n%F{1}󰅚%f %F{8}killed by kernel / oom (exit 137). something ate every megabyte of ram.%f"
+                    print -P "\n%F{9}󰅚%f %F{8}killed by kernel / oom (exit 137). something ate every megabyte of ram.%f"
                     ;;
                 134)
-                    print -P "\n%F{1}󰅚%f %F{8}sigabrt (exit 134). process raised its hands and walked out.%f"
+                    print -P "\n%F{9}󰅚%f %F{8}sigabrt (exit 134). process raised its hands and walked out.%f"
                     ;;
                 130)
                     # don't nag when cancelling interactive pickers/pagers/TUIs
                     case "$head_cmd" in
-                        fzf|settings|config|cli|nuke|fkill|btop|top|htop|yazi|yz|nvim|micro|less|bat|man|glog|gbr|gdiff|fe|fif) ;;
+                        fzf|settings|config|cli|nuke|fkill|btop|top|htop|yazi|yz|y|nvim|micro|less|bat|man|glog|gbr|gdiff|fe|fif|lazygit|lg) ;;
                         *)
                             print -P "\n%F{3}󰀦%f %F{8}sigint (exit 130). clean abort before things got worse.%f"
                             ;;
                     esac
                     ;;
                 126)
-                    print -P "\n%F{1}󰅚%f %F{8}permission denied (exit 126). missing +x bit or blocked execution.%f"
+                    print -P "\n%F{5}󰅚%f %F{8}permission denied (exit 126). missing +x bit or blocked execution.%f"
                     ;;
             esac
         fi

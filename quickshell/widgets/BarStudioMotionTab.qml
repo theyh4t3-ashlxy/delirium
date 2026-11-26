@@ -569,7 +569,7 @@ Item {
                             { id: "normal", label: "grav" },
                             { id: "zero", label: "zero-g" },
                             { id: "reverse", label: "anti-g" },
-                            { id: "chaos", label: "chaos" }
+                            { id: "orbit", label: "orbit" }
                         ]
                         current: root.gravityMode
                         activeColor: Theme.secondary
@@ -772,7 +772,7 @@ Item {
                                 } else if (root.gravityMode === "reverse") {
                                     gx = -root.barDx * gMag;
                                     gy = -root.barDy * gMag;
-                                } else if (root.gravityMode === "chaos") {
+                                } else if (root.gravityMode === "orbit") {
                                     toyBall.chaosAngle += 0.08 * (dt / 0.016);
                                     gx = Math.sin(toyBall.chaosAngle) * gMag;
                                     gy = Math.cos(toyBall.chaosAngle * 1.3) * gMag;
@@ -835,7 +835,7 @@ Item {
                                     }
                                 }
 
-                                if (Math.hypot(toyBall.vx, toyBall.vy) < 20 && root.gravityMode !== "chaos") {
+                                if (Math.hypot(toyBall.vx, toyBall.vy) < 20 && root.gravityMode !== "orbit") {
                                     toyBall.restTime += dt;
                                     if (toyBall.restTime > 0.4) {
                                         toyBall.vx = 0;

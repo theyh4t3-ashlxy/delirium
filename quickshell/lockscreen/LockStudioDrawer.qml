@@ -1284,7 +1284,7 @@ Rectangle {
                                         rowSpacing: 4
 
                                         Repeater {
-                                            model: ["smart", "hyprland", "quotes", "actions", "custom", "off"]
+                                            model: ["smart", "hyprland", "delirium", "quotes", "actions", "custom", "off"]
                                             delegate: OptChip {
                                                 required property string modelData
                                                 label: modelData
@@ -1326,6 +1326,10 @@ Rectangle {
                                                 root.saveSandbox();
                                             }
                                             onAccepted: if (lockSurface?.claimSurfaceFocus) lockSurface.claimSurfaceFocus();
+                                            Keys.onEscapePressed: {
+                                                lockSurface.optionsOpen = false;
+                                                if (lockSurface?.claimSurfaceFocus) lockSurface.claimSurfaceFocus();
+                                            }
                                         }
                                     }
 
@@ -1644,7 +1648,7 @@ Rectangle {
                                         spacing: 4
 
                                         Repeater {
-                                            model: ["login", "hyprlock", "system-auth"]
+                                            model: ["login", "swaylock"]
                                             delegate: OptChip {
                                                 required property string modelData
                                                 label: modelData

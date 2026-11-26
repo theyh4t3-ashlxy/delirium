@@ -237,7 +237,7 @@ BarPill {
                         Layout.fillWidth: true
                         text: Theme.getFlavor(
                             "system",
-                            Theme.getVibe(Theme.kaoChaos + " choose your destiny", "keys 1-6 or arrows • enter to confirm", "keys 1-6 or arrows • enter to confirm")
+                            Theme.getVibe(Theme.kaoTableFlip + " choose your destiny", "keys 1-6 or arrows • enter to confirm", "keys 1-6 or arrows • enter to confirm")
                         )
                         font.family: Theme.fontFamily
                         font.variableAxes: Theme.sansAxes

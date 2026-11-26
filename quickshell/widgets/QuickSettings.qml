@@ -1606,6 +1606,7 @@ BarPill {
                                     { label: "actions", value: "actions" },
                                     { label: "quotes", value: "quotes" },
                                     { label: "hyprland", value: "hyprland" },
+                                    { label: "delirium", value: "delirium" },
                                     { label: "off", value: "off" }
                                 ]
                                 currentValue: Settings.flavorMode ?? "actions"

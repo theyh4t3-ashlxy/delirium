@@ -5,7 +5,21 @@ alias test-build="sudo nixos-rebuild test --flake '$_dotfiles_dir#lost'"
 alias boot-build="sudo nixos-rebuild boot --flake '$_dotfiles_dir#lost'"
 alias nsearch="nix search nixpkgs"
 alias nshell="nix-shell -p"
-alias nrun="nix run nixpkgs#"
+
+# ephemeral nixpkgs command runner
+nrun() {
+    if [[ -z "${1:-}" ]]; then
+        print -P "%F{3}󰀦 usage: nrun <package> [args...]%f"
+        return 1
+    fi
+    local pkg="$1"
+    shift
+    if (( $# > 0 )); then
+        nix run "nixpkgs#${pkg}" -- "$@"
+    else
+        nix run "nixpkgs#${pkg}"
+    fi
+}
 alias nix-gens="nixos-rebuild list-generations"
 alias neovim="nvim"
 
@@ -91,12 +105,13 @@ fm() {
 
 # yazi wrapper with cwd sync on exit
 yz() {
-    local tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
-    yazi "$@" --cwd-file="$tmp"
-    if cwd="$(command cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+    local tmp cwd
+    tmp="$(mktemp -t "yazi-cwd.XXXXXX")" || return 1
+    command yazi "$@" --cwd-file="$tmp"
+    if cwd="$(command cat -- "$tmp")" && [[ -n "$cwd" && "$cwd" != "$PWD" ]]; then
         builtin cd -- "$cwd"
     fi
-    rm -f -- "$tmp"
+    command rm -f -- "$tmp"
 }
 
 # terminal git gui
@@ -120,6 +135,27 @@ alias dots="cd '$_dotfiles_dir'"
 alias q="exit"
 alias cl="clear"
 alias config="settings"
+alias prompt-edit="settings custom"
+alias prompt-save="settings save-prompt"
+alias prompt-load="settings prompts"
+
+# quick timestamped backup copy
+bak() {
+    local src="${1:-}"
+    [[ -e "$src" ]] || { print -P "%F{5}󰅚 missing path: ${src:-<none>}%f"; return 1; }
+    local clean="${src%/}"
+    command cp -aiv -- "$clean" "${clean}.bak.$(date +%Y%m%d_%H%M%S)"
+}
+
+if (( $+commands[wl-copy] )); then
+    copyfile() {
+        [[ -f "${1:-}" ]] || { print -P "%F{5}󰅚 file not found: ${1:-<none>}%f"; return 1; }
+        wl-copy < "$1" && print -P "%F{2}󰄲 copied file contents -> clipboard%f"
+    }
+    copydir() {
+        print -rn -- "$PWD" | wl-copy && print -P "%F{2}󰄲 copied path -> ${PWD}%f"
+    }
+fi
 
 # directory shortcuts
 hash -d dots="$HOME/.local/share/dotfiles"
@@ -144,17 +180,17 @@ why() {
     local code="${1:-${_GP_EXIT:-$?}}"
     case "$code" in
         0)   print -P "%F{2}󰄲 exit 0:%f nothing failed. clean run." ;;
-        1)   print -P "%F{1}󰅚 exit 1:%f general failure. something exited non-zero without specifics." ;;
-        2)   print -P "%F{1}󰅚 exit 2:%f misuse / bad arguments or missing flag." ;;
-        126) print -P "%F{1}󰅚 exit 126:%f permission denied. file exists but isn't executable." ;;
-        127) print -P "%F{1}󰅚 exit 127:%f command not found in PATH." ;;
+        1)   print -P "%F{5}󰅚 exit 1:%f general failure. something exited non-zero without specifics." ;;
+        2)   print -P "%F{5}󰅚 exit 2:%f misuse / bad arguments or missing flag." ;;
+        126) print -P "%F{5}󰅚 exit 126:%f permission denied. file exists but isn't executable." ;;
+        127) print -P "%F{5}󰅚 exit 127:%f command not found in PATH." ;;
         130) print -P "%F{3}󰀦 exit 130:%f sigint (ctrl+c)." ;;
-        134) print -P "%F{1}󰅚 exit 134:%f sigabrt. process aborted itself." ;;
-        137) print -P "%F{1}󰅚 exit 137:%f sigkill (killed or out of memory)." ;;
-        139) print -P "%F{1}󰅚 exit 139:%f sigsegv (segmentation fault)." ;;
+        134) print -P "%F{9}󰅚 exit 134:%f sigabrt. process aborted itself." ;;
+        137) print -P "%F{9}󰅚 exit 137:%f sigkill (killed or out of memory)." ;;
+        139) print -P "%F{9}󰅚 exit 139:%f sigsegv (segmentation fault)." ;;
         141) print -P "%F{3}󰀦 exit 141:%f sigpipe (downstream reader closed pipe early)." ;;
         143) print -P "%F{3}󰀦 exit 143:%f sigterm (graceful kill requested)." ;;
-        *)   print -P "%F{1}󰅚 exit $code:%f non-zero status returned." ;;
+        *)   print -P "%F{5}󰅚 exit $code:%f non-zero status returned." ;;
     esac
 }
 alias ouch="why"

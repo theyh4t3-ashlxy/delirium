@@ -9,7 +9,11 @@ dots_help() {
 
     local -a entries=(
         "HEADER:󰞷 zsh & terminal"
-        "settings / config        | customize prompt, syntax critic, check-in, configs"
+        "settings / config        | customize prompt, custom builder, presets, & configs"
+        "prompt-edit / save / load| build, save, or swap custom named prompt profiles"
+        "Alt+S / Ctrl+X E         | toggle sudo prefix on line / edit command in \$EDITOR"
+        "bak <path>               | create timestamped backup copy (.bak.YYYYMMDD_HHMMSS)"
+        "copyfile / copydir       | copy file contents or current directory to wayland clipboard"
         "dots_help / cheatsheet   | display this cheat sheet ('help' too when no args)"
         "c <dir> / up [n]         | smart cd with auto-ls / jump up n levels"
         "ls / l / la / ll / tree  | eza grid, long git table, recursive tree"

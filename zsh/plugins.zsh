@@ -50,7 +50,7 @@ ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
 
 if (( $+ZSH_HIGHLIGHT_STYLES )); then
     ZSH_HIGHLIGHT_STYLES[default]='none'
-    ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=1,bold'
+    ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=9,bold'
     ZSH_HIGHLIGHT_STYLES[reserved-word]='fg=5,bold'
     ZSH_HIGHLIGHT_STYLES[alias]='fg=6'
     ZSH_HIGHLIGHT_STYLES[builtin]='fg=4'
@@ -77,7 +77,7 @@ if (( $+functions[history-substring-search-up] )); then
     bindkey -M vicmd 'j' history-substring-search-down
 
     export HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_FOUND="fg=4,bold"
-    export HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_NOT_FOUND="fg=1,bold"
+    export HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_NOT_FOUND="fg=9,bold"
 fi
 
 # nuke the loader from memory

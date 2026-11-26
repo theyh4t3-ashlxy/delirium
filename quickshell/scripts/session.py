@@ -77,13 +77,18 @@ def run_hyprctl(args: list[str]) -> bool:
 
 def is_session_locked() -> bool:
     """Check if the session is currently marked as locked."""
-    runtime_dir = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
-    token_path = Path(runtime_dir) / "qs_session_locked.token"
-    if token_path.is_file():
-        try:
-            return token_path.read_text().strip() == "locked"
-        except OSError:
-            pass
+    runtime_dir = Path(os.environ.get("XDG_RUNTIME_DIR") or "/tmp")
+    user = os.environ.get("USER") or os.environ.get("LOGNAME") or "user"
+    for token_path in (
+        runtime_dir / f"qs_session_locked_{user}.token",
+        runtime_dir / "qs_session_locked.token",
+    ):
+        if token_path.is_file():
+            try:
+                if token_path.read_text().strip() == "locked":
+                    return True
+            except OSError:
+                pass
     return False
 
 def lock_session() -> bool:
