@@ -179,7 +179,6 @@ in
     gnome-logs
     gnome-maps
     gnome-music
-    gnome-software
     gnome-system-monitor
     gnome-text-editor
     gnome-tour
