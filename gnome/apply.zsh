@@ -16,8 +16,17 @@ if [[ ! -f "$DCONF_FILE" ]]; then
     exit 1
 fi
 
+BACKUP_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles-backups"
+mkdir -p "$BACKUP_DIR"
+dconf dump /org/gnome/ > "$BACKUP_DIR/gnome_dconf_$(date +%Y%m%d_%H%M%S).ini" 2>/dev/null || true
+
 dconf load /org/gnome/ < "$DCONF_FILE"
 print -P "%F{120}󰄲%f loaded gnome dconf profile from $DCONF_FILE"
+
+SYNC_WP="$SCRIPT_DIR/sync-gnome-wallpapers"
+if [[ -x "$SYNC_WP" && -d "$HOME/.wallpapers" ]]; then
+    "$SYNC_WP" >/dev/null 2>&1 || true
+fi
 
 THEME_CSS="$HOME/.local/share/themes/Matugen/gnome-shell/gnome-shell.css"
 if [[ ! -f "$THEME_CSS" ]] && (( $+commands[matugen] )) && [[ -e "$HOME/.curr_wall_static.jpg" ]]; then

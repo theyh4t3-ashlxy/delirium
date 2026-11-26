@@ -5,6 +5,7 @@ clipboard helper, and notification dispatcher for quickshell's screenshot studio
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -596,6 +597,26 @@ def open_editor(file_path: str) -> bool:
 
 def pick_color_fallback() -> None:
     try:
+        if "gnome" in os.environ.get("XDG_CURRENT_DESKTOP", "").lower():
+            res = subprocess.run(
+                [
+                    "gdbus", "call", "--session",
+                    "--dest", "org.gnome.Shell.Screenshot",
+                    "--object-path", "/org/gnome/Shell/Screenshot",
+                    "--method", "org.gnome.Shell.Screenshot.PickColor",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            m = re.search(r"\(\s*([0-9.]+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)\s*\)", res.stdout) if res.returncode == 0 else None
+            if m:
+                r, g, b = (max(0, min(255, round(float(x) * 255))) for x in m.groups())
+                hex_col = f"#{r:02x}{g:02x}{b:02x}"
+                copy_text_to_clipboard(hex_col)
+                emit_kv({"ok": True, "hex": hex_col})
+            return
+
         slurp = subprocess.run(
             ["slurp", "-p", "-b", "00000000", "-c", "00000000"],
             capture_output=True,
@@ -617,6 +638,36 @@ def pick_color_fallback() -> None:
 
 
 def trigger_native_capture(mode: str = "region") -> None:
+    if "gnome" in os.environ.get("XDG_CURRENT_DESKTOP", "").lower():
+        if mode == "eyedropper":
+            pick_color_fallback()
+            return
+        if mode in ("fullscreen", "full"):
+            shot_dir = Path.home() / "Pictures" / "Screenshots"
+            shot_dir.mkdir(parents=True, exist_ok=True)
+            out_path = str(shot_dir / f"Screenshot_{time.strftime('%Y%m%d_%H%M%S')}.png")
+            subprocess.run(
+                [
+                    "gdbus", "call", "--session",
+                    "--dest", "org.gnome.Shell.Screenshot",
+                    "--object-path", "/org/gnome/Shell/Screenshot",
+                    "--method", "org.gnome.Shell.Screenshot.Screenshot",
+                    "true", "true", out_path,
+                ],
+                check=False,
+            )
+            return
+        subprocess.run(
+            [
+                "gdbus", "call", "--session",
+                "--dest", "org.gnome.Shell.Screenshot",
+                "--object-path", "/org/gnome/Shell/Screenshot",
+                "--method", "org.gnome.Shell.Screenshot.InteractiveScreenshot",
+            ],
+            check=False,
+        )
+        return
+
     cmd = ["qs", "ipc", "call", "screenshot"]
     if mode in ("fullscreen", "full"):
         cmd.append("full")
@@ -630,13 +681,31 @@ def trigger_native_capture(mode: str = "region") -> None:
         pass
 
 
+def _print_help() -> None:
+    from _cli_ui import get_style
+    st = get_style()
+    print(f"""{st.cyan}{st.bold}󰄀 shot{st.reset} {st.dim}· screenshot & annotation studio cli (hyprland + gnome){st.reset}
+
+{st.bold}usage:{st.reset}
+  shot [region|window|full|annotate|eyedropper]
+  shot pick-color                 sample pixel hex and copy
+  shot export <file>              composite latest capture
+  shot edit <file>                open in image editor""")
+
+
 def main():
+    if any(a in ("-h", "--help", "help") for a in sys.argv[1:]):
+        _print_help()
+        return
+
     if len(sys.argv) < 2:
         trigger_native_capture("region")
         return
 
     cmd = sys.argv[1].lower()
-    if cmd == "export" and len(sys.argv) >= 3:
+    if cmd in ("region", "window", "full", "fullscreen", "annotate", "eyedropper"):
+        trigger_native_capture(cmd)
+    elif cmd == "export" and len(sys.argv) >= 3:
         run_export(sys.argv[2])
     elif cmd == "capture":
         mode = sys.argv[2].lower() if len(sys.argv) > 2 else "region"

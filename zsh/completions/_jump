@@ -1,0 +1,11 @@
+#compdef jump unmark
+
+local mdir="${XDG_DATA_HOME:-$HOME/.local/share}/quicknav/marks"
+local -a bms=()
+local f
+if [[ -d "$mdir" ]]; then
+    for f in "$mdir"/*(N); do
+        bms+=("${f:t}:${f:A}")
+    done
+fi
+(( ${#bms} )) && _describe -t bms 'saved directory bookmark' bms

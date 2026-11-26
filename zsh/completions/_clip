@@ -1,0 +1,27 @@
+#compdef clip
+
+local curcontext="$curcontext" state line
+typeset -A opt_args
+
+local -a commands=(
+    'status:show clipboard count, pins, and watcher state'
+    'list:list clipboard history & pinned items'
+    'copy:copy history entry by id'
+    'pin:pin history entry by id'
+    'unpin:remove pin by id'
+    'copy-pin:copy pinned item by id'
+    'delete:delete history item by id'
+    'wipe:wipe full clipboard history'
+)
+
+_arguments -C \
+    '--json[emit json list output]' \
+    '(-h --help)'{-h,--help}'[show clip help]' \
+    '1: :->command' \
+    '*: :->args'
+
+case $state in
+    command)
+        _describe -t commands 'clip command' commands
+        ;;
+esac

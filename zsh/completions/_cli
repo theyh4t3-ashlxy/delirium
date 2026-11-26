@@ -4,36 +4,53 @@ local curcontext="$curcontext" state line
 typeset -A opt_args
 
 local -a commands=(
-    'doctor:run desktop, matugen, ANSI, btop, and zsh health diagnostics'
-    'theme:show active wallpaper, mode/scheme, and ANSI color blocks'
+    'doctor:run desktop, matugen, ansi, btop, and zsh health diagnostics'
+    'theme:show active wallpaper, mode/scheme, ansi blocks & kitty preview'
     'palette:alias for theme'
-    'logs:tail active quickshell or Brain_Shell runtime log'
+    'clean:remove stale quickshell runtime pid dirs'
+    'logs:tail active quickshell or brain_shell runtime log'
     'shell:switch or toggle active shell (quickshell <-> brain_shell)'
     'qs:shortcut to switch to standard quickshell'
-    'bs:shortcut to switch to Brain_Shell'
-    'reload:gracefully reload active shell'
-    'restart:gracefully reload active shell'
+    'bs:shortcut to switch to brain_shell'
+    'reload:gracefully reload active shell or gnome matugen themes'
+    'restart:gracefully reload active shell or gnome matugen themes'
     'kill:kill running shell instances'
     'stop:kill running shell instances'
-    'status:show active shell, pids, theme mode, and memory'
-    'info:show active shell info'
-    'launcher:toggle app launcher'
+    'status:show active desktop/shell, pids, theme mode, and memory'
+    'version:show desktop, shell runtime, and theme summary'
+    'info:show active desktop/shell info'
+    'launcher:toggle app launcher or gnome overview'
     'dashboard:toggle dashboard / quicksettings'
     'quicksettings:toggle quicksettings'
     'notifs:toggle notification center'
-    'dnd:toggle do not disturb'
+    'dnd:toggle do not disturb (quickshell & gnome)'
     'clip:toggle clipboard history'
+    'notes:toggle quick notes / kanban'
     'files:open preferred file manager'
     'wp:roll wallpaper or pass subcommands to wp'
     'wall:roll random wallpaper & regenerate tokens'
-    'audio:toggle volume / audio control'
+    'audio:open audio control'
+    'mixer:toggle audio mixer'
+    'mic:toggle microphone popup'
     'media:toggle now playing popup'
-    'capture:open screen capture studio'
+    'wifi:network controls'
+    'bt:bluetooth controls'
+    'vpn:vpn toggle'
+    'hotspot:wireless hotspot toggle'
+    'capture:open screen capture studio / gnome screenshot'
+    'ss:open screenshot studio / gnome screenshot'
     'screenshot:capture screenshot'
+    'pick:sample screen pixel hex color and copy'
+    'eyedropper:sample screen pixel hex color and copy'
     'record:screen recording controls'
+    'studio:open bar studio'
+    'motion:open bar studio motion sandbox'
     'caffeine:toggle sleep inhibitor popup'
     'lock:lock session'
     'power:open power menu'
+    'stats:open stats / btop'
+    'btop:launch btop'
+    'config:open shell settings or gnome control center'
     'keybinds:view keybindings cheatsheet'
     'welcome:open welcome wizard'
     'act:dispatch arbitrary shell action'
@@ -41,6 +58,11 @@ local -a commands=(
 )
 
 _arguments -C \
+    '--json[emit json output]' \
+    '--no-img[skip inline kitty wallpaper preview]' \
+    '--no-color[disable ansi colors]' \
+    '--force[bypass nonewprivs reload guard]' \
+    '--fix[auto-repair safe issues in doctor]' \
     '1: :->command' \
     '*: :->args'
 
@@ -53,7 +75,7 @@ case $state in
             shell|switch|toggle|t)
                 local -a targets=(
                     'qs:standard quickshell'
-                    'bs:Brain_Shell'
+                    'bs:brain_shell'
                     'toggle:toggle between shells'
                     'restart:restart active shell'
                 )

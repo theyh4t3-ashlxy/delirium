@@ -1,0 +1,39 @@
+#compdef shot
+
+local curcontext="$curcontext" state line
+typeset -A opt_args
+
+local -a commands=(
+    'region:interactive area screenshot capture'
+    'window:capture focused window'
+    'full:capture full screen'
+    'fullscreen:alias for full'
+    'annotate:open capture in annotation studio'
+    'eyedropper:open color eyedropper'
+    'pick-color:sample screen pixel hex & copy'
+    'export:composite latest capture'
+    'edit:open image in editor'
+    'copy:copy image file to clipboard'
+    'copy-color:copy hex color to clipboard'
+)
+
+_arguments -C \
+    '(-h --help)'{-h,--help}'[show shot help]' \
+    '1: :->command' \
+    '*: :->args'
+
+case $state in
+    command)
+        _describe -t commands 'shot command' commands
+        ;;
+    args)
+        case $line[1] in
+            edit|export|copy)
+                _files
+                ;;
+            *)
+                return 0
+                ;;
+        esac
+        ;;
+esac

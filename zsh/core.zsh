@@ -78,6 +78,9 @@ else
     { zcompile -R "$zcomp" } >/dev/null 2>&1 &!
 fi
 
+# ensure custom _pick wins over nmh's built-in _mh
+(( $+functions[compdef] )) && compdef _pick pick color 2>/dev/null || true
+
 # compile all zsh configs and plugins to .zwc bytecode on demand
 zrecompile() {
     local zdir="${ZDOTDIR:-$HOME/.config/zsh}"

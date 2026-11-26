@@ -1,0 +1,9 @@
+#compdef nuke fkill
+
+local -a procs=()
+local pid comm
+while IFS= read -r pid comm; do
+    [[ -n "$pid" && -n "$comm" ]] && procs+=("${pid}:${comm}" "${comm}:pid ${pid}")
+done < <(ps -eo pid=,comm= 2>/dev/null)
+
+_describe -t procs 'process or pid' procs

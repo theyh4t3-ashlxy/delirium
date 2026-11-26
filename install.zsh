@@ -15,10 +15,22 @@ BACKUP_DIR="$CACHE_DIR/dotfiles-backups"
 
 DRY_RUN=false
 FETCH_WP=false
+APPLY_GNOME=false
 
 # discover config directories in repo, excluding non-~/.config directories
 ALL_DOTFILES=( "$DOTS_DIR"/*(/N:t) )
 ALL_DOTFILES=( ${ALL_DOTFILES:#(wallpapers|gnome|nixos|pkgs)} )
+
+detect_desktop() {
+    local desk="${(L)XDG_CURRENT_DESKTOP:-}"
+    if [[ "$desk" == *gnome* ]] || pgrep -x gnome-shell >/dev/null 2>&1; then
+        print -r -- "gnome"
+    elif [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || pgrep -x Hyprland >/dev/null 2>&1; then
+        print -r -- "hyprland"
+    else
+        print -r -- "unknown"
+    fi
+}
 
 # logging helpers
 log_info() { print -P "%F{141}󰄛%f $1" }
@@ -63,10 +75,10 @@ ask_yn() {
 
 # check if running on nixos
 verify_nixos() {
-    if [[ ! -f /etc/NIXOS ]]; then
-        log_warn "this system is not nixos. proceed at your own risk."
-    else
+    if [[ -f /etc/NIXOS ]] || grep -qs '^ID=nixos$' /etc/os-release 2>/dev/null; then
         log_ok "nixos environment verified."
+    else
+        log_warn "this system is not nixos. proceed at your own risk."
     fi
 }
 
@@ -239,9 +251,10 @@ link_selected_configurations() {
     log_step "symlinking configurations (${#targets} modules)..."
     execute mkdir -p "$CONFIG_DIR"
 
+    local folder src target current_dest item backup
     for folder in "${targets[@]}"; do
-        local src="$DOTS_DIR/$folder"
-        local target="$CONFIG_DIR/$folder"
+        src="$DOTS_DIR/$folder"
+        target="$CONFIG_DIR/$folder"
 
         if [[ ! -d "$src" ]]; then
             log_warn "source missing for $folder in $DOTS_DIR. skipping."
@@ -249,7 +262,6 @@ link_selected_configurations() {
         fi
 
         if [[ -L "$target" ]]; then
-            local current_dest
             current_dest=$(readlink -f "$target" 2>/dev/null || true)
             if [[ "$current_dest" == /nix/store/* ]]; then
                 log_warn "$target is managed by nix (/nix/store)."
@@ -260,14 +272,19 @@ link_selected_configurations() {
             fi
         fi
 
-        # copy gtk configs as real directories for flatpak compatibility
+        # sync gtk configs non-destructively (preserving generated matugen.css and bookmarks/servers)
         if [[ "$folder" == "gtk-3.0" || "$folder" == "gtk-4.0" ]]; then
-            execute rm -rf "$target"
             execute mkdir -p "$target"
             if (( $+commands[rsync] )); then
-                execute rsync -a --delete "$src/" "$target/"
+                execute rsync -a --exclude='matugen.css' --exclude='colors.css' --exclude='servers' --exclude='gtk.css' "$src/" "$target/"
             else
-                execute cp -rf "$src"/. "$target/"
+                for item in "$src"/*(N.); do
+                    [[ "${item:t}" == (matugen.css|colors.css|servers|gtk.css) ]] && continue
+                    execute cp -f "$item" "$target/"
+                done
+            fi
+            if [[ -f "$src/gtk.css" && ! -f "$target/gtk.css" ]]; then
+                execute cp -f "$src/gtk.css" "$target/gtk.css"
             fi
 
             if [[ -f "$target/bookmarks" ]]; then
@@ -285,7 +302,7 @@ link_selected_configurations() {
         if [[ -L "$target" ]]; then
             execute rm -f "$target"
         elif [[ -d "$target" ]]; then
-            local backup="${target}.stale.$(date +%s)"
+            backup="${target}.stale.$(date +%s)"
             log_warn "moving existing directory $target -> $backup"
             execute mv "$target" "$backup"
         fi
@@ -319,24 +336,91 @@ link_selected_configurations() {
                 log_ok "hooked ~/.zshrc into $CONFIG_DIR/zsh/sources.zsh"
             fi
         fi
+
+        compile_zsh_configs
     fi
+}
+
+compile_zsh_configs() {
+    local zdir="$DOTS_DIR/zsh"
+    [[ -d "$zdir" ]] || return 0
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_dry "zcompile -R $zdir/*.zsh"
+        return 0
+    fi
+    local f count=0
+    for f in "$zdir"/*.zsh(N.); do
+        zcompile -R "$f" 2>/dev/null && (( ++count )) || true
+    done
+    log_ok "compiled $count zsh modules into .zwc bytecode"
+}
+
+install_cli_bins() {
+    local bin_dir="$HOME/.local/bin"
+    execute mkdir -p "$bin_dir"
+
+    local -A cli_links=(
+        "cli"                   "$DOTS_DIR/quickshell/scripts/cli.py"
+        "wp"                    "$DOTS_DIR/quickshell/scripts/wallpaper.py"
+        "shot"                  "$DOTS_DIR/quickshell/scripts/screenshot.py"
+        "pick"                  "$DOTS_DIR/quickshell/scripts/colorpicker.py"
+        "net"                   "$DOTS_DIR/quickshell/scripts/network.py"
+        "pwr"                   "$DOTS_DIR/quickshell/scripts/battery.py"
+        "session"               "$DOTS_DIR/quickshell/scripts/session.py"
+        "wx"                    "$DOTS_DIR/quickshell/scripts/weather.py"
+        "clip"                  "$DOTS_DIR/quickshell/scripts/clipboard.py"
+        "sync-gnome-wallpapers" "$DOTS_DIR/gnome/sync-gnome-wallpapers"
+    )
+
+    local cmd src linked=0
+    for cmd src in "${(@kv)cli_links}"; do
+        if [[ -f "$src" ]]; then
+            execute chmod +x "$src"
+            execute ln -sfn "$src" "$bin_dir/$cmd"
+            (( ++linked )) || true
+        else
+            log_warn "missing cli target for $cmd ($src)"
+        fi
+    done
+
+    if [[ -e "$bin_dir/cli" ]]; then
+        execute ln -sfn "$bin_dir/cli" "$bin_dir/qs-switch"
+    fi
+
+    # ensure quickshell wrapper exists if nixpkgs qs is on the system
+    if [[ -x /run/current-system/sw/bin/qs && ! -e "$bin_dir/qs" ]]; then
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log_dry "write quickshell env wrapper -> $bin_dir/qs"
+        else
+            cat > "$bin_dir/qs" <<'EOF'
+#!/usr/bin/env bash
+export TZDIR="${TZDIR:-/etc/zoneinfo}"
+export TZ="${TZ:-America/Chicago}"
+if [ -z "${QT_LOGGING_RULES:-}" ]; then
+    export QT_LOGGING_RULES="quickshell.dbus.warning=false;quickshell.service.powerprofiles.warning=false"
+elif [[ "$QT_LOGGING_RULES" != *"quickshell.service.powerprofiles.warning=false"* ]]; then
+    export QT_LOGGING_RULES="$QT_LOGGING_RULES;quickshell.dbus.warning=false;quickshell.service.powerprofiles.warning=false"
+fi
+exec /run/current-system/sw/bin/qs "$@"
+EOF
+            chmod +x "$bin_dir/qs"
+        fi
+    fi
+
+    log_ok "installed $linked user cli commands -> ~/.local/bin"
 }
 
 # create runtime directories, install helpers, and fetch missing icon fonts
 setup_directories_and_permissions() {
     log_info "setting up runtime and cache directories..."
     execute mkdir -p "$WALLPAPER_DIR"/{live,wallhaven}
-    execute mkdir -p "$CACHE_DIR"/quickshell/{thumbnails,wallpapers}
+    execute mkdir -p "$CACHE_DIR"/quickshell/{thumbnails,wallpapers,clip_thumbs}
     execute mkdir -p "$CACHE_DIR/zsh"
-    execute mkdir -p "$DATA_DIR"/{quickshell/scratch,quicknav/marks,fonts}
+    execute mkdir -p "$DATA_DIR"/{quickshell/scratch,quicknav/marks,fonts,themes/Matugen/gnome-shell,color-schemes,org.gnome.Ptyxis/palettes,backgrounds,gnome-background-properties,zsh/plugins}
     execute mkdir -p "$HOME/.local/bin" "$HOME/.local/state/quickshell"
     execute mkdir -p "$BACKUP_DIR"
 
-    if [[ -f "$DOTS_DIR/quickshell/scripts/cli.py" ]]; then
-        execute ln -sf "$DOTS_DIR/quickshell/scripts/cli.py" "$HOME/.local/bin/cli"
-        execute chmod +x "$DOTS_DIR/quickshell/scripts/cli.py"
-        log_ok "installed cli -> ~/.local/bin/cli"
-    fi
+    install_cli_bins
 
     # fetch icon fonts if missing from ~/.local/share/fonts
     local font_dir="$DATA_DIR/fonts"
@@ -349,8 +433,25 @@ setup_directories_and_permissions() {
         "SegoeIcons.ttf"              "https://github.com/bdlukaa/fluent_ui/raw/master/fonts/SegoeIcons.ttf"
     )
 
-    local fonts_updated=false
+    local -A font_families=(
+        "MaterialSymbolsRounded.ttf"   "Material Symbols Rounded"
+        "MaterialSymbolsOutlined.ttf"  "Material Symbols Outlined"
+        "MaterialSymbolsSharp.ttf"     "Material Symbols Sharp"
+        "FontAwesome6Free-Solid.ttf"   "Font Awesome 6 Free"
+        "FontAwesome6Free-Regular.ttf" "Font Awesome 6 Free"
+        "SegoeIcons.ttf"               "Segoe"
+    )
+    local sys_fonts=""
+    if (( $+commands[fc-list] )); then
+        sys_fonts="$(fc-list : family 2>/dev/null || true)"
+    fi
+
+    local fonts_updated=false font_file url fam
     for font_file url in "${(@kv)font_urls}"; do
+        fam="${font_families[$font_file]:-}"
+        if [[ -n "$fam" && "$sys_fonts" == *"$fam"* ]]; then
+            continue
+        fi
         if [[ ! -s "$font_dir/$font_file" ]]; then
             log_info "fetching $font_file..."
             if [[ "$DRY_RUN" == "true" ]]; then
@@ -368,8 +469,10 @@ setup_directories_and_permissions() {
 
     if [[ -w "$DOTS_DIR" ]]; then
         local -a script_targets=(
-            "$DOTS_DIR"/quickshell/scripts/*.(sh|py)(N.)
+            "$DOTS_DIR"/quickshell/scripts/*.(sh|zsh|py)(N.)
             "$DOTS_DIR"/matugen/post-hook-scripts/*.(zsh|sh)(N.)
+            "$DOTS_DIR"/gnome/*.zsh(N.)
+            "$DOTS_DIR"/gnome/sync-gnome-wallpapers(N.)
             "$DOTS_DIR"/install.zsh(N.)
         )
 
@@ -392,14 +495,19 @@ initial_theming() {
     fi
 
     local target_wp=""
-    local -a existing_wps=( "$WALLPAPER_DIR"/**/*.(png|jpg|jpeg|webp)(N.) )
+    if [[ "$FETCH_WP" != "true" && -e "$HOME/.curr_wall" ]]; then
+        target_wp=$(readlink -f "$HOME/.curr_wall" 2>/dev/null || true)
+    fi
 
-    if [[ "$FETCH_WP" == "true" ]] || (( ${#existing_wps} == 0 )); then
-        if fetch_wallhaven_wallpaper; then
-            target_wp="$REPLY"
+    local -a existing_wps=( "$WALLPAPER_DIR"/**/*.(png|jpg|jpeg|webp)(N.) )
+    if [[ "$FETCH_WP" == "true" ]] || [[ -z "$target_wp" || ! -f "$target_wp" ]]; then
+        if [[ "$FETCH_WP" == "true" ]] || (( ${#existing_wps} == 0 )); then
+            if fetch_wallhaven_wallpaper; then
+                target_wp="$REPLY"
+            fi
+        else
+            target_wp="${existing_wps[1]}"
         fi
-    else
-        target_wp="${existing_wps[1]}"
     fi
 
     if [[ -z "$target_wp" ]] || [[ "$DRY_RUN" != "true" && ! -f "$target_wp" ]]; then
@@ -409,43 +517,47 @@ initial_theming() {
 
     log_info "active wallpaper -> $target_wp"
 
-    local runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$EUID}"
-    execute mkdir -p "$runtime_dir"
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log_dry "write $target_wp to $runtime_dir/qs_current_wallpaper.txt and settings.conf"
-    else
-        print -r -- "$target_wp" > "$runtime_dir/qs_current_wallpaper.txt" 2>/dev/null || true
-
-        local -a conf_targets=(
-            "$HOME/.local/state/quickshell/settings.conf"
-            "$CONFIG_DIR/quickshell/settings.conf"
-        )
-        for cf in "${conf_targets[@]}"; do
-            mkdir -p "${cf:h}"
-            if [[ -f "$cf" ]] && grep -qs "^currentWallpaper=" "$cf"; then
-                sed -i "s|^currentWallpaper=.*|currentWallpaper=\"$target_wp\"|" "$cf" 2>/dev/null || true
-            else
-                print -r -- "currentWallpaper=\"$target_wp\"" >> "$cf" 2>/dev/null || true
-            fi
-        done
-    fi
-
-    if (( $+commands[matugen] )); then
-        log_info "generating material palette via matugen..."
-        execute matugen image "$target_wp" -m "dark" -t "scheme-tonal-spot" --source-color-index 0 || log_warn "matugen exited with non-zero status."
-        log_ok "matugen dynamic scheme applied."
-    else
-        log_warn "matugen not found. skipping palette generation."
-    fi
-
-    if [[ -f "$DOTS_DIR/quickshell/scripts/wallpaper.py" ]] && (( $+commands[python3] )); then
-        log_info "indexing ~/.wallpapers gallery..."
+    local applied_via_wp=false
+    if [[ -f "$DOTS_DIR/quickshell/scripts/wallpaper.py" ]] && (( $+commands[python3] && $+commands[matugen] )); then
+        log_info "scanning wallpapers & applying unified matugen theme..."
         execute python3 "$DOTS_DIR/quickshell/scripts/wallpaper.py" scan >/dev/null 2>&1 || true
-        log_ok "wallpaper gallery indexed."
+        if execute python3 "$DOTS_DIR/quickshell/scripts/wallpaper.py" set "$target_wp" --dark --scheme scheme-smart >/dev/null 2>&1; then
+            applied_via_wp=true
+            log_ok "unified wallpaper & matugen palette applied."
+        fi
     fi
 
-    if [[ -n "${WAYLAND_DISPLAY:-}" || -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
-        if (( $+commands[awww] )) && [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    if [[ "$applied_via_wp" != "true" ]]; then
+        local runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$EUID}"
+        execute mkdir -p "$runtime_dir"
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log_dry "write $target_wp to $runtime_dir/qs_current_wallpaper.txt and settings.conf"
+        else
+            print -r -- "$target_wp" > "$runtime_dir/qs_current_wallpaper.txt" 2>/dev/null || true
+
+            local -a conf_targets=(
+                "$HOME/.local/state/quickshell/settings.conf"
+                "$CONFIG_DIR/quickshell/settings.conf"
+            )
+            for cf in "${conf_targets[@]}"; do
+                mkdir -p "${cf:h}"
+                if [[ -f "$cf" ]] && grep -qs "^currentWallpaper=" "$cf"; then
+                    sed -i "s|^currentWallpaper=.*|currentWallpaper=\"$target_wp\"|" "$cf" 2>/dev/null || true
+                else
+                    print -r -- "currentWallpaper=\"$target_wp\"" >> "$cf" 2>/dev/null || true
+                fi
+            done
+        fi
+
+        if (( $+commands[matugen] )); then
+            log_info "generating material palette via matugen..."
+            execute matugen image "$target_wp" -m "dark" -t "scheme-smart" --source-color-index 0 || log_warn "matugen exited with non-zero status."
+            log_ok "matugen dynamic scheme applied."
+        else
+            log_warn "matugen not found. skipping palette generation."
+        fi
+
+        if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && (( $+commands[awww] )); then
             log_info "applying wallpaper via awww..."
             if ! awww query >/dev/null 2>&1; then
                 execute awww-daemon --format argb >/dev/null 2>&1 &!
@@ -456,38 +568,59 @@ initial_theming() {
         fi
     fi
 
-    if [[ -x "$DOTS_DIR/gnome/apply.zsh" ]] && (( $+commands[dconf] )); then
-        log_info "syncing gnome dconf & shell theme..."
+    if [[ -x "$HOME/.local/bin/sync-gnome-wallpapers" ]]; then
+        execute "$HOME/.local/bin/sync-gnome-wallpapers" >/dev/null 2>&1 || true
+        log_ok "synced gnome background picker xml."
+    fi
+
+    if [[ "$APPLY_GNOME" == "true" ]] && [[ -x "$DOTS_DIR/gnome/apply.zsh" ]] && (( $+commands[dconf] )); then
+        log_info "applying gnome dconf profile & shell theme..."
         execute "$DOTS_DIR/gnome/apply.zsh" >/dev/null 2>&1 || log_warn "gnome dconf apply skipped or partial."
         log_ok "gnome dconf profile applied."
     fi
 }
 
-# reload hyprland and restart quickshell daemon
+# reload active compositor / desktop shell (hyprland + quickshell or gnome)
 reload_shell() {
-    log_step "reloading window manager and shell..."
+    log_step "reloading active desktop shell & themes..."
 
-    if [[ -z "${WAYLAND_DISPLAY:-}" && -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    if [[ -x "$DOTS_DIR/matugen/post-hook-scripts/ptyxis-theme-reload.zsh" ]]; then
+        execute "$DOTS_DIR/matugen/post-hook-scripts/ptyxis-theme-reload.zsh" >/dev/null 2>&1 || true
+    fi
+
+    local desk
+    desk="$(detect_desktop)"
+    if [[ -z "${WAYLAND_DISPLAY:-}" && -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" && "$desk" == "unknown" ]]; then
         log_info "no active wayland session detected. skipping reload."
         return 0
+    fi
+
+    if [[ "$desk" == "gnome" ]]; then
+        local hook
+        for hook in gnome-theme-reload.zsh gtk-themes-reload.zsh qt-kde-theme-reload.zsh; do
+            if [[ -x "$DOTS_DIR/matugen/post-hook-scripts/$hook" ]]; then
+                execute "$DOTS_DIR/matugen/post-hook-scripts/$hook" >/dev/null 2>&1 || true
+            fi
+        done
+        log_ok "gnome shell, gtk, qt, and ptyxis themes reloaded."
     fi
 
     if (( $+commands[hyprctl] )) && [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
         execute hyprctl reload >/dev/null 2>&1 || true
         log_ok "hyprland config reloaded."
-    fi
 
-    if (( $+commands[uwsm] )); then
-        log_info "restarting quickshell via uwsm..."
-        execute uwsm app -- qs kill >/dev/null 2>&1 || pkill -x qs 2>/dev/null || true
-        sleep 0.3
-        execute uwsm app -- qs -d >/dev/null 2>&1 &!
-        log_ok "quickshell reloaded (uwsm app -- qs -d)."
-    elif (( $+commands[qs] )); then
-        execute qs kill >/dev/null 2>&1 || pkill -x qs 2>/dev/null || true
-        sleep 0.3
-        execute qs -d >/dev/null 2>&1 &!
-        log_ok "quickshell reloaded."
+        if (( $+commands[uwsm] )); then
+            log_info "restarting quickshell via uwsm..."
+            execute uwsm app -- qs kill >/dev/null 2>&1 || pkill -x qs 2>/dev/null || true
+            sleep 0.3
+            execute uwsm app -- qs -d >/dev/null 2>&1 &!
+            log_ok "quickshell reloaded (uwsm app -- qs -d)."
+        elif (( $+commands[qs] )); then
+            execute qs kill >/dev/null 2>&1 || pkill -x qs 2>/dev/null || true
+            sleep 0.3
+            execute qs -d >/dev/null 2>&1 &!
+            log_ok "quickshell reloaded."
+        fi
     fi
 }
 
@@ -532,21 +665,40 @@ rebuild_nixos() {
     fi
 }
 
-# verify required binaries, fonts, and symlinks
+# verify required binaries, cli links, fonts, and symlinks
 doctor_check() {
     log_step "running system diagnostics..."
-    local -a missing_bins=()
-    local -a missing_fonts=()
-    local -a critical_bins=(
-        hyprland uwsm matugen awww mpvpaper
-        kitty zsh wl-copy brightnessctl playerctl
-        python3 micro hyprpicker eza zoxide
-        fzf bat rg fd
-    )
+    local desk
+    desk="$(detect_desktop)"
+    log_info "active desktop: $desk"
 
-    for b in "${critical_bins[@]}"; do
+    local -a missing_bins=()
+    local -a missing_cli=()
+    local -a missing_fonts=()
+    local -a core_bins=(
+        matugen kitty zsh wl-copy brightnessctl playerctl
+        python3 micro eza zoxide fzf bat rg fd curl jq ptyxis fanctl
+    )
+    local -a hypr_bins=(Hyprland uwsm awww mpvpaper hyprpicker cliphist)
+    local -a gnome_bins=(gnome-shell dconf gsettings gnome-control-center)
+
+    local b
+    for b in "${core_bins[@]}"; do
         if (( $+commands[$b] )); then
             print -P "  %F{120}󰄲%f $b: %F{244}$commands[$b]%f"
+        else
+            print -P "  %F{203}󰅚%f $b: %BMISSING%b"
+            missing_bins+=( "$b" )
+        fi
+    done
+
+    print ""
+    log_info "checking hyprland / quickshell stack..."
+    for b in "${hypr_bins[@]}"; do
+        if (( $+commands[$b] )); then
+            print -P "  %F{120}󰄲%f $b: %F{244}$commands[$b]%f"
+        elif [[ "$desk" == "gnome" ]]; then
+            print -P "  %F{244}󰄲 $b: absent (inactive on gnome)%f"
         else
             print -P "  %F{203}󰅚%f $b: %BMISSING%b"
             missing_bins+=( "$b" )
@@ -556,10 +708,38 @@ doctor_check() {
     if (( $+commands[qs] || $+commands[quickshell] )); then
         local qs_bin="${commands[qs]:-$commands[quickshell]}"
         print -P "  %F{120}󰄲%f quickshell: %F{244}$qs_bin%f"
+    elif [[ "$desk" == "gnome" ]]; then
+        print -P "  %F{244}󰄲 quickshell: absent (inactive on gnome)%f"
     else
         print -P "  %F{203}󰅚%f quickshell: %BMISSING%b"
         missing_bins+=( "quickshell" )
     fi
+
+    print ""
+    log_info "checking gnome stack..."
+    for b in "${gnome_bins[@]}"; do
+        if (( $+commands[$b] )); then
+            print -P "  %F{120}󰄲%f $b: %F{244}$commands[$b]%f"
+        elif [[ "$desk" == "hyprland" ]]; then
+            print -P "  %F{244}󰄲 $b: absent (inactive on hyprland)%f"
+        else
+            print -P "  %F{203}󰅚%f $b: %BMISSING%b"
+            missing_bins+=( "$b" )
+        fi
+    done
+
+    print ""
+    log_info "checking ~/.local/bin user clis..."
+    local -a user_clis=(cli qs-switch wp shot pick net pwr session wx clip sync-gnome-wallpapers)
+    local bin_dir="$HOME/.local/bin"
+    for b in "${user_clis[@]}"; do
+        if [[ -x "$bin_dir/$b" ]]; then
+            print -P "  %F{120}󰄲%f $b: %F{244}$bin_dir/$b%f"
+        else
+            print -P "  %F{221}󰀦%f $b: %BNOT LINKED%b"
+            missing_cli+=( "$b" )
+        fi
+    done
 
     print ""
     log_info "checking fonts..."
@@ -569,6 +749,7 @@ doctor_check() {
     fi
 
     local -A required_fonts=(
+        "Google Sans Flex"          "Google Sans Flex"
         "JetBrainsMono Nerd Font"   "JetBrainsMono"
         "Noto Sans"                 "Noto Sans"
         "Material Symbols Rounded"  "Material Symbols Rounded"
@@ -578,6 +759,7 @@ doctor_check() {
         "Segoe Fluent Icons"        "Segoe"
     )
 
+    local label pattern
     for label pattern in "${(@kv)required_fonts}"; do
         if [[ "$all_fonts" == *"$pattern"* ]]; then
             print -P "  %F{120}󰄲%f $label detected"
@@ -589,10 +771,10 @@ doctor_check() {
 
     print ""
     log_info "checking config links..."
+    local l target dest
     for l in "${ALL_DOTFILES[@]}"; do
-        local target="$CONFIG_DIR/$l"
+        target="$CONFIG_DIR/$l"
         if [[ -L "$target" ]]; then
-            local dest
             dest="$(readlink "$target")"
             if [[ "$dest" == /nix/store/* ]]; then
                 print -P "  %F{221}󰄲%f $target -> %F{244}(nix store: $dest)%f"
@@ -610,10 +792,21 @@ doctor_check() {
         fi
     done
 
+    if [[ -d "$CONFIG_DIR/zsh/completions" ]]; then
+        local -a comp_files=( "$CONFIG_DIR"/zsh/completions/_*(N.) )
+        print -P "  %F{120}󰄲%f zsh completions: ${#comp_files} entries"
+    else
+        print -P "  %F{221}󰀦%f zsh completions directory missing"
+    fi
+
     print ""
     local has_errors=false
     if (( ${#missing_bins} > 0 )); then
         log_warn "missing ${#missing_bins} packages: ${missing_bins[*]}"
+        has_errors=true
+    fi
+    if (( ${#missing_cli} > 0 )); then
+        log_warn "unlinked ${#missing_cli} cli tools (run ./install.zsh --links): ${missing_cli[*]}"
         has_errors=true
     fi
     if (( ${#missing_fonts} > 0 )); then
@@ -625,7 +818,7 @@ doctor_check() {
         return 1
     fi
 
-    log_ok "all core packages, fonts, and links verified."
+    log_ok "all core packages, cli links, fonts, and configs verified."
     return 0
 }
 
@@ -635,11 +828,12 @@ show_help() {
     print "modes:"
     print "  -i, --interactive, -c, --custom  guided configuration wizard (default)"
     print "  -a, --all                        full sync (rebuild + backup + links + theme)"
-    print "  -l, --links                      symlink dotfiles only"
+    print "  -l, --links                      symlink dotfiles, gtk dirs, and ~/.local/bin clis"
+    print "  -g, --gnome                      apply gnome dconf layout & reload shell theme"
     print "  -r, --rebuild                    run nixos-rebuild switch"
     print "  -u, --update                     git pull, relink configs, reload shell"
-    print "      --doctor                     check system binaries, fonts, and links"
-    print "      --reload                     reload hyprland and quickshell"
+    print "      --doctor                     check packages, clis, fonts, and config links"
+    print "      --reload                     reload active desktop shell (hyprland/qs or gnome)"
     print "      --fetch-wp                   fetch a random wallpaper from wallhaven"
     print "  -h, --help                       show this message"
     print ""
@@ -666,9 +860,10 @@ main() {
 
     while (( $# > 0 )); do
         case "$1" in
-            -a|--all)                     opt_mode="all"; shift ;;
+            -a|--all)                     opt_mode="all"; APPLY_GNOME=true; shift ;;
             -u|--update)                  opt_mode="update"; shift ;;
             -l|--links)                   opt_mode="links"; shift ;;
+            -g|--gnome)                   opt_mode="gnome"; APPLY_GNOME=true; shift ;;
             -r|--rebuild)                 opt_mode="rebuild"; shift ;;
             -i|--interactive|-c|--custom) opt_mode="custom"; shift ;;
             --doctor|--check)             opt_mode="doctor"; shift ;;
@@ -693,7 +888,7 @@ main() {
         esac
     done
 
-    print -P "%F{141}󰄛 quickshell dotfiles installer%f"
+    print -P "%F{141}󰄛 dotfiles installer (hyprland + gnome)%f"
     if [[ "$DRY_RUN" == "true" ]]; then
         log_warn "dry-run mode enabled. filesystem will not be modified."
     fi
@@ -704,14 +899,15 @@ main() {
         print "select an action:"
         print "  1) 󰚰 custom wizard (pick dotfiles, backups, symlinks)"
         print "  2) 󰏤 full sync (nixos-rebuild + backup + symlinks + theme)"
-        print "  3) 󰌢 symlink dotfiles only"
-        print "  4) 󰏖 rebuild nixos"
-        print "  5) 󰑐 update dotfiles (git pull + sync + reload)"
-        print "  6) 󰄲 doctor diagnostic check"
-        print "  7) 󰁕 reload hyprland & quickshell"
-        print "  8) 󰋩 fetch wallhaven wallpaper & apply theme"
-        print "  9) 󰅚 quit"
-        print -Pn "choice [1-9, default 1]: "
+        print "  3) 󰌢 symlink dotfiles & ~/.local/bin clis only"
+        print "  4) 󰍹 apply gnome dconf profile & reload shell theme"
+        print "  5) 󰏖 rebuild nixos"
+        print "  6) 󰑐 update dotfiles (git pull + sync + reload)"
+        print "  7) 󰄲 doctor diagnostic check"
+        print "  8) 󰁕 reload active shell (hyprland/quickshell or gnome)"
+        print "  9) 󰋩 fetch wallhaven wallpaper & apply theme"
+        print " 10) 󰅚 quit"
+        print -Pn "choice [1-10, default 1]: "
 
         local choice=""
         if [[ -t 0 ]]; then read -r choice; elif [[ -r /dev/tty ]]; then read -r choice </dev/tty; else choice="1"; fi
@@ -719,14 +915,15 @@ main() {
 
         case "$choice" in
             1) opt_mode="custom" ;;
-            2) opt_mode="all" ;;
+            2) opt_mode="all"; APPLY_GNOME=true ;;
             3) opt_mode="links" ;;
-            4) opt_mode="rebuild" ;;
-            5) opt_mode="update" ;;
-            6) opt_mode="doctor" ;;
-            7) opt_mode="reload" ;;
-            8) opt_mode="fetch_wp" ;;
-            9|q|Q) print "aborting."; exit 0 ;;
+            4) opt_mode="gnome"; APPLY_GNOME=true ;;
+            5) opt_mode="rebuild" ;;
+            6) opt_mode="update" ;;
+            7) opt_mode="doctor" ;;
+            8) opt_mode="reload" ;;
+            9) opt_mode="fetch_wp" ;;
+            10|q|Q) print "aborting."; exit 0 ;;
             *) log_warn "invalid input. defaulting to custom wizard."; opt_mode="custom" ;;
         esac
     fi
@@ -740,6 +937,16 @@ main() {
             ;;
         rebuild)
             rebuild_nixos || true
+            ;;
+        gnome)
+            setup_directories_and_permissions
+            if [[ -x "$HOME/.local/bin/sync-gnome-wallpapers" ]]; then
+                execute "$HOME/.local/bin/sync-gnome-wallpapers" >/dev/null 2>&1 || true
+            fi
+            if [[ -x "$DOTS_DIR/gnome/apply.zsh" ]] && (( $+commands[dconf] )); then
+                execute "$DOTS_DIR/gnome/apply.zsh" || log_warn "gnome dconf apply skipped or partial."
+            fi
+            if [[ "$opt_reload" == "true" ]]; then reload_shell; fi
             ;;
         update)
             log_step "updating repository..."
@@ -786,6 +993,14 @@ main() {
                 fi
             fi
 
+            if [[ "$(detect_desktop)" == "gnome" ]]; then
+                if ask_yn "apply gnome dconf layout (backs up current dconf first)?" "Y"; then
+                    APPLY_GNOME=true
+                fi
+            elif ask_yn "apply gnome dconf layout (gnome/apply.zsh)?" "N"; then
+                APPLY_GNOME=true
+            fi
+
             if ask_yn "generate matugen palette from wallpaper?" "Y"; then
                 opt_theme=true
                 if ask_yn "fetch a new random wallpaper from wallhaven?" "N"; then
@@ -795,7 +1010,7 @@ main() {
                 opt_theme=false
             fi
 
-            if ask_yn "reload hyprland & quickshell when done?" "Y"; then
+            if ask_yn "reload active desktop shell when done?" "Y"; then
                 opt_reload=true
             else
                 opt_reload=false

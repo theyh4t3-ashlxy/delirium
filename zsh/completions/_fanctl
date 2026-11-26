@@ -1,0 +1,52 @@
+#compdef fanctl
+
+local curcontext="$curcontext" state line
+typeset -A opt_args
+
+local -a commands=(
+    'status:show live temperatures, fan rpm, and cpu clocks'
+    'set:set fan level directly (0-7, auto, full-speed, disengaged, curve)'
+    'curve:view or switch fan curve profile'
+    'unstick:shock embedded controller to clear 400mhz lock'
+    'watchdog:enable or disable auto-unstick watchdog'
+    'json:dump live thermal and fan status as json'
+    '--json:dump live thermal and fan status as json'
+    'watch:live updating one-line terminal monitor'
+    'help:show fanctl usage'
+    'auto:shortcut for set auto'
+    'full:shortcut for set full-speed'
+    'quiet:shortcut for curve quiet'
+)
+
+_arguments -C \
+    '1: :->command' \
+    '*: :->args'
+
+case $state in
+    command)
+        _describe -t commands 'fanctl command' commands
+        ;;
+    args)
+        case $line[1] in
+            set)
+                local -a levels=(0 1 2 3 4 5 6 7 auto full-speed disengaged curve)
+                _describe -t levels 'fan level' levels
+                ;;
+            curve)
+                local -a curves=(
+                    'quiet:whisper-quiet ramp'
+                    'balanced:default thinkpad thermal curve'
+                    'aggressive:early spin-up under load'
+                )
+                _describe -t curves 'curve profile' curves
+                ;;
+            watchdog)
+                local -a modes=(on off)
+                _describe -t modes 'watchdog state' modes
+                ;;
+            watch)
+                _message 'poll interval in seconds (e.g. 1.0)'
+                ;;
+        esac
+        ;;
+esac

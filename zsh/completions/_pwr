@@ -1,0 +1,54 @@
+#compdef pwr batstat
+
+local curcontext="$curcontext" state line
+typeset -A opt_args
+
+local -a commands=(
+    'status:show battery, watt draw, profile, epp, cpu, and fan summary'
+    'watch:live updating battery and thermal monitor'
+    'probe:print raw battery.py key-value telemetry'
+    'profile:switch acpi platform_profile'
+    'epp:set intel hwp energy performance preference'
+    'turbo:enable or disable cpu turbo boost'
+    'thresholds:set charge start and stop percentages'
+    'fan-curve:switch fanctl curve'
+    'fan-level:set fanctl speed level'
+    'fan-unstick:pulse ec fan controller'
+    'fan-watchdog:toggle 400mhz lock watchdog'
+)
+
+_arguments -C \
+    '--json[emit json output]' \
+    '(-h --help)'{-h,--help}'[show pwr help]' \
+    '1: :->command' \
+    '*: :->args'
+
+case $state in
+    command)
+        _describe -t commands 'pwr subcommand' commands
+        ;;
+    args)
+        case $line[1] in
+            profile)
+                local -a profs=(performance balanced power-saver)
+                _describe -t profs 'platform profile' profs
+                ;;
+            epp)
+                local -a epps=(default performance balance_performance balance_power power)
+                _describe -t epps 'energy pref' epps
+                ;;
+            turbo)
+                local -a bools=(true false)
+                _describe -t bools 'turbo enabled' bools
+                ;;
+            fan-curve)
+                local -a curves=(quiet balanced aggressive)
+                _describe -t curves 'fan curve' curves
+                ;;
+            fan-watchdog)
+                local -a wd=(on off)
+                _describe -t wd 'watchdog' wd
+                ;;
+        esac
+        ;;
+esac

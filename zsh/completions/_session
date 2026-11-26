@@ -1,0 +1,14 @@
+#compdef session
+
+local -a actions=(
+    'status:show active desktop, lock state & caffeine timeout'
+    'lock:lock current desktop session'
+    'is-locked:print locked or unlocked status'
+    'logout:log out of current hyprland or gnome session'
+    'suspend:lock and suspend to ram'
+    'hibernate:hibernate system'
+    'reboot:reboot machine'
+    'poweroff:shut down machine'
+    'caffeine:toggle idle inhibit (quickshell / gnome idle-delay)'
+)
+_describe -t actions 'session action' actions

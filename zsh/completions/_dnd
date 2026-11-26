@@ -1,0 +1,9 @@
+#compdef dnd
+
+local -a actions=(
+    'toggle:flip do-not-disturb state'
+    'on:mute notification toasts (quickshell & gnome)'
+    'off:unmute notification toasts'
+    'status:print current dnd state'
+)
+_describe -t actions 'dnd action' actions

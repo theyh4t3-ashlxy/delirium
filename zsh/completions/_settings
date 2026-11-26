@@ -1,0 +1,98 @@
+#compdef settings config
+
+local curcontext="$curcontext" state line
+typeset -A opt_args
+
+local -a commands=(
+    'custom:open interactive custom prompt builder'
+    'builder:open interactive custom prompt builder'
+    'prompts:manage saved named .prompt profiles'
+    'presets:manage saved named .prompt profiles'
+    'save-prompt:save current prompt as a named .prompt profile'
+    'load-prompt:load a saved .prompt profile'
+    'prompt:set prompt layout style'
+    'style:set prompt layout style'
+    'symbol:set prompt symbol character'
+    'accent:set prompt accent color'
+    'kaomoji:set kaomoji mood set'
+    'mood:set kaomoji mood set'
+    'blankline:toggle blank line before multi-line prompts'
+    'shortpath:toggle folder-only path (%1~ vs %~)'
+    'shlvl:toggle nested shell level badge'
+    'timermin:set minimum seconds before command timer displays'
+    'vicursor:toggle bar/block cursor shape in vi mode'
+    'transient:toggle transient prompt collapse'
+    'git:toggle git status in prompt'
+    'timer:toggle command execution timer'
+    'critic:toggle typo syntax critic'
+    'banter:toggle wide-screen banter'
+    'clock:toggle right prompt clock'
+    'autols:toggle auto-ls on cd'
+    'fastfetch:toggle fastfetch on shell open'
+    'checkin:toggle session check-in on shell open'
+    'editor:switch preferred editor'
+    'fm:switch preferred file manager'
+    'focus:enable distraction-free preset'
+    'expressive:enable reactive expressive preset'
+    'reset:reset user_prefs.conf to defaults'
+    'list:print active user_prefs.conf'
+    'nvim:edit neovim config module'
+    'hypr:edit hyprland config module'
+    'zsh:edit zsh config module'
+    'qs:edit quickshell config module'
+    'matugen:edit matugen config or template'
+    'nixos:edit nixos config or flake'
+    'btop:edit btop.conf'
+    'kitty:edit kitty.conf'
+    'micro:edit micro settings.json'
+    'dots:jump into dotfiles repo'
+)
+
+_arguments -C \
+    '1: :->command' \
+    '*: :->args'
+
+case $state in
+    command)
+        _describe -t commands 'settings subcommand' commands
+        ;;
+    args)
+        case $line[1] in
+            prompt|style)
+                local -a styles=(
+                    two-line open-line bash pure robby lambda
+                    face-prompt kaomoji-speech schematic capsule
+                    single-line minimal bracket custom
+                )
+                _describe -t styles 'prompt style' styles
+                ;;
+            kaomoji|mood)
+                local -a sets=(none reactive cats cute deadpan angry ascii)
+                _describe -t sets 'kaomoji set' sets
+                ;;
+            accent)
+                local -a accents=(primary secondary tertiary cyan green magenta yellow white)
+                _describe -t accents 'prompt accent' accents
+                ;;
+            prompts|presets|load-prompt)
+                local pdir="${XDG_STATE_HOME:-$HOME/.local/state}/zsh/prompts"
+                local -a pnames
+                if [[ -d "$pdir" ]]; then
+                    local f
+                    for f in "$pdir"/*.prompt(N); do
+                        pnames+=("${f:t:r}:saved prompt preset")
+                    done
+                fi
+                (( ${#pnames} )) && _describe -t pnames 'saved prompt' pnames
+                ;;
+            matugen)
+                local -a mmods=(config ptyxis gnome-shell gtk4 gtk3 kitty zsh nvim hypr palette hooks directory)
+                _describe -t mmods 'matugen module' mmods
+                ;;
+            blankline|shortpath|shlvl|vicursor|transient|git|timer|critic|banter|clock|autols|fastfetch|checkin)
+                local -a bools=(true false)
+                _describe -t bools 'boolean' bools
+                ;;
+        esac
+        ;;
+esac

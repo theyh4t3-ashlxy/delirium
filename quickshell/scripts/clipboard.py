@@ -124,9 +124,16 @@ def wl_copy_bytes(data: bytes, mime: str | None = None) -> None:
         pass
 
 
+def _watcher_running() -> bool:
+    if not shutil.which("pgrep"):
+        return False
+    return subprocess.run(["pgrep", "-f", r"wl-paste.*cliphist store"], capture_output=True).returncode == 0
+
+
 def ensure_watch() -> None:
-    pgrep = subprocess.run(["pgrep", "-f", r"wl-paste.*cliphist store"], capture_output=True)
-    if pgrep.returncode != 0:
+    if not (shutil.which("wl-paste") and shutil.which("cliphist")):
+        return
+    if not _watcher_running():
         subprocess.Popen(
             ["wl-paste", "--watch", "cliphist", "store"],
             stdin=subprocess.DEVNULL,
@@ -317,27 +324,205 @@ def cmd_copy_pin(pin_id: str) -> None:
             break
 
 
-def main() -> None:
-    if len(sys.argv) < 2:
+def _build_pretty_rows(limit: int = 80) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for p in load_pins():
+        rows.append({
+            "id": p.get("id", ""),
+            "pinned": "1",
+            "kind": p.get("kind", "text"),
+            "preview": p.get("preview", ""),
+            "thumb": p.get("thumb", ""),
+            "text": p.get("text", ""),
+        })
+
+    res = subprocess.run(["cliphist", "list"], capture_output=True, text=True, timeout=5)
+    if res.returncode == 0 and res.stdout:
+        img_count = 0
+        for line in res.stdout.splitlines():
+            if "\t" not in line:
+                continue
+            cid, preview = line.split("\t", 1)
+            cid = cid.strip()
+            if not cid:
+                continue
+            is_img = bool(BINARY_RE.match(preview.strip()) and IMG_EXT_RE.search(preview))
+            rec = parse_clip_row(cid, preview, decode_thumb=(is_img and img_count < 30))
+            if rec["kind"] == "image":
+                img_count += 1
+            rows.append({
+                "id": rec["id"],
+                "pinned": "0",
+                "kind": rec["kind"],
+                "preview": rec["preview"],
+                "thumb": rec["thumb"],
+                "text": "",
+            })
+            if len(rows) >= limit:
+                break
+    return rows
+
+
+def _interactive_fzf() -> None:
+    from _cli_ui import get_style
+    st = get_style()
+    if not shutil.which("fzf"):
+        print(f"{st.yellow}󰀦 fzf required for interactive clipboard picker{st.reset}", file=sys.stderr)
+        sys.exit(1)
+
+    ensure_watch()
+    rows = _build_pretty_rows(120)
+    if not rows:
+        print(f"{st.dim}clipboard history is empty{st.reset}")
         return
-    action = sys.argv[1]
-    if action == "ensure-watch":
+
+    fzf_lines = []
+    for r in rows:
+        tag = "[pin]" if r["pinned"] == "1" else f"[{r['kind']}]"
+        clean_prev = " ".join(r["preview"].split())[:110]
+        fzf_lines.append(f"{r['pinned']}\t{r['id']}\t{r['thumb']}\t{tag} {clean_prev}")
+
+    preview_cmd = (
+        't={3}; '
+        'if [ -n "$t" ] && [ -f "$t" ]; then '
+        '  if [ -n "${KITTY_WINDOW_ID:-}" ] && command -v kitten >/dev/null 2>&1; then '
+        '    kitten icat --clear --transfer-mode=memory --unicode-placeholder --stdin=no --place="${FZF_PREVIEW_COLUMNS}x${FZF_PREVIEW_LINES}@0x0" "$t"; '
+        '  else file -b "$t"; fi; '
+        'elif [ {1} = "1" ]; then '
+        f'  python3 "{Path(__file__).resolve()}" _show-pin {{2}}; '
+        'else cliphist decode {2} 2>/dev/null | head -c 4096; fi'
+    )
+
+    proc = subprocess.run(
+        [
+            "fzf",
+            "--delimiter=\t",
+            "--with-nth=4",
+            "--reverse",
+            "--height=65%",
+            "--header=[clip · enter=copy · ctrl-p=pin · ctrl-d=delete]",
+            "--expect=ctrl-p,ctrl-d",
+            "--preview", preview_cmd,
+            "--preview-window=right:55%:wrap",
+        ],
+        input="\n".join(fzf_lines),
+        text=True,
+        capture_output=True,
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return
+
+    out_lines = proc.stdout.splitlines()
+    key = out_lines[0].strip() if len(out_lines) > 1 else ""
+    sel = out_lines[1] if len(out_lines) > 1 else out_lines[0]
+    parts = sel.split("\t", 3)
+    if len(parts) < 2:
+        return
+    is_pin, item_id = parts[0] == "1", parts[1]
+
+    if key == "ctrl-p" and not is_pin:
+        cmd_pin(item_id)
+        print(f"{st.green}󰄲 pinned entry {item_id}{st.reset}")
+    elif key == "ctrl-d":
+        if is_pin:
+            cmd_unpin(item_id)
+        else:
+            cmd_delete(item_id)
+        print(f"{st.yellow}󰆴 deleted entry {item_id}{st.reset}")
+    else:
+        if is_pin:
+            cmd_copy_pin(item_id)
+        else:
+            cmd_copy(item_id)
+        print(f"{st.green}󰄲 copied {item_id} to clipboard{st.reset}")
+
+
+def _cmd_status(as_json: bool = False) -> None:
+    import json
+    from _cli_ui import get_style, render_box, term_size
+
+    rows = _build_pretty_rows(500)
+    pinned = sum(1 for r in rows if r.get("pinned") == "1")
+    history = len(rows) - pinned
+    watching = _watcher_running()
+    has_cliphist = bool(shutil.which("cliphist"))
+    if as_json:
+        print(json.dumps({
+            "history": history,
+            "pinned": pinned,
+            "total": len(rows),
+            "watcher_active": watching,
+            "cliphist": has_cliphist,
+        }, indent=2))
+        return
+
+    st = get_style()
+    w_lbl = f"{st.green}active{st.reset}" if watching else f"{st.yellow}stopped{st.reset}"
+    lines = [
+        f" {st.dim}├─{st.reset} {st.bold}{'watcher:':<12}{st.reset} {w_lbl} (cliphist={'ok' if has_cliphist else 'missing'})",
+        f" {st.dim}├─{st.reset} {st.bold}{'history:':<12}{st.reset} {history} entries",
+        f" {st.dim}└─{st.reset} {st.bold}{'pinned:':<12}{st.reset} {pinned} items",
+    ]
+    cols, _ = term_size()
+    print("\n".join(render_box(lines, width=min(cols, 72), title=f"{st.cyan}{st.bold}󰅇 clip · status{st.reset}", style=st, border_color=st.cyan)))
+
+
+def main() -> None:
+    from _cli_ui import get_style, is_pretty_cli
+
+    args = sys.argv[1:]
+    if any(a in ("-h", "--help", "help") for a in args):
+        st = get_style()
+        print(f"{st.cyan}{st.bold}󰅇 clip{st.reset} · clipboard history & pin manager (kitty image previews)\n\nusage:\n  clip                   interactive fzf picker\n  clip status [--json]   show history count, pins & watcher state\n  clip list [--json]     list entries + pins\n  clip copy <id>         copy history item\n  clip pin <id>          pin history item\n  clip wipe              clear history cache")
+        return
+
+    as_json = "--json" in args
+    clean_args = [a for a in args if a not in ("--json", "--pretty", "--kv")]
+    pretty = is_pretty_cli(sys.argv, ("clip",), raw_cmds=("ensure-watch", "list", "copy", "pin", "unpin", "copy-pin", "delete", "wipe", "_show-pin"))
+
+    if not clean_args:
+        _interactive_fzf()
+        return
+
+    action = clean_args[0].lower()
+    if action in ("status", "info"):
+        _cmd_status(as_json=as_json)
+    elif action == "_show-pin" and len(clean_args) >= 2:
+        for p in load_pins():
+            if p.get("id") == clean_args[1]:
+                sys.stdout.write(p.get("text", "") or p.get("preview", ""))
+                break
+    elif action == "ensure-watch":
         ensure_watch()
     elif action == "list":
-        limit = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 60
-        cmd_list(limit)
-    elif action == "copy" and len(sys.argv) > 2:
-        cmd_copy(sys.argv[2])
-    elif action == "pin" and len(sys.argv) > 2:
-        cmd_pin(sys.argv[2])
-    elif action == "unpin" and len(sys.argv) > 2:
-        cmd_unpin(sys.argv[2])
-    elif action == "copy-pin" and len(sys.argv) > 2:
-        cmd_copy_pin(sys.argv[2])
-    elif action == "delete" and len(sys.argv) > 2:
-        cmd_delete(sys.argv[2])
+        limit = int(clean_args[1]) if len(clean_args) > 1 and clean_args[1].isdigit() else 60
+        if pretty:
+            import json
+            rows = _build_pretty_rows(limit)
+            if as_json:
+                print(json.dumps(rows, indent=2))
+            else:
+                for r in rows:
+                    tag = "[pin]" if r["pinned"] == "1" else f"[{r['kind']}]"
+                    print(f"{r['id']:<16} {tag:<8} {' '.join(r['preview'].split())[:72]}")
+        else:
+            cmd_list(limit)
+    elif action == "copy" and len(clean_args) > 1:
+        cmd_copy(clean_args[1])
+    elif action == "pin" and len(clean_args) > 1:
+        cmd_pin(clean_args[1])
+    elif action == "unpin" and len(clean_args) > 1:
+        cmd_unpin(clean_args[1])
+    elif action == "copy-pin" and len(clean_args) > 1:
+        cmd_copy_pin(clean_args[1])
+    elif action == "delete" and len(clean_args) > 1:
+        cmd_delete(clean_args[1])
     elif action == "wipe":
         cmd_wipe()
+    else:
+        st = get_style()
+        print(f"{st.red}󰅚 unknown command or missing arg: {' '.join(clean_args)}{st.reset}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

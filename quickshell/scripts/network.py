@@ -497,25 +497,209 @@ def cmd_forget(target: str) -> None:
         print(f"error={_esc(err or out)}")
 
 
-def main() -> None:
-    args = sys.argv[1:]
-    if not args or args[0] == "status":
-        cmd_status()
+def _fmt_bytes(n: int) -> str:
+    val = float(n)
+    for unit in ("b", "kb", "mb", "gb", "tb"):
+        if val < 1024 or unit == "tb":
+            return f"{val:.1f} {unit}" if unit != "b" else f"{int(val)} b"
+        val /= 1024.0
+    return f"{n} b"
+
+
+def _collect_status_dict() -> dict:
+    rc, devs_raw, _ = _run(["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "dev", "status"])
+    active_iface = active_con = active_type = wifi_iface = ""
+
+    for line in devs_raw.splitlines():
+        parts = line.split(":")
+        if len(parts) < 4:
+            continue
+        dev, typ, state, con = parts[0], parts[1], parts[2], ":".join(parts[3:])
+        if typ == "wifi" and not wifi_iface:
+            wifi_iface = dev
+        if state.startswith("connected") and typ in ("wifi", "ethernet"):
+            if not active_iface or typ == "ethernet":
+                active_iface, active_type, active_con = dev, typ, con
+
+    ip4 = gw = dns = ""
+    if active_iface:
+        _, show_out, _ = _run(["nmcli", "-t", "-f", "IP4.ADDRESS,IP4.GATEWAY,IP4.DNS", "dev", "show", active_iface])
+        dns_list = []
+        for l in show_out.splitlines():
+            if l.startswith("IP4.ADDRESS"):
+                ip4 = l.split(":", 1)[1].strip()
+            elif l.startswith("IP4.GATEWAY"):
+                gw = l.split(":", 1)[1].strip()
+            elif l.startswith("IP4.DNS"):
+                val = l.split(":", 1)[1].strip()
+                if val:
+                    dns_list.append(val)
+        dns = ", ".join(dns_list[:2])
+
+    rx_b, tx_b = _read_net_stats(active_iface or wifi_iface)
+    _, cons_raw, _ = _run(["nmcli", "-t", "-f", "NAME,UUID,TYPE,DEVICE,ACTIVE", "con", "show"])
+    vpns = []
+    saved_wifi = []
+    hotspot_active = False
+    hotspot_name = ""
+
+    for line in cons_raw.splitlines():
+        cols = re.split(r"(?<!\\):", line)
+        if len(cols) < 5:
+            continue
+        name = cols[0].replace("\\:", ":")
+        uuid, ctype, _, active = cols[1], cols[2], cols[3], cols[4]
+        is_act = active.lower() == "yes"
+        if ctype in ("vpn", "wireguard", "tun") or "vpn" in ctype.lower():
+            vpns.append({"name": name, "uuid": uuid, "type": ctype, "active": is_act})
+        elif ctype == "802-11-wireless":
+            _, mode_out, _ = _run(["nmcli", "-g", "802-11-wireless.mode", "con", "show", "uuid", uuid], timeout=2)
+            if mode_out.strip() == "ap" or name == "Hotspot":
+                if is_act:
+                    hotspot_active = True
+                    hotspot_name = name
+            else:
+                saved_wifi.append({"name": name, "uuid": uuid, "active": is_act})
+
+    return {
+        "iface": active_iface or wifi_iface,
+        "wifi_iface": wifi_iface,
+        "active_con": active_con,
+        "active_type": active_type,
+        "ip4": ip4,
+        "gateway": gw,
+        "dns": dns,
+        "rx_bytes": rx_b,
+        "tx_bytes": tx_b,
+        "hotspot_active": hotspot_active,
+        "hotspot_name": hotspot_name,
+        "vpns": vpns,
+        "saved_wifi": saved_wifi,
+    }
+
+
+def _pretty_status(as_json: bool = False) -> None:
+    from _cli_ui import get_style, render_box, term_size
+    d = _collect_status_dict()
+    if as_json:
+        print(json.dumps(d, indent=2))
         return
-    cmd = args[0].lower()
+    st = get_style()
+    con_str = f"{st.green}{d['active_con']}{st.reset} ({d['active_type']})" if d["active_con"] else f"{st.yellow}disconnected{st.reset}"
+    active_vpns = [v["name"] for v in d["vpns"] if v["active"]]
+    vpn_str = f"{st.green}{', '.join(active_vpns)}{st.reset}" if active_vpns else f"{st.dim}none active ({len(d['vpns'])} saved){st.reset}"
+    hs_str = f"{st.green}on ({d['hotspot_name']}){st.reset}" if d["hotspot_active"] else f"{st.dim}off{st.reset}"
+    lines = [
+        f" {st.dim}├─{st.reset} {st.bold}{'connection:':<13}{st.reset} {con_str} · {d['iface'] or 'n/a'}",
+        f" {st.dim}├─{st.reset} {st.bold}{'ip / gw:':<13}{st.reset} {st.cyan}{d['ip4'] or '-'}{st.reset} · gw {d['gateway'] or '-'}",
+        f" {st.dim}├─{st.reset} {st.bold}{'dns:':<13}{st.reset} {d['dns'] or '-'}",
+        f" {st.dim}├─{st.reset} {st.bold}{'traffic:':<13}{st.reset} ↓ {_fmt_bytes(d['rx_bytes'])} · ↑ {_fmt_bytes(d['tx_bytes'])}",
+        f" {st.dim}├─{st.reset} {st.bold}{'hotspot:':<13}{st.reset} {hs_str}",
+        f" {st.dim}└─{st.reset} {st.bold}{'vpn:':<13}{st.reset} {vpn_str}",
+    ]
+    cols, _ = term_size()
+    print("\n".join(render_box(lines, width=min(cols, 90), title=f"{st.cyan}{st.bold}󰤨 net · network status{st.reset}", style=st, border_color=st.cyan)))
+
+
+def _pretty_qr(ssid: str = "", password: str = "") -> None:
+    from _cli_ui import get_style
+    st = get_style()
+    target_ssid = ssid
+    target_pass = password
+    if not target_ssid:
+        _, out, _ = _run(["nmcli", "-s", "-t", "-f", "NAME,TYPE,ACTIVE", "con", "show", "--active"])
+        for l in out.splitlines():
+            cols = re.split(r"(?<!\\):", l)
+            if len(cols) >= 3 and cols[1] == "802-11-wireless" and cols[2] == "yes":
+                con_name = cols[0].replace("\\:", ":")
+                _, s_out, _ = _run(["nmcli", "-g", "802-11-wireless.ssid", "con", "show", con_name])
+                _, p_out, _ = _run(["nmcli", "-s", "-g", "802-11-wireless-security.psk", "con", "show", con_name])
+                target_ssid = s_out.strip() or con_name
+                target_pass = p_out.strip()
+                break
+    elif target_ssid and not target_pass:
+        _, p_out, _ = _run(["nmcli", "-s", "-g", "802-11-wireless-security.psk", "con", "show", target_ssid])
+        target_pass = p_out.strip()
+
+    if not target_ssid:
+        print(f"{st.yellow}󰀦 no active wi-fi ssid found{st.reset}", file=sys.stderr)
+        sys.exit(1)
+
+    rows = generate_qr_matrix(_wifi_qr_payload(target_ssid, target_pass))
+    pad = 2
+    n = len(rows)
+    padded = ["0" * (n + pad * 2)] * pad + [("0" * pad) + r + ("0" * pad) for r in rows] + ["0" * (n + pad * 2)] * pad
+    if len(padded) % 2:
+        padded.append("0" * (n + pad * 2))
+
+    print(f"{st.cyan}{st.bold}󰤨 wi-fi qr:{st.reset} {target_ssid}")
+    for y in range(0, len(padded), 2):
+        r0, r1 = padded[y], padded[y + 1]
+        chars = []
+        for a, b in zip(r0, r1):
+            # white border / dark modules look crispest with inverse terminal half-blocks
+            if a == "0" and b == "0":
+                chars.append("█")
+            elif a == "1" and b == "1":
+                chars.append(" ")
+            elif a == "0" and b == "1":
+                chars.append("▀")
+            else:
+                chars.append("▄")
+        print("  " + "".join(chars))
+
+
+def _print_help() -> None:
+    from _cli_ui import get_style
+    st = get_style()
+    print(f"""{st.cyan}{st.bold}󰤨 net{st.reset} {st.dim}· networkmanager status, wi-fi qr, hotspot & vpn cli{st.reset}
+
+{st.bold}usage:{st.reset}
+  net [status] [--json]               show interface, ip, dns, traffic & vpn
+  net qr [ssid] [password]            render scannable wi-fi qr in terminal
+  net hotspot <on|off|toggle> [ssid] [pw]
+  net vpn <up|down> <name>            connect or disconnect vpn profile
+  net forget <profile>                delete saved networkmanager profile""")
+
+
+def main() -> None:
+    from _cli_ui import is_pretty_cli
+
+    args = sys.argv[1:]
+    if any(a in ("-h", "--help", "help") for a in args):
+        _print_help()
+        return
+
+    as_json = "--json" in args
+    clean_args = [a for a in args if a not in ("--json", "--pretty", "--kv")]
+    pretty = is_pretty_cli(sys.argv, ("net", "netctl"), raw_cmds=("status", "qr", "hotspot", "vpn", "forget"))
+
+    if not clean_args or clean_args[0].lower() == "status":
+        if pretty:
+            _pretty_status(as_json=as_json)
+        else:
+            cmd_status()
+        return
+
+    cmd = clean_args[0].lower()
     if cmd == "qr":
-        cmd_qr(args[1] if len(args) > 1 else "", args[2] if len(args) > 2 else "")
+        ssid = clean_args[1] if len(clean_args) > 1 else ""
+        pw = clean_args[2] if len(clean_args) > 2 else ""
+        if pretty:
+            _pretty_qr(ssid, pw)
+        else:
+            cmd_qr(ssid, pw)
     elif cmd == "hotspot":
-        act = args[1].lower() if len(args) > 1 else "toggle"
-        ssid = args[2] if len(args) > 2 else "quickshell-ap"
-        pwd = args[3] if len(args) > 3 else "nixoshotspot"
+        act = clean_args[1].lower() if len(clean_args) > 1 else "toggle"
+        ssid = clean_args[2] if len(clean_args) > 2 else "quickshell-ap"
+        pwd = clean_args[3] if len(clean_args) > 3 else "nixoshotspot"
         cmd_hotspot(act, ssid, pwd)
-    elif cmd == "vpn" and len(args) >= 3:
-        cmd_vpn(args[1].lower(), args[2])
-    elif cmd == "forget" and len(args) >= 2:
-        cmd_forget(args[1])
+    elif cmd == "vpn" and len(clean_args) >= 3:
+        cmd_vpn(clean_args[1].lower(), clean_args[2])
+    elif cmd == "forget" and len(clean_args) >= 2:
+        cmd_forget(clean_args[1])
     else:
-        cmd_status()
+        _pretty_status(as_json=as_json) if pretty else cmd_status()
 
 
 if __name__ == "__main__":

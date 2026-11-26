@@ -1,0 +1,7 @@
+#compdef wx weather
+
+_arguments -s \
+    '(-f --force)'{-f,--force}'[bypass cache and refresh open-meteo]' \
+    '--json[emit json output]' \
+    '(-h --help)'{-h,--help}'[show wx help]' \
+    '*:target:(status)'

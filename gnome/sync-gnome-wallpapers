@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""
+sync-gnome-wallpapers
+syncs wallpapers from ~/.wallpapers into the nixos/freedesktop equivalent of
+/usr/share/backgrounds (~/.local/share/backgrounds) and generates gnome-background-properties xml
+so all 600+ wallpapers appear natively inside gnome control center's appearance picker.
+"""
+
+import os
+import sys
+import argparse
+from pathlib import Path
+import xml.sax.saxutils as saxutils
+
+DEFAULT_SOURCE = Path.home() / ".wallpapers"
+DEFAULT_TARGET = Path.home() / ".local" / "share" / "backgrounds"
+DEFAULT_PROPS = Path.home() / ".local" / "share" / "gnome-background-properties"
+
+VALID_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".jxl", ".avif"}
+
+def scan_wallpapers(source_dir: Path):
+    wallpapers = []
+    if not source_dir.exists():
+        print(f"error: source directory {source_dir} does not exist", file=sys.stderr)
+        return wallpapers
+
+    for root, _, files in os.walk(source_dir):
+        for file in sorted(files):
+            p = Path(root) / file
+            if p.suffix.lower() in VALID_EXTENSIONS:
+                wallpapers.append(p)
+    return wallpapers
+
+def sync_wallpapers(wallpapers, target_dir: Path, dry_run: bool = False, clean: bool = False):
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    if clean:
+        for item in target_dir.iterdir():
+            if item.is_symlink():
+                if not dry_run:
+                    item.unlink()
+                print(f"[clean] removed symlink: {item.name}")
+
+    created = 0
+    skipped = 0
+
+    for wp in wallpapers:
+        # construct flat recognizable symlink name: category_filename
+        rel_parts = wp.relative_to(DEFAULT_SOURCE).parts
+        if len(rel_parts) > 1:
+            symlink_name = "__".join(rel_parts)
+        else:
+            symlink_name = wp.name
+
+        dest = target_dir / symlink_name
+        if dest.is_symlink() or dest.exists():
+            if dest.resolve() == wp.resolve():
+                skipped += 1
+                continue
+            if not dry_run:
+                dest.unlink(missing_ok=True)
+
+        if not dry_run:
+            dest.symlink_to(wp)
+        created += 1
+
+    return created, skipped
+
+def generate_gnome_properties(wallpapers, props_dir: Path, dry_run: bool = False):
+    props_dir.mkdir(parents=True, exist_ok=True)
+    xml_file = props_dir / "custom-wallpapers.xml"
+
+    lines = [
+        '<?xml version="1.0"?>',
+        '<!DOCTYPE wallpapers SYSTEM "gnome-wp-list.dtd">',
+        '<wallpapers>'
+    ]
+
+    for wp in wallpapers:
+        rel = wp.relative_to(DEFAULT_SOURCE)
+        category = rel.parts[0] if len(rel.parts) > 1 else "general"
+        stem_name = wp.stem.replace("_", " ").replace("-", " ").lower()
+        display_name = f"[{category}] {stem_name}"
+
+        safe_name = saxutils.escape(display_name)
+        safe_path = saxutils.escape(str(wp.resolve()))
+
+        lines.append('  <wallpaper deleted="false">')
+        lines.append(f'    <name>{safe_name}</name>')
+        lines.append(f'    <filename>{safe_path}</filename>')
+        lines.append(f'    <filename-dark>{safe_path}</filename-dark>')
+        lines.append('    <options>zoom</options>')
+        lines.append('    <shade_type>solid</shade_type>')
+        lines.append('    <pcolor>#000000</pcolor>')
+        lines.append('    <scolor>#000000</scolor>')
+        lines.append('  </wallpaper>')
+
+    lines.append('</wallpapers>\n')
+    content = "\n".join(lines)
+
+    if not dry_run:
+        with open(xml_file, "w", encoding="utf-8") as f:
+            f.write(content)
+
+    return xml_file
+
+def main():
+    parser = argparse.ArgumentParser(description="sync ~/.wallpapers to freedesktop backgrounds & gnome properties")
+    parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE, help="source wallpapers directory")
+    parser.add_argument("--target", type=Path, default=DEFAULT_TARGET, help="target backgrounds directory")
+    parser.add_argument("--props", type=Path, default=DEFAULT_PROPS, help="gnome-background-properties directory")
+    parser.add_argument("--dry-run", action="store_true", help="simulate without writing files")
+    parser.add_argument("--clean", action="store_true", help="remove broken or old symlinks first")
+    args = parser.parse_args()
+
+    wps = scan_wallpapers(args.source)
+    if not wps:
+        print("no wallpapers found.")
+        return 1
+
+    created, skipped = sync_wallpapers(wps, args.target, dry_run=args.dry_run, clean=args.clean)
+    xml_path = generate_gnome_properties(wps, args.props, dry_run=args.dry_run)
+
+    mode = "[dry-run] " if args.dry_run else ""
+    print(f"{mode}synced {len(wps)} wallpapers:")
+    print(f"  symlinks created: {created}")
+    print(f"  already current:  {skipped}")
+    print(f"  backgrounds dir:  {args.target}")
+    print(f"  gnome xml props:  {xml_path}")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,9 @@
+#compdef sync-gnome-wallpapers
+
+_arguments \
+    '--source[source wallpapers directory]:directory:_directories' \
+    '--target[target backgrounds symlink directory]:directory:_directories' \
+    '--props[gnome-background-properties output directory]:directory:_directories' \
+    '--dry-run[simulate without writing files]' \
+    '--clean[remove stale symlinks first]' \
+    '(-h --help)'{-h,--help}'[show help]'

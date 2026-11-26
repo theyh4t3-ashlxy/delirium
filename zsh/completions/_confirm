@@ -1,0 +1,27 @@
+#compdef confirm safe-push safe-rm
+
+case "$service" in
+    safe-rm)
+        _files
+        ;;
+    safe-push)
+        local -a push_opts=(
+            '--force-with-lease:safe force push'
+            '--force:force push'
+            '-u:set upstream'
+            '--tags:push tags'
+            '--dry-run:dry run'
+        )
+        _arguments '*:git push arg:->push'
+        _describe -t push_opts 'git push flags' push_opts
+        ;;
+    confirm)
+        if (( CURRENT == 2 )); then
+            _command_names -e
+        else
+            shift words
+            (( CURRENT-- ))
+            _normal
+        fi
+        ;;
+esac

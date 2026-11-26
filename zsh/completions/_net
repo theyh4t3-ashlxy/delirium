@@ -1,0 +1,39 @@
+#compdef net netstat-ui
+
+local curcontext="$curcontext" state line
+typeset -A opt_args
+
+local -a commands=(
+    'status:show active connection, ip, dns, traffic, hotspot & vpn'
+    'qr:render scannable wi-fi qr code in terminal'
+    'hotspot:control wi-fi access point (on/off/toggle)'
+    'vpn:connect or disconnect saved vpn profile'
+    'forget:delete saved networkmanager profile'
+)
+
+_arguments -C \
+    '--json[emit json output]' \
+    '(-h --help)'{-h,--help}'[show net help]' \
+    '1: :->command' \
+    '*: :->args'
+
+case $state in
+    command)
+        _describe -t commands 'net subcommand' commands
+        ;;
+    args)
+        case $line[1] in
+            hotspot)
+                local -a hs_cmds=(on off toggle)
+                _describe -t hs_cmds 'hotspot action' hs_cmds
+                ;;
+            vpn)
+                local -a vpn_cmds=(up down)
+                _describe -t vpn_cmds 'vpn action' vpn_cmds
+                ;;
+            *)
+                return 0
+                ;;
+        esac
+        ;;
+esac

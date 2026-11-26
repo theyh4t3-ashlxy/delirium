@@ -775,7 +775,68 @@ settings() {
             return 0
             ;;
         matugen)
-            ${EDITOR:-nvim} "$HOME/.local/share/dotfiles/matugen/config.toml"
+            local mat_dir="$HOME/.local/share/dotfiles/matugen"
+            local -a mat_modules=(
+                "config      (config.toml matugen targets & hooks)"
+                "ptyxis      (templates/ptyxis-colors.palette)"
+                "gnome-shell (templates/gnome-shell.css)"
+                "gtk4        (templates/gtk4.css)"
+                "gtk3        (templates/gtk3.css)"
+                "kitty       (templates/kitty-colors.conf)"
+                "zsh         (templates/zsh-colors.zsh)"
+                "nvim        (templates/nvim-colors.lua)"
+                "hypr        (templates/hyprland-colors.lua)"
+                "palette     (templates/palette.css)"
+                "hooks       (browse post-hook-scripts/ folder)"
+                "directory   (browse ~/.local/share/dotfiles/matugen)"
+            )
+            local target_file=""
+
+            if [[ -n "$arg" ]]; then
+                case "$arg" in
+                    config|conf|toml)  target_file="$mat_dir/config.toml" ;;
+                    ptyxis)            target_file="$mat_dir/templates/ptyxis-colors.palette" ;;
+                    gnome|gnome-shell) target_file="$mat_dir/templates/gnome-shell.css" ;;
+                    gtk4)              target_file="$mat_dir/templates/gtk4.css" ;;
+                    gtk3)              target_file="$mat_dir/templates/gtk3.css" ;;
+                    kitty)             target_file="$mat_dir/templates/kitty-colors.conf" ;;
+                    zsh)               target_file="$mat_dir/templates/zsh-colors.zsh" ;;
+                    nvim)              target_file="$mat_dir/templates/nvim-colors.lua" ;;
+                    hypr|hyprland)     target_file="$mat_dir/templates/hyprland-colors.lua" ;;
+                    palette|qs)        target_file="$mat_dir/templates/palette.css" ;;
+                    hooks|scripts)     _open_file_manager "$mat_dir/post-hook-scripts"; return 0 ;;
+                    dir|directory|all) _open_file_manager "$mat_dir"; return 0 ;;
+                    *)
+                        [[ -f "$mat_dir/$arg" ]] && target_file="$mat_dir/$arg"
+                        [[ -z "$target_file" && -f "$mat_dir/templates/$arg" ]] && target_file="$mat_dir/templates/$arg"
+                        ;;
+                esac
+            fi
+
+            if [[ -z "$target_file" ]]; then
+                local m_choice
+                m_choice=$(printf "%s\n" "${mat_modules[@]}" | fzf --header="[matugen configs & templates]" --reverse --height=50%)
+                [[ -z "$m_choice" ]] && return 0
+                local sel="${m_choice%% *}"
+                case "$sel" in
+                    config)      target_file="$mat_dir/config.toml" ;;
+                    ptyxis)      target_file="$mat_dir/templates/ptyxis-colors.palette" ;;
+                    gnome-shell) target_file="$mat_dir/templates/gnome-shell.css" ;;
+                    gtk4)        target_file="$mat_dir/templates/gtk4.css" ;;
+                    gtk3)        target_file="$mat_dir/templates/gtk3.css" ;;
+                    kitty)       target_file="$mat_dir/templates/kitty-colors.conf" ;;
+                    zsh)         target_file="$mat_dir/templates/zsh-colors.zsh" ;;
+                    nvim)        target_file="$mat_dir/templates/nvim-colors.lua" ;;
+                    hypr)        target_file="$mat_dir/templates/hyprland-colors.lua" ;;
+                    palette)     target_file="$mat_dir/templates/palette.css" ;;
+                    hooks)       _open_file_manager "$mat_dir/post-hook-scripts"; return 0 ;;
+                    directory)   _open_file_manager "$mat_dir"; return 0 ;;
+                esac
+            fi
+
+            if [[ -n "$target_file" && -f "$target_file" ]]; then
+                ${EDITOR:-micro} "$target_file"
+            fi
             return 0
             ;;
         list|show)

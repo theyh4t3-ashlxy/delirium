@@ -204,6 +204,13 @@ in
   # flatpak on nixos: ideological treason, running bubblewrap containers inside a read-only store
   services.flatpak.enable = true;
 
+  # 4.5 qt theming: plasma integration + breeze style driven by matugen kdeglobals
+  qt = {
+    enable = true;
+    platformTheme = "kde";
+    style = "breeze";
+  };
+
   # 5. window manager: held together by uwsm and unresolved emotional trauma
   programs.hyprland = {
     enable = true;
@@ -306,6 +313,7 @@ EOF
     quickshell
     matugen
     adw-gtk3
+    kdePackages.breeze-icons
     awww
     mpvpaper
     hyprpicker

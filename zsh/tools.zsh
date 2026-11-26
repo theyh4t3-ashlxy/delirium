@@ -112,9 +112,17 @@ fi
 # fzf fuzzy finder
 if (( $+commands[fzf] )); then
     eval "$(fzf --zsh 2>/dev/null || fzf --shell=zsh 2>/dev/null || true)"
+    if (( $+commands[fd] )); then
+        export FZF_DEFAULT_COMMAND="fd --type f --strip-cwd-prefix --hidden --follow --exclude .git"
+        export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+        export FZF_ALT_C_COMMAND="fd --type d --strip-cwd-prefix --hidden --follow --exclude .git"
+    elif (( $+commands[rg] )); then
+        export FZF_DEFAULT_COMMAND="rg --files --hidden --glob '!.git'"
+        export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+    fi
     if [[ "$FZF_DEFAULT_OPTS" != *"--layout="* ]]; then
         export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border=none --inline-info ${FZF_DEFAULT_OPTS:-}"
     fi
-    export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :50 {} 2>/dev/null || eza --tree --level=2 --icons {} 2>/dev/null || head -200 {}' --bind 'ctrl-/:toggle-preview'"
+    export FZF_CTRL_T_OPTS="--preview 'case {} in *.png|*.PNG|*.jpg|*.JPG|*.jpeg|*.JPEG|*.webp|*.WEBP|*.gif|*.GIF|*.avif|*.AVIF|*.bmp|*.BMP) if [ -n \"\${KITTY_WINDOW_ID:-}\" ] && command -v kitten >/dev/null 2>&1; then kitten icat --clear --transfer-mode=memory --unicode-placeholder --stdin=no --place=\"\${FZF_PREVIEW_COLUMNS}x\${FZF_PREVIEW_LINES}@0x0\" {}; else file -b {}; fi ;; *) bat --style=numbers --color=always --line-range :50 {} 2>/dev/null || eza --tree --level=2 --icons {} 2>/dev/null || head -200 {} ;; esac' --bind 'ctrl-/:toggle-preview'"
     export FZF_ALT_C_OPTS="--preview 'eza --tree --level=2 --icons --color=always {} 2>/dev/null || ls {}'"
 fi

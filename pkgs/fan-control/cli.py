@@ -52,11 +52,11 @@ def get_status(proxy) -> dict:
 
 def format_temp_color(temp: float) -> str:
     if temp < 58.0:
-        return f"{C_GREEN}{temp:.1f}°C{C_RESET}"
+        return f"{C_GREEN}{temp:.1f}°c{C_RESET}"
     elif temp < 75.0:
-        return f"{C_YELLOW}{temp:.1f}°C{C_RESET}"
+        return f"{C_YELLOW}{temp:.1f}°c{C_RESET}"
     else:
-        return f"{C_RED}{C_BOLD}{temp:.1f}°C{C_RESET}"
+        return f"{C_RED}{C_BOLD}{temp:.1f}°c{C_RESET}"
 
 def cmd_status(proxy):
     data = get_status(proxy)
@@ -73,15 +73,15 @@ def cmd_status(proxy):
     auto_unstick = data.get("auto_unstick", True)
     is_shocking = data.get("is_shocking", False)
 
-    lock_badge = f"{C_RED}{C_BOLD}[400MHz LOCKED]{C_RESET}" if is_locked else f"{C_GREEN}[normal]{C_RESET}"
-    shock_badge = f" {C_YELLOW}{C_BOLD}⚡ [SHOCK BURST]{C_RESET}" if is_shocking else ""
+    lock_badge = f"{C_RED}{C_BOLD}[400mhz locked]{C_RESET}" if is_locked else f"{C_GREEN}[normal]{C_RESET}"
+    shock_badge = f" {C_YELLOW}{C_BOLD}⚡ [shock burst]{C_RESET}" if is_shocking else ""
     unstick_badge = f"{C_GREEN}enabled{C_RESET}" if auto_unstick else f"{C_DIM}disabled{C_RESET}"
 
     print(f"{C_CYAN}{C_BOLD}thinkpad fanctl{C_RESET}")
-    print(f"  {C_DIM}├─{C_RESET} {C_BOLD}fan status:{C_RESET}     {rpm} RPM  (mode: {C_CYAN}{mode}{C_RESET} | level: {C_BOLD}{level}{C_RESET}){shock_badge}")
+    print(f"  {C_DIM}├─{C_RESET} {C_BOLD}fan status:{C_RESET}     {rpm} rpm  (mode: {C_CYAN}{mode}{C_RESET} | level: {C_BOLD}{level}{C_RESET}){shock_badge}")
     print(f"  {C_DIM}├─{C_RESET} {C_BOLD}temperature:{C_RESET}    {format_temp_color(temp)} (max: {format_temp_color(max_temp)})")
     print(f"  {C_DIM}├─{C_RESET} {C_BOLD}curve profile:{C_RESET}  {C_YELLOW}{curve_prof}{C_RESET}")
-    print(f"  {C_DIM}├─{C_RESET} {C_BOLD}cpu clock:{C_RESET}      {cpu_mhz} MHz ({cpu_min} - {cpu_max} MHz) {lock_badge}")
+    print(f"  {C_DIM}├─{C_RESET} {C_BOLD}cpu clock:{C_RESET}      {cpu_mhz} mhz ({cpu_min} - {cpu_max} mhz) {lock_badge}")
     print(f"  {C_DIM}└─{C_RESET} {C_BOLD}auto-unstick:{C_RESET}   {unstick_badge}")
 
 def cmd_set_level(proxy, level: str):
@@ -147,7 +147,7 @@ def cmd_unstick(proxy):
         res = proxy.TriggerUnstick()
         success = res[0] if isinstance(res, (tuple, list)) else res
         if success:
-            print(f"{C_GREEN}shock engaged:{C_RESET} fan burst full-speed -> 7 to clear 400MHz lock")
+            print(f"{C_GREEN}shock engaged:{C_RESET} fan burst full-speed -> 7 to clear 400mhz lock")
         else:
             print(f"{C_YELLOW}shock ignored:{C_RESET} cooldown active or already shocking", file=sys.stderr)
     except Exception as e:
@@ -185,7 +185,7 @@ def cmd_watch(proxy, interval: float = 1.0):
             lvl = data.get("level", "?")
             mode = data.get("mode", "?")
             cpu = data.get("cpu_mhz", 0)
-            print(f"\r{format_temp_color(temp)} | {rpm:4d} RPM | lvl: {lvl:5s} | mode: {mode:7s} | {cpu:4d} MHz", end="", flush=True)
+            print(f"\r{format_temp_color(temp)} | {rpm:4d} rpm | lvl: {lvl:5s} | mode: {mode:7s} | {cpu:4d} mhz", end="", flush=True)
             time.sleep(interval)
     except KeyboardInterrupt:
         print()
@@ -193,29 +193,29 @@ def cmd_watch(proxy, interval: float = 1.0):
 def print_help():
     print(f"""{C_CYAN}{C_BOLD}fanctl{C_RESET} - thinkpad fan & thermal control cli
 
-{C_BOLD}USAGE:{C_RESET}
+{C_BOLD}usage:{C_RESET}
   fanctl [command] [args...]
 
-{C_BOLD}COMMANDS:{C_RESET}
-  status                   show live temperatures, fan rpm, and cpu clocks (default)
+{C_BOLD}commands:{C_RESET}
+  status                    show live temperatures, fan rpm, and cpu clocks (default)
   set <0-7|auto|full|curve> set fan level directly
-  curve [profile]          view or switch curve (quiet, balanced, aggressive)
-  unstick                  shock embedded controller to clear 400mhz lock
-  watchdog <on|off>        enable or disable auto-unstick watchdog
-  json                     dump live status as json (for quickshell / scripts)
-  watch [interval]         live updating one-line terminal monitor
-  help                     show this help
+  curve [profile]           view or switch curve (quiet, balanced, aggressive)
+  unstick                   shock embedded controller to clear 400mhz lock
+  watchdog <on|off>         enable or disable auto-unstick watchdog
+  json | --json             dump live status as json (for quickshell / scripts)
+  watch [interval]          live updating one-line terminal monitor
+  help                      show this help
 
-{C_BOLD}SHORTCUTS:{C_RESET}
-  fanctl 0..7              same as 'fanctl set 0..7'
-  fanctl auto              same as 'fanctl set auto'
-  fanctl full              same as 'fanctl set full-speed'
-  fanctl quiet             same as 'fanctl curve quiet'
+{C_BOLD}shortcuts:{C_RESET}
+  fanctl 0..7               same as 'fanctl set 0..7'
+  fanctl auto               same as 'fanctl set auto'
+  fanctl full               same as 'fanctl set full-speed'
+  fanctl quiet              same as 'fanctl curve quiet'
 """)
 
 def main():
     args = sys.argv[1:]
-    if not args or args[0] in ["status", "-s"]:
+    if not args or args[0].lower() in ["status", "-s", "--status"]:
         proxy = get_proxy()
         cmd_status(proxy)
         return
@@ -242,7 +242,7 @@ def main():
         cmd_unstick(proxy)
     elif cmd in ["watchdog", "wd"]:
         cmd_watchdog(proxy, args[1:])
-    elif cmd in ["json", "-j"]:
+    elif cmd in ["json", "-j", "--json"]:
         cmd_json(proxy)
     elif cmd in ["watch", "-w"]:
         interval = float(args[1]) if len(args) > 1 else 1.0

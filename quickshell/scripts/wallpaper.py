@@ -495,6 +495,36 @@ def in_gnome_session() -> bool:
   return "gnome" in os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
 
 
+def _read_dconf_str(path: str) -> str:
+  if not shutil.which("dconf"):
+    return ""
+  try:
+    r = subprocess.run(
+        ["dconf", "read", path],
+        capture_output=True,
+        text=True,
+        timeout=1.5,
+    )
+    if r.returncode == 0:
+      return r.stdout.strip().strip("'").strip('"')
+  except Exception:
+    pass
+  return ""
+
+
+def sync_gnome_backgrounds() -> bool:
+  sync_bin = Path.home() / ".local" / "bin" / "sync-gnome-wallpapers"
+  if not sync_bin.exists():
+    log_warn(f"sync-gnome-wallpapers helper not found at {sync_bin}")
+    return False
+  res = subprocess.run([str(sync_bin)])
+  if res.returncode == 0:
+    log_ok("synced gnome background picker xml from ~/.wallpapers")
+    return True
+  log_err("sync-gnome-wallpapers failed")
+  return False
+
+
 def ensure_awww_daemon() -> bool:
   if in_gnome_session():
     return False
@@ -1477,7 +1507,47 @@ def batch_download(args) -> bool:
   return any(results)
 
 
-def print_status() -> bool:
+def _active_preview_path(cfg: dict) -> str:
+  if CURR_WALL_STATIC.exists():
+    try:
+      p = str(CURR_WALL_STATIC.resolve())
+      if os.path.isfile(p):
+        return p
+    except Exception:
+      pass
+  cur = resolve_wallpaper_path(cfg.get("currentWallpaper", ""))
+  if cur and os.path.isfile(cur):
+    if Path(cur).suffix.lower() in VIDEO_EXTS:
+      v_hash = hashlib.md5(cur.encode("utf-8")).hexdigest()[:12]
+      v_thumb = THUMB_DIR / f"{v_hash}.jpg"
+      if v_thumb.is_file():
+        return str(v_thumb)
+      return ""
+    return cur
+  return ""
+
+
+def preview_wallpaper(args) -> bool:
+  from _cli_ui import in_kitty, render_kitty_image
+  cfg = load_settings()
+  target = args[0] if args else _active_preview_path(cfg)
+  if not target or not os.path.isfile(target):
+    log_warn("no previewable image found")
+    return False
+  if Path(target).suffix.lower() in VIDEO_EXTS:
+    v_hash = hashlib.md5(target.encode("utf-8")).hexdigest()[:12]
+    v_thumb = THUMB_DIR / f"{v_hash}.jpg"
+    if not v_thumb.is_file():
+      make_video_thumb(target, v_thumb)
+    target = str(v_thumb)
+  if not in_kitty():
+    print(target)
+    return True
+  return render_kitty_image(target, max_w=640, max_h=340, align="left")
+
+
+def print_status(show_img: bool = True) -> bool:
+  from _cli_ui import in_kitty, render_kitty_image
   cfg = load_settings()
   wps = read_saved_wp_list()
   cur = resolve_wallpaper_path(cfg.get("currentWallpaper", "")) or "none"
@@ -1488,13 +1558,30 @@ def print_status() -> bool:
       .lower()
   )
   trans = str(cfg.get("awwwTransitionType", "wipe")).lower()
+  in_gnome = in_gnome_session()
 
   print(f"{C_MAGENTA}( ⌐■_■ ) wallpaper & matugen status{C_RESET}")
   print(f"  {C_DIM}current:{C_RESET}    {C_CYAN}{cur}{C_RESET}")
   print(f"  {C_DIM}mode:{C_RESET}       {C_GREEN}{mode}{C_RESET}")
   print(f"  {C_DIM}scheme:{C_RESET}     {C_GREEN}{scheme}{C_RESET}")
-  print(f"  {C_DIM}transition:{C_RESET} {trans}")
+  if in_gnome:
+    shell_theme = _read_dconf_str("/org/gnome/shell/extensions/user-theme/name") or "default"
+    uuid = _read_dconf_str("/org/gnome/Ptyxis/default-profile-uuid")
+    ptyxis_pal = (
+        _read_dconf_str(f"/org/gnome/Ptyxis/Profiles/{uuid}/palette")
+        if uuid
+        else "default"
+    )
+    print(f"  {C_DIM}backend:{C_RESET}    gnome (dconf + matugen)")
+    print(f"  {C_DIM}themes:{C_RESET}     shell={shell_theme} • ptyxis={ptyxis_pal}")
+  else:
+    print(f"  {C_DIM}transition:{C_RESET} {trans}")
   print(f"  {C_DIM}indexed:{C_RESET}    {len(wps)} wallpapers in saved_wp")
+  if show_img and in_kitty():
+    p_img = _active_preview_path(cfg)
+    if p_img:
+      print("")
+      render_kitty_image(p_img, max_w=420, max_h=210, align="left")
   return True
 
 
@@ -1531,16 +1618,18 @@ def interactive_picker():
   wps = read_saved_wp_list() or scan()
 
   options = [
-      f"roll      • random local wallpaper ({len(wps)} indexed)",
-      "wallhaven • roll random online wallpaper",
-      "library   • browse & filter local wallpapers",
-      "live      • browse video & gif wallpapers",
-      f"mode      • toggle dark / light (active: {cur_m})",
-      f"scheme    • switch matugen algorithm (active: {cur_s})",
-      "reload    • re-apply current wallpaper & palette",
-      "scan      • rescan folders & rebuild saved_wp",
-      "status    • inspect current state & paths",
+      f"roll       • random local wallpaper ({len(wps)} indexed)",
+      "wallhaven  • roll random online wallpaper",
+      "library    • browse & filter local wallpapers",
+      "live       • browse video & gif wallpapers",
+      f"mode       • toggle dark / light (active: {cur_m})",
+      f"scheme     • switch matugen algorithm (active: {cur_s})",
+      "reload     • re-apply current wallpaper & palette",
+      "scan       • rescan folders & rebuild saved_wp",
+      "status     • inspect current state & paths",
   ]
+  if in_gnome_session() and (Path.home() / ".local" / "bin" / "sync-gnome-wallpapers").exists():
+    options.append("gnome-sync • refresh gnome background picker xml")
 
   choice = fzf_prompt(
       options,
@@ -1567,17 +1656,25 @@ def interactive_picker():
     random_wallhaven([q] if q else [])
   elif action == "library":
     lines = [
-        f"{w['path']}\t[{w['category'].lower()}]\t{w['name'].lower()}"
+        f"{w['path']}\t[{w['category'].lower()}]\t{w['name'].lower()}\t{w.get('thumb') or w['path']}"
         for w in wps
     ]
+    prev_cmd = (
+        'img={4}; '
+        'if [ -n "${KITTY_WINDOW_ID:-}" ] && command -v kitten >/dev/null 2>&1 && [ -f "$img" ]; then '
+        '  kitten icat --clear --transfer-mode=memory --unicode-placeholder --stdin=no --place="${FZF_PREVIEW_COLUMNS}x${FZF_PREVIEW_LINES}@0x0" "$img"; '
+        'else file -b "$img"; fi'
+    )
     res = fzf_prompt(
         lines,
         [
             "--with-nth=2,3",
             "--delimiter=\t",
             "--header=( ✧_✧ ) select wallpaper",
+            "--preview", prev_cmd,
+            "--preview-window=right:55%",
             "--reverse",
-            "--height=60%",
+            "--height=65%",
         ],
     )
     if res:
@@ -1588,17 +1685,25 @@ def interactive_picker():
       log_warn("no live video or gif wallpapers found in ~/.wallpapers")
       return
     lines = [
-        f"{w['path']}\t[live {w.get('ext', '').lower()}]\t{w.get('name', '').lower()}"
+        f"{w['path']}\t[live {w.get('ext', '').lower()}]\t{w.get('name', '').lower()}\t{w.get('thumb') or w['path']}"
         for w in live
     ]
+    prev_cmd = (
+        'img={4}; '
+        'if [ -n "${KITTY_WINDOW_ID:-}" ] && command -v kitten >/dev/null 2>&1 && [ -f "$img" ]; then '
+        '  kitten icat --clear --transfer-mode=memory --unicode-placeholder --stdin=no --place="${FZF_PREVIEW_COLUMNS}x${FZF_PREVIEW_LINES}@0x0" "$img"; '
+        'else file -b {1}; fi'
+    )
     res = fzf_prompt(
         lines,
         [
             "--with-nth=2,3",
             "--delimiter=\t",
             "--header=( ▸‿▸ ) select live wallpaper",
+            "--preview", prev_cmd,
+            "--preview-window=right:55%",
             "--reverse",
-            "--height=50%",
+            "--height=60%",
         ],
     )
     if res:
@@ -1614,29 +1719,40 @@ def interactive_picker():
     log_ok("rescanned library & updated saved_wp:", f"{len(found)} wallpapers")
   elif action == "status":
     print_status()
+  elif action == "gnome-sync":
+    sync_gnome_backgrounds()
 
 
 def print_help():
-  print(f"""{C_MAGENTA}( ✧_✧ ) wp • wallpaper & matugen control hub{C_RESET}
+  print(f"""{C_MAGENTA}( ✧_✧ ) wp • wallpaper & matugen control hub (hyprland + gnome){C_RESET}
 
 {C_BOLD}usage:{C_RESET}
   wp                           open interactive fzf picker
-  wp status                    show active wallpaper, mode, scheme & count
+  wp status                    show active wallpaper, mode, scheme & backend
   wp mode [dark|light|toggle]  switch or toggle dark / light mode
   wp scheme [name]             switch matugen palette algorithm
   wp toggle                    quick toggle between dark and light mode
   wp random [category|online]  roll random wallpaper (e.g. wp random anime)
   wp wh [query]                roll random online wallpaper from wallhaven
+  wp preview [file]            preview wallpaper or image inline in kitty
   wp reload                    re-apply current wallpaper & matugen palette
   wp set <file> [options...]   apply specific image or video file
   wp color <#hex>              apply solid color theme
   wp scan                      rescan folders & rebuild saved_wp
+  wp gnome-sync                update gnome settings wallpaper xml entries
   wp download <url>            download image/video and apply
-  wp pause | unpause | toggle  pause/resume animated gif playback in awww
-  wp clear-cache               clear awww daemon image cache
+  wp pause | unpause | toggle  pause/resume animated gif playback in awww (hyprland)
+  wp clear-cache               clear awww daemon image cache (hyprland)
   wp stop                      stop running live video wallpapers (mpvpaper)
   wp get                       print current wallpaper path
 """)
+
+
+def _gnome_guard_awww(cmd_name: str) -> bool:
+  if in_gnome_session():
+    log_warn(f"'{cmd_name}' controls awww/hyprland only (gnome uses static wallpaper frames)")
+    return True
+  return False
 
 
 def main():
@@ -1659,8 +1775,11 @@ def main():
               True,
           )[1]
       )(scan()),
-      "status": lambda: print_status(),
-      "info": lambda: print_status(),
+      "gnome-sync": lambda: sync_gnome_backgrounds(),
+      "preview": lambda: preview_wallpaper(args),
+      "img": lambda: preview_wallpaper(args),
+      "status": lambda: print_status(show_img="--no-img" not in args),
+      "info": lambda: print_status(show_img="--no-img" not in args),
       "set": lambda: set_wallpaper(args),
       "mode": lambda: set_mode(args),
       "scheme": lambda: set_scheme(args),
@@ -1681,28 +1800,44 @@ def main():
       "download": lambda: download(args),
       "batch-download": lambda: batch_download(args),
       "pause": lambda: (
-          ensure_awww_daemon(),
-          subprocess.run(["awww", "pause"], stderr=subprocess.DEVNULL),
-          log_ok("paused awww animation"),
-          True,
-      )[3],
+          False
+          if _gnome_guard_awww("pause")
+          else (
+              ensure_awww_daemon(),
+              subprocess.run(["awww", "pause"], stderr=subprocess.DEVNULL),
+              log_ok("paused awww animation"),
+              True,
+          )[3]
+      ),
       "unpause": lambda: (
-          ensure_awww_daemon(),
-          subprocess.run(["awww", "unpause"], stderr=subprocess.DEVNULL),
-          log_ok("resumed awww animation"),
-          True,
-      )[3],
+          False
+          if _gnome_guard_awww("unpause")
+          else (
+              ensure_awww_daemon(),
+              subprocess.run(["awww", "unpause"], stderr=subprocess.DEVNULL),
+              log_ok("resumed awww animation"),
+              True,
+          )[3]
+      ),
       "awww-toggle": lambda: (
-          ensure_awww_daemon(),
-          subprocess.run(["awww", "toggle"], stderr=subprocess.DEVNULL),
-          log_ok("toggled awww playback"),
-          True,
-      )[3],
+          False
+          if _gnome_guard_awww("awww-toggle")
+          else (
+              ensure_awww_daemon(),
+              subprocess.run(["awww", "toggle"], stderr=subprocess.DEVNULL),
+              log_ok("toggled awww playback"),
+              True,
+          )[3]
+      ),
       "clear-cache": lambda: (
-          subprocess.run(["awww", "clear-cache"], stderr=subprocess.DEVNULL),
-          log_ok("cleared awww cache"),
-          True,
-      )[2],
+          False
+          if _gnome_guard_awww("clear-cache")
+          else (
+              subprocess.run(["awww", "clear-cache"], stderr=subprocess.DEVNULL),
+              log_ok("cleared awww cache"),
+              True,
+          )[2]
+      ),
       "stop": lambda: (
           kill_mpvpaper(),
           log_ok("stopped live wallpapers"),

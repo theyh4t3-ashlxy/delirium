@@ -404,21 +404,21 @@ PanelWindow {
     }}
 
     Component { id: compWallpaper; WallpaperBrowser { barScreen: root.screen; barMonitor: root.hyprMonitor } }
-    Component { id: compWorkspaces; Workspaces {} }
+    Component { id: compWorkspaces; Workspaces { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compWindowTitle; WindowTitle { barScreen: root.screen; barMonitor: root.hyprMonitor } }
-    Component { id: compClock; Clock {} }
-    Component { id: compMedia; NowPlaying {} }
+    Component { id: compClock; Clock { barScreen: root.screen; barMonitor: root.hyprMonitor } }
+    Component { id: compMedia; NowPlaying { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compQuickNotes; QuickNotes { barScreen: root.screen; barMonitor: root.hyprMonitor } }
-    Component { id: compClipboard; Clipboard {} }
+    Component { id: compClipboard; Clipboard { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compIdleInhibitor; IdleInhibitor { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compNotifications; Notifications { barScreen: root.screen; barMonitor: root.hyprMonitor } }
-    Component { id: compSystemTray; SystemTray {} }
-    Component { id: compBluetooth; Bluetooth {} }
-    Component { id: compNetwork; NetworkStatus {} }
-    Component { id: compVolume; VolumeControl {} }
+    Component { id: compSystemTray; SystemTray { barScreen: root.screen; barMonitor: root.hyprMonitor } }
+    Component { id: compBluetooth; Bluetooth { barScreen: root.screen; barMonitor: root.hyprMonitor } }
+    Component { id: compNetwork; NetworkStatus { barScreen: root.screen; barMonitor: root.hyprMonitor } }
+    Component { id: compVolume; VolumeControl { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compBattery; Battery { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compQuickSettings; QuickSettings { barScreen: root.screen; barMonitor: root.hyprMonitor } }
-    Component { id: compPowerMenu; PowerMenu {} }
+    Component { id: compPowerMenu; PowerMenu { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compScreenCapture; ScreenCapture { barScreen: root.screen; barMonitor: root.hyprMonitor } }
     Component { id: compLayout; LayoutSwitcher { barScreen: root.screen; barMonitor: root.hyprMonitor } }
 
@@ -993,16 +993,16 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: root.effectivePaddingH
                 anchors.verticalCenter: parent.verticalCenter
-                clusters: root.leftClusters
+                clusters: !root.isVertical ? root.leftClusters : []
                 vertical: false
             }
 
             BarClusterZone {
                 id: centerZoneH
                 anchors.centerIn: parent
-                clusters: root.centerClusters
+                clusters: !root.isVertical ? root.centerClusters : []
                 vertical: false
-                showRecFallback: true
+                showRecFallback: !root.isVertical
                 z: 10
             }
 
@@ -1011,7 +1011,7 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.rightMargin: root.effectivePaddingH
                 anchors.verticalCenter: parent.verticalCenter
-                clusters: root.rightClusters
+                clusters: !root.isVertical ? root.rightClusters : []
                 vertical: false
                 maxSpan: root.maxRightRowWidth
             }
@@ -1026,16 +1026,16 @@ PanelWindow {
                 anchors.top: parent.top
                 anchors.topMargin: root.effectivePaddingH
                 anchors.horizontalCenter: parent.horizontalCenter
-                clusters: root.leftClusters
+                clusters: root.isVertical ? root.leftClusters : []
                 vertical: true
             }
 
             BarClusterZone {
                 id: centerZoneV
                 anchors.centerIn: parent
-                clusters: root.centerClusters
+                clusters: root.isVertical ? root.centerClusters : []
                 vertical: true
-                showRecFallback: true
+                showRecFallback: root.isVertical
                 z: 10
             }
 
@@ -1044,7 +1044,7 @@ PanelWindow {
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: root.effectivePaddingH
                 anchors.horizontalCenter: parent.horizontalCenter
-                clusters: root.rightClusters
+                clusters: root.isVertical ? root.rightClusters : []
                 vertical: true
             }
         }

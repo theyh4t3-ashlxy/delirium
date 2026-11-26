@@ -142,22 +142,79 @@ def get_weather(location: str = "", force: bool = False) -> dict:
     return res
 
 
+def _wmo_icon(code: int, is_day: bool = True) -> str:
+    if code == 0:
+        return "󰖙" if is_day else "󰖔"
+    if code in (1, 2):
+        return "󰖕" if is_day else "󰼱"
+    if code == 3:
+        return "󰖐"
+    if code in (45, 48):
+        return "󰖑"
+    if code in (51, 53, 55, 56, 57):
+        return "󰖗"
+    if code in (61, 63, 65, 66, 67, 80, 81, 82):
+        return "󰖖"
+    if code in (71, 73, 75, 77, 85, 86):
+        return "󰖘"
+    if code in (95, 96, 99):
+        return "󰖓"
+    return "󰖐"
+
+
+def _pretty_weather(w: dict, as_json: bool = False) -> None:
+    from _cli_ui import get_style, render_box, term_size
+    if as_json:
+        clean = {k: v for k, v in w.items() if not k.startswith("_")}
+        print(json.dumps(clean, indent=2))
+        return
+    st = get_style()
+    icon = _wmo_icon(int(w.get("code", 0)), bool(w.get("is_day", True)))
+    lines = [
+        f" {st.dim}├─{st.reset} {st.bold}{'location:':<12}{st.reset} {st.cyan}{str(w['city']).lower()}{st.reset}",
+        f" {st.dim}├─{st.reset} {st.bold}{'now:':<12}{st.reset} {st.green}{w['temp_c']}°c{st.reset} ({w['temp_f']}°f) · feels {w['feels_c']}°c · {st.magenta}{w['cond']}{st.reset}",
+        f" {st.dim}├─{st.reset} {st.bold}{'hi / lo:':<12}{st.reset} {w['high_c']}°c / {w['low_c']}°c",
+        f" {st.dim}└─{st.reset} {st.bold}{'air:':<12}{st.reset} humidity {w['humidity']}% · wind {w['wind_kmh']} km/h",
+    ]
+    cols, _ = term_size()
+    print("\n".join(render_box(lines, width=min(cols, 76), title=f"{st.blue}{st.bold}{icon} wx · weather{st.reset}", style=st, border_color=st.blue)))
+
+
 def main() -> None:
+    from _cli_ui import get_style, is_pretty_cli
+
     args = sys.argv[1:]
+    if any(a in ("-h", "--help", "help") for a in args):
+        st = get_style()
+        print(f"{st.blue}{st.bold}wx{st.reset} · cached open-meteo forecast\n\nusage:\n  wx [status|city] [-f|--force] [--json]")
+        return
+
+    as_json = "--json" in args
+    pretty = is_pretty_cli(sys.argv, ("wx", "weather"), raw_cmds=("fetch",))
     force = "--force" in args or "-f" in args
-    loc_args = [a for a in args if a not in ("--force", "-f", "fetch")]
+    loc_args = [
+        a for a in args
+        if a.lower() not in ("--force", "-f", "fetch", "status", "show", "--json", "--pretty", "--kv")
+    ]
     loc = " ".join(loc_args).strip()
 
     try:
         w = get_weather(loc, force=force)
-        for k, v in w.items():
-            if k.startswith("_"):
-                continue
-            if isinstance(v, bool):
-                print(f"{k}={'true' if v else 'false'}")
-            else:
-                print(f"{k}={_esc(str(v))}")
+        if pretty:
+            _pretty_weather(w, as_json=as_json)
+        else:
+            for k, v in w.items():
+                if k.startswith("_"):
+                    continue
+                if isinstance(v, bool):
+                    print(f"{k}={'true' if v else 'false'}")
+                else:
+                    print(f"{k}={_esc(str(v))}")
     except Exception as exc:
+        if pretty:
+            st = get_style()
+            print(f"{st.red}󰅚 {str(exc).lower()}{st.reset}", file=sys.stderr)
+            sys.exit(1)
         print("ok=false")
         print(f"error={_esc(str(exc))}")
 

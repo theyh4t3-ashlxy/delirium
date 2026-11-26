@@ -94,7 +94,9 @@ alias chgrp="chgrp --preserve-root"
 
 # launch GUI file manager without hijacking stdout
 fm() {
-    if (( $+commands[dolphin] )); then
+    if [[ "${XDG_CURRENT_DESKTOP:l}" == *gnome* ]] && (( $+commands[nautilus] )); then
+        nautilus "${1:-.}" >/dev/null 2>&1 &!
+    elif (( $+commands[dolphin] )); then
         dolphin "${1:-.}" >/dev/null 2>&1 &!
     elif (( $+commands[nautilus] )); then
         nautilus "${1:-.}" >/dev/null 2>&1 &!
@@ -119,8 +121,20 @@ if (( $+commands[lazygit] )); then
     alias lg="lazygit"
 fi
 
-# screen color picker
-alias color="hyprpicker -a"
+# screen color picker (wraps standalone pick cli across hyprland & gnome)
+unalias color 2>/dev/null || true
+color() {
+    if (( $+commands[pick] )); then
+        command pick --copy
+    else
+        python3 "${_dotfiles_dir}/quickshell/scripts/colorpicker.py" --copy
+    fi
+}
+
+# friendly aliases for standalone python CLIs in ~/.local/bin
+alias weather="wx"
+alias batstat="pwr"
+alias netstat-ui="net"
 
 # directory stack & jumps
 alias d="dirs -v"
@@ -163,6 +177,7 @@ hash -d hypr="$HOME/.local/share/dotfiles/hypr"
 hash -d qs="$HOME/.local/share/dotfiles/quickshell"
 hash -d nix="$HOME/.local/share/dotfiles/nixos"
 hash -d btop="$HOME/.local/share/dotfiles/btop"
+hash -d mat="$HOME/.local/share/dotfiles/matugen"
 hash -d wp="$HOME/.wallpapers"
 hash -d conf="$HOME/.config"
 

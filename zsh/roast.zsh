@@ -62,8 +62,9 @@ _critic_suggest_cmd() {
 
     local -a pool=(
         ${(k)commands} ${(k)aliases} ${(k)functions} ${(k)builtins}
-        git nix rebuild sysup gens try in nshell nrun nixs zoxide bat eza rg fd fzf btop yazi nvim micro kitty cli wp qs
-        settings dnd nuke glog gbr gdiff ports extract calc clear exit ls cd cat grep
+        git nix rebuild sysup gens try in nshell nrun nixs zoxide bat eza rg fd fzf btop yazi nvim micro kitty ptyxis nautilus cli wp qs fanctl
+        settings dnd nuke glog gbr gdiff ports extract calc clear exit ls cd cat grep bak copyfile copydir prompt-edit prompt-save prompt-load
+        confirm safe-rm safe-push mark unmark marks jump scratch topcpu topmem undo session weather wx pwr net shot clip pick color
     )
     typeset -U pool
 

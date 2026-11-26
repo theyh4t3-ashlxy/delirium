@@ -408,29 +408,121 @@ def run_fan_action(sub: str, arg: str = "") -> None:
         print(f"ok=false\nerror={exc}")
 
 
-def main() -> None:
-    args = sys.argv[1:]
-    if not args or args[0] == "probe":
-        probe_battery()
+def _pretty_status(as_json: bool = False) -> None:
+    from _cli_ui import get_style, render_box, term_size
+
+    bat = _discover_battery()
+    data: dict[str, object] = {}
+    if bat:
+        bname = os.path.basename(bat)
+        cap = _read_text(os.path.join(bat, "capacity"))
+        bstat = _read_text(os.path.join(bat, "status"))
+        full_val = _read_text(os.path.join(bat, "energy_full")) or _read_text(os.path.join(bat, "charge_full"))
+        des_val = _read_text(os.path.join(bat, "energy_full_design")) or _read_text(os.path.join(bat, "charge_full_design"))
+        health = round(100.0 * int(full_val) / int(des_val), 1) if (full_val.isdigit() and des_val.isdigit() and int(des_val) > 0) else None
+        data["battery"] = {
+            "name": bname,
+            "capacity": int(cap) if cap.isdigit() else cap,
+            "status": bstat.lower(),
+            "cycles": int(_read_text(os.path.join(bat, "cycle_count")) or 0),
+            "start": _read_text(os.path.join(bat, "charge_control_start_threshold")) or _read_text(os.path.join(bat, "charge_start_threshold")),
+            "stop": _read_text(os.path.join(bat, "charge_control_end_threshold")) or _read_text(os.path.join(bat, "charge_stop_threshold")),
+            "health_pct": health,
+        }
+    data["power"] = _detect_power_state()
+    data["fan"] = _detect_fan_telemetry()
+    gpus, dgpu_state = _detect_dgpu_status()
+    data["gpus"] = {"count": gpus, "dgpu_state": dgpu_state}
+
+    if as_json:
+        print(json.dumps(data, indent=2))
         return
 
-    cmd = args[0].lower()
-    if cmd == "set-profile" and len(args) >= 2:
-        set_profile(args[1])
-    elif cmd == "set-epp" and len(args) >= 2:
-        set_epp(args[1])
-    elif cmd == "set-turbo" and len(args) >= 2:
-        set_turbo(args[1])
-    elif cmd == "set-thresholds" and len(args) >= 3:
-        set_thresholds(args[1], args[2])
-    elif cmd == "fan-curve" and len(args) >= 2:
-        run_fan_action("curve", args[1])
-    elif cmd == "fan-level" and len(args) >= 2:
-        run_fan_action("level", args[1])
+    st = get_style()
+    binfo = data.get("battery") or {}
+    pinfo = data["power"]
+    finfo = data["fan"]
+    turbo = "on" if pinfo.get("turbo", "1") == "1" else "off"
+    lines = [
+        f" {st.dim}├─{st.reset} {st.bold}{'battery:':<14}{st.reset} {st.green}{binfo.get('capacity', '?')}%{st.reset} ({binfo.get('status', '?')}) · thresh {binfo.get('start', '?')}-{binfo.get('stop', '?')}% · health {binfo.get('health_pct', '?')}% ({binfo.get('cycles', '?')} cyc)",
+        f" {st.dim}├─{st.reset} {st.bold}{'power:':<14}{st.reset} {st.cyan}{pinfo.get('profile', '?')}{st.reset} · epp={st.magenta}{pinfo.get('epp', '?')}{st.reset} · gov={pinfo.get('governor', '?')} · turbo={turbo}",
+        f" {st.dim}├─{st.reset} {st.bold}{'thermals:':<14}{st.reset} cpu {finfo.get('cpu_mhz', '?')}mhz @ {finfo.get('cpu_temp', '?')}°c · nvme {finfo.get('nvme_temp', '?')}°c · fan {finfo.get('fan_rpm', '?')} rpm ({finfo.get('curve_profile', '?')})",
+        f" {st.dim}└─{st.reset} {st.bold}{'gpus:':<14}{st.reset} {gpus} detected · dgpu={dgpu_state or 'n/a'} · backend={pinfo.get('backend', '?')}",
+    ]
+    cols, _ = term_size()
+    print("\n".join(render_box(lines, width=min(cols, 92), title=f"{st.cyan}{st.bold}󰁹 pwr · power & thermals{st.reset}", style=st, border_color=st.cyan)))
+
+
+def _print_help() -> None:
+    from _cli_ui import get_style
+    st = get_style()
+    print(f"""{st.cyan}{st.bold}󰁹 pwr{st.reset} {st.dim}· thinkpad battery, cpu, and fan controller{st.reset}
+
+{st.bold}usage:{st.reset}
+  pwr [status] [--json]            show battery, power profile, clocks, and fan status
+  pwr watch [sec]                  live refreshing thermal/power view
+  pwr profile <performance|balanced|power-saver>
+  pwr epp <default|performance|balance_performance|balance_power|power>
+  pwr turbo <on|off>               toggle intel_pstate turbo boost
+  pwr thresholds <start> <stop>    set thinkpad battery charge thresholds
+  pwr fan <curve|level|unstick|watchdog> ...
+  pwr probe                        raw k=v output (for quickshell)""")
+
+
+def main() -> None:
+    from _cli_ui import is_pretty_cli
+    import time
+
+    args = sys.argv[1:]
+    if any(a in ("-h", "--help", "help") for a in args):
+        _print_help()
+        return
+
+    as_json = "--json" in args
+    clean_args = [a for a in args if a not in ("--json", "--pretty", "--kv")]
+    pretty = is_pretty_cli(sys.argv, ("pwr", "battery"), raw_cmds=("probe", "set-profile", "set-epp", "set-turbo", "set-thresholds", "fan-curve", "fan-level", "fan-unstick", "fan-watchdog"))
+
+    if not clean_args:
+        if pretty:
+            _pretty_status(as_json=as_json)
+        else:
+            probe_battery()
+        return
+
+    cmd = clean_args[0].lower()
+    if cmd == "status":
+        _pretty_status(as_json=as_json)
+    elif cmd == "watch":
+        interval = float(clean_args[1]) if len(clean_args) > 1 else 1.5
+        try:
+            while True:
+                sys.stdout.write("\033[H\033[J")
+                _pretty_status(as_json=False)
+                time.sleep(interval)
+        except KeyboardInterrupt:
+            print()
+    elif cmd == "probe":
+        probe_battery()
+    elif cmd in ("set-profile", "profile") and len(clean_args) >= 2:
+        set_profile(clean_args[1])
+    elif cmd in ("set-epp", "epp") and len(clean_args) >= 2:
+        set_epp(clean_args[1])
+    elif cmd in ("set-turbo", "turbo") and len(clean_args) >= 2:
+        val = "1" if clean_args[1].lower() in ("1", "true", "on", "enable") else ("0" if clean_args[1].lower() in ("0", "false", "off", "disable") else clean_args[1])
+        set_turbo(val)
+    elif cmd in ("set-thresholds", "thresholds") and len(clean_args) >= 3:
+        set_thresholds(clean_args[1], clean_args[2])
+    elif cmd == "fan" and len(clean_args) >= 2:
+        sub = clean_args[1].lower()
+        run_fan_action(sub, clean_args[2] if len(clean_args) > 2 else "")
+    elif cmd == "fan-curve" and len(clean_args) >= 2:
+        run_fan_action("curve", clean_args[1])
+    elif cmd == "fan-level" and len(clean_args) >= 2:
+        run_fan_action("level", clean_args[1])
     elif cmd == "fan-unstick":
         run_fan_action("unstick")
-    elif cmd == "fan-watchdog" and len(args) >= 2:
-        run_fan_action("watchdog", args[1])
+    elif cmd == "fan-watchdog" and len(clean_args) >= 2:
+        run_fan_action("watchdog", clean_args[1])
     else:
         probe_battery()
 

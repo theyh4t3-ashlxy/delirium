@@ -59,9 +59,13 @@ def run_qs_ipc(target: str, method: str, *args: str) -> tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
+def in_gnome_session() -> bool:
+    return "gnome" in os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+
+
 def run_hyprctl(args: list[str]) -> bool:
     """Run hyprctl dispatch and verify response."""
-    if not shutil.which("hyprctl"):
+    if in_gnome_session() or not shutil.which("hyprctl"):
         return False
     try:
         res = subprocess.run(
@@ -77,6 +81,15 @@ def run_hyprctl(args: list[str]) -> bool:
 
 def is_session_locked() -> bool:
     """Check if the session is currently marked as locked."""
+    if in_gnome_session() and shutil.which("loginctl"):
+        try:
+            sid = os.environ.get("XDG_SESSION_ID", "")
+            cmd = ["loginctl", "show-session", sid, "-p", "LockedHint", "--value"] if sid else ["loginctl", "show-session", "self", "-p", "LockedHint", "--value"]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=2, check=False)
+            if res.returncode == 0 and res.stdout.strip().lower() == "yes":
+                return True
+        except Exception:
+            pass
     runtime_dir = Path(os.environ.get("XDG_RUNTIME_DIR") or "/tmp")
     user = os.environ.get("USER") or os.environ.get("LOGNAME") or "user"
     for token_path in (
@@ -92,18 +105,24 @@ def is_session_locked() -> bool:
     return False
 
 def lock_session() -> bool:
-    """Lock screen via native Quickshell IPC with loginctl and locker fallbacks."""
+    """Lock screen via native Quickshell IPC (Hyprland) or loginctl / GNOME."""
     if is_session_locked():
         return True
 
-    # 1. Primary: Quickshell IPC lock
-    ok, _ = run_qs_ipc("lock", "lock")
-    if ok:
-        return True
+    # 1. Primary on Hyprland: Quickshell IPC lock
+    if not in_gnome_session():
+        ok, _ = run_qs_ipc("lock", "lock")
+        if ok:
+            return True
 
-    # 2. Logind lock-session
+    # 2. Logind lock-session (works cleanly on both GNOME and Hyprland)
     if run(["loginctl", "lock-session"], timeout=4):
         return True
+
+    if in_gnome_session() and shutil.which("gdbus"):
+        if run(["gdbus", "call", "--session", "--dest", "org.gnome.ScreenSaver",
+                "--object-path", "/org/gnome/ScreenSaver", "--method", "org.gnome.ScreenSaver.Lock"], timeout=4):
+            return True
 
     # 3. Dedicated locker fallbacks if standalone locker installed
     for locker in ["hyprlock", "swaylock", "waylock"]:
@@ -120,13 +139,47 @@ def lock_session() -> bool:
         "-u", "critical",
         "-a", "session manager",
         "-i", "system-lock-screen",
-        "Screen lock failed",
-        "Quickshell lock IPC and system locker fallbacks did not respond.",
+        "screen lock failed",
+        "quickshell lock ipc and system locker fallbacks did not respond.",
     ])
     return False
 
 def toggle_caffeine() -> bool:
-    """Toggle Quickshell idle monitor on/off (Caffeine mode)."""
+    """Toggle idle monitor on/off (Quickshell on Hyprland, org.gnome.desktop.session idle-delay on GNOME)."""
+    if in_gnome_session():
+        if not shutil.which("gsettings"):
+            return False
+        try:
+            cur = subprocess.run(
+                ["gsettings", "get", "org.gnome.desktop.session", "idle-delay"],
+                capture_output=True, text=True, timeout=2, check=False,
+            )
+            val_str = cur.stdout.strip().split()[-1] if cur.returncode == 0 and cur.stdout.strip() else "300"
+            cur_val = int(val_str) if val_str.isdigit() else 300
+        except Exception:
+            cur_val = 300
+
+        state_file = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "quickshell" / "gnome_prev_idle_delay"
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        if cur_val > 0:
+            state_file.write_text(str(cur_val), encoding="utf-8")
+            ok = run(["gsettings", "set", "org.gnome.desktop.session", "idle-delay", "uint32 0"], timeout=3)
+            is_caffeine = True
+        else:
+            prev = "300"
+            if state_file.is_file():
+                saved = state_file.read_text(encoding="utf-8").strip()
+                if saved.isdigit() and int(saved) > 0:
+                    prev = saved
+            ok = run(["gsettings", "set", "org.gnome.desktop.session", "idle-delay", f"uint32 {prev}"], timeout=3)
+            is_caffeine = False
+
+        if ok:
+            new_state = "inhibited (caffeine active)" if is_caffeine else "enabled"
+            run(["notify-send", "-a", "idle monitor", "-i", "caffeine" if is_caffeine else "preferences-desktop-screensaver",
+                 "idle timeout changed", f"gnome idle timer is now {new_state}"])
+        return ok
+
     ok, out = run_qs_ipc("caffeine", "toggle")
     if not ok:
         # Fallback to direct idle toggle if caffeine alias not present
@@ -136,8 +189,8 @@ def toggle_caffeine() -> bool:
                 "notify-send",
                 "-u", "critical",
                 "-a", "idle monitor",
-                "Idle toggle failed",
-                "Quickshell idle IPC service did not respond.",
+                "idle toggle failed",
+                "quickshell idle ipc service did not respond.",
             ])
             return False
 
@@ -154,13 +207,17 @@ def toggle_caffeine() -> bool:
         "notify-send",
         "-a", "idle monitor",
         "-i", icon,
-        "Idle Timeout Changed",
-        f"Quickshell idle is now {new_state}",
+        "idle timeout changed",
+        f"quickshell idle is now {new_state}",
     ])
     return True
 
 def logout_session() -> bool:
-    """Clean exit order: UWSM -> hyprshutdown -> hyprctl dispatch exit -> loginctl."""
+    """Clean exit order: GNOME quit (if GNOME) -> UWSM -> hyprshutdown -> hyprctl -> loginctl."""
+    if in_gnome_session() and shutil.which("gnome-session-quit"):
+        if run(["gnome-session-quit", "--logout", "--no-prompt"], timeout=10):
+            return True
+
     # 1. UWSM managed session
     if shutil.which("uwsm") and run(["uwsm", "stop"], timeout=10):
         return True
@@ -192,8 +249,8 @@ def suspend_system():
                 "notify-send",
                 "-u", "critical",
                 "-a", "power manager",
-                "Suspend Aborted",
-                "Refusing to suspend: screen locker failed to engage.",
+                "suspend aborted",
+                "refusing to suspend: screen locker failed to engage.",
             ])
             return
         # Brief pause to let compositor map and render lock layer
@@ -222,16 +279,58 @@ def hibernate_system():
     run(["loginctl", "hibernate"], timeout=10)
 
 def print_usage():
-    print("Usage: session.py [lock|logout|suspend|reboot|poweroff|hibernate|caffeine|status]", file=sys.stderr)
+    from _cli_ui import get_style
+    st = get_style()
+    print(f"""{st.cyan}{st.bold}󰐥 session{st.reset} {st.dim}· desktop power & lock manager (hyprland + gnome){st.reset}
+
+{st.bold}usage:{st.reset}
+  session [status]                   show desktop, lock, and caffeine state
+  session lock | is-locked           lock session or query lock hint
+  session caffeine                   toggle idle monitor / gnome idle-delay
+  session logout | suspend | hibernate | reboot | poweroff""")
+
+def cmd_status(as_json: bool = False):
+    from _cli_ui import get_style, render_box, term_size
+    in_gnome = in_gnome_session()
+    locked = is_session_locked()
+    desktop = "gnome" if in_gnome else ("hyprland" if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE") else os.environ.get("XDG_CURRENT_DESKTOP", "unknown").lower())
+    caffeine = "unknown"
+    if in_gnome and shutil.which("gsettings"):
+        r = subprocess.run(["gsettings", "get", "org.gnome.desktop.session", "idle-delay"], capture_output=True, text=True, check=False)
+        if r.returncode == 0 and r.stdout.strip():
+            caffeine = "on (idle=0)" if r.stdout.strip().split()[-1] == "0" else f"off ({r.stdout.strip().split()[-1]}s)"
+    elif not in_gnome:
+        ok_c, out_c = run_qs_ipc("caffeine", "status")
+        if ok_c and out_c.strip().lower() in ("true", "false"):
+            caffeine = "on" if out_c.strip().lower() == "true" else "off"
+        else:
+            ok_i, out_i = run_qs_ipc("idle", "status")
+            if ok_i and out_i.strip().lower() in ("true", "false"):
+                caffeine = "off" if out_i.strip().lower() == "true" else "on"
+    if as_json:
+        print(json.dumps({"desktop": desktop, "locked": locked, "caffeine": caffeine}, indent=2))
+        return
+    st = get_style()
+    lines = [
+        f" {st.dim}├─{st.reset} {st.bold}{'desktop:':<12}{st.reset} {st.green}{desktop}{st.reset}",
+        f" {st.dim}├─{st.reset} {st.bold}{'locked:':<12}{st.reset} {st.yellow if locked else st.dim}{'yes' if locked else 'no'}{st.reset}",
+        f" {st.dim}└─{st.reset} {st.bold}{'caffeine:':<12}{st.reset} {caffeine}",
+    ]
+    cols, _ = term_size()
+    print("\n".join(render_box(lines, width=min(cols, 68), title=f"{st.cyan}{st.bold}󰐥 session status{st.reset}", style=st, border_color=st.cyan)))
 
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
+    args = sys.argv[1:]
+    if any(a in ("-h", "--help", "help") for a in args):
         print_usage()
-        sys.exit(0 if (len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help")) else 1)
+        return
 
-    action = sys.argv[1].lower()
+    as_json = "--json" in args
+    clean = [a for a in args if a != "--json"]
+    action = clean[0].lower() if clean else "status"
 
     actions = {
+        "status": lambda: cmd_status(as_json=as_json),
         "lock": lock_session,
         "is-locked": lambda: print("locked" if is_session_locked() else "unlocked"),
         "logout": logout_session,
@@ -252,7 +351,7 @@ def main():
     if handler:
         handler()
     else:
-        print(f"Unknown action: {action}", file=sys.stderr)
+        print(f"unknown action: {action}", file=sys.stderr)
         print_usage()
         sys.exit(1)
 

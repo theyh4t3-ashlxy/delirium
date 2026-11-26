@@ -1,0 +1,5 @@
+#compdef pick color
+
+_arguments -s \
+    '(-c --copy)'{-c,--copy}'[copy picked hex color to wayland clipboard]' \
+    '(-h --help)'{-h,--help}'[show pick help]'

@@ -197,25 +197,35 @@ gdiff() {
     sel=$(git status --short |
         fzf --ansi --reverse --height=75% \
             --header="[gdiff: enter=open in ${EDITOR:-nvim}]" \
-            --preview='f=$(echo {} | cut -c4-); git diff --color=always -- "$f" 2>/dev/null; [[ -z $(git diff -- "$f" 2>/dev/null) ]] && bat --style=numbers --color=always --line-range :120 "$f" 2>/dev/null || true' \
+            --preview='f=$(echo {} | cut -c4-); f="${f##* -> }"; f="${f#\"}"; f="${f%\"}"; git diff --color=always -- "$f" 2>/dev/null; [[ -z $(git diff -- "$f" 2>/dev/null) ]] && bat --style=numbers --color=always --line-range :120 "$f" 2>/dev/null || true' \
             --preview-window='right:65%')
     [[ -z "$sel" ]] && return 0
     local fpath="${sel:3}"
+    fpath="${fpath##* -> }"
+    fpath="${fpath#\"}"
+    fpath="${fpath%\"}"
     [[ -f "$fpath" ]] && ${EDITOR:-nvim} "$fpath"
 }
 
-# fuzzy find inside files with ripgrep and bat preview
+# interactive live ripgrep search with fzf + bat preview
 fif() {
     if ! (( $+commands[rg] )) || ! (( $+commands[fzf] )); then
-        print -P "%F{1}󰅚 rg or fzf missing%f"
+        print -P "%F{5}󰅚 rg or fzf missing%f"
         return 1
     fi
+    local rg_prefix="rg --column --line-number --no-heading --color=always --smart-case"
+    local initial_query="${*:-}"
     local file_line
-    file_line=$(rg --color=always --line-number --no-heading --smart-case "${*:-}" 2>/dev/null |
-        fzf --ansi \
+    file_line=$(
+        FZF_DEFAULT_COMMAND="$rg_prefix ${(q)initial_query}" \
+        fzf --ansi --disabled --query "$initial_query" \
+            --header="[fif: live ripgrep · enter=open in ${EDITOR:-nvim}]" \
+            --bind "start:reload:$rg_prefix {q} || true" \
+            --bind "change:reload:sleep 0.05; $rg_prefix {q} || true" \
             --delimiter : \
             --preview 'bat --style=numbers --color=always {1} --highlight-line {2}' \
-            --preview-window 'right,60%,border-left,+{2}+3/3,~3')
+            --preview-window 'right,60%,border-left,+{2}+3/3,~3'
+    )
     if [[ -n "$file_line" ]]; then
         local file="${file_line%%:*}"
         local rest="${file_line#*:}"
@@ -245,10 +255,17 @@ un() {
 }
 alias fun="un"
 
-# fuzzy edit file
+# fuzzy edit file (optionally inside a given directory, with kitty image preview)
 fe() {
+    local root="${1:-.}"
     local file
-    file=$(fzf --preview 'bat --style=numbers --color=always --line-range :100 {} 2>/dev/null || head -n 100 {}' --header="[󰈙 open file]")
+    local prev='case "{}" in *.png|*.PNG|*.jpg|*.JPG|*.jpeg|*.JPEG|*.webp|*.WEBP|*.gif|*.GIF|*.avif|*.AVIF|*.bmp) if [ -n "${KITTY_WINDOW_ID:-}" ] && command -v kitten >/dev/null 2>&1; then kitten icat --clear --transfer-mode=memory --unicode-placeholder --stdin=no --place="${FZF_PREVIEW_COLUMNS}x${FZF_PREVIEW_LINES}@0x0" {}; else file -b {}; fi ;; *) bat --style=numbers --color=always --line-range :100 {} 2>/dev/null || head -n 100 {} ;; esac'
+    if (( $+commands[fd] )); then
+        file=$(fd --type f --hidden --follow --exclude .git . "$root" 2>/dev/null |
+            fzf --preview "$prev" --header="[󰈙 open file in ${root}]")
+    else
+        file=$(fzf --walker-root="$root" --preview "$prev" --header="[󰈙 open file]")
+    fi
     [[ -n "$file" ]] && ${EDITOR:-nvim} "$file"
 }
 
@@ -259,3 +276,156 @@ gens() {
 }
 alias generations="gens"
 alias snaps="gens"
+
+# command confirmation guard ([y]es / [n]o / [a]bort / [e]dit)
+confirm() {
+    if (( $# == 0 )); then
+        print -P "%F{5}󰄛 confirm%f - ask before running risky commands ([y]es / [n]o / [a]bort / [e]dit)"
+        print -P "  usage: %F{6}confirm <command ...>%f"
+        print -P "  also:  %F{6}safe-rm <paths...>%f  ·  %F{6}safe-push [args...]%f"
+        return 0
+    fi
+
+    local -a cmd_args=("$@")
+    local cmd_str="${(j: :)cmd_args}"
+
+    while true; do
+        print -P "%F{5}󰄛 confirm:%f %B${cmd_str}%b"
+        print -Pn "  [%F{2}%By%f]es  [%F{3}%Bn%f]o  [%F{5}%Ba%f]bort  [%F{6}%Be%f]dit ❯ "
+
+        local key=""
+        IFS= read -r -k 1 -u 0 key
+        print ""
+
+        case "$key" in
+            y|Y)
+                if (( $#cmd_args == 1 )) && [[ "${cmd_args[1]}" == *[[:space:]\|\&\;\<\>\$\`]* ]]; then
+                    eval "${cmd_args[1]}"
+                else
+                    "${cmd_args[@]}"
+                fi
+                return $?
+                ;;
+            n|N|$'\n'|$'\r')
+                print -P "  %F{3}󰀦 skipped.%f"
+                return 0
+                ;;
+            a|A|q|Q|$'\e')
+                print -P "  %F{5}󰅚 aborted.%f"
+                return 1
+                ;;
+            e|E)
+                local edited="$cmd_str"
+                if vared -p "  edit❯ " edited; then
+                    [[ -z "$edited" ]] && return 0
+                    cmd_str="$edited"
+                    cmd_args=("$edited")
+                fi
+                ;;
+            *)
+                print -P "  %F{5}󰅚 press y, n, a, or e%f"
+                ;;
+        esac
+    done
+}
+
+safe-rm() {
+    (( $# > 0 )) || { print -P "%F{3}󰀦 usage: safe-rm <path...>%f"; return 1; }
+    confirm rm -rf -- "$@"
+}
+
+safe-push() {
+    confirm git push "$@"
+}
+
+# quick directory bookmarks (mark / unmark / marks / jump)
+_quicknav_dir() {
+    local d="${XDG_DATA_HOME:-$HOME/.local/share}/quicknav/marks"
+    [[ -d "$d" ]] || mkdir -p "$d"
+    print -r -- "$d"
+}
+
+mark() {
+    local mdir name target="${PWD}"
+    mdir=$(_quicknav_dir)
+    name="${1:-${PWD:t}}"
+    name="${name//\//-}"
+    ln -sfn -- "$target" "$mdir/$name"
+    print -P "%F{2}󰄲 marked:%f %F{5}${name}%f -> %F{8}${target}%f"
+}
+
+unmark() {
+    local mdir name="${1:-}"
+    mdir=$(_quicknav_dir)
+    [[ -n "$name" ]] || { print -P "%F{3}󰀦 usage: unmark <bookmark>%f"; return 1; }
+    if [[ -L "$mdir/$name" || -e "$mdir/$name" ]]; then
+        command rm -f -- "$mdir/$name"
+        print -P "%F{3}󰀦 unmarked:%f %F{5}${name}%f"
+    else
+        print -P "%F{5}󰅚 bookmark not found:%f ${name}"
+        return 1
+    fi
+}
+
+marks() {
+    local mdir l name target
+    mdir=$(_quicknav_dir)
+    local -a list=("$mdir"/*(N))
+    if (( ! ${#list} )); then
+        print -P "%F{8}no directory bookmarks saved (use 'mark [name]')%f"
+        return 0
+    fi
+    print -P "%F{5}󰄛 directory bookmarks:%f"
+    for l in "${list[@]}"; do
+        name="${l:t}"
+        target="${l:A}"
+        print -P "  %F{6}${(r:16:)name}%f -> %F{8}${target}%f"
+    done
+}
+
+jump() {
+    local mdir name="${1:-}"
+    mdir=$(_quicknav_dir)
+    if [[ -z "$name" ]]; then
+        if (( $+commands[fzf] )); then
+            local -a names=("$mdir"/*(N:t))
+            (( ${#names} )) || { marks; return 0; }
+            name=$(printf "%s\n" "${names[@]}" | fzf --header="[jump to bookmark]" --preview="p=\$(readlink '$mdir/{}'); eza --icons --color=always \"\$p\" 2>/dev/null || ls \"\$p\"" --reverse --height=45%)
+            [[ -z "$name" ]] && return 0
+        else
+            marks
+            return 0
+        fi
+    fi
+
+    local dest="$mdir/$name"
+    if [[ -d "$dest" ]]; then
+        cd -- "${dest:A}"
+    else
+        print -P "%F{5}󰅚 bookmark '${name}' does not exist%f"
+        return 1
+    fi
+}
+
+# developer & system helpers
+scratch() {
+    local sdir="${XDG_DATA_HOME:-$HOME/.local/share}/zsh/scratch"
+    mkdir -p "$sdir"
+    local sfile="$sdir/scratch_$(date +%Y%m%d_%H%M%S).md"
+    ${EDITOR:-micro} "$sfile"
+    [[ ! -s "$sfile" ]] && command rm -f -- "$sfile"
+}
+
+topcpu() { ps -eo pid,comm,%cpu,%mem --sort=-%cpu | head -n "${1:-11}"; }
+topmem() { ps -eo pid,comm,%mem,%cpu --sort=-%mem | head -n "${1:-11}"; }
+
+undo() {
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        print -P "%F{5}󰅚 not inside a git repository%f"
+        return 1
+    fi
+    local msg
+    msg=$(git log -1 --oneline 2>/dev/null)
+    print -P "%F{3}󰀦 soft-undoing commit:%f ${msg}"
+    git reset --soft HEAD~1
+}
